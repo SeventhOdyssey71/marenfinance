@@ -33,7 +33,15 @@ const shots = [
   { name: 'home-390', path: '/', width: 390, height: 844 },
   { name: 'home-360', path: '/', width: 360, height: 780 },
   { name: 'home-2560', path: '/', width: 2560, height: 1400 },
+  // The dApp. Every route at desktop, and the two most layout-sensitive at 390px.
   { name: 'app-1440', path: '/app', width: 1440, height: 1000 },
+  { name: 'app-390', path: '/app', width: 390, height: 844 },
+  { name: 'app-vault-1440', path: '/app/vault', width: 1440, height: 1000 },
+  { name: 'app-vault-390', path: '/app/vault', width: 390, height: 844 },
+  { name: 'app-pay-1440', path: '/app/pay', width: 1440, height: 1000 },
+  { name: 'app-pay-390', path: '/app/pay', width: 390, height: 844 },
+  { name: 'app-earn-1440', path: '/app/earn', width: 1440, height: 1000 },
+  { name: 'app-activity-1440', path: '/app/activity', width: 1440, height: 1000 },
 ];
 
 /** Retina closeups, captured at viewport size rather than full page. */
@@ -52,6 +60,12 @@ const closeups = [
   { name: 'x2-cta-1440', path: '/', width: 1440, height: 900, scrollTo: '#cta-title' },
   { name: 'x2-hero-390', path: '/', width: 390, height: 844, scrollTo: null },
   { name: 'x2-frictions-390', path: '/', width: 390, height: 844, scrollTo: '#frictions' },
+  // The health hero and the borrow slider are where this design either holds or
+  // falls apart, so both get a retina closeup.
+  { name: 'x2-app-health-1440', path: '/app', width: 1440, height: 900, scrollTo: null },
+  { name: 'x2-vault-1440', path: '/app/vault', width: 1440, height: 980, scrollTo: null },
+  { name: 'x2-pay-1440', path: '/app/pay', width: 1440, height: 900, scrollTo: null },
+  { name: 'x2-earn-1440', path: '/app/earn', width: 1440, height: 900, scrollTo: null },
 ];
 
 const specifier = process.env.PLAYWRIGHT_CORE ?? 'playwright-core';
@@ -173,5 +187,63 @@ for (const shot of closeups) {
   await context.close();
 }
 
+/**
+ * States that only exist after an interaction, and that are the whole point of the
+ * screens they live on: the Vault with Mezo's oracle stalled, and the confirmation sheet
+ * where a payment's resolved address is shown before anything is signed. A design review
+ * that never sees these has not seen the product.
+ */
+const states = [
+  {
+    name: 'state-vault-stale-1440',
+    path: '/app/vault',
+    width: 1440,
+    height: 1100,
+    async act(page) {
+      await page.getByRole('button', { name: 'Demo controls' }).click();
+      await page.getByRole('button', { name: /Stall the oracle/ }).click();
+      await page.waitForTimeout(900);
+    },
+  },
+  {
+    // The pooled route is the differentiator, and its copy and figures differ from the
+    // direct route's in ways a review has to actually look at.
+    name: 'state-vault-pooled-1440',
+    path: '/app/vault',
+    width: 1440,
+    height: 1400,
+    async act(page) {
+      await page.getByRole('button', { name: 'Demo controls' }).click();
+      await page.getByRole('button', { name: /^Pooled/ }).click();
+      await page.waitForTimeout(900);
+    },
+  },
+  {
+    name: 'state-tx-confirm-1440',
+    path: '/app/pay',
+    width: 1440,
+    height: 900,
+    async act(page) {
+      await page.getByRole('button', { name: /^Send / }).click();
+      await page.waitForTimeout(500);
+    },
+  },
+];
+
+for (const shot of states) {
+  const context = await browser.newContext({
+    viewport: { width: shot.width, height: shot.height },
+    deviceScaleFactor: 2,
+    colorScheme: 'dark',
+  });
+  const page = await context.newPage();
+  await page.goto(`${BASE}${shot.path}`, { waitUntil: 'networkidle' });
+  await page.waitForTimeout(700);
+  await shot.act(page);
+  await page.screenshot({ path: join(outDir, `${shot.name}.png`) });
+  console.log(`${shot.name.padEnd(24)} ${shot.width}px @2x`);
+  await context.close();
+}
+
 await browser.close();
-console.log(`\nWrote ${shots.length + closeups.length} screenshots to ${outDir}`);
+console.log(`\nWrote ${shots.length + closeups.length + states.length} screenshots to ${outDir}`);

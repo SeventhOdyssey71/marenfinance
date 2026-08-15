@@ -140,6 +140,217 @@ const check = (name, pass, detail = '') => {
   await ctx.close();
 }
 
+// ---- 4. the dApp: the promises that are load-bearing ----------------------
+//
+// These are not smoke tests. Each one corresponds to a claim the product makes in
+// writing, and a claim a user could lose money believing if it stopped being true.
+{
+  const ctx = await browser.newContext({ viewport: { width: 1440, height: 1000 } });
+  const page = await ctx.newPage();
+  const bad = [];
+  page.on('response', (r) => {
+    if (r.status() >= 400) bad.push(`${r.status()} ${r.url()}`);
+  });
+
+  // --- Portfolio ---
+  await page.goto('http://127.0.0.1:3000/app', { waitUntil: 'networkidle' });
+  await page.waitForTimeout(600);
+
+  check('app: exactly one h1', (await page.locator('h1').count()) === 1);
+  const landmarks = await page.evaluate(() => ({
+    header: document.querySelectorAll('header').length,
+    main: document.querySelectorAll('main').length,
+    footer: document.querySelectorAll('footer').length,
+    navs: document.querySelectorAll('nav[aria-label]').length,
+  }));
+  check(
+    'app: landmarks present (header/main/footer/labelled navs)',
+    landmarks.header === 1 && landmarks.main === 1 && landmarks.footer === 1 && landmarks.navs >= 2,
+    JSON.stringify(landmarks),
+  );
+
+  await page.keyboard.press('Tab');
+  const firstStop = await page.evaluate(() => document.activeElement?.textContent?.trim());
+  check(
+    'app: skip link is the first tab stop',
+    firstStop === 'Skip to content',
+    `got="${firstStop}"`,
+  );
+
+  // Borrowing capacity must be the contract's ceiling, not an ICR estimate.
+  const capacityCopy = await page.locator('text=getTroveMaxBorrowingCapacity').count();
+  check(
+    'app: borrowing capacity names getTroveMaxBorrowingCapacity()',
+    capacityCopy > 0,
+    'the real ceiling, not an ICR-derived estimate',
+  );
+
+  // The gasless claim must never be unconditional. MarenVault.deposit() is payable and
+  // MarenRelayHub reverts on any request carrying value, so the first deposit costs the
+  // user BTC gas. Copy that says otherwise is a lie the contracts will expose.
+  const gasText = await page
+    .locator('section')
+    .filter({ hasText: 'What gasless means here' })
+    .first()
+    .innerText();
+  check('app: gas copy never promises "no gas, ever"', !/no gas,? ever/i.test(gasText));
+  check(
+    'app: gas copy states the first-deposit exception',
+    /first deposit costs gas/i.test(gasText),
+    'deposit is payable, therefore never relayable',
+  );
+
+  // --- Vault: the slider stops at the 180% floor ---
+  await page.goto('http://127.0.0.1:3000/app/vault', { waitUntil: 'networkidle' });
+  await page.waitForTimeout(600);
+
+  const slider = page.locator('input[type=range]');
+  check('vault: borrow control is a real range input', (await slider.count()) === 1);
+  check(
+    'vault: slider is labelled and announces a unit-bearing value',
+    Boolean(await slider.getAttribute('aria-label')) &&
+      /MUSD/.test((await slider.getAttribute('aria-valuetext')) ?? ''),
+    (await slider.getAttribute('aria-valuetext')) ?? '',
+  );
+
+  // Drive it to the maximum with the keyboard, then read the resulting ratio.
+  await slider.focus();
+  await page.keyboard.press('End');
+  await page.waitForTimeout(400);
+  const ratioText = await page.locator('text=Resulting ratio').locator('..').innerText();
+  const ratioAtMax = Number((ratioText.match(/([\d,]+\.\d)%/)?.[1] ?? '0').replace(/,/g, ''));
+  check(
+    'vault: slider at maximum still leaves the position at or above 180%',
+    ratioAtMax >= 180,
+    `resulting ratio ${ratioAtMax}%`,
+  );
+
+  const ringOnSlider = await page.evaluate(() => {
+    const cs = getComputedStyle(document.activeElement);
+    return cs.outlineStyle !== 'none' && parseFloat(cs.outlineWidth) > 0;
+  });
+  check('vault: slider shows a focus ring when focused by keyboard', ringOnSlider);
+
+  // --- Vault: a stale oracle blocks borrowing and leaves repay open ---
+  await page.getByRole('button', { name: 'Demo controls' }).click();
+  await page.getByRole('button', { name: /Stall the oracle/ }).click();
+  await page.waitForTimeout(800);
+
+  check(
+    'vault: stale oracle shows the price-feed-unavailable state',
+    (await page.locator('text=Price feed unavailable').count()) > 0,
+  );
+  const borrowDisabled = await page
+    .getByRole('button', { name: /^Borrow/ })
+    .first()
+    .isDisabled();
+  check('vault: stale oracle disables borrowing', borrowDisabled);
+
+  const staleBanner = await page.locator('text=You can still repay and withdraw').count();
+  check('vault: stale state says repay and withdraw remain open', staleBanner > 0);
+
+  await page.getByRole('tab', { name: 'Repay' }).click();
+  await page.waitForTimeout(400);
+  const repayEnabled = await page
+    .getByRole('button', { name: /^Repay/ })
+    .last()
+    .isEnabled();
+  check('vault: repay stays available while the oracle is stale', repayEnabled);
+
+  // No figure may be computed from the stale price.
+  const staleHealth = await page.evaluate(() =>
+    document.body.innerText.includes('Resulting ratio'),
+  );
+  check('vault: no ratio preview is rendered from a stale price', !staleHealth);
+
+  await page.getByRole('button', { name: /Oracle stalled/ }).click();
+  await page.waitForTimeout(600);
+
+  // --- Pay: the resolved address is shown before confirmation ---
+  await page.goto('http://127.0.0.1:3000/app/pay', { waitUntil: 'networkidle' });
+  await page.waitForTimeout(700);
+
+  const resolvedInline = await page.locator('#pay-to-status').innerText();
+  check(
+    'pay: the resolved address is shown beside the handle',
+    /0x[0-9a-fA-F]{40}/.test(resolvedInline),
+    resolvedInline.slice(0, 60),
+  );
+
+  await page.getByRole('button', { name: /^Send / }).click();
+  await page.waitForTimeout(300);
+  const dialog = page.locator('[role=dialog]');
+  check('pay: confirmation is a modal dialog', (await dialog.count()) === 1);
+  check(
+    'pay: dialog is aria-modal and labelled',
+    (await dialog.getAttribute('aria-modal')) === 'true',
+  );
+  const dialogText = await dialog.innerText();
+  check(
+    'pay: confirmation repeats the full resolved address',
+    /0x[0-9a-fA-F]{40}/.test(dialogText),
+  );
+  await page.keyboard.press('Escape');
+  await page.waitForTimeout(200);
+  check('pay: Escape closes the dialog', (await page.locator('[role=dialog]').count()) === 0);
+
+  // --- Earn: no forward APY, anywhere ---
+  await page.goto('http://127.0.0.1:3000/app/earn', { waitUntil: 'networkidle' });
+  await page.waitForTimeout(600);
+  const earnText = await page.locator('main').innerText();
+  check(
+    'earn: no forward rate is quoted anywhere on the page',
+    !/\d[\d.,]*\s*%\s*(apy|apr)/i.test(earnText) && !/apy\s*[:of]*\s*\d/i.test(earnText),
+  );
+  check(
+    'earn: the realised figure is labelled backward-looking',
+    /Backward-looking/.test(earnText),
+  );
+  check('earn: says plainly why there is no APY', /does not display an APY/i.test(earnText));
+
+  // --- Activity: status wording and explorer links ---
+  await page.goto('http://127.0.0.1:3000/app/activity', { waitUntil: 'networkidle' });
+  await page.waitForTimeout(600);
+  const activityText = await page.locator('main').innerText();
+  check('activity: a failed row says no funds moved', /Failed — no funds moved/.test(activityText));
+  const explorerLinks = await page.locator('main a[href*="explorer"]').count();
+  check('activity: rows link to the Mezo explorer', explorerLinks > 0, `${explorerLinks} links`);
+
+  check('app: no 4xx/5xx responses across the dApp', bad.length === 0, bad.join(', '));
+  await ctx.close();
+}
+
+// ---- 5. reduced motion across the dApp -----------------------------------
+{
+  const ctx = await browser.newContext({
+    viewport: { width: 1440, height: 1000 },
+    reducedMotion: 'reduce',
+  });
+  const page = await ctx.newPage();
+  await page.goto('http://127.0.0.1:3000/app', { waitUntil: 'networkidle' });
+  await page.waitForTimeout(900);
+  const canvases = await page.evaluate(() => document.querySelectorAll('canvas').length);
+  check('app reduced-motion: no shader canvas mounted', canvases === 0, `canvases=${canvases}`);
+  const healthVisible = await page.locator('text=Position health').count();
+  check('app reduced-motion: the health card still renders', healthVisible > 0);
+  await ctx.close();
+}
+
+// ---- 6. no horizontal overflow at the narrow end --------------------------
+{
+  const ctx = await browser.newContext({ viewport: { width: 390, height: 844 } });
+  const page = await ctx.newPage();
+  for (const path of ['/app', '/app/vault', '/app/pay', '/app/earn', '/app/activity']) {
+    await page.goto(`http://127.0.0.1:3000${path}`, { waitUntil: 'networkidle' });
+    await page.waitForTimeout(400);
+    const overflow = await page.evaluate(
+      () => document.documentElement.scrollWidth - document.documentElement.clientWidth,
+    );
+    check(`390px: ${path} has no horizontal overflow`, overflow === 0, `${overflow}px`);
+  }
+  await ctx.close();
+}
+
 await browser.close();
 const failed = results.filter((r) => !r.pass);
 console.log(`\n${results.length - failed.length}/${results.length} checks passed`);
