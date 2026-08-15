@@ -119,11 +119,12 @@ export function usePrice(): PriceFeed {
     retry: 1,
   });
 
-  // Re-render on a timer so `ageSeconds` counts up and the state flips on its own.
-  const tick = useSecondsTick(query.data ? 1_000 : 0);
-  void tick;
+  // The clock is a value, not a side effect of rendering: it lives in state and is
+  // advanced by an interval. That keeps this hook's output a function of its inputs, and
+  // it is what makes a price go stale on screen without waiting for the next fetch.
+  const nowSeconds = useNowSeconds();
 
-  if (query.isPending) return { state: 'loading' };
+  if (query.isPending || nowSeconds === null) return { state: 'loading' };
   if (query.error) {
     return {
       state: 'unavailable',
@@ -131,7 +132,7 @@ export function usePrice(): PriceFeed {
         'Mezo’s oracle did not answer. Its price feed reverts above 60 seconds of staleness, so this is the same condition the protocol would refuse on.',
     };
   }
-  return classifyPrice(query.data ?? null, Math.floor(Date.now() / 1000));
+  return classifyPrice(query.data ?? null, nowSeconds);
 }
 
 export function usePosition() {
@@ -220,13 +221,21 @@ export function useResolvedHandle(query: string) {
 
 // ── internals ────────────────────────────────────────────────────────────────
 
-/** A render tick, so time-dependent state (price age) advances without a refetch. */
-function useSecondsTick(intervalMs: number): number {
-  const [n, setN] = useState(0);
+/**
+ * The wall clock, in seconds, as state — `null` until the client has read it.
+ *
+ * Two reasons it is not simply `Date.now()` at render time. A timestamp baked into SSR
+ * output is a hydration mismatch waiting to happen; and a placeholder of `0` would make
+ * every observation look zero seconds old, which is the one wrong answer this app must
+ * never give. `null` means "we do not know what time it is", and the caller treats that
+ * as loading rather than as fresh.
+ */
+function useNowSeconds(): number | null {
+  const [now, setNow] = useState<number | null>(null);
   useEffect(() => {
-    if (intervalMs <= 0) return;
-    const id = setInterval(() => setN((v) => v + 1), intervalMs);
+    setNow(Math.floor(Date.now() / 1000));
+    const id = setInterval(() => setNow(Math.floor(Date.now() / 1000)), 1_000);
     return () => clearInterval(id);
-  }, [intervalMs]);
-  return n;
+  }, []);
+  return now;
 }
