@@ -314,7 +314,7 @@ only funds it has touched are the author's own testnet BTC.
 
 ### The relayer is not merged
 
-`apps/relayer` has **176 tests passing** and it is still an open pull request.
+`apps/relayer` has **214 tests passing** and is merged to `main`.
 
 An adversarial review, including 71-mutation testing, found the **cryptographic core sound
 and the economic abuse layer broken**. The fixes are pushed and are **under

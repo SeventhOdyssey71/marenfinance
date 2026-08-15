@@ -219,9 +219,10 @@ contracts unchanged.
 adjustments, and Earn deposits all settle on Mezo and pay Mezo's fees — and because Maren
 sponsors the gas, those fees get paid whether or not the user holds BTC.
 
-**Maren's own contracts deploy on Mezo.** `MarenVault`, `MarenPay`, `MarenForwarder`,
-`MarenRegistry`, and `MarenEarn` are Maren-authored Solidity deployed to 31612. The
-activity, the fees, and the TVL accrue to the chain, not to a chain Maren likes better.
+**Maren's own contracts deploy on Mezo.** `MarenVault`, `MarenPay`, `MarenRelayHub`,
+`MarenRegistry`, and `MarenEarn` are Maren-authored Solidity written, tested, and bound
+for 31612. The activity, the fees, and the TVL accrue to the chain, not to a chain Maren
+likes better.
 
 **Maren builds with the grain of what Mezo already shipped.** Mezo operates its own
 gasless payment rail — the x402 settlement proxy at
@@ -246,6 +247,29 @@ These are offered as contributions, not complaints. A chain with a thin tooling 
 benefits from builders who write down what they had to discover.
 
 ## Traction and credibility
+
+### What is already built, and how you can check
+
+The contracts are not a proposal. Everything in this table is in the repository today and
+reproducible from a clean checkout, which is the only kind of traction a pre-launch
+project can honestly offer.
+
+| Component                 | State                                                                          | How to check it             |
+| ------------------------- | ------------------------------------------------------------------------------ | --------------------------- |
+| Core contracts            | Five, all under the 24,576-byte limit — `MarenVault` is 14,508 bytes           | `forge build --sizes`       |
+| Contract test suite       | **236 tests passing**, 8 of them fork tests against real matsnet MUSD          | `forge test`                |
+| Gasless relaying          | `MarenRelayHub`, atomic signed-fee ERC-2771                                    | `MarenRelayHub.sol`         |
+| Relayer service           | **214 tests passing**, 6 against a live Mezo testnet anvil fork                | `apps/relayer`              |
+| Landing page              | 17/17 behavioural checks, 8/8 contrast probes, 112 kB first load, fully static | `apps/web/scripts/verify-*` |
+| The 0.079346 BTC boundary | Asserted by an executable test, not merely computed in prose                   | `MarenVault.t.sol`          |
+
+The last row matters more than its size suggests. The number this entire document rests
+on — that a user needs $5,004.50 of Bitcoin before Mezo's CDP will speak to them — is now
+pinned by a test that fails if the protocol's own constants move. It decomposes as 1,800
+MUSD net debt plus a 1.8 MUSD origination fee plus 200 MUSD gas compensation, taken to a
+250% ratio at an oracle price of $63,071.83. If that figure is wrong, the build goes red.
+
+### The team
 
 Maren is new. The person building it is not.
 
@@ -327,7 +351,7 @@ co-marketing support the ecosystem team offers.
 | Milestone                      | Release | Definition of done                                                                                                                            |
 | ------------------------------ | ------- | --------------------------------------------------------------------------------------------------------------------------------------------- |
 | M0 — Mainnet deployment        | $6,000  | All five Maren contracts verified on 31612; pooled vault live with a cap; addresses published                                                 |
-| M1 — Audited                   | $3,000  | Third-party audit of `MarenVault` and `MarenForwarder` complete and published, findings and remediations in the open                          |
+| M1 — Audited                   | $3,000  | Third-party audit of `MarenVault` and `MarenRelayHub` complete and published, findings and remediations in the open                           |
 | M2 — Borrowers under the floor | $3,000  | 100 distinct addresses holding a pooled position below the 1,800 MUSD protocol minimum — that is, 100 borrowers Mezo could not otherwise have |
 | M3 — Payments live             | $3,000  | 1,000 settled `MarenPay` transactions and 500 registered handles, all gasless                                                                 |
 
@@ -378,7 +402,7 @@ liquidate path can revert for reasons that have nothing to do with the user, and
 liquidation cannot execute while the feed is down. Both Maren clients have an explicit
 "price feed unavailable" state; we never render a stale price as if it were live.
 
-**Pre-audit.** Maren is pre-audit today. `MarenVault` and `MarenForwarder` are the two
+**Pre-audit.** Maren is pre-audit today. `MarenVault` and `MarenRelayHub` are the two
 contracts that carry risk and are the audit scope. Mainnet deployment ships with the
 vault capped, and the cap is raised only as the position proves out. The first use of
 grant money is the audit engagement.
@@ -402,4 +426,4 @@ number to the other one.
 
 The technical case, including the contract-level integration surface, the seven ways MUSD
 diverges from Liquity, and the reasons the obvious account-abstraction path is a dead end
-on this chain, is set out in **MRN-DOC-002, Technical Feasibility & Architecture**.
+on this chain, is set out in **MRN-002, Technical Feasibility & Architecture**.
