@@ -1,0 +1,162 @@
+'use client';
+
+import { useState } from 'react';
+import { formatBtc, formatMusd, getChain, shortHash } from '@maren/sdk';
+
+import { Segmented } from '@/components/app/controls';
+import { Num } from '@/components/app/money';
+import { AppCard, CardTitle, Label } from '@/components/app/primitives';
+import { ArrowUpRight } from '@/components/ui/icons';
+import { activityDirection, activityTitle, statusLabel, timeAgo } from '@/lib/copy';
+import { NETWORK, useActivity } from '@/lib/data/source';
+import type { ActivityItem, ActivityKind } from '@/lib/data/types';
+
+type Filter = 'all' | 'payments' | 'vault' | 'earn';
+
+const FILTERS = [
+  { key: 'all' as const, label: 'All' },
+  { key: 'payments' as const, label: 'Payments' },
+  { key: 'vault' as const, label: 'Vault' },
+  { key: 'earn' as const, label: 'Earn' },
+];
+
+const GROUPS: Record<Exclude<Filter, 'all'>, readonly ActivityKind[]> = {
+  payments: ['send', 'receive', 'link-created', 'link-claimed', 'request-created'],
+  vault: ['deposit', 'withdraw', 'borrow', 'repay'],
+  earn: ['earn-deposit', 'earn-withdraw'],
+};
+
+const explorer = getChain(NETWORK).blockExplorers.default;
+
+/**
+ * Activity — the ledger.
+ *
+ * Status is the point of this screen. Every row says which of the three states it is in,
+ * and 'Failed — no funds moved' says so in as many words rather than hiding behind
+ * "unsuccessful". A row is only ever 'Confirmed' because a receipt came back with
+ * `status === 'success'`; a hash on its own leaves it 'Awaiting receipt'.
+ *
+ * Every row with a hash links to Mezo's explorer, so nothing here has to be taken on
+ * Maren's word.
+ */
+export default function ActivityPage() {
+  const { data: activity } = useActivity();
+  const [filter, setFilter] = useState<Filter>('all');
+
+  const rows = (activity ?? []).filter(
+    (item) => filter === 'all' || GROUPS[filter].includes(item.kind),
+  );
+
+  return (
+    <div className="flex flex-col gap-6">
+      <div>
+        <Label>Activity</Label>
+        <h1 className="t-h2 mt-2">History</h1>
+        <p className="mt-3 max-w-[68ch] text-sm leading-relaxed text-text-muted">
+          Everything Maren has done on your behalf, with the gas each action actually cost
+          you and a link to the receipt on {explorer.name}.
+        </p>
+      </div>
+
+      <Segmented options={FILTERS} value={filter} onChange={setFilter} label="Activity filter" />
+
+      <AppCard className="p-0">
+        <div className="px-6">
+          {rows.map((item, index) => (
+            <Row key={item.id} item={item} last={index === rows.length - 1} />
+          ))}
+          {rows.length === 0 ? (
+            <p className="py-8 text-sm text-text-subtle">Nothing in this filter yet.</p>
+          ) : null}
+        </div>
+      </AppCard>
+
+      <AppCard>
+        <CardTitle>Reading this ledger</CardTitle>
+        <ul className="mt-4 max-w-[68ch] space-y-2.5 text-sm leading-relaxed text-text-muted">
+          <li>
+            <span className="text-text">Confirmed</span> means a receipt came back with
+            status success. A transaction hash on its own is not a result and never
+            appears as one.
+          </li>
+          <li>
+            <span className="text-text">Awaiting receipt</span> means we have a hash and no
+            receipt yet. It may still land — check here before retrying.
+          </li>
+          <li>
+            <span className="text-text">Failed</span> means the chain mined it and then
+            reverted it. No funds moved.
+          </li>
+          <li>
+            <span className="text-text">Gas</span> is what you paid in BTC. Sponsored rows
+            are zero because Maren’s relayer paid instead; a deposit is never sponsored,
+            because it carries value and the relay hub refuses those.
+          </li>
+        </ul>
+      </AppCard>
+    </div>
+  );
+}
+
+function Row({ item, last }: { item: ActivityItem; last: boolean }) {
+  const direction = activityDirection(item.kind);
+  const amount =
+    item.musdWei !== undefined
+      ? formatMusd(item.musdWei)
+      : item.btcWei !== undefined
+        ? formatBtc(item.btcWei)
+        : null;
+
+  const statusClass =
+    item.status === 'failed'
+      ? 'text-danger'
+      : item.status === 'pending'
+        ? 'text-warning'
+        : 'text-text-subtle';
+
+  return (
+    <div
+      className={`flex flex-wrap items-start justify-between gap-x-6 gap-y-3 py-5 ${
+        last ? '' : 'border-b border-[var(--border-hairline)]'
+      }`}
+    >
+      <div className="min-w-0">
+        <p className="text-[0.9375rem] text-text">{activityTitle(item.kind, item.counterparty)}</p>
+        <p className="mt-1.5 text-xs text-text-subtle">
+          {timeAgo(item.at)} · <span className={statusClass}>{statusLabel(item.status)}</span>
+          {item.memo ? ` · ${item.memo}` : ''}
+        </p>
+        {item.hash ? (
+          <a
+            href={`${explorer.url}/tx/${item.hash}`}
+            target="_blank"
+            rel="noreferrer noopener"
+            className="num mt-2 inline-flex items-center gap-1.5 rounded-[var(--radius-pill)] text-xs text-text-muted transition-colors duration-[120ms] ease-out hover:text-text"
+          >
+            {shortHash(item.hash)}
+            <ArrowUpRight className="size-3" />
+            <span className="sr-only">— open on {explorer.name}</span>
+          </a>
+        ) : null}
+      </div>
+
+      <div className="shrink-0 text-right">
+        {amount ? (
+          <Num size="md">
+            {direction === 'out' ? '−' : direction === 'in' ? '+' : ''}
+            {amount}
+          </Num>
+        ) : null}
+        <p className="mt-1.5 text-xs text-text-subtle">
+          {item.sponsored ? (
+            'Gas paid by Maren'
+          ) : (
+            <>
+              Gas <span className="num">{formatBtc(item.gasPaidWei)}</span>
+            </>
+          )}
+        </p>
+      </div>
+    </div>
+  );
+}
