@@ -69,8 +69,8 @@ export function AppNav() {
         {/* Narrow viewports get the same routes as a scrollable rail rather than a
             hamburger: five destinations is few enough to show, and a dashboard hides
             behind a menu at exactly the moment a user wants to compare two screens. */}
-        <nav aria-label="App sections" className="-mx-6 md:hidden">
-          <ul className="flex items-center gap-1 overflow-x-auto px-6 pb-3">
+        <nav aria-label="App sections" className="bleed-x md:hidden">
+          <ul className="flex items-center gap-1 overflow-x-auto pb-3">
             {routes.map((route) => {
               const active =
                 route.href === '/app' ? pathname === '/app' : pathname.startsWith(route.href);

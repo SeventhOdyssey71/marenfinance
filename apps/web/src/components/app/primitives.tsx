@@ -90,7 +90,11 @@ export function Metric({
     <div className={align === 'right' ? 'text-right' : ''}>
       <Label>{label}</Label>
       <div className="mt-2">{value}</div>
-      {caption ? <div className="mt-1 text-xs text-text-subtle">{caption}</div> : null}
+      {/* `text-muted`, not `text-subtle`: a caption that qualifies a headline figure —
+          "capped by Mezo's per-trove ceiling" — is decision-relevant, and the subtle
+          token measures 3.6:1 against `surface`, under WCAG AA for body text. Subtle is
+          reserved for genuinely tertiary text: timestamps and units. */}
+      {caption ? <div className="metric-caption mt-1 text-xs text-text-muted">{caption}</div> : null}
     </div>
   );
 }

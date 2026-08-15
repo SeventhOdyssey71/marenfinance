@@ -34,15 +34,12 @@ export function DataModeBanner() {
 
   return (
     <div className="rounded-[var(--radius-card)] border border-[var(--border-hairline)] bg-surface-inset p-4">
-      <div className="flex flex-wrap items-start justify-between gap-4">
+      <div className="flex flex-wrap items-center justify-between gap-4">
         <div className="max-w-[68ch]">
           <p className="t-label text-warning">Demo data</p>
           <p className="mt-2 text-sm leading-relaxed text-text-muted">
-            Maren’s contracts are not deployed yet, so every figure below is mock data on
-            the Mezo {source.network} configuration. Nothing here is a real balance and
-            no action broadcasts a transaction. The live reads are written and gated on{' '}
-            <span className="num">isDeployed()</span> — see{' '}
-            <span className="num">apps/web/README.md</span>.
+            Maren’s contracts are not deployed yet — every figure below is mock data on
+            Mezo {source.network}, and no action broadcasts a transaction.
           </p>
         </div>
 
@@ -57,8 +54,20 @@ export function DataModeBanner() {
         </button>
       </div>
 
-      <div id="demo-controls" hidden={!open} className="mt-4 border-t border-[var(--border-hairline)] pt-4">
-        <div className="flex flex-wrap gap-x-10 gap-y-5">
+      <div
+        id="demo-controls"
+        hidden={!open}
+        className="mt-4 border-t border-[var(--border-hairline)] pt-4"
+      >
+        <p className="max-w-[68ch] text-sm leading-relaxed text-text-muted">
+          The live reads are written against the real ABIs and gated on{' '}
+          <span className="num">isDeployed()</span>; when{' '}
+          <span className="num">Deploy.s.sol</span> writes addresses into{' '}
+          <span className="num">@maren/sdk</span> this banner disappears and the same
+          screens read from chain. See <span className="num">apps/web/README.md</span>.
+        </p>
+
+        <div className="mt-5 flex flex-wrap gap-x-10 gap-y-5">
           <fieldset>
             <legend className="t-label text-text-subtle">Account</legend>
             <div className="mt-2.5 flex gap-2">

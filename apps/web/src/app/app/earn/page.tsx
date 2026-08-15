@@ -124,7 +124,10 @@ export default function EarnPage() {
 
         {/* The disclosure that makes the number honest. Not a footnote, not a tooltip —
             it sits directly under the figure it qualifies. */}
-        <p className="mt-5 max-w-[68ch] text-sm leading-relaxed text-text-muted">
+        <p
+          data-contrast="earn-disclosure"
+          className="mt-5 max-w-[68ch] text-sm leading-relaxed text-text-muted"
+        >
           This is MUSD actually realised in the past, not a rate and not a forecast. Maren
           does not display an APY for Earn because there is no reliable one to display.
         </p>
