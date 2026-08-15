@@ -5,6 +5,7 @@ import type { ReactNode } from 'react';
 import {
   MAREN_POLICY,
   assessHealth,
+  borrowCeiling,
   collateralValue,
   formatBtc,
   formatMusd,
@@ -20,7 +21,6 @@ import { LivePulseFrame } from '@/components/shaders/live-pulse';
 import { EarnIcon, PayIcon, VaultIcon } from '@/components/ui/icons';
 import { activityTitle, bufferTitle, statusLabel, timeAgo } from '@/lib/copy';
 import { healthTone, policyRatio, toneShaderColors } from '@/lib/health';
-import { borrowCeiling } from '@/lib/vault';
 import {
   useActivity,
   useBalances,
