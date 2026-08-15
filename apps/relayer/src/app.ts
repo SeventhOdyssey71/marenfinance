@@ -1,7 +1,7 @@
 import { Hono } from 'hono';
 import type { Context } from 'hono';
 import { getConnInfo } from '@hono/node-server/conninfo';
-import { resolveClientIp } from './clientip.js';
+import { ipBucketKey, resolveClientIp } from './clientip.js';
 import { isRelayError, RelayError } from './errors.js';
 import { hashIp, newRequestId, type Logger } from './logger.js';
 import { settlementHttpStatus } from './receipt.js';
@@ -111,8 +111,11 @@ export function buildApp(deps: AppDeps): Hono<{ Variables: Vars }> {
     });
     const result = await service.relay(body, {
       requestId: c.get('requestId'),
-      // Hashed here: the raw address never reaches the service or the logger.
-      ipHash: hashIp(resolved.ip, service.config.ipSalt),
+      // Bucketed, THEN hashed. `ipBucketKey` collapses IPv6 to its /64 first:
+      // keying on the full /128 gave every host in an ordinary residential
+      // allocation its own bucket, so the per-IP cap braked nothing at all for
+      // an IPv6 client. The raw address never reaches the service or the logger.
+      ipHash: hashIp(ipBucketKey(resolved.ip), service.config.ipSalt),
       ipSource: resolved.source,
     });
     // 202, not 200. The transaction is broadcast, not delivered (R15). Poll

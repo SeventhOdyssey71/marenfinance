@@ -1,7 +1,7 @@
 import { Writable } from 'node:stream';
 import { describe, expect, it } from 'vitest';
 import pino from 'pino';
-import { createLogger, ephemeralIpSalt, hashIp } from '../src/logger.js';
+import { createLogger, ephemeralIpSalt, hashIp, REDACT_PATHS } from '../src/logger.js';
 import { buildTestRelayer, makeEnv, signedRequest, USER } from './helpers.js';
 import { createRelayer } from '../src/create.js';
 import { FakeChain } from './helpers.js';
@@ -16,20 +16,6 @@ import { MemoryStore } from '../src/store.js';
  * making `hashIp` return its input broke no test. Either the claims get tested
  * or they come out of the comment. They are tested here.
  */
-
-function capture(): { logger: pino.Logger; lines: () => string } {
-  const chunks: string[] = [];
-  const stream = new Writable({
-    write(chunk, _encoding, callback) {
-      chunks.push(String(chunk));
-      callback();
-    },
-  });
-  return {
-    logger: pino({ level: 'trace', redact: { paths: [], censor: '' } }, stream),
-    lines: () => chunks.join(''),
-  };
-}
 
 describe('hashIp', () => {
   const salt = 'a-fixed-salt';
@@ -62,8 +48,16 @@ describe('hashIp', () => {
   });
 });
 
+/**
+ * These exercise the REAL `createLogger` against the REAL `REDACT_PATHS`.
+ *
+ * The previous version rebuilt an approximation of the config with an inline
+ * copy of the path list, so emptying `redact.paths` in `logger.ts` left the
+ * suite green — and the copy had already drifted to 6 of the 12 entries. A test
+ * that cannot fail when the thing it names is deleted is not a test.
+ */
 describe('pino redaction', () => {
-  it('censors signature, key and password fields', () => {
+  function realLogger(): { logger: ReturnType<typeof createLogger>; output: () => string } {
     const chunks: string[] = [];
     const stream = new Writable({
       write(chunk, _encoding, callback) {
@@ -71,45 +65,71 @@ describe('pino redaction', () => {
         callback();
       },
     });
-    const logger = createLogger('trace');
-    // createLogger writes to stdout, so re-create with the same options against
-    // our stream by asserting on the configured redaction paths instead.
-    const child = pino(
-      {
-        level: 'trace',
-        redact: {
-          paths: ['signature', '*.signature', 'privateKey', '*.privateKey', 'password', 'body'],
-          censor: '[redacted]',
-        },
-      },
-      stream,
-    );
-    child.info(
-      {
-        signature: '0xdeadbeefsignature',
-        privateKey: '0xsecretkey',
-        password: 'hunter2',
-        body: { signature: '0xnested' },
-        payer: '0xabc',
-      },
-      'test',
-    );
-    const output = chunks.join('');
+    return { logger: createLogger('trace', stream), output: () => chunks.join('') };
+  }
 
-    expect(output).not.toContain('0xdeadbeefsignature');
-    expect(output).not.toContain('0xsecretkey');
-    expect(output).not.toContain('hunter2');
-    expect(output).not.toContain('0xnested');
-    expect(output).toContain('[redacted]');
-    // Non-sensitive context survives, or the logs would be useless.
-    expect(output).toContain('0xabc');
-    expect(logger.level).toBe('trace');
+  /** One sensitive value per configured path, so every entry is covered. */
+  const SECRET = 'S3CRET-CANARY';
+
+  function payloadFor(path: string): Record<string, unknown> {
+    // Build the nested object a given redaction path would match.
+    const segments = path.split('.');
+    const leaf = segments.at(-1)!;
+    if (segments.length === 1) return { [leaf]: SECRET };
+    const parent = segments[0] === '*' ? 'someContainer' : segments[0]!;
+    return { [parent]: { [leaf]: SECRET } };
+  }
+
+  it('censors a value at EVERY configured redaction path', () => {
+    expect(REDACT_PATHS.length).toBeGreaterThan(0);
+
+    for (const path of REDACT_PATHS) {
+      const { logger, output } = realLogger();
+      logger.info(payloadFor(path), 'test');
+      const text = output();
+      expect(
+        text.includes(SECRET),
+        `redaction path ${JSON.stringify(path)} did not censor its value: ${text}`,
+      ).toBe(false);
+      expect(text).toContain('[redacted]');
+    }
+  });
+
+  it('covers the fields that actually carry secrets in this service', () => {
+    // Named explicitly so removing one from logger.ts fails here by name rather
+    // than only shrinking a loop that still passes.
+    for (const required of [
+      'signature',
+      '*.signature',
+      'req.signature',
+      'request.signature',
+      'privateKey',
+      '*.privateKey',
+      'password',
+      '*.password',
+      'RELAYER_PRIVATE_KEY',
+      'RELAYER_KEYSTORE_PASSWORD',
+      'body',
+      '*.body',
+      'headers.authorization',
+    ]) {
+      expect(REDACT_PATHS, `${required} must stay in REDACT_PATHS`).toContain(required);
+    }
+  });
+
+  it('keeps non-sensitive context, or the logs would be useless', () => {
+    const { logger, output } = realLogger();
+    logger.info({ signature: SECRET, payer: '0xabc', fn: 'marenPay.pay' }, 'test');
+    const text = output();
+    expect(text).not.toContain(SECRET);
+    expect(text).toContain('0xabc');
+    expect(text).toContain('marenPay.pay');
   });
 
   it('serialises bigints instead of throwing', () => {
-    const { logger, lines } = capture();
+    const { logger, output } = realLogger();
     expect(() => logger.info({ wei: 1_300_000n }, 'fees')).not.toThrow();
-    expect(lines()).toContain('1300000');
+    expect(output()).toContain('1300000');
   });
 });
 

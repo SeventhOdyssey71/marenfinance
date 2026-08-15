@@ -1,7 +1,14 @@
 import { getAddress, isAddress, type Address, type Hash } from 'viem';
 import { admitCall } from './calldata.js';
 import type { RelayerConfig } from './config.js';
-import { bad, conflict, forbidden, isRelayError, unavailable } from './errors.js';
+import {
+  bad,
+  conflict,
+  forbidden,
+  isRelayError,
+  unavailable,
+  type RelayError,
+} from './errors.js';
 import {
   parseForwardRequest,
   verifyForwardRequest,
@@ -271,51 +278,77 @@ export class RelayerService {
     const projectedGasCostWei = request.gas * fees.maxFeePerGas;
 
     const day = this.#day();
+
+    // 5a. cheap pre-check ----------------------------------------------------
+    // Rejects the common case without touching the counters. This is an
+    // OPTIMISATION ONLY and is not authoritative — see 5b.
     const usage = await this.#readUsage(payer, ctx.ipHash, day);
-    const decision = evaluatePolicy(config.policy, {
+    const preCheck = evaluatePolicy(config.policy, {
       usage,
       signedFeeMusdWei: call.signedFeeMusdWei,
       projectedGasCostWei,
     });
-    if (!decision.ok) {
-      if (decision.error.code === 'GLOBAL_DAILY_BUDGET_EXHAUSTED') {
-        // Halt the whole relayer for the rest of the UTC day rather than
-        // rediscovering the same answer on every request.
-        this.#budgetHaltedOn = day;
-        logger.error(
-          { event: 'relay.budget_halt', day, limitWei: config.policy.maxDailySpendWei },
-          'daily BTC budget exhausted — relaying halted until 00:00 UTC',
-        );
-      }
-      logger.warn(
-        { event: 'relay.rejected', requestId: ctx.requestId, payer, code: decision.error.code },
-        decision.error.message,
-      );
-      throw decision.error;
+    if (!preCheck.ok) {
+      this.#rejectPolicy(preCheck.error, day, ctx, payer);
     }
 
-    // Refuse to start work we cannot finish. An empty hot key mid-queue is worse
-    // than a clean 503.
-    const balance = await chain.balance();
-    if (balance < MIN_BALANCE_WEI || balance < projectedGasCostWei) {
-      throw unavailable('RELAYER_UNDERFUNDED', 'the relayer hot key is out of BTC', {
-        balanceWei: balance.toString(),
-      });
+    // 5b. AUTHORITATIVE reservation -----------------------------------------
+    //
+    // The previous shape here was a check-then-act race, and it was measured:
+    // 25 concurrent requests against a one-request budget went 13x over, 250
+    // went 130x, every one broadcast. `get` -> decide -> (balance + simulate:
+    // two RPC round trips) -> `incrBy` left a window hundreds of milliseconds
+    // wide in which every concurrent request saw the same pre-spend counters.
+    // It was not a MemoryStore artifact — it reproduced against atomic Redis
+    // INCRBY, because the atomicity was never the problem. Discarding INCRBY's
+    // return value was.
+    //
+    // So: increment FIRST, and decide on the values the increment itself
+    // returned. Those are per-request unique under any correct store, which
+    // makes the decision serialisable no matter how many requests race. If we
+    // lose, we refund and reject.
+    const reserved = await this.#reserve(payer, ctx.ipHash, day, projectedGasCostWei);
+
+    // Reconstruct the usage this request actually saw, by subtracting its own
+    // contribution from the post-increment values. Feeding that back through
+    // the SAME policy function keeps one definition of every cap.
+    const confirmed = evaluatePolicy(config.policy, {
+      usage: {
+        lifetimeActions: Number(reserved.lifetime - 1n),
+        addressActionsToday: Number(reserved.addressDay - 1n),
+        ipActionsToday: Number(reserved.ipDay - 1n),
+        spentTodayWei: reserved.spendDay - projectedGasCostWei,
+      },
+      signedFeeMusdWei: call.signedFeeMusdWei,
+      projectedGasCostWei,
+    });
+    if (!confirmed.ok) {
+      await this.#release(payer, ctx.ipHash, day, projectedGasCostWei);
+      this.#rejectPolicy(confirmed.error, day, ctx, payer);
     }
+    const decision = confirmed.ok ? confirmed : preCheck;
 
-    // 6. simulation ---------------------------------------------------------
-    const gasLimit = await chain.simulate(request);
-
-    // 7. reservation --------------------------------------------------------
-    // Debited BEFORE broadcast. If the broadcast fails we give it back; if it
-    // succeeds and later reverts we do NOT, because the gas was still spent and
-    // refunding a reverted action would make deliberate reverts a free way to
-    // drain the budget.
-    await this.#reserve(payer, ctx.ipHash, day, projectedGasCostWei);
-
-    // 8. submission ---------------------------------------------------------
+    // Everything from here holds a reservation, so every failure path must give
+    // it back or we leak budget on each error.
     let pending: PendingTx;
     try {
+      // Refuse to start work we cannot finish. An empty hot key mid-queue is
+      // worse than a clean 503.
+      const balance = await chain.balance();
+      if (balance < MIN_BALANCE_WEI || balance < projectedGasCostWei) {
+        throw unavailable('RELAYER_UNDERFUNDED', 'the relayer hot key is out of BTC', {
+          balanceWei: balance.toString(),
+        });
+      }
+
+      // 6. simulation --------------------------------------------------------
+      const gasLimit = await chain.simulate(request);
+
+      // 7. submission --------------------------------------------------------
+      // The reservation stands once broadcast succeeds. If the transaction
+      // later reverts we do NOT refund, because the gas was still spent and
+      // refunding reverts would make deliberate reverts a free way to drain the
+      // budget.
       pending = await nonces.submit(
         fees,
         (submitCtx) => chain.sendExecute(request, submitCtx, gasLimit),
@@ -324,8 +357,8 @@ export class RelayerService {
     } catch (error) {
       await this.#release(payer, ctx.ipHash, day, projectedGasCostWei);
       logger.error(
-        { event: 'relay.submit_failed', requestId: ctx.requestId, payer, err: error },
-        'broadcast failed; quota reservation released',
+        { event: 'relay.reservation_released', requestId: ctx.requestId, payer, err: error },
+        'request failed after reservation; quota and budget released',
       );
       throw isRelayError(error)
         ? error
@@ -545,14 +578,47 @@ export class RelayerService {
     };
   }
 
-  async #reserve(payer: Address, ipHash: string, day: string, weigh: bigint): Promise<void> {
+  /**
+   * Debit every counter and RETURN what each one became.
+   *
+   * The return value is the whole point: `incrBy` is the only operation that
+   * yields a value no concurrent caller can also see, so it is the only sound
+   * basis for a limit decision. A `get` before an `incrBy` is a race by
+   * construction, however atomic the store.
+   */
+  async #reserve(
+    payer: Address,
+    ipHash: string,
+    day: string,
+    weigh: bigint,
+  ): Promise<{ lifetime: bigint; addressDay: bigint; ipDay: bigint; spendDay: bigint }> {
     const { store } = this.#deps;
-    await Promise.all([
+    const [lifetime, addressDay, ipDay, spendDay] = await Promise.all([
       store.incrBy(keys.lifetime(payer), 1n, NO_TTL),
       store.incrBy(keys.addressDay(payer, day), 1n, DAY_SECONDS),
       store.incrBy(keys.ipDay(ipHash, day), 1n, DAY_SECONDS),
       store.incrBy(keys.spendDay(day), weigh, DAY_SECONDS),
     ]);
+    return { lifetime, addressDay, ipDay, spendDay };
+  }
+
+  /** Log, latch the budget halt if that is what happened, and throw. */
+  #rejectPolicy(error: RelayError, day: string, ctx: RelayContext, payer: Address): never {
+    const { config, logger } = this.#deps;
+    if (error.code === 'GLOBAL_DAILY_BUDGET_EXHAUSTED') {
+      // Halt the whole relayer for the rest of the UTC day rather than
+      // rediscovering the same answer on every request.
+      this.#budgetHaltedOn = day;
+      logger.error(
+        { event: 'relay.budget_halt', day, limitWei: config.policy.maxDailySpendWei },
+        'daily BTC budget exhausted — relaying halted until 00:00 UTC',
+      );
+    }
+    logger.warn(
+      { event: 'relay.rejected', requestId: ctx.requestId, payer, code: error.code },
+      error.message,
+    );
+    throw error;
   }
 
   async #release(payer: Address, ipHash: string, day: string, weigh: bigint): Promise<void> {

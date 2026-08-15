@@ -14,7 +14,14 @@ import pino, { type Logger } from 'pino';
  *     needs to distinguish IPs, not to know them.
  */
 
-const REDACT_PATHS = [
+/**
+ * Exported so the tests can assert against THIS list rather than a copy.
+ *
+ * A duplicated literal in the test had already drifted to half the entries,
+ * which meant emptying this array left the suite green — the redaction claim was
+ * decorative. Import it; never restate it.
+ */
+export const REDACT_PATHS = [
   'signature',
   '*.signature',
   'req.signature',
@@ -30,8 +37,12 @@ const REDACT_PATHS = [
   'headers.authorization',
 ];
 
-export function createLogger(level: string): Logger {
-  return pino({
+/**
+ * @param destination optional sink, so tests can exercise the REAL logger
+ *        configuration instead of reconstructing an approximation of it.
+ */
+export function createLogger(level: string, destination?: pino.DestinationStream): Logger {
+  const options: pino.LoggerOptions = {
     level,
     redact: { paths: REDACT_PATHS, censor: '[redacted]' },
     base: { service: 'maren-relayer' },
@@ -44,7 +55,8 @@ export function createLogger(level: string): Logger {
         return normaliseBigints(object) as Record<string, unknown>;
       },
     },
-  });
+  };
+  return destination === undefined ? pino(options) : pino(options, destination);
 }
 
 function normaliseBigints(value: unknown): unknown {

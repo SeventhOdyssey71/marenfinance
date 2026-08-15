@@ -29,7 +29,7 @@ const CHAIN_ID = 31611;
 const PROBE_CONTRACT = getAddress('0x118917a40FAF1CD7a13dB0Ef56C86De7973Ac503');
 const PROBE_ACCOUNT = getAddress('0x4444444444444444444444444444444444444444');
 
-/** A node that answers eth_chainId and nothing else — i.e. dRPC's public tier. */
+/** A node that answers eth_chainId and returns -32601 for everything else. */
 function chainIdOnlyNode(chainId = CHAIN_ID): typeof fetch {
   return (async (_url: string | URL | Request, init?: RequestInit) => {
     const { method } = JSON.parse(String(init?.body)) as { method: string };
