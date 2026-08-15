@@ -97,7 +97,9 @@ export function PillButton({
               ? inert
                 ? styles.labelInert
                 : styles.labelOnWhite
-              : styles.labelOnDark,
+              : variant === 'ghost'
+                ? styles.labelGhost
+                : styles.labelOnDark,
             tone === 'danger' && variant !== 'primary' && styles.labelDanger,
           ]}
           numberOfLines={1}
@@ -163,6 +165,13 @@ const styles = StyleSheet.create({
   },
   labelOnWhite: { color: base.bg },
   labelInert: { color: '#A1A1AA' },
+  /**
+   * A ghost button is the quietest action on the screen and must read that way. At full
+   * #FAFAFA it had the same weight as the primary CTA sitting directly above it, so the
+   * onboarding footer offered two equally loud choices. The shipped web app renders its
+   * ghost variant `text-text-muted`; this matches it.
+   */
+  labelGhost: { color: '#A1A1AA' },
   labelOnDark: { color: '#FAFAFA' },
   labelDanger: { color: '#F87171' },
   spinner: { marginRight: space.sm },
