@@ -27,8 +27,20 @@ export const mezoMainnet = defineChain({
     decimals: 18,
   },
   rpcUrls: {
-    default: { http: ['https://jsonrpc-mezo.boar.network'] },
-    public: { http: ['https://jsonrpc-mezo.boar.network'] },
+    // dRPC first: it is the only endpoint that also offers WebSocket, which we need
+    // for live position-health subscriptions. All three verified -> 31612 on 2026-08-15.
+    default: {
+      http: [
+        'https://mezo.drpc.org',
+        'https://jsonrpc-mezo.boar.network',
+        'https://mainnet.mezo.public.validationcloud.io',
+      ],
+      webSocket: ['wss://mezo.drpc.org'],
+    },
+    public: {
+      http: ['https://mezo.drpc.org', 'https://jsonrpc-mezo.boar.network'],
+      webSocket: ['wss://mezo.drpc.org'],
+    },
   },
   blockExplorers: {
     default: {
@@ -42,6 +54,8 @@ export const mezoMainnet = defineChain({
   contracts: {
     multicall3: {
       address: '0xcA11bde05977b3631167028862bE2a173976CA11',
+      // Bisected on-chain: no code at 351759, code at 351760.
+      blockCreated: 351760,
     },
   },
   testnet: false,
