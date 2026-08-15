@@ -51,18 +51,21 @@ export function CollateralFloor() {
               </span>
             </div>
 
+            {/* Figures stay neutral. Three saturated colours in one small card reads
+                as decoration, not information — the health chip above is the only
+                thing here that carries a signal, so it is the only thing coloured. */}
             <dl className="mt-5 grid grid-cols-2 gap-x-4 gap-y-4 sm:grid-cols-3">
               <div>
                 <dt className="text-xs text-text-subtle">Collateral</dt>
-                <dd className="num mt-1.5 text-[0.9375rem] text-btc">0.004 BTC</dd>
+                <dd className="num mt-1.5 text-[0.9375rem] text-text">0.004 BTC</dd>
               </div>
               <div>
                 <dt className="text-xs text-text-subtle">Debt</dt>
-                <dd className="num mt-1.5 text-[0.9375rem] text-musd">100.00 MUSD</dd>
+                <dd className="num mt-1.5 text-[0.9375rem] text-text">100.00 MUSD</dd>
               </div>
               <div className="col-span-2 sm:col-span-1">
                 <dt className="text-xs text-text-subtle">Collateral ratio</dt>
-                <dd className="num mt-1.5 text-[0.9375rem] text-success">252.0%</dd>
+                <dd className="num mt-1.5 text-[0.9375rem] text-text">252.0%</dd>
               </div>
             </dl>
 

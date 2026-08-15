@@ -59,6 +59,17 @@ Dark-first. There is no light mode in the product UI (documents are light — se
 colours appear only when they carry meaning. A screen where everything is coloured is
 a screen where nothing is important.
 
+**Rule — one accent per component, and asset colours are not decoration.**
+`btc` and `musd` colour a figure only when that figure is the single subject of its
+component: a balance headline, an asset row in a wallet list. They must **never** be
+applied across a row of metrics. An early version of the landing page's example
+position card rendered the collateral in BTC orange, the debt in MUSD green, the
+collateral ratio in success green, and put a green status pill above all three — four
+saturated colours in one small card. It read as decoration rather than information,
+which is the tell of machine-generated design. The fix is the rule: in any multi-metric
+display the figures are `text`, and only the one element carrying a genuine signal —
+the health chip — is coloured.
+
 ---
 
 ## 3. Typography
@@ -108,8 +119,15 @@ Headlines are tight and large. Body text never exceeds `68ch`.
 We use **`@paper-design/shaders-react`**, and we use it in exactly **three** places.
 Restraint is the point — the reference design is 95% black with a few gradient bleeds.
 
-1. **`MeshGradient`** — the hero background and the closing CTA band. Violet core
-   (`#5B3DF5`) falling off into `#08080A`, with a `#1B1140` mid. Slow: `speed <= 0.2`.
+1. **`Warp`** — the hero background and the closing CTA band. A striped base pattern
+   folded by noise and swirl, rotated ~38° so the bands run bottom-left to top-right.
+   Palette `#08080A → #241268 → #6C4BFF → #B9A6FF`. Slow: `speed <= 0.2`.
+
+   *Not `MeshGradient`.* Mesh blends colour blobs, and on a dark palette it averages
+   into a soft haze with no structure — the hero read as a flat dark rectangle however
+   the palette was tuned. Warp keeps an edge on each fold, which is what produces the
+   silk-like bands and the bright specular highlights. Legibility is protected by the
+   scrims over the shader, never by dimming the palette until the shader disappears.
 2. **`PulsingBorder`** — on the live position-health card only, and only while a
    position is open. It is a status indicator, not decoration; colour tracks the health
    state (`success` / `warning` / `danger`).

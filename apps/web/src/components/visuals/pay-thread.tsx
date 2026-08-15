@@ -31,7 +31,7 @@ export function PayThread() {
                 <span className="text-text-subtle">{r.out ? '−' : '+'}</span>
                 {r.amount}
               </p>
-              <p className="num mt-0.5 text-[0.6875rem] text-musd">MUSD</p>
+              <p className="num mt-0.5 text-[0.6875rem] text-text-subtle">MUSD</p>
             </div>
           </li>
         ))}
