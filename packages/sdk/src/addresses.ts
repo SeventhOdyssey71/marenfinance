@@ -157,12 +157,20 @@ export const MAREN_ADDRESSES: Record<MezoNetwork, MarenAddresses> = {
     marenRegistry: ZERO,
     marenEarn: ZERO,
   },
+  // Deployed to Mezo matsnet on 2026-08-15 from
+  // 0x54196397D6f01b48739dB3957257cB33cD341885, and source-verified on Blockscout.
+  // Runtime bytecode sizes were checked against the local build before these were
+  // written here: Vault 14,508 · Earn 11,396 · Pay 9,264 · RelayHub 7,934 ·
+  // Registry 4,742. See docs/DEPLOYMENTS.md for tx hashes.
   testnet: {
-    marenVault: ZERO,
-    marenPay: ZERO,
-    marenForwarder: ZERO,
-    marenRegistry: ZERO,
-    marenEarn: ZERO,
+    marenVault: '0x46252B00AB59384518d9dB6D1f210ffF1221645b',
+    marenPay: '0xe475Ff919D54E055809f516E3bed8a5c7a101836',
+    // MarenRelayHub extends MarenForwarder and is the single trusted forwarder;
+    // the standalone forwarder is deliberately not deployed. Verified on-chain:
+    // MarenPay.trustedForwarder() returns this address.
+    marenForwarder: '0x22cC1Adfb0C91D9359746dE3F7E8cB7F2B8eA98C',
+    marenRegistry: '0x9e123Cdd0CD524812CF9F552d3FAB13d8143b77E',
+    marenEarn: '0xE3B02b215085B99Ce61E0F5ea9763Ac637aa7826',
   },
 };
 
