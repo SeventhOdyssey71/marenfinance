@@ -100,7 +100,7 @@ export default function Settings() {
 
       {address ? (
         <View style={styles.fullAddress}>
-          <Num size="numericSm" tone="subtle" selectable>
+          <Num size="numericSm" tone="muted" selectable>
             {address}
           </Num>
           <Pressable
@@ -136,7 +136,7 @@ export default function Settings() {
                 </Txt>
                 {active ? <Icon name="check" size={14} color={brand.violet400} /> : null}
               </View>
-              <Num size="numericSm" tone="subtle" style={styles.chainId}>
+              <Num size="numericSm" tone="muted" style={styles.chainId}>
                 {`chain ${c.id}`}
               </Num>
             </Pressable>
@@ -144,7 +144,7 @@ export default function Settings() {
         })}
       </View>
 
-      <Txt variant="small" tone="subtle" style={styles.networkNote}>
+      <Txt variant="small" tone="muted" style={styles.networkNote}>
         {network === 'mainnet'
           ? 'Mainnet moves real Bitcoin and real MUSD. Every figure on screen is a live position.'
           : 'Matsnet is Mezo’s testnet. Nothing here is worth anything, which is the point.'}
@@ -201,7 +201,7 @@ export default function Settings() {
             label="App Attest"
             hint="not implemented in this build — we do not claim it"
             value={
-              <Txt variant="small" tone="subtle">
+              <Txt variant="small" tone="muted">
                 Not used
               </Txt>
             }
@@ -217,7 +217,7 @@ export default function Settings() {
             No custom URL scheme is used for authentication
           </Txt>
         </View>
-        <Txt variant="small" tone="subtle" style={styles.authBody}>
+        <Txt variant="small" tone="muted" style={styles.authBody}>
           The auth callback arrives only on {AUTH_REDIRECT_URI}, a universal link Apple
           verifies against this app’s entitlement, with a 256-bit CSRF token compared in
           constant time. A custom scheme is claimable by any other app on the device, so
@@ -231,7 +231,7 @@ export default function Settings() {
         <View style={styles.switchRow}>
           <View style={styles.switchBody}>
             <Txt variant="small">Simulate a stale price feed</Txt>
-            <Txt variant="small" tone="subtle" style={styles.switchCaption}>
+            <Txt variant="small" tone="muted" style={styles.switchCaption}>
               Backdates the oracle observation past Mezo’s {STALE_AFTER_SECONDS}s limit so
               the price-unavailable state and the borrow gate can be exercised.
             </Txt>
@@ -267,7 +267,7 @@ export default function Settings() {
         style={styles.signOut}
       />
 
-      <Txt variant="small" tone="subtle" style={styles.signOutNote}>
+      <Txt variant="small" tone="muted" style={styles.signOutNote}>
         Signing out deletes the key from the Keychain. Maren holds no copy — without your
         own backup the funds it controls are unrecoverable.
       </Txt>

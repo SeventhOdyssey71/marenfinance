@@ -28,8 +28,8 @@ export function PriceBanner({ feed }: { feed: PriceFeed }) {
         <Num size="numericSm" tone="muted">
           {formatUsd(feed.priceWei)}
         </Num>
-        <Txt variant="small" tone="subtle">
-          · {feed.ageSeconds}s ago
+        <Txt variant="small" tone="muted">
+          · {freshness(feed.ageSeconds)}
         </Txt>
       </View>
     );
@@ -38,7 +38,7 @@ export function PriceBanner({ feed }: { feed: PriceFeed }) {
   if (feed.state === 'loading') {
     return (
       <View style={styles.live}>
-        <Txt variant="small" tone="subtle">
+        <Txt variant="small" tone="muted">
           Reading price feed…
         </Txt>
       </View>
@@ -66,27 +66,39 @@ export function PriceBanner({ feed }: { feed: PriceFeed }) {
 
         {isStale ? (
           <>
-            <Txt variant="small" tone="subtle" style={styles.alertDetail}>
+            <Txt variant="small" tone="muted" style={styles.alertDetail}>
               Mezo's oracle rejects observations older than {STALE_AFTER_SECONDS}s. This one is{' '}
               {feed.ageSeconds}s old, so anything priced against it would revert on-chain.
             </Txt>
             <View style={styles.lastKnown}>
-              <Txt variant="small" tone="subtle">
+              <Txt variant="small" tone="muted">
                 Last known
               </Txt>
-              <Num size="numericSm" tone="subtle" style={styles.struck}>
+              <Num size="numericSm" tone="muted" style={styles.struck}>
                 {formatUsd(feed.lastKnownWei)}
               </Num>
             </View>
           </>
         ) : (
-          <Txt variant="small" tone="subtle" style={styles.alertDetail}>
+          <Txt variant="small" tone="muted" style={styles.alertDetail}>
             {feed.reason}
           </Txt>
         )}
       </View>
     </View>
   );
+}
+
+/**
+ * How fresh a live observation is.
+ *
+ * "0s ago" is technically exact and reads like a placeholder someone forgot to finish.
+ * The age still appears verbatim in the VoiceOver label above, and the moment it matters
+ * — past the oracle's own tolerance — this component is not rendering the live variant
+ * at all, so nothing is being softened here except the wording.
+ */
+function freshness(ageSeconds: number): string {
+  return ageSeconds < 5 ? 'just now' : `${ageSeconds}s ago`;
 }
 
 const styles = StyleSheet.create({

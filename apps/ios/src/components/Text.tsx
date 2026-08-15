@@ -50,8 +50,25 @@ export function Txt({
   );
 }
 
-/** §3 Label — uppercase, tracked, 12px. Used for every field and section caption. */
-export function Label({ style, tone = 'subtle', ...rest }: MarenTextProps) {
+/**
+ * §3 Label — uppercase, tracked, 12px. Used for every field and section caption.
+ *
+ * Defaults to `muted`, not `subtle`, and that is a deliberate deviation from the tone
+ * BRAND.md's table implies for "tertiary" text. The palette is unchanged — `subtle` is
+ * still exactly `#6B6B75` — but it is not used for text that carries information,
+ * because at 12px it does not meet WCAG AA on any Maren surface:
+ *
+ *     #6B6B75 on #08080A  3.80:1      #A1A1AA on #08080A  7.81:1
+ *     #6B6B75 on #101013  3.60:1      #A1A1AA on #101013  7.41:1
+ *     #6B6B75 on #0C0C0F  3.71:1      #A1A1AA on #0C0C0F  7.62:1
+ *     #6B6B75 on #17171B  3.39:1      #A1A1AA on #17171B  6.97:1
+ *
+ * BRAND.md's own preamble settles the conflict: "dark, quiet, expensive, and legible
+ * before it is decorative." A label a user cannot read is not quiet, it is broken. Pass
+ * `tone="subtle"` explicitly for text that is genuinely decorative or duplicated by an
+ * adjacent accessible label — the full address echoed under a truncated one, say.
+ */
+export function Label({ style, tone = 'muted', ...rest }: MarenTextProps) {
   return <Txt variant="label" tone={tone} style={style} {...rest} />;
 }
 

@@ -15,6 +15,7 @@ import { Icon, type IconName } from '../src/components/Icon';
 import { PillButton } from '../src/components/PillButton';
 import { Label, Txt } from '../src/components/Text';
 import { base, brand, gradients, radius, semantic, space } from '../src/design/tokens';
+import { gasCopy } from '../src/lib/copy';
 
 const { width } = Dimensions.get('window');
 
@@ -23,8 +24,12 @@ const { width } = Dimensions.get('window');
  *
  * BRAND.md §1 sets the voice: "calm, precise, adult… No hype words, no 'revolutionary',
  * no rocket emoji." So each panel is a plain statement of a mechanism, and the third one
- * names the constraint that makes the second true — the relayer pays BTC gas, and that
- * is why the user never needs to hold BTC.
+ * names the constraint that makes the second true — the relayer pays BTC gas, which is
+ * why the user does not need to keep a BTC balance to spend.
+ *
+ * It says "does not need to keep a balance", not "never needs BTC". The deposit is
+ * payable and cannot be relayed, so the first transaction is the user's own. The panel
+ * copy lives in `gasCopy` precisely so that caveat travels with the claim.
  *
  * The risk panel is not buried in a legal screen. ARCHITECTURE.md §3.4 requires the
  * pooled-trove risk statement to appear in the UI, so it appears before setup, not after.
@@ -58,9 +63,8 @@ const PANELS: Panel[] = [
   },
   {
     kicker: 'Three',
-    title: 'Spend without gas',
-    body:
-      'Mezo charges gas in BTC. Maren’s relayer pays it for you, so you can send MUSD holding no Bitcoin at all. You sign; we settle.',
+    title: gasCopy.onboardingTitle,
+    body: gasCopy.onboardingBody,
     icon: 'send',
     accent: brand.violet400,
   },

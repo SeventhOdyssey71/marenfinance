@@ -77,7 +77,7 @@ function Legend({
 }) {
   return (
     <View style={{ alignItems: align === 'right' ? 'flex-end' : 'flex-start' }}>
-      <Txt variant="numericSm" tone="subtle">
+      <Txt variant="numericSm" tone="muted">
         {value}
       </Txt>
       <Label style={styles.caption}>{caption}</Label>
