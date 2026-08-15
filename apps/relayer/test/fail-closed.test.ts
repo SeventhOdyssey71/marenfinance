@@ -106,7 +106,9 @@ describe('fail-closed boot', () => {
 
   it('an unknown contract name in the target allowlist is a problem, not a skip', () => {
     const { problems } = loadConfig(
-      makeEnv({ RELAYER_ALLOWED_TARGETS: 'marenAnything:0x2222222222222222222222222222222222222222' }),
+      makeEnv({
+        RELAYER_ALLOWED_TARGETS: 'marenAnything:0x2222222222222222222222222222222222222222',
+      }),
     );
     expect(problems.join('\n')).toMatch(/unknown contract/);
   });

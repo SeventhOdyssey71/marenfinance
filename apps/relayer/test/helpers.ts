@@ -11,11 +11,7 @@ import pino from 'pino';
 import type { ChainAdapter } from '../src/chain.js';
 import type { Env } from '../src/config.js';
 import { createRelayer, type Relayer } from '../src/create.js';
-import {
-  FORWARD_REQUEST_TYPES,
-  forwarderDomain,
-  type ForwardRequest,
-} from '../src/forwarder.js';
+import { FORWARD_REQUEST_TYPES, forwarderDomain, type ForwardRequest } from '../src/forwarder.js';
 import { MemoryStore } from '../src/store.js';
 import { RELAYABLE_FUNCTIONS } from '../src/registry.js';
 import type { ReceiptLike } from '../src/receipt.js';
@@ -24,7 +20,8 @@ import type { GasFees, SubmitContext } from '../src/nonce.js';
 export const SILENT_LOGGER = pino({ level: 'silent' });
 
 /** anvil account #0 — a published test key, never used for anything real. */
-export const RELAYER_KEY: Hex = '0xac0976bf9e2feb37b8bb0d1a2c1e1b0dc48b8ab9d8f7b6e5a4c3d2e1f0a9b8c7';
+export const RELAYER_KEY: Hex =
+  '0xac0976bf9e2feb37b8bb0d1a2c1e1b0dc48b8ab9d8f7b6e5a4c3d2e1f0a9b8c7';
 /** anvil account #1's key, used as the *user* signing ForwardRequests. */
 export const USER_KEY: Hex = '0x59c6995e998f97a5a0044966f0945389dc9e86dae88c7a8412f4603b6b78690d';
 

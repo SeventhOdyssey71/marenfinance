@@ -46,9 +46,7 @@ describe('NonceManager', () => {
     const nonces = results.map((r) => r.nonce);
 
     expect(new Set(nonces).size).toBe(40);
-    expect([...nonces].sort((a, b) => a - b)).toEqual(
-      Array.from({ length: 40 }, (_, i) => 12 + i),
-    );
+    expect([...nonces].sort((a, b) => a - b)).toEqual(Array.from({ length: 40 }, (_, i) => 12 + i));
     // Broadcast order matches allocation order: the critical section covers both.
     expect(issued).toEqual(nonces);
     expect(chainNonce).toBe(12);
@@ -212,7 +210,10 @@ describe('stuck transaction replacement', () => {
   it('stops tracking once a receipt exists and reports the settlement', async () => {
     const hash = '0xbbbb000000000000000000000000000000000000000000000000000000000000' as Hash;
     const receipts = new Map<Hash, ReceiptLike>([
-      [hash, { status: 'success', blockNumber: 10n, gasUsed: 100_000n, effectiveGasPrice: 1_300_000n }],
+      [
+        hash,
+        { status: 'success', blockNumber: 10n, gasUsed: 100_000n, effectiveGasPrice: 1_300_000n },
+      ],
     ]);
     const settled: Array<{ success: boolean; gasCostWei: bigint | null }> = [];
     const watcher = new TxWatcher({

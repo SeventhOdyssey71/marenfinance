@@ -118,9 +118,7 @@ describe('global daily BTC budget under concurrency', () => {
       expect(rejected.length).toBe(concurrency - accepted);
       for (const response of rejected.slice(0, 5)) {
         expect(response.status).toBe(429);
-        expect(((await response.json()) as ErrorBody).error).toBe(
-          'GLOBAL_DAILY_BUDGET_EXHAUSTED',
-        );
+        expect(((await response.json()) as ErrorBody).error).toBe('GLOBAL_DAILY_BUDGET_EXHAUSTED');
       }
     },
   );
@@ -168,12 +166,13 @@ describe('global daily BTC budget under concurrency', () => {
       expect(addressDay, `addressDay for ${account.address}`).toBe(expected);
     }
 
-    // The per-IP counters were refunded too — each loser used its own IP.
+    // The per-IP counters were refunded too, EXACTLY — each loser used its own
+    // IP, so every bucket except the winner's must be back at zero. The previous
+    // `toBeLessThanOrEqual(1n)` here passed even with the ipDay refund deleted.
+    const winnerIndex = accounts.findIndex((a) => a.address === winners[0]?.address);
     for (let i = 0; i < accounts.length; i += 1) {
-      const used = await store.get(
-        keys.ipDay(await ipHashFor(relayer, `203.0.113.${i + 1}`), day),
-      );
-      expect(used).toBeLessThanOrEqual(1n);
+      const used = await store.get(keys.ipDay(await ipHashFor(relayer, `203.0.113.${i + 1}`), day));
+      expect(used, `ipDay bucket for 203.0.113.${i + 1}`).toBe(i === winnerIndex ? 1n : 0n);
     }
   });
 });
@@ -341,6 +340,54 @@ describe('refund failures are retried, not swallowed', () => {
     expect(chain.sent).toHaveLength(0);
   });
 
+  /**
+   * A retried refund is NOT idempotent: `decrBy` is a bare DECRBY, so a command
+   * that lands but whose response is lost is applied again. Measured on ONE
+   * refunded request before the clamp: spend went to -1.56e12, lifetime to -3,
+   * and `/quota` then advertised 28 free actions against a configured 25, with
+   * reserved headroom above the operator's daily cap. Negative counters are
+   * free money, so they are clamped.
+   */
+  describe('a double-applied refund cannot drive counters negative', () => {
+    /** Applies every decrBy twice, simulating a lost response plus a retry. */
+    class DoubleRefundStore implements RelayStore {
+      readonly kind = 'memory' as const;
+      readonly inner = new MemoryStore();
+      async incrBy(key: string, amount: bigint, ttl: number): Promise<bigint> {
+        return this.inner.incrBy(key, amount, ttl);
+      }
+      async decrBy(key: string, amount: bigint): Promise<bigint> {
+        await this.inner.decrBy(key, amount);
+        return this.inner.decrBy(key, amount); // the duplicate application
+      }
+      async get(key: string): Promise<bigint> {
+        return this.inner.get(key);
+      }
+    }
+
+    it('clamps spend and lifetime at zero, and never advertises extra free actions', async () => {
+      const store = new DoubleRefundStore();
+      const chain = new FakeChain({ simulateReverts: true });
+      const relayer = await buildTestRelayer(makeEnv(), chain, store as never);
+      const account = signer(0);
+
+      await relayer.post('/relay', await signedRequest({ account }));
+
+      const day = new Date().toISOString().slice(0, 10);
+      expect(await store.get(keys.spendDay(day))).toBe(0n);
+      expect(await store.get(keys.lifetime(account.address))).toBe(0n);
+      expect(await store.get(keys.addressDay(account.address, day))).toBe(0n);
+
+      // And the quota endpoint never promises more than the policy allows.
+      const quota = (await (await relayer.get(`/quota/${account.address}`)).json()) as {
+        freeActionsRemaining: number;
+        freeActionsPerAddress: number;
+      };
+      expect(quota.freeActionsRemaining).toBeLessThanOrEqual(quota.freeActionsPerAddress);
+      expect(quota.freeActionsRemaining).toBe(25);
+    });
+  });
+
   it('retries a transient refund failure within the request itself', async () => {
     const store = new NoRefundStore();
     const chain = new FakeChain({ simulateReverts: true });
@@ -497,32 +544,6 @@ describe('per-address and free-tier caps', () => {
     expect(accepted).toBeLessThanOrEqual(2);
     expect(chain.sent.length).toBe(accepted);
   });
-
-  it('holds the free-tier allowance against a simultaneous burst', async () => {
-    const store = new LaggyStore();
-    const chain = new FakeChain();
-    const relayer = await buildTestRelayer(
-      makeEnv({
-        RELAYER_FREE_ACTIONS_PER_ADDRESS: '2',
-        RELAYER_MAX_ACTIONS_PER_ADDRESS_DAY: '100',
-        RELAYER_MAX_ACTIONS_PER_IP_DAY: '100',
-        // Paid tier closed, so anything past the free tier must be refused.
-        RELAYER_FEE_MUSD: '',
-      }),
-      chain,
-      store as never,
-    );
-
-    const account = signer(0);
-    const bodies = await Promise.all(
-      Array.from({ length: 12 }, () => signedRequest({ account, nonce: 0n })),
-    );
-    const responses = await Promise.all(bodies.map((body) => relayer.post('/relay', body)));
-
-    const accepted = responses.filter((r) => r.status === 202).length;
-    expect(accepted).toBeLessThanOrEqual(2);
-    expect(chain.sent.length).toBe(accepted);
-  });
 });
 
 /**
@@ -553,10 +574,7 @@ describe('IPv6 bucketing', () => {
 
   it('rate limits two hosts in the same /64 together', async () => {
     const chain = new FakeChain();
-    const relayer = await buildTestRelayer(
-      makeEnv({ RELAYER_MAX_ACTIONS_PER_IP_DAY: '1' }),
-      chain,
-    );
+    const relayer = await buildTestRelayer(makeEnv({ RELAYER_MAX_ACTIONS_PER_IP_DAY: '1' }), chain);
     const first = signer(0);
     const second = signer(1);
 

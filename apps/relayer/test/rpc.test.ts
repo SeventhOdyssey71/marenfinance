@@ -210,10 +210,9 @@ describe('capability preflight', () => {
       if (method === 'eth_chainId') {
         return new Response(JSON.stringify({ result: `0x${CHAIN_ID.toString(16)}` }));
       }
-      return new Response(
-        JSON.stringify({ error: { code: 3, message: 'execution reverted' } }),
-        { status: 200 },
-      );
+      return new Response(JSON.stringify({ error: { code: 3, message: 'execution reverted' } }), {
+        status: 200,
+      });
     }) as unknown as typeof fetch;
 
     const report = await probeEndpoint('https://example-rpc.test', {

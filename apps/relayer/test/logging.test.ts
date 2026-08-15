@@ -209,7 +209,11 @@ describe('the relay path never logs a signature or a raw IP', () => {
 describe('request ids', () => {
   it('echoes a caller-supplied request id and returns it on errors', async () => {
     const relayer = await buildTestRelayer();
-    const response = await relayer.post('/relay', { nonsense: true }, { 'x-request-id': 'abc-123' });
+    const response = await relayer.post(
+      '/relay',
+      { nonsense: true },
+      { 'x-request-id': 'abc-123' },
+    );
     expect(response.headers.get('x-request-id')).toBe('abc-123');
     expect(((await response.json()) as { requestId: string }).requestId).toBe('abc-123');
   });

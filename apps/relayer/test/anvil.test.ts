@@ -145,7 +145,11 @@ describe.skipIf(fork === null)('anvil fork of Mezo testnet', () => {
 
   const account = privateKeyToAccount(ANVIL_KEY);
   const publicClient = createPublicClient({ chain: anvilChain, transport: http(ANVIL_URL) });
-  const walletClient = createWalletClient({ account, chain: anvilChain, transport: http(ANVIL_URL) });
+  const walletClient = createWalletClient({
+    account,
+    chain: anvilChain,
+    transport: http(ANVIL_URL),
+  });
 
   /** Deploy raw runtime bytecode and return its address. */
   async function deploy(initCode: `0x${string}`): Promise<Address> {

@@ -43,11 +43,7 @@ import { parseAbiItem, toFunctionSelector, type AbiFunction, type Hex } from 'vi
 
 /** Names of the Maren contracts the relayer knows about. Mirrors `MarenAddresses`. */
 export type MarenContractName =
-  | 'marenPay'
-  | 'marenRegistry'
-  | 'marenVault'
-  | 'marenEarn'
-  | 'marenForwarder';
+  'marenPay' | 'marenRegistry' | 'marenVault' | 'marenEarn' | 'marenForwarder';
 
 export interface RelayableFunction {
   /** Human-readable ABI signature, exactly as declared in Solidity. */
@@ -101,48 +97,46 @@ function fn(contract: MarenContractName, signature: string): RelayableFunction {
  * the user makes themselves. Only the MUSD-denominated vault operations are
  * relayable. This is a deliberate omission, not an oversight.
  */
-export const RELAYABLE_FUNCTIONS: Readonly<Record<MarenContractName, readonly RelayableFunction[]>> =
-  {
-    marenPay: [
-      fn('marenPay', 'function pay(address to, uint256 amount, string memo, uint256 relayFee)'),
-      fn('marenPay', 'function payTo(string handle, uint256 amount, string memo, uint256 relayFee)'),
-      fn(
-        'marenPay',
-        'function createRequest(address from, uint256 amount, string memo, uint256 relayFee)',
-      ),
-      fn('marenPay', 'function fulfillRequest(bytes32 id, uint256 relayFee)'),
-      fn('marenPay', 'function cancelRequest(bytes32 id, uint256 relayFee)'),
-      fn(
-        'marenPay',
-        'function createLink(bytes32 amountHash, uint256 amount, uint64 expiry, uint256 relayFee)',
-      ),
-      fn('marenPay', 'function claimLink(bytes32 secret, uint256 relayFee)'),
-      fn(
-        'marenPay',
-        'function split(address[] recipients, uint256[] amounts, string memo, uint256 relayFee)',
-      ),
-    ],
-    marenRegistry: [
-      fn('marenRegistry', 'function commitHandle(bytes32 commitment, uint256 relayFee)'),
-      fn('marenRegistry', 'function revealHandle(string handle, bytes32 salt, uint256 relayFee)'),
-      fn('marenRegistry', 'function setPrimaryHandle(string handle, uint256 relayFee)'),
-    ],
-    marenVault: [
-      fn('marenVault', 'function borrow(uint256 amount, uint256 relayFee)'),
-      fn('marenVault', 'function repay(uint256 amount, uint256 relayFee)'),
-      fn(
-        'marenVault',
-        'function withdrawCollateral(uint256 amount, address to, uint256 relayFee)',
-      ),
-    ],
-    marenEarn: [
-      fn('marenEarn', 'function depositFor(uint256 assets, address receiver, uint256 relayFee)'),
-      fn('marenEarn', 'function redeemFor(uint256 shares, address receiver, uint256 relayFee)'),
-    ],
-    // The forwarder is never itself a relay target — relaying a call *to* the
-    // forwarder would let a request nest another request. Explicitly empty.
-    marenForwarder: [],
-  };
+export const RELAYABLE_FUNCTIONS: Readonly<
+  Record<MarenContractName, readonly RelayableFunction[]>
+> = {
+  marenPay: [
+    fn('marenPay', 'function pay(address to, uint256 amount, string memo, uint256 relayFee)'),
+    fn('marenPay', 'function payTo(string handle, uint256 amount, string memo, uint256 relayFee)'),
+    fn(
+      'marenPay',
+      'function createRequest(address from, uint256 amount, string memo, uint256 relayFee)',
+    ),
+    fn('marenPay', 'function fulfillRequest(bytes32 id, uint256 relayFee)'),
+    fn('marenPay', 'function cancelRequest(bytes32 id, uint256 relayFee)'),
+    fn(
+      'marenPay',
+      'function createLink(bytes32 amountHash, uint256 amount, uint64 expiry, uint256 relayFee)',
+    ),
+    fn('marenPay', 'function claimLink(bytes32 secret, uint256 relayFee)'),
+    fn(
+      'marenPay',
+      'function split(address[] recipients, uint256[] amounts, string memo, uint256 relayFee)',
+    ),
+  ],
+  marenRegistry: [
+    fn('marenRegistry', 'function commitHandle(bytes32 commitment, uint256 relayFee)'),
+    fn('marenRegistry', 'function revealHandle(string handle, bytes32 salt, uint256 relayFee)'),
+    fn('marenRegistry', 'function setPrimaryHandle(string handle, uint256 relayFee)'),
+  ],
+  marenVault: [
+    fn('marenVault', 'function borrow(uint256 amount, uint256 relayFee)'),
+    fn('marenVault', 'function repay(uint256 amount, uint256 relayFee)'),
+    fn('marenVault', 'function withdrawCollateral(uint256 amount, address to, uint256 relayFee)'),
+  ],
+  marenEarn: [
+    fn('marenEarn', 'function depositFor(uint256 assets, address receiver, uint256 relayFee)'),
+    fn('marenEarn', 'function redeemFor(uint256 shares, address receiver, uint256 relayFee)'),
+  ],
+  // The forwarder is never itself a relay target — relaying a call *to* the
+  // forwarder would let a request nest another request. Explicitly empty.
+  marenForwarder: [],
+};
 
 export const MAREN_CONTRACT_NAMES = Object.keys(RELAYABLE_FUNCTIONS) as MarenContractName[];
 
