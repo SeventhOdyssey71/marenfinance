@@ -8,6 +8,10 @@ node_modules/
 dist/
 build/
 out/
+
+# ...except the document set, which is committed so the PDFs can be linked and reviewed
+# without a local build. See docs/build/.gitignore.
+!docs/build/
 .next/
 .turbo/
 .expo/
