@@ -27,19 +27,28 @@ export const mezoMainnet = defineChain({
     decimals: 18,
   },
   rpcUrls: {
-    // dRPC first: it is the only endpoint that also offers WebSocket, which we need
-    // for live position-health subscriptions. All three verified -> 31612 on 2026-08-15.
+    // Both endpoints verified 2026-08-15 by executing a real eth_call
+    // (TroveManager.getTroveOwnersCount() -> 26), not merely eth_chainId.
+    //
+    // DO NOT ADD https://mezo.drpc.org HERE.
+    // Its public endpoint answers eth_chainId and NOTHING ELSE. Probed method by
+    // method on 2026-08-15: eth_blockNumber, eth_getBalance, eth_call, eth_estimateGas,
+    // eth_getLogs and eth_getBlockByNumber all return
+    //   -32601 "the method ... does not exist/is not available"
+    // It requires an API key for everything except chain identification, so a
+    // `cast chain-id` smoke test passes against it while the entire application fails.
+    // This is exactly the trap that put a dead RPC into viem's shipped Mezo definition.
     default: {
       http: [
-        'https://mezo.drpc.org',
         'https://jsonrpc-mezo.boar.network',
         'https://mainnet.mezo.public.validationcloud.io',
       ],
-      webSocket: ['wss://mezo.drpc.org'],
     },
     public: {
-      http: ['https://mezo.drpc.org', 'https://jsonrpc-mezo.boar.network'],
-      webSocket: ['wss://mezo.drpc.org'],
+      http: [
+        'https://jsonrpc-mezo.boar.network',
+        'https://mainnet.mezo.public.validationcloud.io',
+      ],
     },
   },
   blockExplorers: {
