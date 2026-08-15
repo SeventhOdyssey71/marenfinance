@@ -50,7 +50,7 @@ export function Nav() {
     <header
       className={`fixed inset-x-0 top-0 z-50 transition-colors duration-[240ms] ease-out ${
         scrolled || open
-          ? 'border-b border-[var(--border-hairline)] bg-[#08080A]/72 backdrop-blur-xl'
+          ? 'bg-[#08080A]/72 border-b border-[var(--border-hairline)] backdrop-blur-xl'
           : 'border-b border-transparent'
       }`}
     >
@@ -69,10 +69,8 @@ export function Nav() {
               <li key={l.href}>
                 <a
                   href={l.href}
-                  {...(l.external
-                    ? { target: '_blank', rel: 'noreferrer noopener' }
-                    : {})}
-                  className="inline-flex h-9 items-center rounded-[var(--radius-pill)] px-3.5 text-sm text-text-muted transition-colors duration-[120ms] ease-out hover:text-text"
+                  {...(l.external ? { target: '_blank', rel: 'noreferrer noopener' } : {})}
+                  className="text-text-muted hover:text-text inline-flex h-9 items-center rounded-[var(--radius-pill)] px-3.5 text-sm transition-colors duration-[120ms] ease-out"
                 >
                   {l.label}
                 </a>
@@ -83,7 +81,7 @@ export function Nav() {
           <div className="flex items-center gap-2">
             <Link
               href="/app"
-              className="group hidden h-11 items-center gap-3 rounded-[var(--radius-pill)] bg-white pr-2 pl-5 text-sm font-medium text-[#08080A] transition-colors duration-[120ms] ease-out hover:bg-white/90 sm:inline-flex"
+              className="group hidden h-11 items-center gap-3 rounded-[var(--radius-pill)] bg-white pl-5 pr-2 text-sm font-medium text-[#08080A] transition-colors duration-[120ms] ease-out hover:bg-white/90 sm:inline-flex"
             >
               Launch App
               <span
@@ -100,7 +98,7 @@ export function Nav() {
               aria-expanded={open}
               aria-controls="mobile-nav"
               aria-label={open ? 'Close menu' : 'Open menu'}
-              className="grid size-11 shrink-0 place-items-center rounded-[var(--radius-pill)] border border-[var(--border-hairline)] bg-surface-raised text-text md:hidden"
+              className="bg-surface-raised text-text grid size-11 shrink-0 place-items-center rounded-[var(--radius-pill)] border border-[var(--border-hairline)] md:hidden"
             >
               <svg
                 viewBox="0 0 20 20"
@@ -140,7 +138,7 @@ export function Nav() {
                 href={l.href}
                 {...(l.external ? { target: '_blank', rel: 'noreferrer noopener' } : {})}
                 onClick={() => setOpen(false)}
-                className="flex h-12 items-center text-[1.0625rem] text-text-muted"
+                className="text-text-muted flex h-12 items-center text-[1.0625rem]"
               >
                 {l.label}
               </a>
@@ -150,7 +148,7 @@ export function Nav() {
             <Link
               href="/app"
               onClick={() => setOpen(false)}
-              className="flex h-12 w-full items-center justify-between rounded-[var(--radius-pill)] bg-white pr-2 pl-6 font-medium text-[#08080A]"
+              className="flex h-12 w-full items-center justify-between rounded-[var(--radius-pill)] bg-white pl-6 pr-2 font-medium text-[#08080A]"
             >
               Launch App
               <span

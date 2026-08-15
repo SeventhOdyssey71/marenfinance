@@ -4,14 +4,5 @@
   "trailingComma": "all",
   "printWidth": 100,
   "tabWidth": 2,
-  "plugins": ["prettier-plugin-tailwindcss"],
-  "overrides": [
-    {
-      "files": "*.sol",
-      "options": {
-        "singleQuote": false,
-        "printWidth": 120
-      }
-    }
-  ]
+  "plugins": ["prettier-plugin-tailwindcss"]
 }

@@ -1,0 +1,76 @@
+{
+  "expo": {
+    "name": "Maren",
+    "slug": "maren-ios",
+    "version": "0.1.0",
+    "orientation": "portrait",
+    "icon": "./assets/icon.png",
+    "scheme": "maren",
+    "userInterfaceStyle": "dark",
+    "backgroundColor": "#08080A",
+    "newArchEnabled": true,
+    "splash": {
+      "image": "./assets/splash-icon.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#08080A"
+    },
+    "ios": {
+      "bundleIdentifier": "finance.maren.app",
+      "supportsTablet": false,
+      "requireFullScreen": true,
+      "associatedDomains": ["applinks:maren.finance"],
+      "infoPlist": {
+        "NSFaceIDUsageDescription": "Maren uses Face ID to unlock the signing key stored in your device Keychain. Every transaction you sign requires it.",
+        "NSCameraUsageDescription": "Maren uses the camera only to scan payment QR codes. Nothing is recorded or uploaded.",
+        "UIViewControllerBasedStatusBarAppearance": true,
+        "ITSAppUsesNonExemptEncryption": false
+      }
+    },
+    "plugins": [
+      "expo-router",
+      "expo-secure-store",
+      "expo-web-browser",
+      [
+        "expo-local-authentication",
+        {
+          "faceIDPermission": "Maren uses Face ID to unlock the signing key stored in your device Keychain."
+        }
+      ],
+      [
+        "expo-camera",
+        {
+          "cameraPermission": "Maren uses the camera only to scan payment QR codes.",
+          "recordAudioAndroid": false
+        }
+      ],
+      [
+        "expo-font",
+        {
+          "fonts": [
+            "./assets/fonts/Satoshi-Regular.otf",
+            "./assets/fonts/Satoshi-Medium.otf",
+            "./assets/fonts/Satoshi-Bold.otf",
+            "./assets/fonts/Satoshi-Black.otf",
+            "./assets/fonts/GeistMono-Regular.otf",
+            "./assets/fonts/GeistMono-Medium.otf"
+          ]
+        }
+      ],
+      [
+        "expo-splash-screen",
+        {
+          "image": "./assets/splash-icon.png",
+          "backgroundColor": "#08080A",
+          "imageWidth": 160
+        }
+      ]
+    ],
+    "experiments": {
+      "typedRoutes": true
+    },
+    "extra": {
+      "marenNetwork": "testnet",
+      "marenAuthOrigin": "https://maren.finance"
+    }
+  }
+}

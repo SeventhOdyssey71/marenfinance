@@ -2,7 +2,7 @@
   "name": "maren",
   "version": "0.1.0",
   "private": true,
-  "description": "Maren Finance — Bitcoin liquidity, gasless spending, earn yield. Built on Mezo Chain.",
+  "description": "Maren Finance \u2014 Bitcoin liquidity, gasless spending, earn yield. Built on Mezo Chain.",
   "license": "MIT",
   "packageManager": "pnpm@10.19.0",
   "engines": {
@@ -15,8 +15,9 @@
     "typecheck": "turbo run typecheck",
     "test": "turbo run test",
     "clean": "turbo run clean && rm -rf node_modules",
-    "contracts:build": "pnpm --filter @maren/contracts build",
-    "contracts:test": "pnpm --filter @maren/contracts test",
+    "contracts:build": "forge build --root packages/contracts --sizes",
+    "contracts:test": "forge test --root packages/contracts",
+    "contracts:fmt": "forge fmt --root packages/contracts --check",
     "docs:pdf": "node tools/pdf/build.mjs",
     "format": "prettier --write \"**/*.{ts,tsx,js,mjs,json,md,css}\"",
     "format:check": "prettier --check \"**/*.{ts,tsx,js,mjs,json,md,css}\"",
@@ -24,6 +25,7 @@
   },
   "devDependencies": {
     "prettier": "^3.4.2",
+    "prettier-plugin-tailwindcss": "^0.6.9",
     "turbo": "^2.3.3",
     "typescript": "^5.7.2"
   }

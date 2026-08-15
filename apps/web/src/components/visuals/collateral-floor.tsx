@@ -13,60 +13,63 @@ export function CollateralFloor() {
       <div className="mt-7 space-y-6">
         <div>
           <div className="flex items-baseline justify-between gap-4">
-            <span className="text-sm text-text-muted">Mezo trove minimum</span>
-            <span className="num text-sm text-text">0.079 BTC</span>
+            <span className="text-text-muted text-sm">Mezo trove minimum</span>
+            <span className="num text-text text-sm">0.079 BTC</span>
           </div>
-          <div className="mt-2.5 h-2.5 w-full overflow-hidden rounded-[var(--radius-pill)] bg-surface-inset">
+          <div className="bg-surface-inset mt-2.5 h-2.5 w-full overflow-hidden rounded-[var(--radius-pill)]">
             <div className="h-full w-full rounded-[var(--radius-pill)] bg-[linear-gradient(90deg,#3A3A44_0%,#55555F_100%)]" />
           </div>
         </div>
 
         <div>
           <div className="flex items-baseline justify-between gap-4">
-            <span className="text-sm text-text-muted">Maren pooled floor</span>
+            <span className="text-text-muted text-sm">Maren pooled floor</span>
             <span className="num text-sm text-violet-400">0.001 BTC</span>
           </div>
-          <div className="mt-2.5 h-2.5 w-full overflow-hidden rounded-[var(--radius-pill)] bg-surface-inset">
+          <div className="bg-surface-inset mt-2.5 h-2.5 w-full overflow-hidden rounded-[var(--radius-pill)]">
             {/* 0.001 / 0.079 = 1.27% — floored to 6px so it stays visible */}
-            <div className="h-full min-w-[6px] w-[1.27%] rounded-[var(--radius-pill)] bg-violet-500 shadow-[0_0_12px_rgba(91,61,245,0.7)]" />
+            <div className="h-full w-[1.27%] min-w-[6px] rounded-[var(--radius-pill)] bg-violet-500 shadow-[0_0_12px_rgba(91,61,245,0.7)]" />
           </div>
         </div>
       </div>
 
-      <p className="mt-6 text-sm leading-relaxed text-text-subtle">
-        The violet bar is 1.27% of the grey one. That gap is the entire addressable
-        market Mezo is currently turning away.
+      <p className="text-text-subtle mt-6 text-sm leading-relaxed">
+        The violet bar is 1.27% of the grey one. That gap is the entire addressable market Mezo is
+        currently turning away.
       </p>
 
-      <div className="mt-8 hairline-t pt-8">
+      <div className="hairline-t mt-8 pt-8">
         <LivePulseFrame>
-          <div className="rounded-[var(--radius-card)] bg-surface-inset p-5">
+          <div className="bg-surface-inset rounded-[var(--radius-card)] p-5">
             <div className="flex items-center justify-between gap-4">
               <p className="t-label text-text-subtle">Example position</p>
-              <span className="inline-flex items-center gap-2 rounded-[var(--radius-pill)] border border-success/25 bg-success/8 px-2.5 py-1">
-                <span aria-hidden className="size-1.5 rounded-full bg-success" />
-                <span className="text-[0.6875rem] font-medium tracking-wide text-success">
+              <span className="border-success/25 bg-success/8 inline-flex items-center gap-2 rounded-[var(--radius-pill)] border px-2.5 py-1">
+                <span aria-hidden className="bg-success size-1.5 rounded-full" />
+                <span className="text-success text-[0.6875rem] font-medium tracking-wide">
                   Healthy
                 </span>
               </span>
             </div>
 
+            {/* Figures stay neutral. Three saturated colours in one small card reads
+                as decoration, not information — the health chip above is the only
+                thing here that carries a signal, so it is the only thing coloured. */}
             <dl className="mt-5 grid grid-cols-2 gap-x-4 gap-y-4 sm:grid-cols-3">
               <div>
-                <dt className="text-xs text-text-subtle">Collateral</dt>
-                <dd className="num mt-1.5 text-[0.9375rem] text-btc">0.004 BTC</dd>
+                <dt className="text-text-subtle text-xs">Collateral</dt>
+                <dd className="num text-text mt-1.5 text-[0.9375rem]">0.004 BTC</dd>
               </div>
               <div>
-                <dt className="text-xs text-text-subtle">Debt</dt>
-                <dd className="num mt-1.5 text-[0.9375rem] text-musd">100.00 MUSD</dd>
+                <dt className="text-text-subtle text-xs">Debt</dt>
+                <dd className="num text-text mt-1.5 text-[0.9375rem]">100.00 MUSD</dd>
               </div>
               <div className="col-span-2 sm:col-span-1">
-                <dt className="text-xs text-text-subtle">Collateral ratio</dt>
-                <dd className="num mt-1.5 text-[0.9375rem] text-success">252.0%</dd>
+                <dt className="text-text-subtle text-xs">Collateral ratio</dt>
+                <dd className="num text-text mt-1.5 text-[0.9375rem]">252.0%</dd>
               </div>
             </dl>
 
-            <p className="mt-5 text-xs leading-relaxed text-text-subtle">
+            <p className="text-text-subtle mt-5 text-xs leading-relaxed">
               Illustrative figures. Maren liquidates internally at 140%, well above the
               protocol&rsquo;s 110% cliff.
             </p>

@@ -1,0 +1,36 @@
+{
+  "name": "@maren/relayer",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Gasless ERC-2771 meta-transaction relayer for Maren Finance on Mezo. Pays BTC gas so users can hold zero BTC.",
+  "license": "MIT",
+  "type": "module",
+  "main": "./src/server.ts",
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {
+    "dev": "tsx watch src/server.ts",
+    "start": "node --import tsx src/server.ts",
+    "build": "tsc --noEmit",
+    "typecheck": "tsc --noEmit",
+    "lint": "echo 'no linter configured yet' && exit 0",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "clean": "rm -rf dist .turbo node_modules"
+  },
+  "dependencies": {
+    "@hono/node-server": "^1.13.7",
+    "@maren/sdk": "workspace:*",
+    "hono": "^4.6.14",
+    "pino": "^9.5.0",
+    "viem": "^2.21.55",
+    "zod": "^3.24.1"
+  },
+  "devDependencies": {
+    "@types/node": "^22.10.2",
+    "tsx": "^4.19.2",
+    "typescript": "^5.7.2",
+    "vitest": "^2.1.8"
+  }
+}

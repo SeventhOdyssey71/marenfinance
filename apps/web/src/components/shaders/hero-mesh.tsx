@@ -3,8 +3,8 @@
 import dynamic from 'next/dynamic';
 import { useShaderGate } from '@/hooks/use-shader-gate';
 
-const MeshCanvas = dynamic(
-  () => import('./canvases').then((m) => ({ default: m.MeshCanvas })),
+const RibbonCanvas = dynamic(
+  () => import('./canvases').then((m) => ({ default: m.RibbonCanvas })),
   { ssr: false },
 );
 
@@ -26,7 +26,7 @@ export function HeroMesh() {
       <div className="mesh-fallback absolute inset-0" />
       {!reduced && mounted && (
         <div className="absolute inset-0 animate-[maren-reveal_800ms_ease-out_forwards] opacity-0">
-          <MeshCanvas running={visible} />
+          <RibbonCanvas running={visible} />
         </div>
       )}
       {/* Feather the bottom edge into the page background. */}

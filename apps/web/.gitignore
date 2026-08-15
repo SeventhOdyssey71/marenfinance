@@ -3,5 +3,5 @@
 /out/
 next-env.d.ts
 
-# verification artefacts — regenerate with `pnpm --filter @maren/web build && node scripts/shoot.mjs`
+# verification artefacts — regenerate with `pnpm --filter @maren/web build && node scripts/screenshot.mjs`
 /.screenshots/

@@ -30,6 +30,9 @@ const CHROME_CANDIDATES = [
 ].filter(Boolean);
 
 const LAUNCH_ARGS = [
+  // CI runners have no usable Chrome sandbox; without these the browser starts
+  // and dies immediately with "Failed to launch the browser process".
+  ...(process.env.CI ? ['--no-sandbox', '--disable-setuid-sandbox'] : []),
   '--allow-file-access-from-files',
   '--font-render-hinting=none',
   '--disable-lcd-text',
