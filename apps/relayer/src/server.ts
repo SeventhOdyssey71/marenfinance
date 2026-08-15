@@ -6,6 +6,15 @@ import { createRelayer } from './create.js';
  *
  * This is the deployment shape that gets the stuck-transaction sweeper, because
  * it is the one with a process that outlives a request.
+ *
+ * RUN THIS AS `node --import tsx src/server.ts`, which is what `pnpm start`
+ * does — NOT as `tsx src/server.ts`. The tsx CLI wrapper spawns the program as a
+ * CHILD process and does not forward SIGTERM to it (verified against tsx
+ * 4.23.12: the shutdown handler below never ran, and the process died with
+ * signal). Under a process manager that would mean every deploy killed in-flight
+ * submissions between "nonce allocated" and "broadcast returned", which is
+ * exactly the window that leaves a nonce gap stalling every later transaction.
+ * `--import` loads tsx as a loader inside a single process, so signals arrive.
  */
 
 const relayer = await createRelayer({ env: process.env, startWatcher: true });
