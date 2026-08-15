@@ -31,9 +31,17 @@ import { ephemeralIpSalt } from './logger.js';
  * `POST /relay` returns 503 RELAYER_NOT_ACCEPTING and nothing is ever signed or
  * submitted. There is no code path where an absent variable results in relaying.
  *
- * Note the default state of this repo today: `MAREN_ADDRESSES` in @maren/sdk is
- * all zeroes because the contracts are not deployed yet. So an unconfigured
- * relayer is already in the refusing state, which is the correct default.
+ * A note on what does NOT keep this safe any more. This comment used to say that
+ * `MAREN_ADDRESSES` is all zeroes, so an unconfigured relayer is already in the
+ * refusing state. That stopped being true on 15 August 2026, when matsnet
+ * addresses were written into @maren/sdk: `buildTargets` now resolves a real
+ * allowlist on testnet from the SDK alone, with no operator configuration.
+ *
+ * The relayer still refuses, because it has no signing key and `problems` is
+ * non-empty — but it refuses for a different reason than it used to, and the
+ * gate that a reader might assume is holding is not the one doing the work.
+ * A safety property that depends on a data file being empty is not a safety
+ * property; see R8 in docs/research/SECURITY-LESSONS.md.
  */
 
 export interface AllowedTarget {

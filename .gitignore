@@ -70,8 +70,10 @@ Thumbs.db
 # vercel
 .vercel
 
-# agent worktrees — never commit
-.claude/worktrees/
+# agent worktrees and local editor/agent state — never commit.
+# `.claude/worktrees/` alone left `.claude/settings.local.json` untracked but NOT
+# ignored, one `git add -A` away from being committed.
+.claude/
 
 # research scratch — agents occasionally drop probe output in the repo root
 /*.tmp
