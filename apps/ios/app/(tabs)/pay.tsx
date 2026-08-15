@@ -128,8 +128,10 @@ function SendPanel({
   const overBalance = balances !== undefined && amountWei > balances.musdWei;
   const canSend = recipientOk && amountWei > 0n && !overBalance;
 
-  // MarenPay caps the on-chain memo at 80 bytes.
-  const memoBytes = new TextEncoder().encode(memo).length;
+  // MarenPay caps the on-chain memo at 80 BYTES, not characters — one emoji is four.
+  // Computed directly rather than via TextEncoder, whose availability under Hermes
+  // varies by version and which would silently mis-count if it were missing.
+  const memoBytes = utf8Length(memo);
 
   return (
     <>
@@ -351,6 +353,16 @@ function RequestPanel() {
       />
     </>
   );
+}
+
+/** UTF-8 byte length, for the 80-byte on-chain memo cap. */
+function utf8Length(s: string): number {
+  let bytes = 0;
+  for (const char of s) {
+    const cp = char.codePointAt(0) ?? 0;
+    bytes += cp < 0x80 ? 1 : cp < 0x800 ? 2 : cp < 0x10000 ? 3 : 4;
+  }
+  return bytes;
 }
 
 /** Parse a decimal MUSD string to 1e18 wei without going through a float. */

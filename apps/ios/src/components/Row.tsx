@@ -101,7 +101,10 @@ const styles = StyleSheet.create({
     backgroundColor: base.border,
     marginVertical: space.lg,
   },
-  labelCol: { flexShrink: 1 },
+  // The label takes what is left after the numeral, rather than the numeral being
+  // squeezed. A wrapped figure is much worse than a wrapped label — BRAND.md §3 wants
+  // digits in a stable tabular column.
+  labelCol: { flexShrink: 1, flexGrow: 1, flexBasis: 0 },
   valueCol: { alignItems: 'flex-end', flexShrink: 0 },
   sub: { marginTop: 2 },
   hint: { marginTop: 2 },

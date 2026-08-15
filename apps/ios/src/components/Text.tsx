@@ -63,7 +63,7 @@ export function Label({ style, tone = 'subtle', ...rest }: MarenTextProps) {
  * `unit={null}` only when the unit is rendered immediately adjacent by the caller.
  */
 export interface NumProps extends Omit<MarenTextProps, 'variant'> {
-  size?: 'numericXl' | 'numericLg' | 'numeric' | 'numericSm';
+  size?: 'numericXl' | 'numericLg' | 'numericMd' | 'numeric' | 'numericSm';
   /** The already-formatted value, produced by an @maren/sdk formatter. */
   children: ReactNode;
 }

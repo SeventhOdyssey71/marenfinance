@@ -14,6 +14,7 @@
     "clean": "rm -rf .expo dist .turbo node_modules"
   },
   "dependencies": {
+    "@expo/metro-runtime": "^57.0.10",
     "@maren/sdk": "workspace:*",
     "@tanstack/react-query": "^5.101.4",
     "expo": "~57.0.13",
@@ -40,6 +41,7 @@
     "react-native-safe-area-context": "~5.7.0",
     "react-native-screens": "~4.26.2",
     "react-native-svg": "15.15.4",
+    "react-native-url-polyfill": "^4.0.0",
     "viem": "^2.55.16",
     "zustand": "^5.0.15"
   },

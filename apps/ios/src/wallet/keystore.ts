@@ -108,10 +108,10 @@ export async function storeKey(privateKey: Hex): Promise<KeyProtection> {
       sessionKey = null;
       return { mode: 'keychain-biometric', label: biometricName(cap) };
     } catch (error) {
-      // Falling through to session-only is a downgrade, so it is reported, not hidden.
-      const reason = error instanceof Error ? error.message : String(error);
+      // Falling through to session-only is a downgrade, so it is reported, not hidden —
+      // but it is reported in words a person can act on, not as a raw native stack.
       sessionKey = privateKey;
-      return { mode: 'session-only', reason: `Keychain write failed: ${reason}` };
+      return { mode: 'session-only', reason: explainKeychainFailure(error) };
     }
   }
 
@@ -122,6 +122,32 @@ export async function storeKey(privateKey: Hex): Promise<KeyProtection> {
       ? 'No Face ID or Touch ID is enrolled on this device.'
       : cap.reason,
   };
+}
+
+/**
+ * Turn a native Keychain error into something a user can act on.
+ *
+ * The raw errors are Swift exception strings such as "FunctionCallException: Calling the
+ * 'setValueWithKeyAsync' function has failed … MissingPlistKeyException: You must set
+ * `NSFaceIDUsageDescription`". Surfacing that verbatim in a banking app is noise: it
+ * tells the person nothing about what to do and everything about our stack. We keep the
+ * meaning, drop the trace, and say what it means for their key.
+ */
+export function explainKeychainFailure(error: unknown): string {
+  const raw = error instanceof Error ? error.message : String(error);
+
+  if (/NSFaceIDUsageDescription|MissingPlistKey/i.test(raw)) {
+    // The usual cause is running inside Expo Go, whose Info.plist is not ours. A
+    // development or release build of Maren carries the key (see app.json).
+    return 'This build cannot open a biometry-protected Keychain item. Maren’s own builds declare the Face ID usage key; Expo Go does not, so the key cannot be persisted here.';
+  }
+  if (/UserCancel|authentication.*cancel|-128/i.test(raw)) {
+    return 'The biometric prompt was cancelled, so the key was not written.';
+  }
+  if (/biometry.*(not enrolled|lockout)|-7/i.test(raw)) {
+    return 'Biometry is unavailable or locked out on this device.';
+  }
+  return 'The Keychain refused to store the key on this device.';
 }
 
 export type KeyAccess =

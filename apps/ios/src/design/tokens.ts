@@ -136,6 +136,37 @@ export const toneColor: Record<HealthTone, string> = {
   danger: semantic.danger,
 };
 
+/**
+ * The colour for a LARGE health figure — the hero collateral ratio and the scale fill.
+ *
+ * This is deliberately not `toneColor`. BRAND.md §2: "the only saturated colour on a
+ * default screen is the violet CTA… A screen where everything is coloured is a screen
+ * where nothing is important."
+ *
+ * A healthy position is the default state. Rendering it as a 44px green numeral above a
+ * full green bar spends the screen's entire colour budget saying "nothing is wrong",
+ * which leaves nothing louder available for when something is. So at hero scale, green
+ * and neutral both render as plain text, and colour appears only once the position
+ * actually needs attention.
+ *
+ * The small status pill still uses `toneColor`, so the success green is present — it is
+ * simply proportionate to what it is telling you.
+ */
+export const healthHeroColor: Record<HealthTone, string> = {
+  neutral: text.primary,
+  success: text.primary,
+  warning: semantic.warning,
+  danger: semantic.danger,
+};
+
+/** Track fill for the CR scale. Quiet until it matters, for the same reason. */
+export const healthFillColor: Record<HealthTone, string> = {
+  neutral: 'rgba(255,255,255,0.22)',
+  success: 'rgba(255,255,255,0.28)',
+  warning: semantic.warning,
+  danger: semantic.danger,
+};
+
 /** Human-readable status labels. Calm, precise, adult — §1 voice. */
 export const healthLabel: Record<string, string> = {
   none: 'No debt',

@@ -137,7 +137,9 @@ export default function Onboarding() {
                * statement must appear in the UI. Stated before setup, not after.
                */
               <View style={styles.riskNote}>
-                <Txt variant="small" tone="subtle">
+                {/* `muted`, not `subtle`: this is the risk disclosure, and #6B6B75 on
+                    #0C0C0F falls under 4.5:1. Risk copy is never the dimmest text. */}
+                <Txt variant="small" tone="muted">
                   Small positions share one trove. Your collateral is segregated in
                   accounting, not in custody — a drawdown faster than the keeper can
                   respond could socialise losses. Above 0.079 BTC, Maren opens you a
@@ -186,8 +188,11 @@ const styles = StyleSheet.create({
   pager: { flex: 1 },
   panel: {
     paddingHorizontal: space.xl,
-    paddingTop: space.xxxl,
-    justifyContent: 'flex-start',
+    paddingBottom: space.xxl,
+    // Centred rather than top-aligned: the three panels differ in length, and
+    // top-aligning left a large dead gap under the short ones that read as a mistake
+    // rather than as BRAND.md §4's deliberate whitespace.
+    justifyContent: 'center',
   },
   iconWell: {
     width: 56,
