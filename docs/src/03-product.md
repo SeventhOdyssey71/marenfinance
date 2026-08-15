@@ -10,12 +10,12 @@ classification: Shared with the Mezo ecosystem team
 
 Maren is a Bitcoin-backed account. Four surfaces, one identity, on web and iOS.
 
-| Surface | What it does |
-|---|---|
-| **Vault** | Deposit BTC, draw MUSD against it without selling |
-| **Pay** | Send, request, split, and link MUSD — gasless, to a `@handle` |
-| **Earn** | Put idle MUSD to work |
-| **Portfolio** | Position health, capacity, history, alerts |
+| Surface       | What it does                                                  |
+| ------------- | ------------------------------------------------------------- |
+| **Vault**     | Deposit BTC, draw MUSD against it without selling             |
+| **Pay**       | Send, request, split, and link MUSD — gasless, to a `@handle` |
+| **Earn**      | Put idle MUSD to work                                         |
+| **Portfolio** | Position health, capacity, history, alerts                    |
 
 The design constraint that shapes every screen: **a Maren user should never need to hold
 BTC to use their own money.** On a chain where BTC is the gas token, that is not a
@@ -47,6 +47,7 @@ and every signature requires Face ID.
 # 2. Vault
 
 ## Deposit
+
 Native BTC, minimum **0.001 BTC**. On deposit, Maren states which route the user is on
 and why:
 
@@ -58,6 +59,7 @@ volume is better for Maren. A user with enough collateral is told, in plain word
 they do not need to accept pooling risk.
 
 ## Borrow
+
 A slider, not a number field. Dragging it updates three things live:
 
 1. Collateral ratio (rounds **down** — never flatters)
@@ -66,16 +68,18 @@ A slider, not a number field. Dragging it updates three things live:
 
 The slider **stops at 180%** and will not cross it. Below our recommended 250% the
 figures shift from neutral to amber; the copy changes from descriptive to a question:
-*BTC would only need to fall 34% to liquidate this position. Continue?*
+_BTC would only need to fall 34% to liquidate this position. Continue?_
 
 Costs are shown before confirmation, itemised: 0.1% origination fee, 200 MUSD liquidation
 reserve (refunded on close), 1.00% APR simple interest fixed for the life of the loan.
 
 ## Repay, add, withdraw
+
 Standard, with one rule: **withdrawal remains available even when borrowing is paused.**
 If Maren halts the vault, entries close and exits stay open. A user is never trapped.
 
 ## When the price feed is stale
+
 Mezo's oracle reverts if the price is more than 60 seconds old, which makes every
 borrow path fail for reasons unrelated to the user. Rather than showing an opaque error,
 the Vault enters an explicit state:
@@ -107,6 +111,7 @@ then spend money.
 **Scan to pay** (iOS) — QR, for in-person and merchant use.
 
 ## What "gasless" actually means, in the interface
+
 We do not let the word do undefined work. On the confirmation screen:
 
 > **No gas.** Maren pays the Bitcoin network fee for this transaction.
@@ -126,8 +131,8 @@ returns come from liquidation gains, which are lumpy and unpredictable. So:
 
 - We show **trailing realised yield**, explicitly labelled as backward-looking.
 - We show **no forward APY**, because we would be making it up.
-- The copy says so: *Returns come from liquidations, which are irregular. Past returns
-  do not predict future ones.*
+- The copy says so: _Returns come from liquidations, which are irregular. Past returns
+  do not predict future ones._
 
 A less honest version of this screen would raise more deposits. It would also attract
 capital that leaves for the next number, and this product is not for those users.
