@@ -210,9 +210,9 @@ function RouteCard() {
             data-contrast="route-body"
             className="text-text-muted mt-4 max-w-[68ch] text-sm leading-relaxed"
           >
-            Your collateral clears the {formatMusd(MIN_NET_DEBT)} minimum net debt MUSD requires, so
-            you hold your own trove and take no pooling risk. Maren prefers this route whenever it
-            is available, even though pooled volume would be better for us.
+            Your collateral clears the {formatMusd(MIN_NET_DEBT)} minimum net debt the protocol
+            requires, so you hold your own trove and take no pooling risk. Maren prefers this route
+            whenever it is available, even though pooled volume would be better for us.
           </p>
           <p className="text-text-subtle mt-3 max-w-[68ch] text-sm leading-relaxed">
             The pooled vault exists for deposits below about{' '}
