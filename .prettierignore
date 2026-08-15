@@ -9,3 +9,7 @@ packages/contracts/lib
 packages/contracts/out
 packages/contracts/cache
 docs/build
+
+# foundry build output — never format generated artifacts
+packages/contracts/broadcast
+packages/contracts/deployments

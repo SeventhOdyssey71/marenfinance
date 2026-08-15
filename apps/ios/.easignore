@@ -1,0 +1,48 @@
+# R14 — what does NOT leave this machine on an EAS build.
+#
+# SECURITY-LESSONS.md R14 records Talise's Critical C2: production database dumps and
+# Apple signing keys were uploaded to a third-party build service on every mobile build.
+# EAS uploads the project directory as a tarball, so this file is the control that keeps
+# that from happening again. It is enforced BEFORE the first build, not after.
+#
+# .gitignore is NOT consulted when .easignore exists, so everything that must stay
+# local is restated here in full. See README.md § "What leaves this machine".
+
+# ── secrets: never, under any circumstance ──────────────────────────────────
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+*.p8
+*.p12
+*.mobileprovision
+*.jks
+*.keystore
+secrets.json
+google-services.json
+GoogleService-Info.plist
+
+# ── anything resembling data ────────────────────────────────────────────────
+*.sql
+*.dump
+*.sqlite
+*.sqlite3
+*.db
+/fixtures/
+/dumps/
+
+# ── local artefacts with no business in a build ─────────────────────────────
+.screenshots/
+.expo/
+dist/
+coverage/
+node_modules/
+*.log
+.DS_Store
+
+# ── repo material the app build does not need ───────────────────────────────
+/test/
+*.test.ts
+*.test.tsx
+vitest.config.ts
