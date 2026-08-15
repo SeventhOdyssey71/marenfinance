@@ -8,10 +8,9 @@ const RibbonCanvas = dynamic(
   { ssr: false },
 );
 
-const GrainCanvas = dynamic(
-  () => import('./canvases').then((m) => ({ default: m.GrainCanvas })),
-  { ssr: false },
-);
+const GrainCanvas = dynamic(() => import('./canvases').then((m) => ({ default: m.GrainCanvas })), {
+  ssr: false,
+});
 
 /**
  * Shader usage 1 of 3 (CTA half) + usage 3 of 3 — MeshGradient under the

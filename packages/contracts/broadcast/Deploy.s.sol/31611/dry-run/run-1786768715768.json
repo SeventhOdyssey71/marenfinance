@@ -24,9 +24,7 @@
       "contractName": "MarenRegistry",
       "contractAddress": "0x7fa9385be102ac3eac297483dd6233d62b3e1496",
       "function": null,
-      "arguments": [
-        "0x5b73C5498c1E3b4dbA84de0F1833c4a029d90519"
-      ],
+      "arguments": ["0x5b73C5498c1E3b4dbA84de0F1833c4a029d90519"],
       "transaction": {
         "from": "0x1804c8ab1f12e6bbf3894d4083f33e07309d1f38",
         "gas": "0x156d25",

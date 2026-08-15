@@ -1,6 +1,12 @@
 import { Pressable, StyleSheet, View } from 'react-native';
 import { useRouter } from 'expo-router';
-import { collateralValue, formatBtc, formatCollateralRatio, formatUsd, MAREN_POLICY } from '@maren/sdk';
+import {
+  collateralValue,
+  formatBtc,
+  formatCollateralRatio,
+  formatUsd,
+  MAREN_POLICY,
+} from '@maren/sdk';
 
 import { Btc, Musd, Ratio, Usd } from '../../src/components/Money';
 import { Card } from '../../src/components/Card';
@@ -47,7 +53,7 @@ export default function Home() {
   const { data: balances } = useBalances();
   const health = useHealth();
 
-  const tone = health ? healthTone[health.status] ?? 'neutral' : 'neutral';
+  const tone = health ? (healthTone[health.status] ?? 'neutral') : 'neutral';
   /** Small semantic indicator — keeps the success green. */
   const pillColour = toneColor[tone];
   /** Hero numeral — neutral while healthy, per BRAND.md §2. */
@@ -75,11 +81,7 @@ export default function Home() {
             label={hidden ? 'Show amounts' : 'Hide amounts'}
             onPress={toggleHidden}
           />
-          <IconButton
-            name="settings"
-            label="Settings"
-            onPress={() => router.push('/settings')}
-          />
+          <IconButton name="settings" label="Settings" onPress={() => router.push('/settings')} />
         </View>
       </View>
 
@@ -139,8 +141,8 @@ export default function Home() {
               <View style={styles.blockedNote} accessibilityRole="alert">
                 <Icon name="alert" size={16} color={toneColor.warning} />
                 <Txt variant="small" tone="muted" style={styles.blockedText}>
-                  Below {formatCollateralRatio(MAREN_POLICY.minHealthyCr)} Maren does not
-                  let you borrow more. Repay or add collateral to reopen borrowing.
+                  Below {formatCollateralRatio(MAREN_POLICY.minHealthyCr)} Maren does not let you
+                  borrow more. Repay or add collateral to reopen borrowing.
                 </Txt>
               </View>
             ) : null}
@@ -166,12 +168,20 @@ export default function Home() {
           <StatRow
             label="Bitcoin collateral"
             accessibilityLabel={`Bitcoin collateral ${position ? formatBtc(position.collateralWei) : 'unknown'}`}
-            value={position ? <Btc wei={position.collateralWei} size="numericMd" hidden={hidden} /> : <Dash />}
+            value={
+              position ? (
+                <Btc wei={position.collateralWei} size="numericMd" hidden={hidden} />
+              ) : (
+                <Dash />
+              )
+            }
             sub={collateralUsd !== null ? <Usd wei={collateralUsd} hidden={hidden} /> : null}
           />
           <StatRow
             label="MUSD balance"
-            value={balances ? <Musd wei={balances.musdWei} size="numericMd" hidden={hidden} /> : <Dash />}
+            value={
+              balances ? <Musd wei={balances.musdWei} size="numericMd" hidden={hidden} /> : <Dash />
+            }
             sub={
               <Txt variant="small" tone="subtle">
                 spendable
@@ -204,10 +214,9 @@ export default function Home() {
           </Txt>
         </View>
         <Txt variant="small" tone="subtle" style={styles.gasBody}>
-          Mezo charges gas in BTC. Maren’s relayer pays it for every payment and Earn
-          action, so your BTC stays collateral. Vault operations go through Mezo’s own
-          signed borrower contract and are not sponsored — the Vault screen says so before
-          you sign.
+          Mezo charges gas in BTC. Maren’s relayer pays it for every payment and Earn action, so
+          your BTC stays collateral. Vault operations go through Mezo’s own signed borrower contract
+          and are not sponsored — the Vault screen says so before you sign.
         </Txt>
       </Card>
     </Screen>

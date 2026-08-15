@@ -75,8 +75,8 @@ Feasibility PDFs, and a link to the repository once it is made public.
 whole pitch in one line, and it demonstrates the work was done before the ask was made.
 
 **It gives before it asks.** Four concrete findings, three with fixes already written,
-offered unconditionally. This changes the frame from *founder requesting money* to
-*contributor who is already contributing*.
+offered unconditionally. This changes the frame from _founder requesting money_ to
+_contributor who is already contributing_.
 
 **It names the hard thing.** Volunteering that the audit costs more than the grant is
 counter-intuitive but it is the single most credibility-building sentence in the message.

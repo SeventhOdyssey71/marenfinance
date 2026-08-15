@@ -85,22 +85,17 @@ export function Frictions() {
               >
                 <div className="flex items-center gap-4">
                   <span className="num text-sm text-violet-400">{item.index}</span>
-                  <span
-                    aria-hidden
-                    className="h-px flex-1 bg-[var(--border-hairline)]"
-                  />
+                  <span aria-hidden className="h-px flex-1 bg-[var(--border-hairline)]" />
                   <span className="t-label text-text-subtle">{item.friction}</span>
                 </div>
 
                 <h3 className="t-h2 mt-7 text-balance">{item.answer}</h3>
 
-                <p className="mt-5 text-base leading-relaxed text-text-muted">
-                  {item.body}
-                </p>
+                <p className="text-text-muted mt-5 text-base leading-relaxed">{item.body}</p>
 
                 <ul className="mt-7 space-y-3.5">
                   {item.points.map((p) => (
-                    <li key={p} className="flex gap-3.5 text-sm text-text-muted">
+                    <li key={p} className="text-text-muted flex gap-3.5 text-sm">
                       <span
                         aria-hidden
                         className="mt-[0.5625rem] size-1 shrink-0 rounded-full bg-violet-400"

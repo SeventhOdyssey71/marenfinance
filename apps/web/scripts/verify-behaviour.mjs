@@ -48,11 +48,10 @@ const check = (name, pass, detail = '') => {
   });
   check('reduced-motion: static gradient fallback present', Boolean(fallback));
 
-  const revealed = await page.evaluate(
-    () =>
-      [...document.querySelectorAll('.reveal')].every(
-        (el) => Number(getComputedStyle(el).opacity) > 0.99,
-      ),
+  const revealed = await page.evaluate(() =>
+    [...document.querySelectorAll('.reveal')].every(
+      (el) => Number(getComputedStyle(el).opacity) > 0.99,
+    ),
   );
   check('reduced-motion: all content visible (no stuck opacity:0)', revealed);
   await ctx.close();
@@ -93,10 +92,7 @@ const check = (name, pass, detail = '') => {
   const second = triggers.nth(1);
   await second.focus();
   await page.keyboard.press('Enter');
-  check(
-    'faq: keyboard Enter toggles',
-    (await second.getAttribute('aria-expanded')) === 'true',
-  );
+  check('faq: keyboard Enter toggles', (await second.getAttribute('aria-expanded')) === 'true');
 
   const ring = await page.evaluate(() => {
     const el = document.activeElement;
@@ -137,8 +133,8 @@ const check = (name, pass, detail = '') => {
     landmarks.header === 1 && landmarks.main === 1 && landmarks.footer === 1 && landmarks.navs >= 2,
     JSON.stringify(landmarks),
   );
-  const imgAlt = await page.evaluate(
-    () => [...document.querySelectorAll('svg[role=img]')].every((s) => s.hasAttribute('aria-label')),
+  const imgAlt = await page.evaluate(() =>
+    [...document.querySelectorAll('svg[role=img]')].every((s) => s.hasAttribute('aria-label')),
   );
   check('every role=img svg has an aria-label', imgAlt);
   await ctx.close();

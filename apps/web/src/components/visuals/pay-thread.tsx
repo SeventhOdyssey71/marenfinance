@@ -14,31 +14,31 @@ export function PayThread() {
         {rows.map((r) => (
           <li
             key={r.handle}
-            className="flex items-center gap-3 rounded-[var(--radius-card)] bg-surface-inset p-4 sm:gap-4"
+            className="bg-surface-inset flex items-center gap-3 rounded-[var(--radius-card)] p-4 sm:gap-4"
           >
             <span
               aria-hidden
-              className="grid size-9 shrink-0 place-items-center rounded-[var(--radius-pill)] border border-[var(--border-hairline)] bg-surface-raised text-[0.8125rem] font-medium text-text-muted"
+              className="bg-surface-raised text-text-muted grid size-9 shrink-0 place-items-center rounded-[var(--radius-pill)] border border-[var(--border-hairline)] text-[0.8125rem] font-medium"
             >
               {r.handle.charAt(1).toUpperCase()}
             </span>
             <div className="min-w-0 flex-1">
-              <p className="num truncate text-[0.9375rem] text-text">{r.handle}</p>
-              <p className="mt-0.5 truncate text-xs text-text-subtle">{r.memo}</p>
+              <p className="num text-text truncate text-[0.9375rem]">{r.handle}</p>
+              <p className="text-text-subtle mt-0.5 truncate text-xs">{r.memo}</p>
             </div>
             <div className="shrink-0 text-right">
-              <p className="num text-[0.9375rem] text-text">
+              <p className="num text-text text-[0.9375rem]">
                 <span className="text-text-subtle">{r.out ? '−' : '+'}</span>
                 {r.amount}
               </p>
-              <p className="num mt-0.5 text-[0.6875rem] text-text-subtle">MUSD</p>
+              <p className="num text-text-subtle mt-0.5 text-[0.6875rem]">MUSD</p>
             </div>
           </li>
         ))}
       </ul>
 
-      <div className="mt-6 flex items-center gap-2 rounded-[var(--radius-pill)] border border-[var(--border-hairline)] bg-surface-inset py-2 pr-2 pl-4">
-        <span className="num flex-1 truncate text-sm text-text-subtle">
+      <div className="bg-surface-inset mt-6 flex items-center gap-2 rounded-[var(--radius-pill)] border border-[var(--border-hairline)] py-2 pl-4 pr-2">
+        <span className="num text-text-subtle flex-1 truncate text-sm">
           @handle · amount · memo
         </span>
         <span className="inline-flex h-9 shrink-0 items-center rounded-[var(--radius-pill)] bg-white px-4 text-[0.8125rem] font-medium text-[#08080A]">
@@ -46,9 +46,9 @@ export function PayThread() {
         </span>
       </div>
 
-      <p className="mt-5 text-sm leading-relaxed text-text-subtle">
-        Handles resolve on-chain. Memos are indexed events. Payment links can be claimed
-        by someone who has never touched Mezo and holds no BTC.
+      <p className="text-text-subtle mt-5 text-sm leading-relaxed">
+        Handles resolve on-chain. Memos are indexed events. Payment links can be claimed by someone
+        who has never touched Mezo and holds no BTC.
       </p>
     </div>
   );

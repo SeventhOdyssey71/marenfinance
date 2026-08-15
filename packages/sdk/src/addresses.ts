@@ -97,8 +97,7 @@ export const MULTICALL3_ADDRESS: Address = '0xcA11bde05977b3631167028862bE2a1739
  * from ChainlinkAggregatorV3Interface — `description()` reverts.
  * Source: github.com/mezo-org/mezod/precompile/priceoracle/
  */
-export const MEZO_PRICE_ORACLE_PRECOMPILE: Address =
-  '0x7b7c000000000000000000000000000000000015';
+export const MEZO_PRICE_ORACLE_PRECOMPILE: Address = '0x7b7c000000000000000000000000000000000015';
 
 /** The BTC gas-token precompile on Mezo. */
 export const MEZO_BTC_PRECOMPILE: Address = '0x7b7C000000000000000000000000000000000000';
@@ -134,8 +133,7 @@ export const PERMIT2_ADDRESS: Address = '0x000000000022D473030F116dDEE9F6B43aC78
  * It is not. Maren uses EIP-2612 permit + ERC-2771 relaying, with EIP-7702 as the
  * upgrade path. See docs/ARCHITECTURE.md §4.
  */
-export const ERC4337_ENTRYPOINT_V07_INERT: Address =
-  '0x0000000071727De22E5E9d8BAf0edAc6f37da032';
+export const ERC4337_ENTRYPOINT_V07_INERT: Address = '0x0000000071727De22E5E9d8BAf0edAc6f37da032';
 
 /**
  * Maren's own deployments. Populated by `packages/contracts/script/Deploy.s.sol`,

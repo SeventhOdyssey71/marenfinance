@@ -41,7 +41,13 @@ export interface IconProps {
 }
 
 export function Icon({ name, size = 20, color = text.primary }: IconProps) {
-  const s = { stroke: color, strokeWidth: 1.6, strokeLinecap: 'round' as const, strokeLinejoin: 'round' as const, fill: 'none' };
+  const s = {
+    stroke: color,
+    strokeWidth: 1.6,
+    strokeLinecap: 'round' as const,
+    strokeLinejoin: 'round' as const,
+    fill: 'none',
+  };
 
   return (
     <Svg width={size} height={size} viewBox="0 0 24 24" accessibilityRole="image">
@@ -56,7 +62,10 @@ export function Icon({ name, size = 20, color = text.primary }: IconProps) {
       {name === 'chevronLeft' && <Path d="M15 5l-7 7 7 7" {...s} />}
       {name === 'scan' && (
         <>
-          <Path d="M4 9V6a2 2 0 0 1 2-2h3M15 4h3a2 2 0 0 1 2 2v3M20 15v3a2 2 0 0 1-2 2h-3M9 20H6a2 2 0 0 1-2-2v-3" {...s} />
+          <Path
+            d="M4 9V6a2 2 0 0 1 2-2h3M15 4h3a2 2 0 0 1 2 2v3M20 15v3a2 2 0 0 1-2 2h-3M9 20H6a2 2 0 0 1-2-2v-3"
+            {...s}
+          />
           <Path d="M4 12h16" {...s} />
         </>
       )}
@@ -66,7 +75,9 @@ export function Icon({ name, size = 20, color = text.primary }: IconProps) {
           <Path d="M8 10.5V7.5a4 4 0 0 1 8 0v3" {...s} />
         </>
       )}
-      {name === 'shield' && <Path d="M12 3.5 19.5 6.5v5.2c0 4.4-3.1 7.9-7.5 9.3-4.4-1.4-7.5-4.9-7.5-9.3V6.5z" {...s} />}
+      {name === 'shield' && (
+        <Path d="M12 3.5 19.5 6.5v5.2c0 4.4-3.1 7.9-7.5 9.3-4.4-1.4-7.5-4.9-7.5-9.3V6.5z" {...s} />
+      )}
       {name === 'alert' && (
         <>
           <Path d="M12 4.5 21 20H3z" {...s} />
@@ -79,7 +90,12 @@ export function Icon({ name, size = 20, color = text.primary }: IconProps) {
           <Path d="M12 7.4V12l3 1.8" {...s} />
         </>
       )}
-      {name === 'external' && <Path d="M13 5h6v6M19 5l-8 8M18 14v4a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4" {...s} />}
+      {name === 'external' && (
+        <Path
+          d="M13 5h6v6M19 5l-8 8M18 14v4a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4"
+          {...s}
+        />
+      )}
       {name === 'copy' && (
         <>
           <Rect x="9" y="9" width="11" height="11" rx="2.2" {...s} />
@@ -105,12 +121,18 @@ export function Icon({ name, size = 20, color = text.primary }: IconProps) {
       {name === 'settings' && (
         <>
           <Circle cx="12" cy="12" r="3.1" {...s} />
-          <Path d="M12 3.2v2.3M12 18.5v2.3M20.8 12h-2.3M5.5 12H3.2M18.2 5.8l-1.6 1.6M7.4 16.6l-1.6 1.6M18.2 18.2l-1.6-1.6M7.4 7.4 5.8 5.8" {...s} />
+          <Path
+            d="M12 3.2v2.3M12 18.5v2.3M20.8 12h-2.3M5.5 12H3.2M18.2 5.8l-1.6 1.6M7.4 16.6l-1.6 1.6M18.2 18.2l-1.6-1.6M7.4 7.4 5.8 5.8"
+            {...s}
+          />
         </>
       )}
       {name === 'faceid' && (
         <>
-          <Path d="M4 8.5V6.5A2.5 2.5 0 0 1 6.5 4h2M15.5 4h2A2.5 2.5 0 0 1 20 6.5v2M20 15.5v2a2.5 2.5 0 0 1-2.5 2.5h-2M8.5 20h-2A2.5 2.5 0 0 1 4 17.5v-2" {...s} />
+          <Path
+            d="M4 8.5V6.5A2.5 2.5 0 0 1 6.5 4h2M15.5 4h2A2.5 2.5 0 0 1 20 6.5v2M20 15.5v2a2.5 2.5 0 0 1-2.5 2.5h-2M8.5 20h-2A2.5 2.5 0 0 1 4 17.5v-2"
+            {...s}
+          />
           <Path d="M9 9.8v1.4M15 9.8v1.4M12 9.8v3.4h-1M9.4 15.6a4 4 0 0 0 5.2 0" {...s} />
         </>
       )}
