@@ -61,6 +61,19 @@ export const healthBands = [
   { label: 'Danger', from: MCR, tone: 'danger' as Tone },
 ] as const;
 
+/**
+ * A POLICY threshold in prose: "180%", not "180.0%".
+ *
+ * The SDK's one-decimal form exists for measured ratios, where the decimal carries
+ * information and the rounding direction matters. A threshold is an exact constant and
+ * setting it in prose as "Maren's 180.0% floor" reads like a machine wrote it. Derived
+ * from the SDK formatter rather than re-implemented, so a change there follows through.
+ */
+export function policyRatio(cr: bigint): string {
+  const formatted = formatCollateralRatio(cr);
+  return formatted.endsWith('.0%') ? `${formatted.slice(0, -3)}%` : formatted;
+}
+
 export function bandCaption(): string {
   return `Healthy at or above ${formatCollateralRatio(MAREN_POLICY.minHealthyCr)} · caution below it · Maren liquidates a pooled position at ${formatCollateralRatio(
     MAREN_POLICY.vaultLiquidationCr,

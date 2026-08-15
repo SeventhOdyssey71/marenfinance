@@ -42,11 +42,19 @@ export function HealthScale({
   // Integer math throughout, then one division at the very end for a CSS percentage.
   const position = Number(((clamped - min) * 1000n) / (max - min)) / 10;
 
+  const percentOf = (value: bigint) => Number(((value - min) * 1000n) / (max - min)) / 10;
+
+  /**
+   * Ticks and their captions share one percentage each. An earlier version spaced the
+   * captions with `justify-between`, which put "180% Maren floor" at the middle of the
+   * track while its tick sat at 37% — a scale whose labels disagree with its marks is
+   * worse than a scale with no labels at all.
+   */
   const marks = [
-    { at: MAREN_POLICY.vaultLiquidationCr, label: '140%' },
-    { at: MAREN_POLICY.warnCr, label: '160%' },
-    { at: MAREN_POLICY.minHealthyCr, label: '180%' },
-    { at: MAREN_POLICY.targetCr, label: '250%' },
+    { at: MAREN_POLICY.vaultLiquidationCr, label: '140', minor: true },
+    { at: MAREN_POLICY.warnCr, label: '160', minor: true },
+    { at: MAREN_POLICY.minHealthyCr, label: '180 floor', minor: false },
+    { at: MAREN_POLICY.targetCr, label: '250 target', minor: false },
   ];
 
   const tone = toneClasses[healthTone[status]];
@@ -63,7 +71,7 @@ export function HealthScale({
             key={mark.label}
             aria-hidden
             className="absolute top-0 h-1.5 w-px bg-white/20"
-            style={{ left: `${Number(((mark.at - min) * 1000n) / (max - min)) / 10}%` }}
+            style={{ left: `${percentOf(mark.at)}%` }}
           />
         ))}
         <span
@@ -73,11 +81,25 @@ export function HealthScale({
         />
       </div>
 
-      <div className="mt-2.5 flex justify-between text-[0.6875rem] text-text-subtle">
-        <span className="num">110% protocol</span>
-        <span className="num">180% Maren floor</span>
-        <span className="num">300%+</span>
+      <div className="relative mt-2.5 h-4 text-[0.6875rem] text-text-subtle">
+        <span className="num absolute left-0">110</span>
+        {marks.map((mark) => (
+          <span
+            key={mark.label}
+            className={`num absolute -translate-x-1/2 whitespace-nowrap ${
+              mark.minor ? 'hidden sm:inline' : ''
+            }`}
+            style={{ left: `${percentOf(mark.at)}%` }}
+          >
+            {mark.label}
+          </span>
+        ))}
+        <span className="num absolute right-0">300+</span>
       </div>
+      <p className="sr-only">
+        Percentages are collateral ratios. Maren refuses to lend below 180%; the protocol
+        liquidates below 110%.
+      </p>
     </div>
   );
 }
