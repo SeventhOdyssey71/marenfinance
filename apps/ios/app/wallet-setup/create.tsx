@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { StyleSheet, View } from 'react-native';
 import { useRouter } from 'expo-router';
 import { shortAddress } from '@maren/sdk';
@@ -40,8 +40,10 @@ export default function CreateWallet() {
   const [error, setError] = useState<string | null>(null);
 
   const generate = useCallback(async () => {
-    setBusy(true);
-    setError(null);
+    // Yield before touching state so nothing here lands synchronously inside the mount
+    // effect below — a synchronous setState in an effect body is a cascading render, and
+    // `busy` already starts true so there is nothing to set on the way in anyway.
+    await Promise.resolve();
     try {
       const key: Hex = createPrivateKey();
       const derived = deriveAddress(key);
@@ -56,8 +58,20 @@ export default function CreateWallet() {
     }
   }, []);
 
+  /** Explicit retry: this one *is* a user event, so resetting state here is correct. */
+  const retry = useCallback(() => {
+    setBusy(true);
+    setError(null);
+    void generate();
+  }, [generate]);
+
+  // Generate exactly once. The ref guard matters because this writes to the Keychain and
+  // raises a Face ID prompt — running it twice would prompt the user twice.
+  const started = useRef(false);
   useEffect(() => {
-    generate();
+    if (started.current) return;
+    started.current = true;
+    void generate();
   }, [generate]);
 
   const finish = () => {
@@ -86,7 +100,7 @@ export default function CreateWallet() {
           <Txt variant="small" tone="muted" style={styles.body}>
             {error}
           </Txt>
-          <PillButton label="Try again" onPress={generate} style={styles.retry} />
+          <PillButton label="Try again" onPress={retry} style={styles.retry} />
         </Card>
       ) : (
         <>

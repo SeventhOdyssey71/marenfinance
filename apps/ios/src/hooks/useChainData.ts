@@ -1,3 +1,4 @@
+import { useEffect, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { assessHealth, type PositionHealth } from '@maren/sdk';
 
@@ -21,10 +22,31 @@ export const queryKeys = {
   activity: ['activity'] as const,
 };
 
+/**
+ * A wall clock that ticks, in unix seconds.
+ *
+ * `Date.now()` read during render is impure: the value changes without any state
+ * changing, so the age of an observation only advanced when something else happened to
+ * re-render the tree. A price could sit on screen reading "12s ago" for a minute. This
+ * makes the passage of time an explicit state change, which is both correct and the
+ * thing that makes the staleness banner appear on its own.
+ */
+function useNowSeconds(intervalMs = 1_000): number {
+  const [now, setNow] = useState(() => Math.floor(Date.now() / 1000));
+
+  useEffect(() => {
+    const id = setInterval(() => setNow(Math.floor(Date.now() / 1000)), intervalMs);
+    return () => clearInterval(id);
+  }, [intervalMs]);
+
+  return now;
+}
+
 export function usePrice(): PriceFeed {
   // Subscribing to the developer stale toggle re-runs classification immediately when
   // it changes, rather than on the next poll.
   const forcedStale = useAppStore((s) => s.forcedStaleSeconds);
+  const now = useNowSeconds();
 
   const { data, error, isLoading } = useQuery({
     queryKey: [...queryKeys.price, forcedStale],
@@ -38,7 +60,7 @@ export function usePrice(): PriceFeed {
   if (isLoading) return { state: 'loading' };
   return classifyPrice(
     data ?? null,
-    Math.floor(Date.now() / 1000),
+    now,
     error ? (error instanceof Error ? error.message : String(error)) : undefined,
   );
 }

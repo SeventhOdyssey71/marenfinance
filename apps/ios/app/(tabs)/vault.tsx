@@ -6,7 +6,6 @@ import {
   assessHealth,
   collateralRatio,
   formatBtc,
-  formatCollateralRatio,
   formatMusd,
   formatUsd,
   liquidationPrice,
@@ -337,7 +336,15 @@ function BorrowPanel({
             <View style={[styles.previewCell, styles.previewCellRight]}>
               <Label>Liquidation price</Label>
               <View style={styles.previewValue}>
-                <Num size="numericLg">{formatUsd(preview.liq)}</Num>
+                {/*
+                  numericMd, not numericLg: a six-figure liquidation price is ten
+                  characters, and at 28px mono that wrapped mid-number across two lines
+                  ("$36,283." / "74") in a half-width cell. A wrapped figure is the one
+                  thing BRAND.md §3's tabular column exists to prevent.
+                */}
+                <Num size="numericMd" numberOfLines={1} adjustsFontSizeToFit>
+                  {formatUsd(preview.liq)}
+                </Num>
               </View>
               <Txt variant="small" tone="muted">
                 {formatPriceDropCaption(preview.health.priceDropToLiquidationBps)}

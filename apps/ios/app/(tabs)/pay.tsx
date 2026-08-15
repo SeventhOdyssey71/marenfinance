@@ -1,5 +1,6 @@
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import { Pressable, StyleSheet, TextInput, View } from 'react-native';
+import { useQuery } from '@tanstack/react-query';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import * as Clipboard from 'expo-clipboard';
 import QRCode from 'react-native-qrcode-svg';
@@ -98,34 +99,41 @@ function SendPanel({
   const [to, setTo] = useState(initialTo ?? '');
   const [amount, setAmount] = useState(initialAmount ?? '');
   const [memo, setMemo] = useState('');
-  const [resolved, setResolved] = useState<Handle | null>(null);
-  const [resolving, setResolving] = useState(false);
 
-  // Deep-linked values from the scanner arrive after mount.
-  useEffect(() => {
+  /**
+   * Deep-linked values from the scanner arrive after mount.
+   *
+   * Adjusted during render against the previous prop rather than in an effect. React's
+   * own guidance for "reset state when a prop changes" is this pattern; the effect
+   * version renders once with the stale value and then again with the new one, which is
+   * the cascading render the purity rules are pointing at.
+   */
+  const [seenParams, setSeenParams] = useState({ to: initialTo, amount: initialAmount });
+  if (seenParams.to !== initialTo || seenParams.amount !== initialAmount) {
+    setSeenParams({ to: initialTo, amount: initialAmount });
     if (initialTo) setTo(initialTo);
     if (initialAmount) setAmount(initialAmount);
-  }, [initialTo, initialAmount]);
+  }
 
-  // Handle resolution through MarenRegistry.
-  useEffect(() => {
-    const query = to.trim();
-    if (!query.startsWith('@')) {
-      setResolved(null);
-      return;
-    }
-    let alive = true;
-    setResolving(true);
-    resolveHandle(query).then((h) => {
-      if (alive) {
-        setResolved(h);
-        setResolving(false);
-      }
-    });
-    return () => {
-      alive = false;
-    };
-  }, [to]);
+  /**
+   * Handle resolution through MarenRegistry.
+   *
+   * A query rather than an effect plus two useStates. It is a keyed async read of remote
+   * data, which is what the rest of the app already uses TanStack Query for — and it
+   * removes the manual `alive` flag, the loading boolean, and the synchronous setState
+   * in an effect that came with hand-rolling it.
+   */
+  const handleQuery = to.trim();
+  const isHandle = handleQuery.startsWith('@') && handleQuery.length > 1;
+
+  const { data: resolvedData, isFetching: resolving } = useQuery({
+    queryKey: ['handle', handleQuery],
+    queryFn: () => resolveHandle(handleQuery),
+    enabled: isHandle,
+    staleTime: 30_000,
+  });
+
+  const resolved: Handle | null = isHandle ? (resolvedData ?? null) : null;
 
   const amountWei = parseMusd(amount);
   const isAddress = /^0x[0-9a-fA-F]{40}$/.test(to.trim());
@@ -224,9 +232,9 @@ function SendPanel({
             style={styles.amountInput}
             accessibilityLabel="Amount in MUSD"
           />
-          <Txt variant="h3" tone="musd">
+          <Num size="numericSm" tone="musd">
             MUSD
-          </Txt>
+          </Num>
         </View>
 
         <View style={styles.balanceRow}>
@@ -348,9 +356,9 @@ function RequestPanel() {
             style={styles.amountInput}
             accessibilityLabel="Requested amount in MUSD"
           />
-          <Txt variant="h3" tone="musd">
+          <Num size="numericSm" tone="musd">
             MUSD
-          </Txt>
+          </Num>
         </View>
         {amountWei > 0n ? (
           <Txt variant="small" tone="muted" style={styles.memoCount}>

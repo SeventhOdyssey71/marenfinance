@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { Pressable, StyleSheet, View } from 'react-native';
-import { formatMusd, formatUsd } from '@maren/sdk';
+import { formatMusd } from '@maren/sdk';
 
 import { Amount, Musd } from '../../src/components/Money';
 import { Card } from '../../src/components/Card';

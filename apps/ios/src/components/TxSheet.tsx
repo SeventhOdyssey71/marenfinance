@@ -5,7 +5,7 @@ import * as Linking from 'expo-linking';
 import { getChain, shortHash } from '@maren/sdk';
 
 import { describeOutcome, type TxOutcome } from '../chain/receipt';
-import { isSponsored, submitAction, type ActionKind } from '../chain/actions';
+import { submitAction, type ActionKind } from '../chain/actions';
 import { base, brand, radius, semantic, space } from '../design/tokens';
 import { useAppStore } from '../state/store';
 import { Icon } from './Icon';
