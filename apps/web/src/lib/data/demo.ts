@@ -15,7 +15,12 @@ import { useSyncExternalStore } from 'react';
  * here refetches everything rather than leaving half the screen on old numbers.
  */
 
-export type DemoAccount = 'direct' | 'pooled';
+/**
+ * `empty` is a brand-new wallet: no collateral, no debt, no MUSD, no history. It is the
+ * state every user starts in and the one the interface has to be best at, so it is
+ * reachable from the demo controls rather than only by connecting a fresh wallet.
+ */
+export type DemoAccount = 'direct' | 'pooled' | 'empty';
 
 export interface DemoState {
   /** Which mock account is loaded. Changes the borrow route, and so the whole Vault. */

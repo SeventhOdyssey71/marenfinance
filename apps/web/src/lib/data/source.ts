@@ -57,24 +57,44 @@ export interface DataSource {
   connected: boolean;
 }
 
-/** The gate. One expression, one place. */
-export function dataMode(network: MezoNetwork = NETWORK): DataMode {
-  return isDeployed(getMarenAddresses(network).marenVault) ? 'live' : 'mock';
+/** True once Maren's contracts exist at the addresses in the SDK. */
+export function contractsDeployed(network: MezoNetwork = NETWORK): boolean {
+  return isDeployed(getMarenAddresses(network).marenVault);
+}
+
+/**
+ * The gate. One expression, one place.
+ *
+ * Deployment is necessary but not sufficient: reading a position needs an address to
+ * read it FOR. Before the deploy this only asked whether the contracts existed, and the
+ * account fell back to a hardcoded demo address — so once matsnet went live the app
+ * happily read the chain for a wallet that owns nothing and rendered every screen as a
+ * column of dashes. That is the first thing a visitor sees, and it made a working
+ * product look broken.
+ *
+ * So: live when the contracts are deployed AND a wallet is connected. Otherwise the app
+ * previews itself with demo data and says so, which is the honest version of the same
+ * screen and the only one worth showing someone who has not connected yet.
+ */
+export function dataMode(network: MezoNetwork = NETWORK, connected = false): DataMode {
+  return contractsDeployed(network) && connected ? 'live' : 'mock';
 }
 
 export function useDataSource(): DataSource {
   const { address, isConnected } = useAccount();
-  const mode = dataMode();
+  const connected = isConnected && Boolean(address);
+  const mode = dataMode(NETWORK, connected);
 
   return {
     mode,
     network: NETWORK,
-    reason:
-      mode === 'mock'
-        ? 'Maren’s contracts are not deployed yet, so every figure on this screen is demo data.'
+    reason: !contractsDeployed()
+      ? 'Maren’s contracts are not deployed yet, so every figure here is demo data.'
+      : mode === 'mock'
+        ? 'Connect a wallet to read your own position. Until then every figure here is demo data.'
         : `Live from Mezo ${NETWORK}.`,
     account: mode === 'live' && address ? address : mock.MOCK_ADDRESS,
-    connected: isConnected,
+    connected,
   };
 }
 

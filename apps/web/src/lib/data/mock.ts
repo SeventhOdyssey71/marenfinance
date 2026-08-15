@@ -2,7 +2,7 @@ import { BORROWING_RATE, INTEREST_RATE_BPS, MUSD_GAS_COMPENSATION, WAD } from '@
 import type { Address, Hash } from 'viem';
 
 import type { PriceObservation } from '../chain/price';
-import { demoState } from './demo';
+import { demoState, type DemoAccount } from './demo';
 import type {
   ActivityItem,
   Balances,
@@ -59,8 +59,8 @@ export async function readPrice(): Promise<PriceObservation> {
 }
 
 /**
- * Two accounts, because the two borrow routes are genuinely different products and the
- * screen has to be right for both.
+ * Three accounts, because the two borrow routes are genuinely different products, and
+ * the state before either of them is the one every user actually starts in.
  *
  *   direct — 0.5 BTC against 12,000 MUSD. At $63k that is a ratio around 260%: healthy,
  *            but not by a wide margin, and one bad week from caution. A demo position at
@@ -68,6 +68,10 @@ export async function readPrice(): Promise<PriceObservation> {
  *   pooled — 0.012 BTC (~$756). Nowhere near the 1,800 MUSD protocol minimum, so a trove
  *            of one's own is impossible and MarenVault is the only route. This is the
  *            user the product exists for.
+ *   empty  — nothing at all. No collateral, no debt, no MUSD, no history. Every derived
+ *            figure on every screen is undefined for this account, which is exactly why
+ *            it exists: it is the state that produced a 60-digit liquidation price, and
+ *            it is the first thing a new user sees.
  */
 const ACCOUNTS = {
   direct: {
@@ -92,6 +96,16 @@ const ACCOUNTS = {
     maxBorrowingCapacityWei: 480_000n * WAD,
     openedDaysAgo: 46,
   },
+  empty: {
+    collateralWei: 0n,
+    principalWei: 0n,
+    musdWei: 0n,
+    btcWei: 0n,
+    earnSharesWei: 0n,
+    earnDepositedWei: 0n,
+    maxBorrowingCapacityWei: 0n,
+    openedDaysAgo: 0,
+  },
 } as const;
 
 type MutableAccount = {
@@ -105,9 +119,10 @@ type MutableAccount = {
   openedDaysAgo: number;
 };
 
-const live: Record<'direct' | 'pooled', MutableAccount> = {
+const live: Record<DemoAccount, MutableAccount> = {
   direct: { ...ACCOUNTS.direct },
   pooled: { ...ACCOUNTS.pooled },
+  empty: { ...ACCOUNTS.empty },
 };
 
 function current(): MutableAccount {
@@ -117,7 +132,27 @@ function current(): MutableAccount {
 export async function readPosition(): Promise<Position> {
   await tick();
   const account = current();
-  const route = demoState().account;
+  const selected = demoState().account;
+
+  /**
+   * A wallet that has never deposited has no route, and inventing one would make the
+   * Vault quote it a liquidation reserve and an origination fee against a debt of zero.
+   * `route: 'none'` is the state every screen branches on to show its empty state.
+   */
+  if (selected === 'empty' || (account.collateralWei === 0n && account.principalWei === 0n)) {
+    return {
+      collateralWei: account.collateralWei,
+      debtWei: 0n,
+      principalWei: 0n,
+      interestWei: 0n,
+      interestRateBps: INTEREST_RATE_BPS,
+      maxBorrowingCapacityWei: 0n,
+      route: 'none',
+      openedAt: 0,
+    };
+  }
+
+  const route = selected === 'pooled' ? 'pooled' : 'direct';
 
   const elapsed = BigInt(account.openedDaysAgo) * BigInt(DAY);
   const interestWei =
@@ -158,6 +193,19 @@ export async function readBalances(): Promise<Balances> {
 export async function readEarn(): Promise<EarnPosition> {
   await tick();
   const account = current();
+
+  // Nothing deposited means no observed window, not a window of zero return. Reporting
+  // "0.00 MUSD realised over 90 days" to someone who has never deposited states a result
+  // they did not get from an experiment they did not run.
+  if (account.earnSharesWei === 0n) {
+    return {
+      sharesWei: 0n,
+      assetsWei: 0n,
+      depositedWei: 0n,
+      trailing: { windowDays: 0, realisedWei: 0n, liquidationEvents: 0, lastGainAt: null },
+    };
+  }
+
   // Share price has drifted above 1.0 as liquidation gains were swept in.
   const assetsWei = (account.earnSharesWei * 1_021_400_000_000_000_000n) / WAD;
   return {
@@ -200,6 +248,9 @@ export async function resolveHandle(query: string): Promise<Handle | null> {
 
 export async function reverseResolve(address: Address): Promise<string | null> {
   await tick();
+  // A new wallet has not registered a handle yet — that is one of the things the empty
+  // state invites the user to do.
+  if (demoState().account === 'empty') return null;
   return HANDLES.find((h) => h.address.toLowerCase() === address.toLowerCase())?.handle ?? null;
 }
 
@@ -300,6 +351,8 @@ let activity: ActivityItem[] | null = null;
 
 export async function readActivity(): Promise<ActivityItem[]> {
   await tick();
+  // A brand-new wallet has done nothing, so it has no history to show.
+  if (demoState().account === 'empty') return [];
   activity ??= seededActivity();
   return [...activity].sort((a, b) => b.at - a.at);
 }
@@ -331,6 +384,7 @@ const seededRequests = (): PaymentRequest[] => [
 
 export async function readRequests(): Promise<PaymentRequest[]> {
   await tick();
+  if (demoState().account === 'empty') return [];
   requests ??= seededRequests();
   return [...requests];
 }
@@ -352,6 +406,7 @@ const seededLinks = (): PaymentLink[] => [
 
 export async function readLinks(): Promise<PaymentLink[]> {
   await tick();
+  if (demoState().account === 'empty') return [];
   links ??= seededLinks();
   return [...links];
 }
