@@ -14,7 +14,7 @@ colophon: |
 
 ## What this document establishes
 
-The investment thesis (MRN-DOC-001) argues that Mezo's constraint is distribution and
+The investment thesis (MRN-001) argues that Mezo's constraint is distribution and
 that Maren removes it. This document establishes that Maren can actually be built, by
 naming every contract it must call, every place the chain diverges from what a
 competent engineer would assume, and every failure mode we have to design around.
@@ -55,7 +55,7 @@ somebody else. Maren is an application layer, not a protocol.
 | Gasless payment settlement              | x402 settlement proxy, live on both networks                                             | Interoperation, not replacement                             |
 | Batched reads                           | Multicall3 at the canonical address on both networks                                     | A corrected chain definition, because viem's omits it       |
 | Sub-minimum borrowing                   | —                                                                                        | `MarenVault`: a pooled trove with per-user accounting       |
-| Meta-transactions for our own contracts | —                                                                                        | `MarenForwarder` + relayer                                  |
+| Meta-transactions for our own contracts | —                                                                                        | `MarenRelayHub` + relayer                                   |
 | Human-readable payment identity         | —                                                                                        | `MarenRegistry`                                             |
 | Consumer payments surface               | —                                                                                        | `MarenPay`                                                  |
 | Stability Pool yield, tokenised         | —                                                                                        | `MarenEarn`, an ERC-4626 wrapper                            |
@@ -265,7 +265,7 @@ breaks.
 
 ### Position math, and which way it rounds
 
-The headline number in MRN-DOC-001 — the collateral required to reach the 1,800 MUSD
+The headline number in MRN-001 — the collateral required to reach the 1,800 MUSD
 minimum — is not a calculation performed in a document. It is the output of
 `collateralRequiredFor()` in `packages/sdk/src/position.ts`, executed against the live
 oracle price of $63,071.83, and asserted by a test that requires the result to fall
@@ -420,7 +420,15 @@ million MUSD and 29,360 holders sit above a CDP with 26 troves in it.
 
 ## Maren's contract architecture
 
-Solidity 0.8.28, Foundry, OpenZeppelin v5. Five contracts, in `packages/contracts/src/`.
+Solidity 0.8.28, Foundry, OpenZeppelin v5. Five deployed contracts in
+`packages/contracts/src/`, alongside the `MarenForwarder` base class that `MarenRelayHub`
+inherits.
+
+This section describes code that exists. The suite is **236 tests passing**, 8 of them
+fork tests executed against the real MUSD protocol on matsnet rather than against mocks,
+and all five deployed contracts are inside the 24,576-byte EIP-170 limit — `MarenVault`,
+the largest and the only one carrying pooled-position accounting, is 14,508 bytes. Where
+this section says a contract does something, `forge test` is the claim's evidence.
 
 The system is easiest to read as two paths: how a user action gets in, and where it
 settles. **Getting in** — the user signs, the relayer pays, the forwarder dispatches:
@@ -429,7 +437,7 @@ settles. **Getting in** — the user signs, the relayer pays, the forwarder disp
 flowchart LR
   U["User<br/>signs EIP-712<br/>holds no BTC"]
   RL["Maren relayer<br/>pays the BTC gas"]
-  F["MarenForwarder<br/>ERC-2771"]
+  F["MarenRelayHub<br/>ERC-2771 + signed fee"]
   P["MarenPay"]
   R["MarenRegistry"]
   V["MarenVault"]
@@ -467,6 +475,72 @@ An ERC-2771 trusted forwarder built on OpenZeppelin's `ERC2771Forwarder`. Users 
 EIP-712 `ForwardRequest`; the relayer submits it and pays the BTC gas. Domain
 `Maren Forwarder`, version `1`. Replay protection is a per-signer nonce plus a deadline.
 Only Maren contracts trust it; it is never a general-purpose relayer.
+
+### `MarenRelayHub` — the forwarder actually deployed
+
+`MarenRelayHub` extends `MarenForwarder` and adds an atomic, signed-fee relay path. It is
+the contract that gets deployed and passed as `trustedForwarder` to everything else. The
+standalone `MarenForwarder` is its base class and must **not** also be deployed and
+trusted: two trusted forwarders would be two independent ways to forge a sender, and only
+one of them would be allowlisted.
+
+It exists because both obvious ways to charge a relay fee are broken. A trailing
+`uint256 relayFee` on every function is covered by the user's signature but no contract
+does anything with it — consent to a number with no settlement attached — and it drags
+relayer economics into `MarenPay` and `MarenVault`. Batching a fee leg and a work leg
+through `executeBatch` looks correct and is not; that is the finding below.
+
+Instead one EIP-712 `RelayedCall` signature covers the target, the exact calldata, the
+gas, the nonce, the deadline, **and** `feeToken` / `feeAmount` / `feeRecipient`. The hub
+takes the fee and performs the call in the same frame, bubbling any inner revert, so fee
+and work settle together or neither does.
+
+| Property                        | How it is enforced                                                   |
+| ------------------------------- | -------------------------------------------------------------------- |
+| Atomic                          | fee then call in one frame; an inner revert is bubbled               |
+| Fee inside the signed payload   | all three fee fields are members of the EIP-712 struct               |
+| One trusted forwarder           | the hub _is_ a `MarenForwarder`; deployment wires exactly one        |
+| End user survives to the target | ERC-2771 suffix, with `_isTrustedByTarget` checked first             |
+| Target and selector allowlist   | per-`(target, selector)`, on the fee path and the fee-free `execute` |
+
+Value is never relayed: `RelayedCall` has no `value` field and `execute` rejects a
+non-zero one. That is why `MarenVault.deposit()` is deliberately absent from the
+allowlist and every action after the deposit is present. A user pays for their first
+deposit; everything afterwards can be sponsored.
+
+### `ERC2771Forwarder.executeBatch` is not atomic for inner-call failures
+
+This one is worth stating carefully, because the batched-fee design is the natural thing
+to reach for and it fails silently.
+
+OpenZeppelin's `ERC2771Forwarder.executeBatch` takes an `atomic` flag, and the obvious
+reading is that setting it makes the batch all-or-nothing. It does not. The flag governs
+**validation** only — untrusted target, expired deadline, bad signature. The inner call
+is a raw `call` whose `success` value is recorded and then used for nothing except
+deciding whether to refund `value`. A failed inner call does not revert the batch, in
+either mode, including when `refundReceiver` is the zero address.
+
+The consequence for a relay design is direct: **a batched fee leg settles even when the
+work leg reverts.** The user is charged for an action that did not happen, and the
+failure is invisible to a caller that only checks that the transaction succeeded.
+
+```solidity
+// Proven, not assumed. The test drives a batch whose work leg reverts and asserts that
+// the fee leg settled anyway — which is why MarenRelayHub disables executeBatch outright
+// rather than documenting a caveat around it.
+function test_executeBatchIsNotAtomicForInnerCallFailures() public { … }
+```
+
+`MarenRelayHub` therefore reverts `executeBatch` with `BatchExecutionDisabled()`. Single
+`execute` does bubble the inner revert and remains available as the fee-free sponsored
+path, and `executeWithFee` is the only way to charge.
+
+> [!NOTE]
+> This is offered to the Mezo team, and to anyone else building ERC-2771 relaying on
+> OpenZeppelin v5, as a finding rather than a complaint. The library behaves exactly as
+> its implementation says; it is the name of the parameter that invites the wrong
+> conclusion. Any relayer that batches a fee alongside the work it is charging for should
+> check this against its own dependency version before shipping.
 
 ### `MarenRegistry` — handles
 
@@ -576,7 +650,7 @@ mechanism is live and audited.
 
 Mezo ships `BorrowerOperationsSignatures`, an EIP-712 signed variant of every borrower
 operation. For **direct** troves, Maren calls Mezo's contract directly rather than
-routing through `MarenForwarder`.
+routing through `MarenRelayHub`.
 
 The reasoning is trust surface, not convenience. Wrapping it would mean a user's
 direct-trove position depends on Maren's forwarder being correct. Calling it means the
@@ -689,11 +763,11 @@ nobody can read a price.
 
 ## Delivery plan
 
-| Stage                  | Network        | Gate                                                                                                                                  |
-| ---------------------- | -------------- | ------------------------------------------------------------------------------------------------------------------------------------- |
-| 1. Build and integrate | matsnet, 31611 | All five contracts deployed, a pooled trove seeded, the full borrow-pay-earn-exit loop run end to end                                 |
-| 2. Audit               | —              | Third-party audit of `MarenVault` and `MarenForwarder` — the two contracts that carry risk — with findings and remediations published |
-| 3. Capped mainnet      | mainnet, 31612 | Vault deployed with a hard cap; the cap is raised only as the position proves out                                                     |
+| Stage                  | Network        | Gate                                                                                                                                 |
+| ---------------------- | -------------- | ------------------------------------------------------------------------------------------------------------------------------------ |
+| 1. Build and integrate | matsnet, 31611 | All five contracts deployed, a pooled trove seeded, the full borrow-pay-earn-exit loop run end to end                                |
+| 2. Audit               | —              | Third-party audit of `MarenVault` and `MarenRelayHub` — the two contracts that carry risk — with findings and remediations published |
+| 3. Capped mainnet      | mainnet, 31612 | Vault deployed with a hard cap; the cap is raised only as the position proves out                                                    |
 
 Mezo Market listing requires MUSD integration, a third-party audit submitted to the
 Supernormal Foundation, and a live mainnet deployment. Deployment itself is
@@ -739,7 +813,7 @@ definition, the endpoint certification rule, the divergence list, and the three 
 discrepancies in section 6 — so the next team pays less than we did.
 
 **We are wrong about demand.** The falsifiable version of the thesis is milestone M2 in
-MRN-DOC-001: 100 distinct addresses holding a pooled position below the 1,800 MUSD
+MRN-001: 100 distinct addresses holding a pooled position below the 1,800 MUSD
 protocol minimum. If sub-minimum borrowing demand does not exist on Mezo, that number
 will not move, and it will not move early. It is deliberately the milestone that is
 hardest to fake and quickest to disprove.
