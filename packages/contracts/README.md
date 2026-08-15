@@ -153,6 +153,26 @@ is exactly what makes `deleverage()` safe.
   runs it at cost: the liquidator receives collateral worth exactly what they repaid and the 5%
   penalty goes to the insurance buffer.
 
+#### Agreement with `packages/sdk/src/position.ts`
+The SDK and this contract must never quote different numbers, or the UI offers users borrows
+the contract then rejects. They use the **same rounding discipline** — collateral ratios round
+DOWN, required collateral and liquidation prices round UP, always in the direction that makes a
+position look less safe — and the same core expressions.
+
+They differ in one deliberate place, and the contract's view functions are named to say so:
+
+| SDK (direct trove) | Vault (pooled) |
+|---|---|
+| `collateralRequiredFor(netDebt, …)` grosses up by the 0.1% fee **and** the 200 MUSD gas compensation | `collateralRequiredForDebt(debt, targetCr)` takes the pooled debt as-is |
+| `maxNetDebtAt(…)` subtracts gas compensation and divides out the fee | `maxBorrowable(user)` does neither |
+
+A pooled position carries no per-user gas compensation — there is one for the whole pooled
+trove, already paid by the protocol's own seed position — and a borrow served from
+`reserveMUSD` pays no origination fee at all. Grossing up in the vault would over-quote every
+pooled user by 200 MUSD of collateral they do not owe. `assessBorrowRoute` decides which of the
+two a given user is quoted; use the SDK's functions for the direct route and the contract's for
+the pooled one.
+
 #### Mezo divergences that shape this contract
 - No `_maxFeePercentage` parameter anywhere. A ported Liquity ABI encodes the wrong selector.
 - `maxBorrowingCapacity` is a per-trove ceiling frozen at the price when the trove opened.
