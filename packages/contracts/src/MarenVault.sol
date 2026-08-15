@@ -732,7 +732,8 @@ contract MarenVault is AccessControl, ERC2771Context, ReentrancyGuard {
      *      to the borrower's debt and puts them fractionally under 180% if they borrow exactly
      *      this number. That fee is governable, so modelling it here would be modelling a
      *      value that can change underneath us; the UI targets 250%, not 180%, and carries its
-     *      own buffer.
+     *      own buffer. The counterpart comment lives on `maxNetDebtAt` in
+     *      packages/sdk/src/position.ts; if you change either, change both.
      */
     function maxBorrowable(address user) external view returns (uint256) {
         uint256 price = _price();
@@ -759,7 +760,9 @@ contract MarenVault is AccessControl, ERC2771Context, ReentrancyGuard {
      *
      *      So: pass a POOLED debt figure (e.g. `debtOf(user)`) to this function, and use the
      *      SDK's `collateralRequiredFor` for the direct-trove route. `assessBorrowRoute` is
-     *      what decides which of the two a given user is being quoted.
+     *      what decides which of the two a given user is being quoted. The counterpart comment
+     *      lives on `collateralRequiredFor` in packages/sdk/src/position.ts; if you change
+     *      either, change both.
      *
      *      Sanity anchor, at the live oracle price of $63,071.83: a DIRECT trove's total debt
      *      at open (1,800 net + 1.8 fee + 200 gas comp = 2,001.8) at 250% needs 0.079346 BTC

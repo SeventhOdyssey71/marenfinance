@@ -21,11 +21,17 @@ import {Test} from "forge-std/Test.sol";
  *     catches it before production. The constants below are the exact bytes the relayer must
  *     reproduce, asserted against a real `execute` round trip.
  *
- *  2. THE RELAY FEE DOES NOT NEED TO BE A PARAMETER ON EVERY FUNCTION. See
- *     `test_relayFeeCanBeSettledInABatchWithoutTouchingAnyFunctionSignature` — a fee leg and
- *     a business leg travel as two separately signed ForwardRequests inside one
- *     `executeBatch`, atomically. The fee is inside a signed payload, which is the property
- *     the relayer actually needs, without a trailing `uint256 relayFee` on every entrypoint.
+ *  2. THE EVIDENCE THAT KILLED THE BATCHED-FEE DESIGN. The tests below were written to
+ *     evaluate settling a relay fee as a second ForwardRequest inside one `executeBatch`,
+ *     as an alternative to a trailing `uint256 relayFee` on every function. They showed it
+ *     does not hold: `executeBatch` does not revert when an inner call fails, in EITHER mode,
+ *     so the fee leg settles for work that reverted.
+ *
+ *     Both designs were therefore rejected and `MarenRelayHub` was built instead — one
+ *     signature covering work and fee, executed in a single frame. These tests are kept
+ *     because the finding is the justification for that contract, and because if a future
+ *     OpenZeppelin release makes `executeBatch` genuinely atomic, this is where we will
+ *     notice. See `test/MarenRelayHub.t.sol` for the design that shipped.
  */
 contract RelayerIntegrationTest is Test {
     /// @dev keccak256 of OpenZeppelin v5's ForwardRequest type string. The relayer must
@@ -151,11 +157,11 @@ contract RelayerIntegrationTest is Test {
      *      vault contracts entirely, and matches ARCHITECTURE.md §4's "a small fee taken in
      *      MUSD inside the same transaction".
      *
-     *      IMPORTANT CAVEAT, PROVEN BELOW: `executeBatch` does NOT roll the fee leg back if
-     *      the work leg's inner call reverts. See
-     *      `test_executeBatchIsNotAtomicForInnerCallFailures`. This test shows the happy path
-     *      only; the relayer must simulate first, or a small relay-hub contract must do
-     *      "take fee, then call target" inside a single forwarded call.
+     *      REJECTED, AND THIS TEST ONLY SHOWS THE HAPPY PATH. `executeBatch` does NOT roll the
+     *      fee leg back when the work leg's inner call reverts — see
+     *      `test_executeBatchIsNotAtomicForInnerCallFailures` directly below. That is why
+     *      `MarenRelayHub` exists and why this pattern is not what Maren ships. Kept as the
+     *      record of what was evaluated.
      */
     function test_relayFeeCanBeSettledInABatchWithoutTouchingAnyFunctionSignature() public {
         bytes32 secret = keccak256("batched");
@@ -211,10 +217,10 @@ contract RelayerIntegrationTest is Test {
      *         be atomic. This is a property of OpenZeppelin's forwarder, not of Maren's
      *         contracts, and it is the easiest way for a relayer to charge a user for nothing.
      *
-     *         CONSEQUENCE FOR apps/relayer: do not rely on `executeBatch` for fee+work
-     *         atomicity. Use single `execute` (which does bubble the inner revert — see the
-     *         next test) and eat the gas on failure, or introduce a small relay-hub contract
-     *         that performs "take fee, then call target" inside ONE forwarded call.
+     *         CONSEQUENCE: `MarenRelayHub` disables `executeBatch` outright and settles fees
+     *         through `executeWithFee`, which performs "take fee, then call target" inside ONE
+     *         frame and bubbles the inner revert. Single `execute` also bubbles (see the next
+     *         test) and remains the fee-free sponsored path.
      */
     function test_executeBatchIsNotAtomicForInnerCallFailures() public {
         uint256 fee = 0.25e18;

@@ -37,6 +37,42 @@ authorisation.
 > which is why every user-facing entrypoint here is small and independently callable rather
 > than a monolith — a 7702-delegated account can batch them.
 
+### `MarenRelayHub` — the forwarder actually deployed
+`MarenRelayHub` **extends** `MarenForwarder` and adds an atomic, signed-fee relay path. Deploy
+**this**, and pass its address as `trustedForwarder` to every other Maren contract. The
+standalone `MarenForwarder` is its base class and must **not** also be deployed and trusted —
+two trusted forwarders would be two independent ways to forge a sender, and only one of them
+would be allowlisted.
+
+It exists because both obvious ways to charge a relay fee are broken:
+
+- **A trailing `uint256 relayFee` on every function** is covered by the signature but no
+  contract does anything with it. It is consent to a number with no settlement attached —
+  signed but unenforced — and it drags relayer economics into `MarenPay` and `MarenVault`.
+- **A fee leg + work leg batched through `executeBatch`** looks correct and is not. See the
+  finding below.
+
+Instead, one EIP-712 `RelayedCall` signature covers the target, the exact calldata, the gas,
+the nonce, the deadline, **and** `feeToken` / `feeAmount` / `feeRecipient`. The hub takes the
+fee and performs the call in the same frame, bubbling any inner revert, so fee and work settle
+together or neither does.
+
+| Property | How it is enforced | Test |
+|---|---|---|
+| Atomic | fee then call in one frame; inner revert is bubbled | `test_property1_revertingWorkRevertsTheFee` |
+| Fee inside the signed payload | all three fee fields are members of the EIP-712 struct | `test_property2_relayerCannotRaiseTheFee` / `…RedirectTheFee` / `…SwapTheFeeToken` |
+| One trusted forwarder | the hub *is* a `MarenForwarder`; `Deploy.s.sol` wires exactly one | `test_property3_hubIsTheSingleTrustedForwarder` |
+| End user survives to the target | ERC-2771 suffix, plus `_isTrustedByTarget` checked first | `test_property4_msgSenderInsideTargetIsTheEndUser` |
+| Target + selector allowlist | per-`(target, selector)`, on the fee path **and** the fee-free `execute` | `test_property5_*` |
+
+`executeBatch` is **disabled** — it reverts with `BatchExecutionDisabled()`. Value is never
+relayed: `RelayedCall` has no `value` field and `execute` rejects a non-zero one, which is why
+`MarenVault.deposit()` is not in the allowlist and every post-deposit action is.
+
+Property 4 is the one most likely to go wrong silently, so it is asserted against
+`test/mocks/SenderProbe.sol`, which records both `_msgSender()` and the raw `msg.sender` —
+a direct observation rather than an inference from a payment that moved the right balances.
+
 ### `MarenRegistry`
 `@handle` → address, 3–32 characters of `[a-z0-9_]` validated on-chain, with commit-reveal
 registration.
@@ -305,8 +341,11 @@ position, not to users.
       (`borrow`, `repay`, `withdraw`, `closePosition`, plus all of `MarenPay` and
       `MarenRegistry`).
 - [ ] `packages/sdk/src/addresses.ts` updated from `deployments/<chainid>.json`.
-- [ ] Third-party audit of `MarenVault` and `MarenForwarder` before mainnet, per
-      `docs/ARCHITECTURE.md` §7.
+- [ ] Third-party audit before mainnet, per `docs/ARCHITECTURE.md` §7. **Audit scope is
+      `MarenVault`, `MarenForwarder` AND `MarenRelayHub`** — the hub holds no funds, but it can
+      make an arbitrary allowlisted call appear to come from any user who has signed anything,
+      and it moves fees under user allowances. It carries authority, which is the thing worth
+      auditing.
 
 ---
 
@@ -321,23 +360,30 @@ constants the relayer must reproduce and proves them with a real `execute` round
 | Type string | `ForwardRequest(address from,address to,uint256 value,uint256 gas,uint256 nonce,uint48 deadline,bytes data)` |
 | Domain | name `Maren Forwarder`, version `1`, plus chainId and verifyingContract |
 
-Three things the relayer needs to know:
+Four things the relayer needs to know:
 
-1. **No Maren function takes a trailing `uint256 relayFee`.** The fee can be bound into a signed
-   payload without polluting every business signature — see
-   `test_relayFeeCanBeSettledInABatchWithoutTouchingAnyFunctionSignature`, where a fee leg
-   (`payWithPermit`) and a work leg travel as two separately signed `ForwardRequest`s.
+1. **No Maren function takes a trailing `uint256 relayFee`, and none will.** Charge fees through
+   `MarenRelayHub.executeWithFee`, where `feeToken`, `feeAmount` and `feeRecipient` are members
+   of the signed `RelayedCall` struct. Build the digest with `relayedCallDigest(...)` rather
+   than transcribing the type string — a one-character difference means every sponsored
+   transaction fails signature recovery in production and nothing catches it first.
 2. **`executeBatch` is NOT atomic for inner-call failures**, in either mode. OpenZeppelin's
    `atomic` flag governs *validation* only — untrusted target, expired deadline, bad signature.
    The inner call is a raw `call` whose `success` is recorded and used for nothing but refunding
    `value`. So a batched fee leg settles even when the work leg reverts, including with
    `refundReceiver == address(0)`. Proven by `test_executeBatchIsNotAtomicForInnerCallFailures`.
-   Single `execute` **does** bubble the inner revert. Until a small relay-hub contract exists
-   that does "take fee, then call target" inside one forwarded call, simulate before relaying.
-3. **Value-bearing calls are not relayable**, which the vault is built for: `deposit()` is the
-   only payable entrypoint, and `borrow` / `repay` / `withdraw` / `closePosition` are separate
-   non-payable externals on an `ERC2771Context` contract. A user pays for their first deposit
-   and everything afterwards can be sponsored.
+   **This is why `MarenRelayHub` disables `executeBatch` outright.** Single `execute` does
+   bubble the inner revert and remains available as the fee-free sponsored path.
+3. **Nothing relays until it is allowlisted.** `MarenRelayHub` enforces a per-`(target,
+   selector)` allowlist on both the fee path and `execute`. `Deploy.s.sol` seeds it; anything
+   added later needs an explicit `setAllowedCalls` from `RELAY_ADMIN_ROLE`.
+4. **Value-bearing calls are not relayable** — the hub rejects them. The vault is built for it:
+   `deposit()` is the only payable entrypoint, and `borrow` / `repay` / `withdraw` /
+   `closePosition` are separate non-payable externals. A user pays for their first deposit and
+   everything afterwards can be sponsored.
+
+Use `apps/relayer`'s allowlist as a second layer, not the only one. The hub's allowlist is the
+one that is on-chain and cannot be bypassed by a compromised relayer key.
 
 ---
 
