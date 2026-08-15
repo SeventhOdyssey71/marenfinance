@@ -67,7 +67,7 @@ export function PriceBanner({ feed }: { feed: PriceFeed }) {
         {isStale ? (
           <>
             <Txt variant="small" tone="muted" style={styles.alertDetail}>
-              Mezo's oracle rejects observations older than {STALE_AFTER_SECONDS}s. This one is{' '}
+              Mezo’s oracle rejects observations older than {STALE_AFTER_SECONDS}s. This one is{' '}
               {feed.ageSeconds}s old, so anything priced against it would revert on-chain.
             </Txt>
             <View style={styles.lastKnown}>
