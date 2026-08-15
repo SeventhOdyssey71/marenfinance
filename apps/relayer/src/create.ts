@@ -161,6 +161,9 @@ export async function createRelayer(options: CreateRelayerOptions): Promise<Rela
 
   // Wire settlement reconciliation back into the service's budget accounting.
   watcher?.setOnSettled((tx, settlement) => service.reconcile(tx, settlement));
+  // Deferred refunds must drain even when no transaction is in flight: a store
+  // outage can leave budget owed back with nothing pending to trigger it.
+  watcher?.setOnSweep(() => service.retryPendingRefunds().then(() => undefined));
 
   const app = buildApp({
     service,

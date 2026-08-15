@@ -91,6 +91,16 @@ export class NonceManager {
    * transaction was in fact broadcast before the error surfaced, reusing its
    * nonce would replace a transaction we already told a user about. A resync
    * from the chain is the only safe recovery.
+   *
+   * KNOWN GAP — a throw here is treated by the caller as "not broadcast", and
+   * that is not always true. If the RPC accepted the transaction but the
+   * response was lost (connection reset, timeout after the node queued it), the
+   * transaction lands and burns gas while the caller refunds the reservation, so
+   * the budget is credited back for spend that really happened. Bounded to one
+   * request's gas, and it under-counts spend rather than over-counting it, which
+   * is the unsafe direction for the budget but not for the user. Closing it
+   * needs the caller to re-read the nonce and check for a landed transaction
+   * before refunding; recorded rather than silently accepted.
    */
   async submit(
     fees: GasFees,
@@ -157,6 +167,13 @@ export interface TxWatcherOptions {
    * the provisional gas reservation against what the transaction actually cost.
    */
   readonly onSettled?: (tx: PendingTx, settlement: Settlement) => void | Promise<void>;
+  /**
+   * Called at the start of every sweep, whether or not anything is pending.
+   * Used to drain deferred quota refunds, which must not wait for a
+   * transaction to settle — a store outage can leave refunds owed while no
+   * transaction is in flight at all.
+   */
+  readonly onSweep?: () => void | Promise<void>;
 }
 
 /**
@@ -175,10 +192,16 @@ export class TxWatcher {
   readonly #pending = new Map<Hash, PendingTx>();
   #timer: NodeJS.Timeout | null = null;
   #onSettled: TxWatcherOptions['onSettled'];
+  #onSweep: TxWatcherOptions['onSweep'];
 
   constructor(options: TxWatcherOptions) {
     this.#options = options;
     this.#onSettled = options.onSettled;
+    this.#onSweep = options.onSweep;
+  }
+
+  setOnSweep(handler: NonNullable<TxWatcherOptions['onSweep']>): void {
+    this.#onSweep = handler;
   }
 
   /**
@@ -218,6 +241,7 @@ export class TxWatcher {
 
   /** One pass. Exposed so tests can drive it deterministically. */
   async sweep(): Promise<void> {
+    await this.#onSweep?.();
     const now = this.#options.now?.() ?? Date.now();
     for (const tx of [...this.#pending.values()]) {
       const settlement = await settle(this.#options.reader, tx.hash);

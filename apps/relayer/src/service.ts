@@ -90,7 +90,11 @@ export interface HealthView {
   readonly store: string;
   readonly inFlight: number;
   readonly watching: number;
+  /** Reserved: in-flight plus committed. What the cap is enforced against. */
   readonly spentTodayWei: string | null;
+  /** Committed only: broadcast and never refunded. What may latch the halt. */
+  readonly committedTodayWei: string | null;
+  readonly pendingRefunds: number;
   readonly dailyBudgetWei: string;
   readonly problems: readonly string[];
 }
@@ -118,6 +122,8 @@ export class RelayerService {
   #budgetHaltedOn: string | null = null;
   /** `payer:nonce` slots currently being processed. See H3 in `relay`. */
   readonly #inFlightRequests = new Set<string>();
+  /** Refunds the store refused. Retried rather than dropped — see `#refund`. */
+  readonly #pendingRefunds: Array<{ key: string; amount: bigint }> = [];
 
   constructor(deps: RelayerServiceDeps) {
     this.#deps = deps;
@@ -181,6 +187,12 @@ export class RelayerService {
     }
     if (config.forwarder === null) {
       throw unavailable('RELAYER_NOT_ACCEPTING', 'no forwarder configured');
+    }
+
+    // Opportunistic: give back any refund the store previously refused, before
+    // it can accumulate into a budget that halts us having spent nothing.
+    if (this.#pendingRefunds.length > 0) {
+      await this.retryPendingRefunds();
     }
 
     // 2. shape --------------------------------------------------------------
@@ -289,7 +301,7 @@ export class RelayerService {
       projectedGasCostWei,
     });
     if (!preCheck.ok) {
-      this.#rejectPolicy(preCheck.error, day, ctx, payer);
+      this.#rejectPolicy(preCheck.error, ctx, payer);
     }
 
     // 5b. AUTHORITATIVE reservation -----------------------------------------
@@ -324,7 +336,7 @@ export class RelayerService {
     });
     if (!confirmed.ok) {
       await this.#release(payer, ctx.ipHash, day, projectedGasCostWei);
-      this.#rejectPolicy(confirmed.error, day, ctx, payer);
+      this.#rejectPolicy(confirmed.error, ctx, payer);
     }
     const decision = confirmed.ok ? confirmed : preCheck;
 
@@ -354,6 +366,9 @@ export class RelayerService {
         (submitCtx) => chain.sendExecute(request, submitCtx, gasLimit),
         { requestId: ctx.requestId, reservedWei: projectedGasCostWei, reservedDay: day, payer },
       );
+      // The reservation is now COMMITTED: it was broadcast and will not be
+      // refunded. Only committed spend may latch the day-long halt.
+      await this.#commitSpend(day, projectedGasCostWei);
     } catch (error) {
       await this.#release(payer, ctx.ipHash, day, projectedGasCostWei);
       logger.error(
@@ -448,6 +463,7 @@ export class RelayerService {
     let balanceWei: bigint | null = null;
     let nonce: number | null = null;
     let spentToday: bigint | null = null;
+    let committedToday: bigint | null = null;
     const problems = [...this.#deps.problems];
 
     if (chain !== null) {
@@ -460,8 +476,16 @@ export class RelayerService {
     }
     try {
       spentToday = await store.get(keys.spendDay(this.#day()));
+      committedToday = await store.get(keys.committedDay(this.#day()));
     } catch {
       problems.push('quota store is unreachable');
+    }
+    if (this.#pendingRefunds.length > 0) {
+      // Not fatal, but it inflates the reserved counter until it clears, so an
+      // operator should see it before it looks like real spend.
+      problems.push(
+        `${this.#pendingRefunds.length} reservation refund(s) could not be written to the quota store`,
+      );
     }
     if (balanceWei !== null && balanceWei < MIN_BALANCE_WEI) {
       problems.push('relayer hot key balance is below the minimum operating balance');
@@ -486,6 +510,8 @@ export class RelayerService {
       inFlight: nonces?.inFlight ?? 0,
       watching: watcher?.size ?? 0,
       spentTodayWei: spentToday?.toString() ?? null,
+      committedTodayWei: committedToday?.toString() ?? null,
+      pendingRefunds: this.#pendingRefunds.length,
       dailyBudgetWei: config.policy.maxDailySpendWei.toString(),
       problems,
     };
@@ -534,6 +560,16 @@ export class RelayerService {
       const updated = await this.#deps.store.incrBy(keys.spendDay(day), delta, DAY_SECONDS);
       if (updated < 0n) {
         await this.#deps.store.incrBy(keys.spendDay(day), -updated, DAY_SECONDS);
+      }
+      // Committed spend tracks the same correction, or the halt would be latched
+      // off a number that never converges on what we actually paid.
+      const committed = await this.#deps.store.incrBy(
+        keys.committedDay(day),
+        delta,
+        DAY_SECONDS,
+      );
+      if (committed < 0n) {
+        await this.#deps.store.incrBy(keys.committedDay(day), -committed, DAY_SECONDS);
       }
     } catch {
       // A reconciliation we cannot record leaves the budget OVER-counted, which
@@ -602,39 +638,149 @@ export class RelayerService {
     return { lifetime, addressDay, ipDay, spendDay };
   }
 
-  /** Log, latch the budget halt if that is what happened, and throw. */
-  #rejectPolicy(error: RelayError, day: string, ctx: RelayContext, payer: Address): never {
-    const { config, logger } = this.#deps;
-    if (error.code === 'GLOBAL_DAILY_BUDGET_EXHAUSTED') {
-      // Halt the whole relayer for the rest of the UTC day rather than
-      // rediscovering the same answer on every request.
-      this.#budgetHaltedOn = day;
-      logger.error(
-        { event: 'relay.budget_halt', day, limitWei: config.policy.maxDailySpendWei },
-        'daily BTC budget exhausted — relaying halted until 00:00 UTC',
-      );
-    }
-    logger.warn(
+  /**
+   * Log a policy rejection and throw it.
+   *
+   * NOTE WHAT THIS DOES NOT DO: it does not latch the day-long budget halt.
+   *
+   * It used to, and that was a free remote denial of service. Because the
+   * reservation now increments BEFORE a request can be rejected for any other
+   * reason, a burst that is entirely refunded still transiently drives the
+   * reserved counter past the cap — and the first request to observe that
+   * transient overage would latch the halt permanently, since the latch was
+   * never re-evaluated once the refunds landed. Demonstrated: 60 concurrent
+   * requests whose calls revert in simulation, against a budget for 20, spent
+   * 0 wei, broadcast nothing, refunded everything, and still took the relayer
+   * offline until 00:00 UTC. It also fired by accident, latching the global
+   * halt when one benign client hit its per-address cap at 10% of budget.
+   *
+   * The halt is now derived from COMMITTED spend only — see `#commitSpend`.
+   */
+  #rejectPolicy(error: RelayError, ctx: RelayContext, payer: Address): never {
+    this.#deps.logger.warn(
       { event: 'relay.rejected', requestId: ctx.requestId, payer, code: error.code },
       error.message,
     );
     throw error;
   }
 
+  /**
+   * Record spend that actually happened, and latch the halt if the day's budget
+   * is genuinely gone.
+   *
+   * `committedDay` only ever counts reservations that were broadcast and never
+   * refunded, so it cannot be inflated by requests that fail simulation, lose a
+   * race, or trip any other limit. That is the whole difference between a halt
+   * that means "we are out of money" and one that means "somebody sent us a lot
+   * of doomed requests at once".
+   */
+  async #commitSpend(day: string, weiSpent: bigint): Promise<void> {
+    const { config, logger, store } = this.#deps;
+    let committed: bigint;
+    try {
+      committed = await store.incrBy(keys.committedDay(day), weiSpent, DAY_SECONDS);
+    } catch {
+      // Losing this write under-counts committed spend, which delays the halt
+      // rather than triggering it early. The reserved counter still enforces the
+      // cap per request, so this is the safe direction.
+      logger.warn({ event: 'relay.commit_failed', day }, 'could not record committed spend');
+      return;
+    }
+    if (committed >= config.policy.maxDailySpendWei) {
+      this.#budgetHaltedOn = day;
+      logger.error(
+        {
+          event: 'relay.budget_halt',
+          day,
+          committedWei: committed,
+          limitWei: config.policy.maxDailySpendWei,
+        },
+        'daily BTC budget spent — relaying halted until 00:00 UTC',
+      );
+    }
+  }
+
+  /**
+   * Give back a reservation that will never become spend.
+   *
+   * A failed INCREMENT fails the request, which is safe. A failed DECREMENT is
+   * not: it leaks the reservation forever, and because the budget is the thing
+   * that halts the relayer, enough leaked refunds take the service offline
+   * having spent nothing. Measured with refunds forced to fail and a budget for
+   * 10: after 10 rejected requests — nothing broadcast, no BTC spent — the
+   * counter read 100% of budget and everything after got RELAYER_NOT_ACCEPTING.
+   * Upstash REST over the public internet is exactly the store that flaps, so
+   * swallowing this was not a theoretical hole.
+   *
+   * So refunds retry, and anything still failing is queued for the reconciler
+   * rather than dropped.
+   */
   async #release(payer: Address, ipHash: string, day: string, weigh: bigint): Promise<void> {
-    const { store } = this.#deps;
     await Promise.all([
-      store.decrBy(keys.lifetime(payer), 1n),
-      store.decrBy(keys.addressDay(payer, day), 1n),
-      store.decrBy(keys.ipDay(ipHash, day), 1n),
-      store.decrBy(keys.spendDay(day), weigh),
-    ]).catch(() => {
-      // Losing a release over-counts the user's quota. That is the safe
-      // direction and is not worth failing the request over.
-      this.#deps.logger.warn({ event: 'relay.release_failed', payer }, 'quota release failed');
-    });
+      this.#refund(keys.lifetime(payer), 1n),
+      this.#refund(keys.addressDay(payer, day), 1n),
+      this.#refund(keys.ipDay(ipHash, day), 1n),
+      this.#refund(keys.spendDay(day), weigh),
+    ]);
+  }
+
+  /** One counter's refund, with retries, then the queue. */
+  async #refund(key: string, amount: bigint): Promise<void> {
+    const { store, logger } = this.#deps;
+    for (let attempt = 0; attempt < REFUND_ATTEMPTS; attempt += 1) {
+      try {
+        await store.decrBy(key, amount);
+        return;
+      } catch {
+        if (attempt < REFUND_ATTEMPTS - 1) {
+          await new Promise((resolve) => setTimeout(resolve, REFUND_BACKOFF_MS * (attempt + 1)));
+        }
+      }
+    }
+    this.#pendingRefunds.push({ key, amount });
+    logger.error(
+      { event: 'relay.refund_deferred', key, pending: this.#pendingRefunds.length },
+      'could not refund a reservation after retries; queued for reconciliation',
+    );
+  }
+
+  /**
+   * Drain refunds that could not be applied at the time.
+   *
+   * Called from the stuck-transaction sweep and opportunistically at the head of
+   * each relay, so a store that flaps for a few seconds does not permanently
+   * consume budget. Entries that still fail stay queued.
+   */
+  async retryPendingRefunds(): Promise<number> {
+    if (this.#pendingRefunds.length === 0) return 0;
+    const queued = this.#pendingRefunds.splice(0, this.#pendingRefunds.length);
+    let recovered = 0;
+    for (const entry of queued) {
+      try {
+        await this.#deps.store.decrBy(entry.key, entry.amount);
+        recovered += 1;
+      } catch {
+        this.#pendingRefunds.push(entry);
+      }
+    }
+    if (recovered > 0) {
+      this.#deps.logger.info(
+        { event: 'relay.refunds_recovered', recovered, stillPending: this.#pendingRefunds.length },
+        'recovered deferred refunds',
+      );
+    }
+    return recovered;
+  }
+
+  /** Number of refunds still owed to the counters. Surfaced on `/health`. */
+  get pendingRefundCount(): number {
+    return this.#pendingRefunds.length;
   }
 }
+
+/** Refund retry budget. Short, because the caller is holding an HTTP request. */
+const REFUND_ATTEMPTS = 3;
+const REFUND_BACKOFF_MS = 25;
 
 function formatBtc(wei: bigint): string {
   const whole = wei / 10n ** 18n;

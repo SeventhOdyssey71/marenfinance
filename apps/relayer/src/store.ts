@@ -156,5 +156,20 @@ export const keys = {
   addressDay: (address: string, day: string): string =>
     `maren:relay:addr:${address.toLowerCase()}:${day}`,
   ipDay: (ipHash: string, day: string): string => `maren:relay:ip:${ipHash}:${day}`,
+  /**
+   * RESERVED spend: in-flight reservations plus committed ones. This is what the
+   * daily cap is enforced against, because a reservation that has not yet been
+   * refunded could still become real spend.
+   */
   spendDay: (day: string): string => `maren:relay:spend:${day}`,
+  /**
+   * COMMITTED spend: reservations that were actually broadcast and never given
+   * back. Only this may latch the day-long halt.
+   *
+   * The two must stay separate. `spendDay` transiently exceeds the cap during
+   * any concurrent burst — including a burst that is entirely refunded — so
+   * latching a halt on it let anyone take the relayer offline for a day for free
+   * by sending requests that fail simulation. See `#latchIfBudgetSpent`.
+   */
+  committedDay: (day: string): string => `maren:relay:committed:${day}`,
 } as const;
