@@ -221,7 +221,92 @@ const check = (name, pass, detail = '') => {
     'deposit is payable, therefore never relayable',
   );
 
+  // --- The two figures that broke, checked where they render ---------------
+  //
+  // A live screenshot showed LIQUIDATION PRICE reading
+  // $57,896,044,618,658,097,711,785,492,504,343,953,926,634,992,332,820,282,019,728.79
+  // — MAX_CR formatted as dollars — and overlapping BITCOIN CAN FALL, because a value
+  // that long sets its grid column's minimum width. Both halves are asserted here: the
+  // figure, and the layout that could not survive it.
+
+  const metricBoxes = await page.evaluate(() => {
+    const labels = [...document.querySelectorAll('.t-label')];
+    const liq = labels.find((el) => /liquidation price/i.test(el.textContent));
+    const fall = labels.find((el) => /bitcoin can fall/i.test(el.textContent));
+    if (!liq || !fall) return null;
+    // `.t-label` is a <span>; its closest <div> is the Metric root, which is the grid
+    // item whose track could be widened by an over-long value.
+    const a = liq.closest('div').getBoundingClientRect();
+    const b = fall.closest('div').getBoundingClientRect();
+    // Side-by-side columns must not intersect horizontally while sharing a row.
+    const sameRow = Math.abs(a.top - b.top) < 8;
+    return { overlap: sameRow && a.right > b.left + 1, aRight: a.right, bLeft: b.left };
+  });
+  check(
+    'app: the liquidation-price and drop columns never overlap',
+    metricBoxes !== null && !metricBoxes.overlap,
+    metricBoxes ? `right=${Math.round(metricBoxes.aRight)} left=${Math.round(metricBoxes.bLeft)}` : 'labels not found',
+  );
+
+  // No figure anywhere in the dApp may be an unbounded number. Sixteen consecutive
+  // digits is far past any real balance and far short of a 2^255 sentinel.
+  const appBody = await page.locator('main').innerText();
+  check(
+    'app: no figure runs to 16+ digits',
+    !/\d[\d,]{15,}/.test(appBody.replace(/,/g, '')),
+    (appBody.match(/\d[\d,]{15,}/) ?? [''])[0].slice(0, 40),
+  );
+
+  // The empty account: a position that does not exist quotes no liquidation price.
+  await page.getByRole('button', { name: 'Demo controls' }).click();
+  await page.getByRole('button', { name: /New wallet/ }).click();
+  await page.waitForTimeout(900);
+
+  const emptyBody = await page.locator('main').innerText();
+  check(
+    'app (no debt): renders no numeric liquidation price',
+    !/liquidation price[\s\S]{0,40}?[\d]/i.test(emptyBody),
+    'a position with no debt has no liquidation price',
+  );
+  check(
+    'app (no debt): never renders the MAX_CR sentinel as dollars',
+    !/\$\d{12,}/.test(emptyBody.replace(/,/g, '')),
+  );
+  // Counts em dashes used as PLACEHOLDER VALUES — an element whose entire content is a
+  // dash — not em dashes in prose, which are punctuation and perfectly welcome.
+  const placeholderDashes = await page.evaluate(
+    () =>
+      [...document.querySelectorAll('main span, main div')].filter(
+        (el) => el.textContent.trim() === '—',
+      ).length,
+  );
+  check(
+    'app (no debt): shows a purposeful empty state, not a grid of dashes',
+    /No position yet/.test(emptyBody) && placeholderDashes === 0,
+    `${placeholderDashes} placeholder dashes on the empty portfolio`,
+  );
+
+  // And the Vault, whose preview derives the same figures from a hypothetical debt.
+  // The demo store is module-level state, so it resets to the default account on every
+  // navigation and has to be re-selected here rather than carried over.
+  await page.goto(BASE + '/app/vault', { waitUntil: 'networkidle' });
+  await page.waitForTimeout(600);
+  await page.getByRole('button', { name: 'Demo controls' }).click();
+  await page.getByRole('button', { name: /New wallet/ }).click();
+  await page.waitForTimeout(900);
+
+  const emptyVault = await page.locator('main').innerText();
+  check(
+    'vault (no debt): renders no numeric liquidation price',
+    !/liquidation price[\s\S]{0,40}?[\d]/i.test(emptyVault),
+  );
+  check(
+    'vault (no debt): lands on Deposit rather than an unusable Borrow slider',
+    (await page.getByRole('tab', { name: 'Deposit' }).getAttribute('aria-selected')) === 'true',
+  );
+
   // --- Vault: the slider stops at the 180% floor ---
+  // (navigating resets the demo account to the direct trove)
   await page.goto(BASE + '/app/vault', { waitUntil: 'networkidle' });
   await page.waitForTimeout(600);
 
