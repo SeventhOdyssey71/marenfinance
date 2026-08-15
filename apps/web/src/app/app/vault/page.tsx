@@ -3,14 +3,20 @@
 import { useMemo, useState } from 'react';
 import {
   BORROWING_RATE,
+  LIQUIDATION_RESERVE,
   MAREN_POLICY,
   MIN_NET_DEBT,
   assessBorrowRoute,
+  borrowCeiling,
+  directTroveThreshold,
   formatApr,
   formatBtc,
   formatMusd,
   formatUsd,
   INTEREST_RATE_BPS,
+  maxWithdrawable,
+  previewBorrow,
+  recommendedBorrow,
 } from '@maren/sdk';
 
 import { AmountField, AmountSlider, Segmented } from '@/components/app/controls';
@@ -43,14 +49,6 @@ import { mutate } from '@/lib/data/mock';
 import { useBalances, usePosition, usePrice } from '@/lib/data/source';
 import { parseUnitsSafe } from '@/lib/copy';
 import { healthLabel, healthTone, policyRatio, toneClasses } from '@/lib/health';
-import {
-  LIQUIDATION_RESERVE,
-  borrowCeiling,
-  directTroveThreshold,
-  maxWithdrawable,
-  previewBorrow,
-  recommendedBorrow,
-} from '@/lib/vault';
 
 type Mode = 'deposit' | 'borrow' | 'repay' | 'withdraw';
 
@@ -71,8 +69,9 @@ const MIN_DEPOSIT = 10n ** 15n;
  * that lands the position on Maren's 180% floor. The control cannot be dragged into a
  * state we would refuse.
  *
- * Every figure in the live preview comes from `@maren/sdk` through `lib/vault.ts`. There
- * is no arithmetic in this file that touches a user's risk.
+ * Every figure in the live preview comes from `@maren/sdk` — `borrowCeiling`,
+ * `recommendedBorrow`, `previewBorrow`, `maxWithdrawable`. There is no arithmetic in
+ * this file that touches a user's risk.
  */
 export default function VaultPage() {
   const [chosen, setChosen] = useState<Mode | null>(null);

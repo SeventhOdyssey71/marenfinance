@@ -99,10 +99,11 @@ export function collateralRequiredFor(
  * Rounds UP: a liquidation price quoted too low is a lie that costs a user their collateral.
  */
 export function liquidationPrice(collateralWei: bigint, debtWei: bigint): bigint {
-  // Debt first, and the order is the whole point: an account with neither collateral
-  // nor debt is not "infinitely close to liquidation", it has nothing to liquidate.
-  // Checking collateral first returned MAX_CR for every empty account, which the UI
-  // then formatted as a 60-digit dollar figure.
+  // Debt is checked FIRST, and the order matters. With no debt there is no
+  // liquidation price at any collateral, including none — an empty account is not
+  // at infinite risk, it is at no risk. Checking collateral first returned the
+  // MAX_CR sentinel for a brand-new wallet, and the UI rendered it literally as a
+  // $5.79e58 liquidation price.
   if (debtWei === 0n) return 0n;
   if (collateralWei === 0n) return MAX_CR;
   const numerator = debtWei * MCR;
@@ -112,6 +113,7 @@ export function liquidationPrice(collateralWei: bigint, debtWei: bigint): bigint
 
 /** The price at which Maren's own keeper would liquidate a pooled position (140%). */
 export function marenLiquidationPrice(collateralWei: bigint, debtWei: bigint): bigint {
+  // Same ordering rule as liquidationPrice above.
   if (debtWei === 0n) return 0n;
   if (collateralWei === 0n) return MAX_CR;
   const numerator = debtWei * MAREN_POLICY.vaultLiquidationCr;

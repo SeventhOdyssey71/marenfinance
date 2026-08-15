@@ -35,9 +35,16 @@ answer it, which looks exactly like a network hang.
 
 ## Mock vs live data
 
-**Maren's contracts are not deployed.** `getMarenAddresses()` in `@maren/sdk` returns the
-zero address for all five, so `isDeployed()` is false and the app runs on mock data with
-a disclosure banner on every screen.
+**This flipped when the contracts were deployed, and the flip is the whole design.**
+Since 15 August 2026 `getMarenAddresses('testnet')` returns real matsnet addresses, so
+`isDeployed()` is true and — because `resolveNetwork()` defaults to `testnet` — **the
+app reads live from chain by default.** On `mainnet`, where the addresses are still
+zero, it runs on mock data with a disclosure banner on every screen.
+
+That means the demo controls (the pooled/direct account switch, the oracle-stall button)
+are no longer reachable on the default network, and the live read path in `./live.ts` is
+now the one users hit. It has **not** been exercised end to end against the deployment.
+Set `NEXT_PUBLIC_MEZO_NETWORK=mainnet` to get the mock behaviour back.
 
 The decision is made in **one place**, `src/lib/data/source.ts`:
 
@@ -107,10 +114,11 @@ adding collateral does not raise it, so both limits are shown and the binding on
 **No forward APY on Earn.** The Stability Pool has no emissions. Trailing realised MUSD
 only, labelled backward-looking, with the liquidation-event count kept visible.
 
-**All position maths comes from `@maren/sdk`.** `src/lib/vault.ts` composes it; it does not
-re-derive ratios, liquidation prices or formatting. Where it adds arithmetic — headroom on
-an existing position, the pooled collateral requirement — the comment says why the SDK
-function does not apply and points at the contract that agrees with it.
+**All position maths comes from `@maren/sdk`.** It is not composed locally any more:
+what used to be `src/lib/vault.ts` now lives in `packages/sdk/src/borrow.ts`, because a
+second copy of it had been written inline in the iOS vault screen and the two had
+drifted. Nothing in this app re-derives a ratio, a liquidation price, a borrow ceiling
+or a number format.
 
 ---
 
