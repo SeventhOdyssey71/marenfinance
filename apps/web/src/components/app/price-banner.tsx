@@ -56,15 +56,17 @@ export function PriceBanner({ feed, className = '' }: { feed: PriceFeed; classNa
         Price feed unavailable
       </div>
       <p className="text-text-muted mt-2 max-w-[60ch] text-sm leading-relaxed">
-        {detail} You can still repay and withdraw. New borrowing is paused until it recovers.
+        {detail} You can still repay and withdraw; new borrowing is paused.
       </p>
       {feed.state === 'stale' ? (
         <p className="text-text-subtle mt-3 text-xs">
+          {/* Struck through and labelled. A stale price shown plainly would be read as
+              current, which is the one mistake this whole state exists to prevent. */}
           Last known price{' '}
           <span className="num decoration-text-subtle line-through">
             {formatUsd(feed.lastKnownWei)}
           </span>{' '}
-          — shown for context only. It is not the current price and nothing is computed from it.
+          — nothing is computed from it.
         </p>
       ) : null}
     </div>

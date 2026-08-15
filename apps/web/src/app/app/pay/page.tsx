@@ -157,7 +157,9 @@ function SendPanel({ runner }: { runner: ReturnType<typeof useTxRunner> }) {
     ],
     gas: {
       sponsored: true,
-      note: 'No gas. Maren pays the Bitcoin network fee for this transaction. The memo is written on-chain as an event and is publicly readable.',
+      // The memo's visibility stays: it is written on-chain and the user is about to
+      // sign it, so this is the last honest moment to say so.
+      note: 'No gas — Maren pays it. The memo is written on-chain and is publicly readable.',
     },
     confirmLabel: 'Send',
     simulate: () => mutate.send(amountWei, resolved?.handle ?? shortAddress(recipient ?? ''), memo),
