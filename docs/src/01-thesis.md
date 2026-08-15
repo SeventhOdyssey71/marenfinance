@@ -1,7 +1,7 @@
 ---
 title: Maren Finance — Investment & Grant Thesis
 subtitle: Mezo's Bitcoin credit primitive works. The constraint is distribution. Maren is the consumer layer that removes it.
-docId: MRN-DOC-001
+docId: MRN-001
 date: 2026-08-15
 version: '1.0'
 classification: Confidential

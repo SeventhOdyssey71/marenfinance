@@ -1,7 +1,7 @@
 ---
 title: Maren Finance — Technical Feasibility & Architecture
 subtitle: What Mezo gives us, what we must build, and the specific places where the chain does not behave the way its documentation says it does.
-docId: MRN-DOC-002
+docId: MRN-002
 date: 2026-08-15
 version: '1.0'
 classification: Confidential

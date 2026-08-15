@@ -8,7 +8,8 @@
     "maren-docs-pdf": "./build.mjs"
   },
   "scripts": {
-    "build": "node ./build.mjs"
+    "build": "node ./build.mjs",
+    "preview": "node ./preview.mjs"
   },
   "dependencies": {
     "highlight.js": "^11.11.1",
@@ -18,5 +19,8 @@
     "pdf-lib": "^1.17.1",
     "pdfjs-dist": "^4.10.38",
     "puppeteer-core": "^24.1.0"
+  },
+  "devDependencies": {
+    "@napi-rs/canvas": "^0.1.100"
   }
 }

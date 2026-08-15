@@ -19,7 +19,8 @@
     "contracts:test": "pnpm --filter @maren/contracts test",
     "docs:pdf": "node tools/pdf/build.mjs",
     "format": "prettier --write \"**/*.{ts,tsx,js,mjs,json,md,css}\"",
-    "format:check": "prettier --check \"**/*.{ts,tsx,js,mjs,json,md,css}\""
+    "format:check": "prettier --check \"**/*.{ts,tsx,js,mjs,json,md,css}\"",
+    "docs:preview": "node tools/pdf/preview.mjs"
   },
   "devDependencies": {
     "prettier": "^3.4.2",
