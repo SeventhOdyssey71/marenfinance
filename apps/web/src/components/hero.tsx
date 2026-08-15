@@ -36,23 +36,20 @@ export function Hero() {
       <div className="container-maren relative">
         {/* Capped so the hero stays a hero on a 27" display instead of turning
             into a page of its own. */}
-        <div className="flex min-h-[min(92svh,1000px)] flex-col justify-center pt-[136px] pb-24 md:min-h-[min(94svh,1120px)] md:pt-40 md:pb-32">
+        <div className="flex min-h-[min(92svh,1000px)] flex-col justify-center pb-24 pt-[136px] md:min-h-[min(94svh,1120px)] md:pb-32 md:pt-40">
           <div className="max-w-[62rem]">
             <EyebrowPill>Built on Mezo</EyebrowPill>
 
-            <h1
-              id="hero-title"
-              className="t-display mt-8 text-balance text-text md:mt-10"
-            >
+            <h1 id="hero-title" className="t-display text-text mt-8 text-balance md:mt-10">
               Spend Bitcoin.
               <br />
               <span className="text-text-muted">Never sell it.</span>
             </h1>
 
-            <p className="prose-measure mt-7 text-[1.0625rem] leading-relaxed text-text-muted md:mt-8 md:text-lg">
+            <p className="prose-measure text-text-muted mt-7 text-[1.0625rem] leading-relaxed md:mt-8 md:text-lg">
               Maren turns Bitcoin into spendable liquidity on Mezo. Deposit from{' '}
-              <span className="num text-text">0.001 BTC</span>, draw MUSD against it, and
-              pay anyone — without holding a gas balance, and without selling a satoshi.
+              <span className="num text-text">0.001 BTC</span>, draw MUSD against it, and pay anyone
+              — without holding a gas balance, and without selling a satoshi.
             </p>
 
             <div className="mt-10 flex flex-col gap-3 sm:flex-row sm:items-center md:mt-12">
@@ -75,7 +72,7 @@ export function Hero() {
             {heroFacts.map((f) => (
               <div key={f.label} className="bg-[#0A0A0D]/80 px-6 py-5 backdrop-blur-sm">
                 <dt className="t-label text-text-subtle">{f.label}</dt>
-                <dd className="num mt-2 text-2xl font-medium tracking-tight text-text">
+                <dd className="num text-text mt-2 text-2xl font-medium tracking-tight">
                   {f.value}
                 </dd>
               </div>

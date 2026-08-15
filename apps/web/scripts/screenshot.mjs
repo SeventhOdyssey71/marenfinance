@@ -187,5 +187,63 @@ for (const shot of closeups) {
   await context.close();
 }
 
+/**
+ * States that only exist after an interaction, and that are the whole point of the
+ * screens they live on: the Vault with Mezo's oracle stalled, and the confirmation sheet
+ * where a payment's resolved address is shown before anything is signed. A design review
+ * that never sees these has not seen the product.
+ */
+const states = [
+  {
+    name: 'state-vault-stale-1440',
+    path: '/app/vault',
+    width: 1440,
+    height: 1100,
+    async act(page) {
+      await page.getByRole('button', { name: 'Demo controls' }).click();
+      await page.getByRole('button', { name: /Stall the oracle/ }).click();
+      await page.waitForTimeout(900);
+    },
+  },
+  {
+    // The pooled route is the differentiator, and its copy and figures differ from the
+    // direct route's in ways a review has to actually look at.
+    name: 'state-vault-pooled-1440',
+    path: '/app/vault',
+    width: 1440,
+    height: 1400,
+    async act(page) {
+      await page.getByRole('button', { name: 'Demo controls' }).click();
+      await page.getByRole('button', { name: /^Pooled/ }).click();
+      await page.waitForTimeout(900);
+    },
+  },
+  {
+    name: 'state-tx-confirm-1440',
+    path: '/app/pay',
+    width: 1440,
+    height: 900,
+    async act(page) {
+      await page.getByRole('button', { name: /^Send / }).click();
+      await page.waitForTimeout(500);
+    },
+  },
+];
+
+for (const shot of states) {
+  const context = await browser.newContext({
+    viewport: { width: shot.width, height: shot.height },
+    deviceScaleFactor: 2,
+    colorScheme: 'dark',
+  });
+  const page = await context.newPage();
+  await page.goto(`${BASE}${shot.path}`, { waitUntil: 'networkidle' });
+  await page.waitForTimeout(700);
+  await shot.act(page);
+  await page.screenshot({ path: join(outDir, `${shot.name}.png`) });
+  console.log(`${shot.name.padEnd(24)} ${shot.width}px @2x`);
+  await context.close();
+}
+
 await browser.close();
-console.log(`\nWrote ${shots.length + closeups.length} screenshots to ${outDir}`);
+console.log(`\nWrote ${shots.length + closeups.length + states.length} screenshots to ${outDir}`);

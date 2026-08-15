@@ -49,9 +49,7 @@ export function AppNav() {
                         href={route.href}
                         aria-current={active ? 'page' : undefined}
                         className={`inline-flex h-9 items-center rounded-[var(--radius-pill)] px-3.5 text-sm transition-colors duration-[120ms] ease-out ${
-                          active
-                            ? 'bg-surface-raised text-text'
-                            : 'text-text-muted hover:text-text'
+                          active ? 'bg-surface-raised text-text' : 'text-text-muted hover:text-text'
                         }`}
                       >
                         {route.label}
@@ -79,7 +77,7 @@ export function AppNav() {
                   <Link
                     href={route.href}
                     aria-current={active ? 'page' : undefined}
-                    className={`inline-flex h-9 items-center rounded-[var(--radius-pill)] px-3.5 text-sm whitespace-nowrap transition-colors duration-[120ms] ease-out ${
+                    className={`inline-flex h-9 items-center whitespace-nowrap rounded-[var(--radius-pill)] px-3.5 text-sm transition-colors duration-[120ms] ease-out ${
                       active ? 'bg-surface-raised text-text' : 'text-text-muted'
                     }`}
                   >

@@ -78,9 +78,9 @@ export default function VaultPage() {
       <div>
         <Label>Vault</Label>
         <h1 className="t-h2 mt-2">Bitcoin credit</h1>
-        <p className="mt-3 max-w-[68ch] text-sm leading-relaxed text-text-muted">
-          Deposit Bitcoin, draw MUSD against it, and never sell the collateral. Repay and
-          withdraw stay open even when borrowing does not.
+        <p className="text-text-muted mt-3 max-w-[68ch] text-sm leading-relaxed">
+          Deposit Bitcoin, draw MUSD against it, and never sell the collateral. Repay and withdraw
+          stay open even when borrowing does not.
         </p>
       </div>
 
@@ -115,7 +115,11 @@ export default function VaultPage() {
             label="Borrow limit"
             hint="Mezo fixes this at the price the trove opened at"
             value={
-              position ? <Musd wei={position.maxBorrowingCapacityWei} size="lg" /> : <Dash size="lg" />
+              position ? (
+                <Musd wei={position.maxBorrowingCapacityWei} size="lg" />
+              ) : (
+                <Dash size="lg" />
+              )
             }
             last
           />
@@ -131,9 +135,7 @@ export default function VaultPage() {
           price={livePrice}
         />
       ) : null}
-      {mode === 'deposit' ? (
-        <DepositPanel runner={runner} price={livePrice} />
-      ) : null}
+      {mode === 'deposit' ? <DepositPanel runner={runner} price={livePrice} /> : null}
       {mode === 'repay' ? <RepayPanel runner={runner} /> : null}
       {mode === 'withdraw' ? (
         <WithdrawPanel
@@ -171,37 +173,34 @@ function RouteCard() {
   return (
     <AppCard>
       <div className="flex flex-wrap items-center justify-between gap-4">
-        <CardTitle>{onPooled ? 'You are on the pooled route' : 'You are on a direct trove'}</CardTitle>
-        <span className="t-label text-text-subtle">
-          {onPooled ? 'Pooled' : 'Direct'}
-        </span>
+        <CardTitle>
+          {onPooled ? 'You are on the pooled route' : 'You are on a direct trove'}
+        </CardTitle>
+        <span className="t-label text-text-subtle">{onPooled ? 'Pooled' : 'Direct'}</span>
       </div>
 
       {onPooled ? (
         <>
-          <p className="mt-4 max-w-[68ch] text-sm leading-relaxed text-text-muted">
-            A trove of your own needs {threshold ? formatBtc(threshold) : '~0.079 BTC'} at the
-            250% we recommend, because MUSD will not open one below{' '}
-            {formatMusd(MIN_NET_DEBT)} of net debt. You hold{' '}
-            {formatBtc(position.collateralWei)}, so your deposit sits inside Maren’s managed
-            trove with a per-user ledger.
+          <p className="text-text-muted mt-4 max-w-[68ch] text-sm leading-relaxed">
+            A trove of your own needs {threshold ? formatBtc(threshold) : '~0.079 BTC'} at the 250%
+            we recommend, because MUSD will not open one below {formatMusd(MIN_NET_DEBT)} of net
+            debt. You hold {formatBtc(position.collateralWei)}, so your deposit sits inside Maren’s
+            managed trove with a per-user ledger.
           </p>
           <div className="mt-4">
             <Note>
               Pooled positions share one trove. Your collateral is segregated in{' '}
-              <em className="not-italic text-text">accounting, not custody</em>: a
-              catastrophic, faster-than-keeper drawdown could socialise losses. Maren
-              liquidates a pooled position internally at{' '}
-              {policyRatio(MAREN_POLICY.vaultLiquidationCr)} — well above the
-              protocol’s 110% — and the 0.001 BTC floor, per-block keeper checks and an
-              insurance buffer funded from vault fees are the mitigations. They are not a
-              guarantee.
+              <em className="text-text not-italic">accounting, not custody</em>: a catastrophic,
+              faster-than-keeper drawdown could socialise losses. Maren liquidates a pooled position
+              internally at {policyRatio(MAREN_POLICY.vaultLiquidationCr)} — well above the
+              protocol’s 110% — and the 0.001 BTC floor, per-block keeper checks and an insurance
+              buffer funded from vault fees are the mitigations. They are not a guarantee.
             </Note>
           </div>
           {assessment?.eligible && assessment.route === 'direct' ? (
-            <p className="mt-4 text-sm leading-relaxed text-text-muted">
-              Your collateral now supports a direct trove. Closing this position and
-              opening one of your own would remove the pooling risk entirely.
+            <p className="text-text-muted mt-4 text-sm leading-relaxed">
+              Your collateral now supports a direct trove. Closing this position and opening one of
+              your own would remove the pooling risk entirely.
             </p>
           ) : null}
         </>
@@ -209,17 +208,16 @@ function RouteCard() {
         <>
           <p
             data-contrast="route-body"
-            className="mt-4 max-w-[68ch] text-sm leading-relaxed text-text-muted"
+            className="text-text-muted mt-4 max-w-[68ch] text-sm leading-relaxed"
           >
-            Your collateral clears the {formatMusd(MIN_NET_DEBT)} minimum net debt MUSD
-            requires, so you hold your own trove and take no pooling risk. Maren prefers
-            this route whenever it is available, even though pooled volume would be better
-            for us.
+            Your collateral clears the {formatMusd(MIN_NET_DEBT)} minimum net debt MUSD requires, so
+            you hold your own trove and take no pooling risk. Maren prefers this route whenever it
+            is available, even though pooled volume would be better for us.
           </p>
-          <p className="mt-3 max-w-[68ch] text-sm leading-relaxed text-text-subtle">
+          <p className="text-text-subtle mt-3 max-w-[68ch] text-sm leading-relaxed">
             The pooled vault exists for deposits below about{' '}
-            {threshold ? formatBtc(threshold) : '0.079 BTC'} — the level where a trove of
-            one’s own becomes impossible rather than merely uncomfortable.
+            {threshold ? formatBtc(threshold) : '0.079 BTC'} — the level where a trove of one’s own
+            becomes impossible rather than merely uncomfortable.
           </p>
         </>
       )}
@@ -328,9 +326,9 @@ function BorrowPanel({
   return (
     <AppCard className="p-6 md:p-8">
       <CardTitle>Borrow MUSD</CardTitle>
-      <p className="mt-3 max-w-[68ch] text-sm leading-relaxed text-text-muted">
-        {formatApr(INTEREST_RATE_BPS)}, simple interest, fixed for the life of this loan.
-        The slider stops at Maren’s 180% floor — it will not let you past it.
+      <p className="text-text-muted mt-3 max-w-[68ch] text-sm leading-relaxed">
+        {formatApr(INTEREST_RATE_BPS)}, simple interest, fixed for the life of this loan. The slider
+        stops at Maren’s 180% floor — it will not let you past it.
       </p>
 
       <div className="mt-8">
@@ -348,7 +346,9 @@ function BorrowPanel({
           onChange={setAmount}
           disabled={disabled}
           label="Amount to borrow"
-          describeValue={(v) => `${formatMusd(v)} of a maximum ${formatMusd(ceiling?.amountWei ?? 0n)}`}
+          describeValue={(v) =>
+            `${formatMusd(v)} of a maximum ${formatMusd(ceiling?.amountWei ?? 0n)}`
+          }
           marker={{
             at: recommended,
             label: `Recommended · ${policyRatio(MAREN_POLICY.targetCr)}`,
@@ -362,7 +362,7 @@ function BorrowPanel({
       </div>
 
       {ceiling && ceiling.amountWei > 0n ? (
-        <p className="mt-4 text-xs leading-relaxed text-text-subtle">
+        <p className="text-text-subtle mt-4 text-xs leading-relaxed">
           {ceiling.binding === 'ceiling'
             ? `Capped by Mezo’s per-trove ceiling — ${formatMusd(ceiling.mezoHeadroomWei)} of it is unused. Your ratio would allow ${formatMusd(ceiling.ratioHeadroomWei)}.`
             : `Capped by Maren’s ${policyRatio(MAREN_POLICY.minHealthyCr)} floor. Mezo’s ceiling would allow ${formatMusd(ceiling.mezoHeadroomWei)}.`}
@@ -413,7 +413,7 @@ function BorrowPanel({
                 position?.route === 'direct' ? (
                   <Musd wei={LIQUIDATION_RESERVE} />
                 ) : (
-                  <span className="text-sm text-text-subtle">none on this route</span>
+                  <span className="text-text-subtle text-sm">none on this route</span>
                 )
               }
             />
@@ -421,16 +421,15 @@ function BorrowPanel({
           </div>
 
           {belowRecommendation ? (
-            <p className="mt-5 max-w-[68ch] text-sm leading-relaxed text-warning" role="status">
-              Bitcoin would only need to fall {dropPercent}% to liquidate this position.
-              That is below the {policyRatio(MAREN_POLICY.targetCr)} we recommend.
-              Continue?
+            <p className="text-warning mt-5 max-w-[68ch] text-sm leading-relaxed" role="status">
+              Bitcoin would only need to fall {dropPercent}% to liquidate this position. That is
+              below the {policyRatio(MAREN_POLICY.targetCr)} we recommend. Continue?
             </p>
           ) : null}
         </div>
       ) : null}
 
-      <p className="mt-6 text-xs leading-relaxed text-text-subtle">
+      <p className="text-text-subtle mt-6 text-xs leading-relaxed">
         {position?.route === 'pooled'
           ? 'Gasless: a pooled borrow carries no BTC with the call, so Maren’s relayer submits it and pays the Bitcoin gas.'
           : 'Direct-trove operations go through Mezo’s own borrower contract and cost BTC gas. Maren does not sponsor them.'}
@@ -510,9 +509,9 @@ function DepositPanel({
   return (
     <AppCard className="p-6 md:p-8">
       <CardTitle>Deposit Bitcoin</CardTitle>
-      <p className="mt-3 max-w-[68ch] text-sm leading-relaxed text-text-muted">
-        Adds collateral and raises your ratio immediately. Note that adding collateral does
-        not raise Mezo’s borrow ceiling — only a refinance does.
+      <p className="text-text-muted mt-3 max-w-[68ch] text-sm leading-relaxed">
+        Adds collateral and raises your ratio immediately. Note that adding collateral does not
+        raise Mezo’s borrow ceiling — only a refinance does.
       </p>
 
       <div className="mt-8 max-w-md">
@@ -542,10 +541,10 @@ function DepositPanel({
         />
       </div>
 
-      <p className="mt-6 max-w-[68ch] text-xs leading-relaxed text-text-subtle">
-        Your first deposit costs BTC gas: it carries value, and the relay hub refuses any
-        request that does. Everything after it — borrow, repay, withdraw on the pooled
-        route, and every payment — is sponsored.
+      <p className="text-text-subtle mt-6 max-w-[68ch] text-xs leading-relaxed">
+        Your first deposit costs BTC gas: it carries value, and the relay hub refuses any request
+        that does. Everything after it — borrow, repay, withdraw on the pooled route, and every
+        payment — is sponsored.
       </p>
 
       <div className="mt-7">
@@ -594,10 +593,9 @@ function RepayPanel({ runner }: { runner: ReturnType<typeof useTxRunner> }) {
   return (
     <AppCard className="p-6 md:p-8">
       <CardTitle>Repay debt</CardTitle>
-      <p className="mt-3 max-w-[68ch] text-sm leading-relaxed text-text-muted">
-        Reduces your principal and raises your ratio. Interest is simple and
-        non-compounding, fixed at the rate this position opened at. Repaying more than you
-        owe repays exactly what you owe.
+      <p className="text-text-muted mt-3 max-w-[68ch] text-sm leading-relaxed">
+        Reduces your principal and raises your ratio. Interest is simple and non-compounding, fixed
+        at the rate this position opened at. Repaying more than you owe repays exactly what you owe.
       </p>
 
       <div className="mt-8 max-w-md">
@@ -617,9 +615,9 @@ function RepayPanel({ runner }: { runner: ReturnType<typeof useTxRunner> }) {
         />
       </div>
 
-      <p className="mt-6 text-xs leading-relaxed text-text-subtle">
-        Repay needs no price. It stays available when the oracle is stale and when
-        borrowing is paused.
+      <p className="text-text-subtle mt-6 text-xs leading-relaxed">
+        Repay needs no price. It stays available when the oracle is stale and when borrowing is
+        paused.
       </p>
 
       <div className="mt-7">
@@ -675,10 +673,10 @@ function WithdrawPanel({
   return (
     <AppCard className="p-6 md:p-8">
       <CardTitle>Withdraw Bitcoin</CardTitle>
-      <p className="mt-3 max-w-[68ch] text-sm leading-relaxed text-text-muted">
+      <p className="text-text-muted mt-3 max-w-[68ch] text-sm leading-relaxed">
         Removes collateral. Maren refuses any withdrawal that would take the position below{' '}
-        {policyRatio(MAREN_POLICY.minHealthyCr)}, so the amount available here is
-        already limited by what you owe.
+        {policyRatio(MAREN_POLICY.minHealthyCr)}, so the amount available here is already limited by
+        what you owe.
       </p>
 
       <div className="mt-8 max-w-md">
@@ -703,9 +701,8 @@ function WithdrawPanel({
           </Note>
         </div>
       ) : (
-        <p className="mt-6 text-xs leading-relaxed text-text-subtle">
-          Withdrawal is never paused. If Maren halts the vault, entries close and exits
-          stay open.
+        <p className="text-text-subtle mt-6 text-xs leading-relaxed">
+          Withdrawal is never paused. If Maren halts the vault, entries close and exits stay open.
         </p>
       )}
 

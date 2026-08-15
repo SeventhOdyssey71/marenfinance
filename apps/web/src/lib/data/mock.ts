@@ -131,8 +131,7 @@ export async function readPosition(): Promise<Position> {
    * pooled user's debt by 200 MUSD, which would then understate their ratio.
    * See `MarenVault.collateralRequiredForDebt` for the counterpart comment.
    */
-  const originationFee =
-    route === 'direct' ? (account.principalWei * BORROWING_RATE) / WAD : 0n;
+  const originationFee = route === 'direct' ? (account.principalWei * BORROWING_RATE) / WAD : 0n;
   const gasCompensation = route === 'direct' ? MUSD_GAS_COMPENSATION : 0n;
 
   const debtWei = account.principalWei + originationFee + interestWei + gasCompensation;

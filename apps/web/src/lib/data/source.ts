@@ -3,12 +3,7 @@
 import { useEffect, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { useAccount, usePublicClient } from 'wagmi';
-import {
-  getMarenAddresses,
-  isDeployed,
-  resolveNetwork,
-  type MezoNetwork,
-} from '@maren/sdk';
+import { getMarenAddresses, isDeployed, resolveNetwork, type MezoNetwork } from '@maren/sdk';
 import type { Address } from 'viem';
 
 import { classifyPrice, type PriceFeed } from '../chain/price';

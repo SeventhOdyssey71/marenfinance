@@ -26,7 +26,7 @@ export function Segmented<T extends string>({
     <div
       role="tablist"
       aria-label={label}
-      className="inline-flex w-full max-w-xl gap-1 rounded-[var(--radius-pill)] border border-[var(--border-hairline)] bg-surface-inset p-1"
+      className="bg-surface-inset inline-flex w-full max-w-xl gap-1 rounded-[var(--radius-pill)] border border-[var(--border-hairline)] p-1"
     >
       {options.map((option) => {
         const active = option.key === value;
@@ -82,7 +82,7 @@ export function AmountField({
 
   return (
     <div>
-      <label htmlFor={id} className="t-label block text-text-subtle">
+      <label htmlFor={id} className="t-label text-text-subtle block">
         {label}
       </label>
 
@@ -97,9 +97,9 @@ export function AmountField({
           placeholder="0.00"
           aria-describedby={error ? `${id}-error` : undefined}
           aria-invalid={error ? true : undefined}
-          className="num min-w-0 flex-1 bg-transparent text-3xl text-text outline-none placeholder:text-text-subtle/60"
+          className="num text-text placeholder:text-text-subtle/60 min-w-0 flex-1 bg-transparent text-3xl outline-none"
         />
-        <span className="t-h3 shrink-0 text-text-muted">{unit}</span>
+        <span className="t-h3 text-text-muted shrink-0">{unit}</span>
       </div>
 
       {max !== undefined ? (
@@ -109,7 +109,7 @@ export function AmountField({
             <button
               type="button"
               onClick={onMax}
-              className="rounded-[var(--radius-pill)] text-text-muted transition-colors duration-[120ms] ease-out hover:text-text"
+              className="text-text-muted hover:text-text rounded-[var(--radius-pill)] transition-colors duration-[120ms] ease-out"
             >
               {max}
             </button>
@@ -126,7 +126,7 @@ export function AmountField({
               key={preset.label}
               type="button"
               onClick={() => onChange(preset.value)}
-              className="inline-flex h-11 items-center rounded-[var(--radius-pill)] border border-[var(--border-hairline)] bg-surface-inset px-4 text-sm text-text-muted transition-colors duration-[120ms] ease-out hover:border-[var(--border-strong)] hover:text-text"
+              className="bg-surface-inset text-text-muted hover:text-text inline-flex h-11 items-center rounded-[var(--radius-pill)] border border-[var(--border-hairline)] px-4 text-sm transition-colors duration-[120ms] ease-out hover:border-[var(--border-strong)]"
             >
               {preset.label}
             </button>
@@ -134,9 +134,9 @@ export function AmountField({
         </div>
       ) : null}
 
-      {hint ? <div className="mt-3 text-xs leading-relaxed text-text-subtle">{hint}</div> : null}
+      {hint ? <div className="text-text-subtle mt-3 text-xs leading-relaxed">{hint}</div> : null}
       {error ? (
-        <p id={`${id}-error`} role="alert" className="mt-3 text-sm text-danger">
+        <p id={`${id}-error`} role="alert" className="text-danger mt-3 text-sm">
           {error}
         </p>
       ) : null}
@@ -215,7 +215,7 @@ export function AmountSlider({
                 type="button"
                 onClick={marker.onSelect}
                 disabled={disabled}
-                className="rounded-[var(--radius-pill)] text-violet-400 transition-colors duration-[120ms] ease-out hover:text-violet-400/80 disabled:text-text-subtle"
+                className="disabled:text-text-subtle rounded-[var(--radius-pill)] text-violet-400 transition-colors duration-[120ms] ease-out hover:text-violet-400/80"
               >
                 {marker.label}
               </button>

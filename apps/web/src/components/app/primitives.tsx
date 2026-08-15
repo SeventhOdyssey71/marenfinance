@@ -63,8 +63,8 @@ export function StatRow({
       }`}
     >
       <div className="min-w-0">
-        <div className="text-sm text-text-muted">{label}</div>
-        {hint ? <div className="mt-1 text-xs text-text-subtle">{hint}</div> : null}
+        <div className="text-text-muted text-sm">{label}</div>
+        {hint ? <div className="text-text-subtle mt-1 text-xs">{hint}</div> : null}
       </div>
       <div className="shrink-0 text-right">
         <div>{value}</div>
@@ -94,7 +94,9 @@ export function Metric({
           "capped by Mezo's per-trove ceiling" — is decision-relevant, and the subtle
           token measures 3.6:1 against `surface`, under WCAG AA for body text. Subtle is
           reserved for genuinely tertiary text: timestamps and units. */}
-      {caption ? <div className="metric-caption mt-1 text-xs text-text-muted">{caption}</div> : null}
+      {caption ? (
+        <div className="metric-caption text-text-muted mt-1 text-xs">{caption}</div>
+      ) : null}
     </div>
   );
 }
@@ -109,12 +111,11 @@ export function Note({
   tone?: 'neutral' | 'warning';
   role?: 'alert' | 'status';
 }) {
-  const border =
-    tone === 'warning' ? 'border-warning/30' : 'border-[var(--border-hairline)]';
+  const border = tone === 'warning' ? 'border-warning/30' : 'border-[var(--border-hairline)]';
   return (
     <div
       {...(role ? { role } : {})}
-      className={`rounded-[var(--radius-input)] border ${border} bg-surface-inset p-4 text-sm leading-relaxed text-text-muted`}
+      className={`rounded-[var(--radius-input)] border ${border} bg-surface-inset text-text-muted p-4 text-sm leading-relaxed`}
     >
       {children}
     </div>
@@ -161,7 +162,7 @@ export function ActionButton({
       type={type}
       onClick={onClick}
       disabled={disabled}
-      className={`group inline-flex h-12 items-center justify-between gap-4 rounded-[var(--radius-pill)] pr-2 pl-6 text-[0.9375rem] font-medium transition-colors duration-[120ms] ease-out disabled:cursor-not-allowed ${variants[variant]} ${className}`}
+      className={`group inline-flex h-12 items-center justify-between gap-4 rounded-[var(--radius-pill)] pl-6 pr-2 text-[0.9375rem] font-medium transition-colors duration-[120ms] ease-out disabled:cursor-not-allowed ${variants[variant]} ${className}`}
       {...rest}
     >
       <span className="whitespace-nowrap">{children}</span>

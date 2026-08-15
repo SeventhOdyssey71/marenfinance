@@ -4,10 +4,9 @@ import dynamic from 'next/dynamic';
 import type { ReactNode } from 'react';
 import { useShaderGate } from '@/hooks/use-shader-gate';
 
-const PulseCanvas = dynamic(
-  () => import('./canvases').then((m) => ({ default: m.PulseCanvas })),
-  { ssr: false },
-);
+const PulseCanvas = dynamic(() => import('./canvases').then((m) => ({ default: m.PulseCanvas })), {
+  ssr: false,
+});
 
 /**
  * Shader usage 2 of 3 — PulsingBorder, on the single live element on the page:
@@ -32,7 +31,7 @@ export function LivePulseFrame({
       {/* Static hairline is always present; the shader only adds the pulse. */}
       <div
         aria-hidden
-        className="pointer-events-none absolute -inset-px rounded-[var(--radius-card)] border border-success/20"
+        className="border-success/20 pointer-events-none absolute -inset-px rounded-[var(--radius-card)] border"
       />
       {!reduced && mounted && (
         <div
