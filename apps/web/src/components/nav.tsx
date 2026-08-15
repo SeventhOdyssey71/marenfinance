@@ -5,12 +5,18 @@ import { useEffect, useState } from 'react';
 import { Wordmark } from './ui/wordmark';
 import { ArrowUpRight } from './ui/icons';
 
-const links = [
+type NavLink = { href: string; label: string; external?: boolean };
+
+const links: readonly NavLink[] = [
   { href: '#product', label: 'Product' },
   { href: '#how-it-works', label: 'How it works' },
-  { href: '#mezo', label: 'Docs' },
+  {
+    href: 'https://github.com/SeventhOdyssey71/marenfinance/tree/main/docs',
+    label: 'Docs',
+    external: true,
+  },
   { href: '#faq', label: 'FAQ' },
-] as const;
+];
 
 export function Nav() {
   const [scrolled, setScrolled] = useState(false);
@@ -63,6 +69,9 @@ export function Nav() {
               <li key={l.href}>
                 <a
                   href={l.href}
+                  {...(l.external
+                    ? { target: '_blank', rel: 'noreferrer noopener' }
+                    : {})}
                   className="inline-flex h-9 items-center rounded-[var(--radius-pill)] px-3.5 text-sm text-text-muted transition-colors duration-[120ms] ease-out hover:text-text"
                 >
                   {l.label}
@@ -129,6 +138,7 @@ export function Nav() {
             <li key={l.href}>
               <a
                 href={l.href}
+                {...(l.external ? { target: '_blank', rel: 'noreferrer noopener' } : {})}
                 onClick={() => setOpen(false)}
                 className="flex h-12 items-center text-[1.0625rem] text-text-muted"
               >

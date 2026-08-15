@@ -15,14 +15,23 @@ export function Hero() {
       <HeroMesh />
 
       {/* Legibility floor: the mesh never sits under body copy at a contrast
-          that drops below 4.5:1. This scrim guarantees it. */}
+          that drops below 4.5:1. Two scrims guarantee it — a vertical one that
+          carries the whole viewport on mobile, and a horizontal one from md up
+          that darkens the text column while leaving the violet bleed visible in
+          the empty right half. */}
       <div
         aria-hidden
-        className="pointer-events-none absolute inset-0 -z-10 bg-[linear-gradient(180deg,rgba(8,8,10,0.62)_0%,rgba(8,8,10,0.34)_38%,rgba(8,8,10,0.88)_88%,#08080A_100%)]"
+        className="pointer-events-none absolute inset-0 -z-10 bg-[linear-gradient(180deg,rgba(8,8,10,0.80)_0%,rgba(8,8,10,0.66)_32%,rgba(8,8,10,0.78)_62%,rgba(8,8,10,0.94)_88%,#08080A_100%)] md:bg-[linear-gradient(180deg,rgba(8,8,10,0.70)_0%,rgba(8,8,10,0.42)_34%,rgba(8,8,10,0.66)_70%,rgba(8,8,10,0.92)_90%,#08080A_100%)]"
+      />
+      <div
+        aria-hidden
+        className="pointer-events-none absolute inset-0 -z-10 hidden md:block md:bg-[linear-gradient(90deg,rgba(8,8,10,0.86)_0%,rgba(8,8,10,0.62)_38%,rgba(8,8,10,0.12)_72%,rgba(8,8,10,0)_100%)]"
       />
 
       <div className="container-maren relative">
-        <div className="flex min-h-[92svh] flex-col justify-center pt-[136px] pb-24 md:min-h-[94svh] md:pt-40 md:pb-32">
+        {/* Capped so the hero stays a hero on a 27" display instead of turning
+            into a page of its own. */}
+        <div className="flex min-h-[min(92svh,1000px)] flex-col justify-center pt-[136px] pb-24 md:min-h-[min(94svh,1120px)] md:pt-40 md:pb-32">
           <div className="max-w-[62rem]">
             <EyebrowPill>Built on Mezo</EyebrowPill>
 

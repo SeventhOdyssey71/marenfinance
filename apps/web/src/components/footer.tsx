@@ -2,7 +2,10 @@ import Link from 'next/link';
 import { Wordmark } from './ui/wordmark';
 import { XLogo, GitHubLogo } from './ui/icons';
 
-const columns = [
+type FooterLink = { label: string; href: string; external?: boolean };
+type FooterColumn = { heading: string; links: readonly FooterLink[] };
+
+const columns: readonly FooterColumn[] = [
   {
     heading: 'Product',
     links: [
@@ -29,7 +32,7 @@ const columns = [
       { label: 'Mezo docs', href: 'https://info.mezo.org', external: true },
     ],
   },
-] as const;
+];
 
 const socials = [
   {
@@ -81,7 +84,7 @@ export function Footer() {
                 <ul className="mt-5 space-y-3.5">
                   {col.links.map((l) => (
                     <li key={l.label}>
-                      {'external' in l && l.external ? (
+                      {l.external ? (
                         <a
                           href={l.href}
                           target="_blank"

@@ -1,4 +1,5 @@
 import type { Metadata, Viewport } from 'next';
+import type { ReactNode } from 'react';
 import { satoshi, geistMono } from './fonts';
 import './globals.css';
 
@@ -47,7 +48,7 @@ export const viewport: Viewport = {
 
 export default function RootLayout({
   children,
-}: Readonly<{ children: React.ReactNode }>) {
+}: Readonly<{ children: ReactNode }>) {
   return (
     <html lang="en" className={`${satoshi.variable} ${geistMono.variable}`}>
       <body className="bg-bg text-text antialiased">{children}</body>
