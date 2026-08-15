@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT
-pragma solidity ^0.8.28;
+pragma solidity 0.8.28;
 
 import {IBorrowerOperations} from "./interfaces/IBorrowerOperations.sol";
 import {IMUSD} from "./interfaces/IMUSD.sol";
@@ -213,7 +213,9 @@ contract MarenVault is AccessControl, ERC2771Context, ReentrancyGuard {
 
     event Deposited(address indexed user, uint256 amount, uint256 newCollateral, bool pushedToTrove);
     event Withdrawn(address indexed user, uint256 amount, uint256 newCollateral);
-    event Borrowed(address indexed user, uint256 amount, uint256 debtAdded, uint256 newDebt, bool fromReserve);
+    event Borrowed(
+        address indexed user, uint256 amount, uint256 debtAdded, uint256 newDebt, bool fromReserve
+    );
     event Repaid(address indexed user, uint256 amount, uint256 newDebt);
     event PositionClosed(address indexed user, uint256 debtRepaid, uint256 collateralReturned);
     event Liquidated(
@@ -704,7 +706,11 @@ contract MarenVault is AccessControl, ERC2771Context, ReentrancyGuard {
     /// @notice Collateral ratio, 1e18 scaled. `type(uint256).max` when the user has no debt.
     /// @dev Reverts with `PriceFeedUnavailable()` when Mezo's oracle is stale.
     function collateralRatioOf(address user) external view returns (uint256) {
-        return _collateralRatio(collateral[user], Math.mulDiv(debtShares[user], _previewIndex(), WAD, Math.Rounding.Ceil), _price());
+        return _collateralRatio(
+            collateral[user],
+            Math.mulDiv(debtShares[user], _previewIndex(), WAD, Math.Rounding.Ceil),
+            _price()
+        );
     }
 
     /// @notice True when the user is below Maren's internal 140% threshold.
@@ -788,8 +794,14 @@ contract MarenVault is AccessControl, ERC2771Context, ReentrancyGuard {
     /// @dev Trove collateral and net debt, INCLUDING pending redistributions and EXCLUDING
     ///      the 200 MUSD gas compensation. Uses the 6-return Mezo variant, not Liquity's 4.
     function _troveCollAndNetDebt() private view returns (uint256 coll, uint256 netDebt) {
-        (uint256 c, uint256 principal, uint256 interest, uint256 pendColl, uint256 pendPrincipal, uint256 pendInterest)
-        = troveManager.getEntireDebtAndColl(address(this));
+        (
+            uint256 c,
+            uint256 principal,
+            uint256 interest,
+            uint256 pendColl,
+            uint256 pendPrincipal,
+            uint256 pendInterest
+        ) = troveManager.getEntireDebtAndColl(address(this));
         coll = c + pendColl;
         uint256 gross = principal + interest + pendPrincipal + pendInterest;
         netDebt = gross > MUSD_GAS_COMPENSATION ? gross - MUSD_GAS_COMPENSATION : 0;
@@ -845,7 +857,10 @@ contract MarenVault is AccessControl, ERC2771Context, ReentrancyGuard {
 
     /// @dev Burns shares for `amount` repaid. Rounds down, so the repayer keeps the rounding
     ///      dust as debt rather than being credited with more than they paid.
-    function _burnDebtShares(address user, uint256 amount, uint256 fullDebt) private returns (uint256 shares) {
+    function _burnDebtShares(address user, uint256 amount, uint256 fullDebt)
+        private
+        returns (uint256 shares)
+    {
         uint256 held = debtShares[user];
         if (amount >= fullDebt) {
             shares = held;

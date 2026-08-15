@@ -58,9 +58,25 @@ mezo_mainnet = "https://jsonrpc-mezo.boar.network"
 mezo_mainnet_alt = "https://mainnet.mezo.public.validationcloud.io"
 mezo_testnet = "https://rpc.test.mezo.org"
 
-# Mezo runs Blockscout, not Etherscan. Note the `api.` subdomain — `explorer.mezo.org/api`
-# 404s. Blockscout ignores the API key but foundry requires the field to be present.
-[etherscan]
-mezo = {key = "blockscout", chain = 31612, url = "https://api.explorer.mezo.org/api"}
-mezo_mainnet = {key = "blockscout", chain = 31612, url = "https://api.explorer.mezo.org/api"}
-mezo_testnet = {key = "blockscout", chain = 31611, url = "https://api.explorer.test.mezo.org/api"}
+# CONTRACT VERIFICATION — Mezo runs Blockscout, not Etherscan. Note the `api.` subdomain;
+# `explorer.mezo.org/api` (without it) 404s.
+#
+#   mainnet 31612  https://api.explorer.mezo.org/api
+#   matsnet 31611  https://api.explorer.test.mezo.org/api
+#
+# There is deliberately NO [etherscan] table here. foundry 1.4.3 resolves that table by
+# looking the chain id up in its built-in chain list, and Mezo is not in it, so ANY
+# [etherscan] entry naming 31611 or 31612 makes `forge script` fail outright with
+# "Error: Chain 31611 not supported" — before it does anything else. Verified by bisection.
+#
+# Pass the verifier on the command line instead, which works today:
+#
+#   forge script script/Deploy.s.sol --rpc-url mezo_testnet --broadcast \
+#     --verify --verifier blockscout \
+#     --verifier-url https://api.explorer.test.mezo.org/api
+#
+#   forge verify-contract <address> src/MarenVault.sol:MarenVault \
+#     --verifier blockscout --verifier-url https://api.explorer.test.mezo.org/api \
+#     --compiler-version 0.8.28 --num-of-optimizations 200
+#
+# Revisit if a future foundry accepts an unknown chain id in [etherscan].

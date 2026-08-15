@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT
-pragma solidity ^0.8.28;
+pragma solidity 0.8.28;
 
 import {IPriceFeed} from "./interfaces/IPriceFeed.sol";
 import {IStabilityPool} from "./interfaces/IStabilityPool.sol";
@@ -301,7 +301,11 @@ contract MarenEarn is ERC4626, AccessControl, ERC2771Context, ReentrancyGuard {
      *      assets out of the vault — `totalAssets()` counts idle MUSD exactly the same — so it
      *      is a de-risking lever, not a withdrawal path. Withdrawals stay open throughout.
      */
-    function emergencyWithdrawFromStabilityPool(uint256 amount) external onlyRole(DEFAULT_ADMIN_ROLE) nonReentrant {
+    function emergencyWithdrawFromStabilityPool(uint256 amount)
+        external
+        onlyRole(DEFAULT_ADMIN_ROLE)
+        nonReentrant
+    {
         if (amount == 0) revert ZeroAmount();
         uint256 inPool = stabilityPool.getCompoundedMUSDDeposit(address(this));
         uint256 pull = amount < inPool ? amount : inPool;
