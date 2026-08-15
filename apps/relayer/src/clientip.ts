@@ -149,6 +149,38 @@ export function ipInAny(ip: string, cidrs: readonly Cidr[]): boolean {
   return cidrs.some((cidr) => ipInCidr(ip, cidr));
 }
 
+/**
+ * Prefix width used to bucket an address for rate limiting.
+ *
+ * IPv4 is bucketed at /32 — one address, one bucket, which is what an IPv4
+ * client actually costs an attacker.
+ *
+ * IPv6 is bucketed at a 64-bit prefix. A single ordinary residential allocation
+ * is a /64 (often a /56 or /48), so every host inside it can mint a fresh /128
+ * for free. Keying the bucket on the full literal meant `2001:db8:abcd:1234::1`
+ * and `...::2` were separate buckets, and the per-IP cap braked nothing at all
+ * for any IPv6 client. A /64 is the smallest unit an operator is normally
+ * assigned, so it is the smallest unit that costs an attacker something.
+ */
+export const IPV6_BUCKET_PREFIX = 64;
+
+/**
+ * The value the per-IP rate limiter buckets on. NOT the address itself.
+ *
+ * Returns a canonical string, so the same /64 always produces the same key
+ * regardless of which host inside it sent the request.
+ */
+export function ipBucketKey(ip: string): string {
+  if (ip === 'unknown') return 'unknown';
+  const parsed = parseIp(ip);
+  if (parsed === null) return 'unknown';
+  if (parsed.size === 32) return `v4:${parsed.value.toString(16)}`;
+
+  const shift = BigInt(128 - IPV6_BUCKET_PREFIX);
+  const prefix = (parsed.value >> shift) << shift;
+  return `v6/${IPV6_BUCKET_PREFIX}:${prefix.toString(16)}`;
+}
+
 // ---------------------------------------------------------------------------
 // resolution
 // ---------------------------------------------------------------------------

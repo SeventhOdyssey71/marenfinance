@@ -139,12 +139,13 @@ many addresses and many IPs, and read every response we produce.
 | T1 | Make the relayer fund something for an attacker by naming a different payer | The payer is the **recovered signer**. `from` is treated as a claim that must match it, never as an input to accounting. Funding-source fields are rejected outright, and the schema is strict. |
 | T2 | Swap the fee, recipient, or amount after the user signed | Everything that moves value is inside the EIP-712 struct. The fee is decoded out of the *signed* calldata. There is no parameter beside the signature that changes what happens. |
 | T3 | Use the relayer as a generic transaction pump | Target **and** selector allowlist, scoped per target. `claimLink` is a MarenPay function; sending it to MarenEarn is rejected even though both are allowlisted. |
-| T4 | Drain the gas float with volume | Free tier of 25 lifetime actions per address, then a required in-band MUSD fee; per-address and per-IP daily caps; a global daily BTC cap that halts the whole service when hit. |
+| T4 | Drain the gas float with volume | Free tier of 25 lifetime actions per address, then a required in-band MUSD fee; per-address and per-IP daily caps; a global daily BTC cap that halts the whole service when hit. Every one of those limits is decided on the value the counter's own atomic increment returned, so a concurrent burst cannot slip past a stale read — see T4d. |
 | T4b | Forge `x-forwarded-for` to get a fresh IP bucket per request | A forwarding header is read **only** from a configured trusted proxy (`RELAYER_TRUSTED_PROXIES`) or an unforgeable platform header, and then the **rightmost untrusted hop** is taken, not the leftmost. Otherwise the socket address is used. Unattributable traffic shares one bucket. |
 | T4c | Run on many instances so each has its own counters | `RELAYER_STORE=memory` and an ephemeral `RELAYER_IP_SALT` are **boot problems** under `VERCEL`. Per-instance counters do not weaken the global BTC cap, they remove it. |
-| T5b | Race two copies of one signed request through the nonce check | `(payer, nonce)` is held for the duration of a relay; the second gets `409 DUPLICATE_REQUEST_IN_FLIGHT` instead of burning gas reverting on a consumed nonce. |
-| T5c | Use an expensive ERC-1271 validator to burn gas at our cost | Contract-account signers get a tighter ceiling (`RELAYER_MAX_GAS_CONTRACT_SIGNER`, default 500,000, always ≤ the general cap). |
+| T4d | Fire N requests simultaneously so they all read the same pre-spend counters | Was a real defect: the cap was checked against a `get`, then two RPC round trips ran, then the increment's return value was **discarded**. Measured at 13× the budget on 25 concurrent requests, 130× on 250. Now the increment happens first and the decision is made on what it returned; losers are refunded and rejected. Regression-tested at 25 and 100 concurrent against a store with injected latency. |
 | T5 | Drain the gas float with reverts | Every request is `eth_call`-simulated before submission and rejected if it would revert. Quota is consumed on submission and **not refunded** on a revert, so deliberate reverts are not a free way to spend our budget. |
+| T5b | Race two copies of one signed request through the nonce check | `(payer, nonce)` is held for the duration of a relay; the second gets `409 DUPLICATE_REQUEST_IN_FLIGHT` instead of burning gas reverting on a consumed nonce. **Per instance** — see Known limitations. |
+| T5c | Use an expensive ERC-1271 validator to burn gas at our cost | Contract-account signers get a tighter ceiling (`RELAYER_MAX_GAS_CONTRACT_SIGNER`, default 500,000, always ≤ the general cap). |
 | T6 | Replay a signed request | Forwarder nonce must equal the on-chain nonce, and the deadline must be in the future and no further out than `RELAYER_MAX_DEADLINE_SECONDS`. |
 | T7 | Replay across networks or forwarders | The EIP-712 domain binds chain id and the verifying contract. A mainnet signature does not verify on testnet, and a signature for another forwarder does not verify here. |
 | T8 | Make us send BTC somewhere | `value != 0` is refused unconditionally. There is no configuration that enables it. |
@@ -227,6 +228,12 @@ signature, because a body field is not signed and can be changed after the fact.
 > `402 SPONSORSHIP_UNAVAILABLE`. A missing fee mechanism must never become an unbounded
 > subsidy (R16). The attachment point is marked `TODO(MarenRelayHub)` in `registry.ts`,
 > `calldata.ts` and `policy.ts`.
+
+**Limits are enforced on the counter's own atomic increment, not on a prior read.**
+Every cap debits first and decides on the value the debit returned, refunding and
+rejecting if it lost. A `get`-then-`incrBy` is a race by construction, however atomic
+the store — that was a real defect here, measured at 130× the daily budget under 250
+concurrent requests before it was fixed.
 
 **The two knobs that decide how much money we can lose have no defaults.** If
 `RELAYER_MAX_DAILY_SPONSORED_BTC` is unset, nothing is sponsored at all. If
@@ -330,7 +337,7 @@ correct default state**, and `problems` tells you exactly what to set.
 ### Tests
 
 ```bash
-pnpm --filter @maren/relayer test        # 176 tests
+pnpm --filter @maren/relayer test        # 202 tests
 pnpm --filter @maren/relayer typecheck
 ```
 
@@ -473,7 +480,18 @@ document.
   transactions per day, so it is theoretical — but it is a real ceiling.
 - **Sybil resistance is economic, not cryptographic.** 25 free actions per *address*,
   and addresses are free. The global daily BTC cap is the actual backstop — which is
-  why `RELAYER_STORE=memory` under `VERCEL` is now a refusal rather than a warning.
+  why `RELAYER_STORE=memory` under `VERCEL` is a refusal rather than a warning, and why
+  every limit is now decided on an atomic increment's return value rather than on a
+  prior read. The honest bound on the cap is **one request's worth of overshoot per
+  racing instance**, not zero: within a single process the reservation is serialisable,
+  but two instances can each admit a request that, together, cross the line. Shared
+  Redis counters keep that to the width of one request rather than one burst.
+- **The `(payer, nonce)` duplicate-request guard is per instance.** It is an in-memory
+  `Set` on the service object, so it does **not** hold across the multi-instance
+  deployment that `RELAYER_STORE=redis` implies. Two instances can still admit the same
+  signed request; one lands and the other reverts on a consumed nonce, costing us that
+  gas. Same shape as the nonce-allocation caveat below, and the same fix — a shared
+  lease — would close both.
 - **Rate limiting depends on the deployment telling us the truth about the client.**
   With no trusted proxy and no platform header, everything behind a load balancer
   resolves to the balancer's address and shares one bucket. That is the safe direction —
@@ -481,6 +499,8 @@ document.
   traffic if you deploy behind a proxy and forget `RELAYER_TRUSTED_PROXIES`.
 - **The paid tier is closed until `MarenRelayHub` ships.** Post-free-tier requests get
   `402 SPONSORSHIP_UNAVAILABLE`. Deliberate: a fee mechanism that is signed but not
-  atomically enforced is worse than none (R13).
+  atomically enforced is worse than none (R13). That principle was invoked here while
+  the budget counter itself had a check-then-act race — it does not any more, and the
+  two were fixed in the same pass rather than one being used to justify the other.
 - **The Vercel deployment path is unverified.** Configuration is written and committed;
   nothing has been deployed from this branch.
