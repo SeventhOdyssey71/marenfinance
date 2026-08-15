@@ -55,7 +55,7 @@ docs            Markdown sources → branded PDFs
 ## Getting started
 
 ```bash
-pnpm install
+CI=true pnpm install   # CI=true avoids a pnpm no-TTY prompt that aborts the install
 cp .env.example .env        # then fill in the values
 
 pnpm dev                    # all apps
