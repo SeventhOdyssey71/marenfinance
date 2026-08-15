@@ -27,13 +27,13 @@ We think that is the right basis on which to ask.
 
 # Milestone schedule
 
-| # | Milestone | Release | Amount | Target |
-|---|---|---|---|---|
-| **M1** | Mainnet deployment | **40%** | **$6,000** | Week 8 — 10 Oct 2026 |
-| **M2** | Third-party audit complete, findings resolved | 25% | $3,750 | Week 14 — 21 Nov 2026 |
-| **M3** | Traction: 250 funded positions and $250,000 MUSD borrowed through Maren | 20% | $3,000 | Week 22 — 16 Jan 2027 |
-| **M4** | iOS app live on the App Store, sustained for 30 days | 15% | $2,250 | Week 28 — 27 Feb 2027 |
-| | **Total** | **100%** | **$15,000** | |
+| #      | Milestone                                                               | Release  | Amount      | Target                |
+| ------ | ----------------------------------------------------------------------- | -------- | ----------- | --------------------- |
+| **M1** | Mainnet deployment                                                      | **40%**  | **$6,000**  | Week 8 — 10 Oct 2026  |
+| **M2** | Third-party audit complete, findings resolved                           | 25%      | $3,750      | Week 14 — 21 Nov 2026 |
+| **M3** | Traction: 250 funded positions and $250,000 MUSD borrowed through Maren | 20%      | $3,000      | Week 22 — 16 Jan 2027 |
+| **M4** | iOS app live on the App Store, sustained for 30 days                    | 15%      | $2,250      | Week 28 — 27 Feb 2027 |
+|        | **Total**                                                               | **100%** | **$15,000** |                       |
 
 ---
 
@@ -61,7 +61,7 @@ We think that is the right basis on which to ask.
   Discord — this is where we would most value the ecosystem team's help, because the
   failure modes we care about only appear with real users.
 - **Weeks 6–7 (19 Sep – 3 Oct):** fix what testnet finds. Freeze contracts.
-- **Week 8:** mainnet deployment, **with the vault capped** (see *Risk-managed launch*).
+- **Week 8:** mainnet deployment, **with the vault capped** (see _Risk-managed launch_).
 
 ---
 
@@ -154,17 +154,17 @@ this before and it is never one submission.
 The pooled vault is the one component in Maren carrying systemic risk, and we intend to
 launch it the way something with systemic risk should be launched.
 
-| Phase | Vault cap | Gate to advance |
-|---|---|---|
-| Mainnet day 1 (M1) | **5 BTC** | 14 days with no keeper failure |
-| Post-audit (M2) | **25 BTC** | All Critical/High findings resolved |
+| Phase              | Vault cap   | Gate to advance                      |
+| ------------------ | ----------- | ------------------------------------ |
+| Mainnet day 1 (M1) | **5 BTC**   | 14 days with no keeper failure       |
+| Post-audit (M2)    | **25 BTC**  | All Critical/High findings resolved  |
 | Post-traction (M3) | **100 BTC** | 60 days of clean liquidation history |
-| Steady state | Governed | Multisig + timelock decision |
+| Steady state       | Governed    | Multisig + timelock decision         |
 
 Direct troves — for users above the ~0.079 BTC threshold — are **uncapped from day one**,
 because they carry no pooling risk at all. The cap constrains only the novel mechanism.
 
-The interface routes any user with enough BTC for a direct trove *to a direct trove*, and
+The interface routes any user with enough BTC for a direct trove _to a direct trove_, and
 tells them why. We would rather lose pooled volume than put someone into a shared position
 they did not need.
 

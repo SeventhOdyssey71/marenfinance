@@ -8,6 +8,10 @@ node_modules/
 dist/
 build/
 out/
+
+# ...except the document set, which is committed so the PDFs can be linked and reviewed
+# without a local build. See docs/build/.gitignore.
+!docs/build/
 .next/
 .turbo/
 .expo/
@@ -16,7 +20,11 @@ out/
 # foundry
 packages/contracts/out/
 packages/contracts/cache/
-packages/contracts/broadcast/*/dry-run/
+# Dry-run artifacts are throwaway simulation output. Real broadcast artifacts
+# (broadcast/<script>/<chainid>/run-*.json) ARE committed — they carry the tx hashes.
+# NOTE: the glob needs `**`; the path is broadcast/<script>/<chainid>/dry-run/, which is
+# one level deeper than a single `*` matches.
+packages/contracts/broadcast/**/dry-run/
 packages/contracts/lib/
 
 # env & secrets — NEVER commit
@@ -62,8 +70,10 @@ Thumbs.db
 # vercel
 .vercel
 
-# agent worktrees — never commit
-.claude/worktrees/
+# agent worktrees and local editor/agent state — never commit.
+# `.claude/worktrees/` alone left `.claude/settings.local.json` untracked but NOT
+# ignored, one `git add -A` away from being committed.
+.claude/
 
 # research scratch — agents occasionally drop probe output in the repo root
 /*.tmp

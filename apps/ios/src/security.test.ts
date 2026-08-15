@@ -87,7 +87,10 @@ describe('R12 — callback validation', () => {
   });
 
   it('refuses a callback that arrives on an untrusted origin', () => {
-    const result = parseCallback(`https://evil.example/auth/callback?code=abc&state=${state}`, state);
+    const result = parseCallback(
+      `https://evil.example/auth/callback?code=abc&state=${state}`,
+      state,
+    );
     expect(result.kind).toBe('error');
   });
 
@@ -196,7 +199,9 @@ describe('price feed staleness', () => {
 
   it('gates borrowing closed on every non-live state', () => {
     expect(priceGate(classifyPrice(null, NOW)).allowed).toBe(false);
-    expect(priceGate(classifyPrice({ priceWei: price, updatedAt: NOW - 900 }, NOW)).allowed).toBe(false);
+    expect(priceGate(classifyPrice({ priceWei: price, updatedAt: NOW - 900 }, NOW)).allowed).toBe(
+      false,
+    );
     expect(priceGate({ state: 'loading' }).allowed).toBe(false);
     expect(priceGate(classifyPrice({ priceWei: price, updatedAt: NOW }, NOW)).allowed).toBe(true);
   });
@@ -252,7 +257,6 @@ describe('payment QR parsing is allowlisted', () => {
   });
 });
 
-
 // ── The gas claim: true, or not shipped ──────────────────────────────────────
 
 describe('gas sponsorship is exactly one exception, and the copy says so', () => {
@@ -278,7 +282,6 @@ describe('gas sponsorship is exactly one exception, and the copy says so', () =>
       expect(isSponsoredKind(kind)).toBe(true);
     }
   });
-
 
   it('never promises gasless without qualification', () => {
     // The claim the brief forbids, in the shapes it would plausibly be written.

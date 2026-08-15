@@ -98,6 +98,90 @@ export function formatPriceDrop(bps: number): string {
   return `${(bps / 100).toFixed(0)}% below today's price`;
 }
 
+// ── the em-dash guard ────────────────────────────────────────────────────────
+
+/**
+ * The placeholder for a figure that does not exist. BRAND.md §8 says always show the
+ * unit and never a bare number; the corollary this section adds is that a number which
+ * has no meaning must not be rendered at all.
+ */
+export const EM_DASH = '—';
+
+/**
+ * The largest figure that can be a real BTC price. Anything at or above this is a
+ * sentinel, an overflow, or a bug, and is rendered as an em dash rather than printed.
+ *
+ * A live screenshot once showed a liquidation price of
+ * $57,896,044,618,658,097,711,785,492,504,343,953,926,634,992,332,820,282,019,728.79 —
+ * `MAX_CR` (2^255 - 1) formatted as dollars. The root cause is fixed in `position.ts`,
+ * but a formatter that will faithfully print a 60-digit dollar amount is a loaded gun
+ * pointed at every future caller, so the ceiling is enforced here as well. One trillion
+ * dollars a coin is many orders of magnitude above any plausible price and many orders
+ * below any sentinel, so it separates the two cleanly.
+ */
+export const DISPLAY_CEILING = 1_000_000_000_000n * WAD;
+
+/** True when `wei` is a figure we are willing to put on screen. */
+export function isDisplayable(wei: bigint): boolean {
+  return wei > 0n && wei < DISPLAY_CEILING;
+}
+
+/**
+ * A USD figure, or an em dash when there is no figure to show.
+ *
+ * Use this for anything DERIVED from a position rather than measured: liquidation
+ * prices, break-even prices, projected values. A measured balance of zero is a fact and
+ * should render as `$0.00` through `formatUsd`; a liquidation price of zero is the
+ * absence of a fact and must render as `—`.
+ */
+export function formatUsdOrDash(wei: bigint | null | undefined): string {
+  if (wei === null || wei === undefined) return EM_DASH;
+  return isDisplayable(wei) ? formatUsd(wei) : EM_DASH;
+}
+
+/**
+ * The liquidation price of a position, or an em dash when the position has no debt.
+ *
+ * A position with no debt cannot be liquidated, so it has no liquidation price. Zero is
+ * the wrong answer and so is any number: `$0.00` reads as "liquidated at zero", which a
+ * user could reasonably take to mean "safe until Bitcoin is worthless" — true, but only
+ * because the statement is empty. The em dash says the honest thing, which is that the
+ * question does not apply.
+ */
+export function formatLiquidationPrice(liquidationPriceWei: bigint, debtWei: bigint): string {
+  if (debtWei <= 0n) return EM_DASH;
+  return formatUsdOrDash(liquidationPriceWei);
+}
+
+/**
+ * How far BTC can fall before liquidation, as a whole percent — or an em dash when the
+ * position has no debt and the question does not apply.
+ *
+ * Rounds DOWN, so a position with 32.9% of headroom is never flattered to 33%.
+ * `Number.isFinite` catches an `Infinity` or `NaN` arriving from a division upstream:
+ * `Math.floor(NaN)` is `NaN` and `${NaN}%` renders as the string "NaN%", which is how a
+ * broken figure ends up on screen wearing a unit.
+ */
+export function formatDropToLiquidation(bps: number, debtWei: bigint): string {
+  if (debtWei <= 0n) return EM_DASH;
+  if (!Number.isFinite(bps)) return EM_DASH;
+  if (bps <= 0) return '0%';
+  return `${Math.floor(bps / 100)}%`;
+}
+
+/**
+ * A collateral ratio, or an em dash when there is no debt to measure it against.
+ *
+ * `formatCollateralRatio` renders the no-debt sentinel as `∞`, which is correct in
+ * isolation but reads as a boast in a metric grid beside real figures. Where the ratio
+ * is one of several derived readouts, the em dash is the quieter and more honest form.
+ */
+export function formatCollateralRatioOrDash(cr: bigint, debtWei: bigint): string {
+  if (debtWei <= 0n) return EM_DASH;
+  if (cr >= MAX_CR) return EM_DASH;
+  return formatCollateralRatio(cr);
+}
+
 // ── internals ────────────────────────────────────────────────────────────────
 
 /** Render a fixed-point bigint with `decimals` precision, truncated to `places`. */

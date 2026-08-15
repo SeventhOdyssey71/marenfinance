@@ -27,13 +27,7 @@
  */
 
 export type ActionType =
-  | 'deposit'
-  | 'withdraw'
-  | 'borrow'
-  | 'repay'
-  | 'send'
-  | 'earn-deposit'
-  | 'earn-withdraw';
+  'deposit' | 'withdraw' | 'borrow' | 'repay' | 'send' | 'earn-deposit' | 'earn-withdraw';
 
 export function isSponsoredKind(type: ActionType): boolean {
   switch (type) {

@@ -82,8 +82,7 @@ export async function readPosition(): Promise<Position> {
   // 214 days of simple, non-compounding interest at the rate the trove opened at.
   const elapsed = 214n * 24n * 60n * 60n;
   const interestWei =
-    (elapsed * state.principalWei * BigInt(INTEREST_RATE_BPS)) /
-    (10_000n * 365n * 24n * 60n * 60n);
+    (elapsed * state.principalWei * BigInt(INTEREST_RATE_BPS)) / (10_000n * 365n * 24n * 60n * 60n);
 
   return {
     collateralWei: state.collateralWei,

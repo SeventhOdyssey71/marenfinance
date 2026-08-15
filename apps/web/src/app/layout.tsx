@@ -46,9 +46,7 @@ export const viewport: Viewport = {
   initialScale: 1,
 };
 
-export default function RootLayout({
-  children,
-}: Readonly<{ children: ReactNode }>) {
+export default function RootLayout({ children }: Readonly<{ children: ReactNode }>) {
   return (
     <html lang="en" className={`${satoshi.variable} ${geistMono.variable}`}>
       <body className="bg-bg text-text antialiased">{children}</body>

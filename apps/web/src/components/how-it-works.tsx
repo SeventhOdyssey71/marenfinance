@@ -38,11 +38,9 @@ export function HowItWorks() {
             <Reveal as="li" key={s.k} delay={i * 90} className="h-full">
               <article className="card group relative flex h-full flex-col p-6 transition-colors duration-[240ms] ease-out hover:border-[var(--border-strong)] md:p-8">
                 <span className="num text-sm text-violet-400">{s.k}</span>
-                <h3 className="t-h3 mt-8 text-text">{s.title}</h3>
-                <p className="mt-4 flex-1 text-sm leading-relaxed text-text-muted">
-                  {s.body}
-                </p>
-                <p className="t-label mt-8 text-text-subtle">{s.meta}</p>
+                <h3 className="t-h3 text-text mt-8">{s.title}</h3>
+                <p className="text-text-muted mt-4 flex-1 text-sm leading-relaxed">{s.body}</p>
+                <p className="t-label text-text-subtle mt-8">{s.meta}</p>
               </article>
             </Reveal>
           ))}

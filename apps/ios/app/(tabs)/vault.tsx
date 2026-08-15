@@ -107,7 +107,11 @@ export default function Vault() {
           label="Borrow limit"
           hint="Mezo caps this at the price when the trove opened"
           value={
-            position ? <Musd wei={position.maxBorrowingCapacityWei} plain /> : <Num tone="muted">—</Num>
+            position ? (
+              <Musd wei={position.maxBorrowingCapacityWei} plain />
+            ) : (
+              <Num tone="muted">—</Num>
+            )
           }
           last
         />
@@ -140,10 +144,7 @@ export default function Vault() {
           price={livePrice}
           gateReason={gate.allowed ? null : gate.reason}
           onSubmit={(wei) =>
-            runner.run(
-              { type: 'borrow', musdWei: wei },
-              `Borrow ${formatMusd(wei)}`,
-            )
+            runner.run({ type: 'borrow', musdWei: wei }, `Borrow ${formatMusd(wei)}`)
           }
         />
       ) : null}
@@ -163,7 +164,9 @@ export default function Vault() {
           sponsored={isSponsoredKind('deposit')}
           disabledReason={gate.allowed ? null : gate.reason}
           cta="Deposit"
-          onSubmit={(wei) => runner.run({ type: 'deposit', btcWei: wei }, `Deposit ${formatBtc(wei)}`)}
+          onSubmit={(wei) =>
+            runner.run({ type: 'deposit', btcWei: wei }, `Deposit ${formatBtc(wei)}`)
+          }
         />
       ) : null}
 
@@ -180,7 +183,9 @@ export default function Vault() {
           maxLabel="Your MUSD balance"
           disabledReason={gate.allowed ? null : gate.reason}
           cta="Repay"
-          onSubmit={(wei) => runner.run({ type: 'repay', musdWei: wei }, `Repay ${formatMusd(wei)}`)}
+          onSubmit={(wei) =>
+            runner.run({ type: 'repay', musdWei: wei }, `Repay ${formatMusd(wei)}`)
+          }
         />
       ) : null}
 
@@ -198,7 +203,9 @@ export default function Vault() {
           sponsored={isSponsoredKind('withdraw')}
           disabledReason={gate.allowed ? null : gate.reason}
           cta="Withdraw"
-          onSubmit={(wei) => runner.run({ type: 'withdraw', btcWei: wei }, `Withdraw ${formatBtc(wei)}`)}
+          onSubmit={(wei) =>
+            runner.run({ type: 'withdraw', btcWei: wei }, `Withdraw ${formatBtc(wei)}`)
+          }
         />
       ) : null}
 
@@ -269,15 +276,15 @@ function BorrowPanel({
   }, [position, price, value]);
 
   const disabled = gateReason !== null || ceiling === 0n;
-  const tone = preview ? healthTone[preview.health.status] ?? 'neutral' : 'neutral';
+  const tone = preview ? (healthTone[preview.health.status] ?? 'neutral') : 'neutral';
   const colour = toneColor[tone];
 
   return (
     <Card style={styles.panel}>
       <Txt variant="h3">Borrow MUSD</Txt>
       <Txt variant="small" tone="muted" style={styles.panelBody}>
-        1.00% APR, simple interest, fixed for the life of this loan. The slider stops at
-        Maren’s 180% floor — it will not let you past it.
+        1.00% APR, simple interest, fixed for the life of this loan. The slider stops at Maren’s
+        180% floor — it will not let you past it.
       </Txt>
 
       {/* Amount */}
@@ -374,9 +381,9 @@ function BorrowPanel({
       <View style={styles.gasRow}>
         <Icon name="shield" size={14} color={brand.violet400} />
         <Txt variant="small" tone="muted" style={styles.gasText}>
-          Depositing sends Bitcoin, so it is the one action a relayer cannot carry for
-          you — you pay gas on that first transaction. Borrow, repay and withdraw are
-          relayed and cost you nothing.
+          Depositing sends Bitcoin, so it is the one action a relayer cannot carry for you — you pay
+          gas on that first transaction. Borrow, repay and withdraw are relayed and cost you
+          nothing.
         </Txt>
       </View>
 
@@ -474,7 +481,11 @@ function AmountPanel({
           <Txt variant="small" tone="muted">
             {maxLabel}
           </Txt>
-          <Num size="numericSm" tone={overMax ? 'inherit' : 'muted'} style={overMax ? { color: semantic.danger } : undefined}>
+          <Num
+            size="numericSm"
+            tone={overMax ? 'inherit' : 'muted'}
+            style={overMax ? { color: semantic.danger } : undefined}
+          >
             {format(max)}
           </Num>
         </View>

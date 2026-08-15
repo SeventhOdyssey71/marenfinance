@@ -2,7 +2,7 @@
   "name": "@maren/ios",
   "version": "0.1.0",
   "private": true,
-  "description": "Maren Finance for iOS — Bitcoin-backed account on Mezo Chain. Expo + expo-router.",
+  "description": "Maren Finance for iOS \u2014 Bitcoin-backed account on Mezo Chain. Expo + expo-router.",
   "main": "expo-router/entry",
   "scripts": {
     "start": "expo start",

@@ -59,8 +59,7 @@ export function biometricName(cap: BiometricCapability): string {
  * describe a `session-only` key as protected.
  */
 export type KeyProtection =
-  | { mode: 'keychain-biometric'; label: string }
-  | { mode: 'session-only'; reason: string };
+  { mode: 'keychain-biometric'; label: string } | { mode: 'session-only'; reason: string };
 
 /** In-memory fallback. Cleared on reload; never written to disk. */
 let sessionKey: Hex | null = null;
@@ -118,9 +117,7 @@ export async function storeKey(privateKey: Hex): Promise<KeyProtection> {
   sessionKey = privateKey;
   return {
     mode: 'session-only',
-    reason: cap.available
-      ? 'No Face ID or Touch ID is enrolled on this device.'
-      : cap.reason,
+    reason: cap.available ? 'No Face ID or Touch ID is enrolled on this device.' : cap.reason,
   };
 }
 
@@ -151,9 +148,7 @@ export function explainKeychainFailure(error: unknown): string {
 }
 
 export type KeyAccess =
-  | { kind: 'ok'; privateKey: Hex }
-  | { kind: 'denied'; reason: string }
-  | { kind: 'missing' };
+  { kind: 'ok'; privateKey: Hex } | { kind: 'denied'; reason: string } | { kind: 'missing' };
 
 /**
  * Read the key, forcing a biometric prompt.

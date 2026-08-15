@@ -110,7 +110,11 @@ export default function Settings() {
             hitSlop={10}
             style={styles.copyButton}
           >
-            <Icon name={copied ? 'check' : 'copy'} size={15} color={copied ? semantic.success : '#6B6B75'} />
+            <Icon
+              name={copied ? 'check' : 'copy'}
+              size={15}
+              color={copied ? semantic.success : '#6B6B75'}
+            />
           </Pressable>
         </View>
       ) : null}
@@ -218,10 +222,10 @@ export default function Settings() {
           </Txt>
         </View>
         <Txt variant="small" tone="muted" style={styles.authBody}>
-          The auth callback arrives only on {AUTH_REDIRECT_URI}, a universal link Apple
-          verifies against this app’s entitlement, with a 256-bit CSRF token compared in
-          constant time. A custom scheme is claimable by any other app on the device, so
-          Maren refuses to accept one — the check is in code, not in a policy document.
+          The auth callback arrives only on {AUTH_REDIRECT_URI}, a universal link Apple verifies
+          against this app’s entitlement, with a 256-bit CSRF token compared in constant time. A
+          custom scheme is claimable by any other app on the device, so Maren refuses to accept one
+          — the check is in code, not in a policy document.
         </Txt>
       </Card>
 
@@ -232,8 +236,8 @@ export default function Settings() {
           <View style={styles.switchBody}>
             <Txt variant="small">Simulate a stale price feed</Txt>
             <Txt variant="small" tone="muted" style={styles.switchCaption}>
-              Backdates the oracle observation past Mezo’s {STALE_AFTER_SECONDS}s limit so
-              the price-unavailable state and the borrow gate can be exercised.
+              Backdates the oracle observation past Mezo’s {STALE_AFTER_SECONDS}s limit so the
+              price-unavailable state and the borrow gate can be exercised.
             </Txt>
           </View>
           <Switch
@@ -268,8 +272,8 @@ export default function Settings() {
       />
 
       <Txt variant="small" tone="muted" style={styles.signOutNote}>
-        Signing out deletes the key from the Keychain. Maren holds no copy — without your
-        own backup the funds it controls are unrecoverable.
+        Signing out deletes the key from the Keychain. Maren holds no copy — without your own backup
+        the funds it controls are unrecoverable.
       </Txt>
     </Screen>
   );

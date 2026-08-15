@@ -27,6 +27,16 @@ Feasibility PDFs, and a link to the repository once it is made public.
 > and I'd rather they took the safer path. Every Maren user is a net-new MUSD borrower
 > for Mezo rather than one of the existing 26 moving around.
 >
+> It's built, not proposed. Five contracts — a pooled vault, payments, a handle
+> registry, an ERC-4626 earn vault, and an atomic signed-fee relay hub — with 236 tests
+> passing plus 8 fork tests against real MUSD on matsnet. A gasless relayer at 210 tests.
+> A landing page and an iOS app, both running. The deploy script simulates cleanly
+> against matsnet at 15.3M gas; I'm holding the actual broadcast until I can fund the
+> deployer, since the faucet pays 0.001 BTC per IP per day and the smallest possible
+> trove needs about 0.079 BTC. If you can point testnet BTC at
+> `0x54196397D6f01b48739dB3957257cB33cD341885`, that's the fastest path to a live
+> deployment you can check yourself.
+>
 > On exclusivity — happy to discuss it. Maren is a new product built for Mezo, so in
 > practical terms it's already exclusive; I'd just want to understand what you need it to
 > mean formally.
@@ -75,8 +85,8 @@ Feasibility PDFs, and a link to the repository once it is made public.
 whole pitch in one line, and it demonstrates the work was done before the ask was made.
 
 **It gives before it asks.** Four concrete findings, three with fixes already written,
-offered unconditionally. This changes the frame from *founder requesting money* to
-*contributor who is already contributing*.
+offered unconditionally. This changes the frame from _founder requesting money_ to
+_contributor who is already contributing_.
 
 **It names the hard thing.** Volunteering that the audit costs more than the grant is
 counter-intuitive but it is the single most credibility-building sentence in the message.

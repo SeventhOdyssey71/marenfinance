@@ -28,23 +28,43 @@ export default function TabsLayout() {
     >
       <Tabs.Screen
         name="index"
-        options={{ title: 'Home', tabBarIcon: icon('wallet'), tabBarAccessibilityLabel: 'Home and portfolio' }}
+        options={{
+          title: 'Home',
+          tabBarIcon: icon('wallet'),
+          tabBarAccessibilityLabel: 'Home and portfolio',
+        }}
       />
       <Tabs.Screen
         name="vault"
-        options={{ title: 'Vault', tabBarIcon: icon('vault'), tabBarAccessibilityLabel: 'Vault: deposit, borrow, repay, withdraw' }}
+        options={{
+          title: 'Vault',
+          tabBarIcon: icon('vault'),
+          tabBarAccessibilityLabel: 'Vault: deposit, borrow, repay, withdraw',
+        }}
       />
       <Tabs.Screen
         name="pay"
-        options={{ title: 'Pay', tabBarIcon: icon('send'), tabBarAccessibilityLabel: 'Pay: send and request MUSD' }}
+        options={{
+          title: 'Pay',
+          tabBarIcon: icon('send'),
+          tabBarAccessibilityLabel: 'Pay: send and request MUSD',
+        }}
       />
       <Tabs.Screen
         name="earn"
-        options={{ title: 'Earn', tabBarIcon: icon('earn'), tabBarAccessibilityLabel: 'Earn on idle MUSD' }}
+        options={{
+          title: 'Earn',
+          tabBarIcon: icon('earn'),
+          tabBarAccessibilityLabel: 'Earn on idle MUSD',
+        }}
       />
       <Tabs.Screen
         name="activity"
-        options={{ title: 'Activity', tabBarIcon: icon('activity'), tabBarAccessibilityLabel: 'Transaction history' }}
+        options={{
+          title: 'Activity',
+          tabBarIcon: icon('activity'),
+          tabBarAccessibilityLabel: 'Transaction history',
+        }}
       />
     </Tabs>
   );

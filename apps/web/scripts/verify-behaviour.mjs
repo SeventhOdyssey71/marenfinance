@@ -10,6 +10,10 @@
  */
 const pw = await import(process.env.PLAYWRIGHT_CORE ?? 'playwright-core');
 const { chromium } = pw.chromium ? pw : pw.default;
+
+/** Override with BASE_URL when port 3000 is taken. */
+const BASE = process.env.BASE_URL ?? 'http://127.0.0.1:3000';
+
 const browser = await chromium.launch({
   executablePath: process.env.CHROME_EXECUTABLE,
   args: ['--use-gl=angle'],
@@ -28,7 +32,7 @@ const check = (name, pass, detail = '') => {
     reducedMotion: 'reduce',
   });
   const page = await ctx.newPage();
-  await page.goto('http://127.0.0.1:3000/', { waitUntil: 'networkidle' });
+  await page.goto(BASE + '/', { waitUntil: 'networkidle' });
   await page.evaluate(async () => {
     const step = window.innerHeight * 0.6;
     for (let y = 0; y <= document.body.scrollHeight; y += step) {
@@ -48,11 +52,10 @@ const check = (name, pass, detail = '') => {
   });
   check('reduced-motion: static gradient fallback present', Boolean(fallback));
 
-  const revealed = await page.evaluate(
-    () =>
-      [...document.querySelectorAll('.reveal')].every(
-        (el) => Number(getComputedStyle(el).opacity) > 0.99,
-      ),
+  const revealed = await page.evaluate(() =>
+    [...document.querySelectorAll('.reveal')].every(
+      (el) => Number(getComputedStyle(el).opacity) > 0.99,
+    ),
   );
   check('reduced-motion: all content visible (no stuck opacity:0)', revealed);
   await ctx.close();
@@ -66,7 +69,7 @@ const check = (name, pass, detail = '') => {
   page.on('response', (r) => {
     if (r.status() >= 400) bad.push(`${r.status()} ${r.url()}`);
   });
-  await page.goto('http://127.0.0.1:3000/', { waitUntil: 'networkidle' });
+  await page.goto(BASE + '/', { waitUntil: 'networkidle' });
 
   const triggers = page.locator('#faq button[aria-expanded]');
   const n = await triggers.count();
@@ -93,10 +96,7 @@ const check = (name, pass, detail = '') => {
   const second = triggers.nth(1);
   await second.focus();
   await page.keyboard.press('Enter');
-  check(
-    'faq: keyboard Enter toggles',
-    (await second.getAttribute('aria-expanded')) === 'true',
-  );
+  check('faq: keyboard Enter toggles', (await second.getAttribute('aria-expanded')) === 'true');
 
   const ring = await page.evaluate(() => {
     const el = document.activeElement;
@@ -123,7 +123,7 @@ const check = (name, pass, detail = '') => {
 {
   const ctx = await browser.newContext({ viewport: { width: 1440, height: 900 } });
   const page = await ctx.newPage();
-  await page.goto('http://127.0.0.1:3000/', { waitUntil: 'networkidle' });
+  await page.goto(BASE + '/', { waitUntil: 'networkidle' });
   const h1 = await page.locator('h1').count();
   check('exactly one h1', h1 === 1, `count=${h1}`);
   const landmarks = await page.evaluate(() => ({
@@ -137,10 +137,322 @@ const check = (name, pass, detail = '') => {
     landmarks.header === 1 && landmarks.main === 1 && landmarks.footer === 1 && landmarks.navs >= 2,
     JSON.stringify(landmarks),
   );
-  const imgAlt = await page.evaluate(
-    () => [...document.querySelectorAll('svg[role=img]')].every((s) => s.hasAttribute('aria-label')),
+  const imgAlt = await page.evaluate(() =>
+    [...document.querySelectorAll('svg[role=img]')].every((s) => s.hasAttribute('aria-label')),
   );
   check('every role=img svg has an aria-label', imgAlt);
+  await ctx.close();
+}
+
+// ---- 4. the dApp: the promises that are load-bearing ----------------------
+//
+// These are not smoke tests. Each one corresponds to a claim the product makes in
+// writing, and a claim a user could lose money believing if it stopped being true.
+{
+  const ctx = await browser.newContext({ viewport: { width: 1440, height: 1000 } });
+  const page = await ctx.newPage();
+  const bad = [];
+  page.on('response', (r) => {
+    if (r.status() >= 400) bad.push(`${r.status()} ${r.url()}`);
+  });
+
+  // --- Portfolio ---
+  await page.goto(BASE + '/app', { waitUntil: 'networkidle' });
+  await page.waitForTimeout(600);
+
+  check('app: exactly one h1', (await page.locator('h1').count()) === 1);
+  const landmarks = await page.evaluate(() => ({
+    header: document.querySelectorAll('header').length,
+    main: document.querySelectorAll('main').length,
+    footer: document.querySelectorAll('footer').length,
+    navs: document.querySelectorAll('nav[aria-label]').length,
+  }));
+  check(
+    'app: landmarks present (header/main/footer/labelled navs)',
+    landmarks.header === 1 && landmarks.main === 1 && landmarks.footer === 1 && landmarks.navs >= 2,
+    JSON.stringify(landmarks),
+  );
+
+  await page.keyboard.press('Tab');
+  const firstStop = await page.evaluate(() => document.activeElement?.textContent?.trim());
+  check(
+    'app: skip link is the first tab stop',
+    firstStop === 'Skip to content',
+    `got="${firstStop}"`,
+  );
+
+  // Borrowing capacity must be the contract's real ceiling, not an ICR estimate — and
+  // the provenance must still be checkable. It moved out of the card body and behind an
+  // info affordance: BRAND.md keeps contract internals out of the primary surface, but
+  // deleting the claim outright would leave the number unfalsifiable.
+  const capacityProvenance = await page.locator('text=getTroveMaxBorrowingCapacity').count();
+  check(
+    'app: borrowing capacity can still be traced to the contract call',
+    capacityProvenance > 0,
+    'the real ceiling, not an ICR-derived estimate',
+  );
+
+  // ...but not in the primary copy. `<details>` keeps it in the DOM and out of the way,
+  // so this asserts the name is not visible until the user asks for it.
+  const capacityVisible = await page.evaluate(() =>
+    [...document.querySelectorAll('details')].some(
+      (d) => !d.open && d.textContent.includes('getTroveMaxBorrowingCapacity'),
+    ),
+  );
+  check(
+    'app: the contract name sits behind an info affordance, not in the card body',
+    capacityVisible,
+    'BRAND.md: no function names in the primary UI',
+  );
+
+  // The gasless claim must never be unconditional. MarenVault.deposit() is payable and
+  // MarenRelayHub reverts on any request carrying value, so the first deposit costs the
+  // user BTC gas. Copy that says otherwise is a lie the contracts will expose.
+  // Located by the data hook rather than the heading text, so retitling the card does
+  // not silently stop this claim from being checked.
+  const gasText = await page.locator('section:has([data-contrast="gas-copy"])').first().innerText();
+  check('app: gas copy never promises "no gas, ever"', !/no gas,? ever/i.test(gasText));
+  check(
+    'app: gas copy states the first-deposit exception',
+    /first deposit costs gas/i.test(gasText),
+    'deposit is payable, therefore never relayable',
+  );
+
+  // --- The two figures that broke, checked where they render ---------------
+  //
+  // A live screenshot showed LIQUIDATION PRICE reading
+  // $57,896,044,618,658,097,711,785,492,504,343,953,926,634,992,332,820,282,019,728.79
+  // — MAX_CR formatted as dollars — and overlapping BITCOIN CAN FALL, because a value
+  // that long sets its grid column's minimum width. Both halves are asserted here: the
+  // figure, and the layout that could not survive it.
+
+  const metricBoxes = await page.evaluate(() => {
+    const labels = [...document.querySelectorAll('.t-label')];
+    const liq = labels.find((el) => /liquidation price/i.test(el.textContent));
+    const fall = labels.find((el) => /bitcoin can fall/i.test(el.textContent));
+    if (!liq || !fall) return null;
+    // `.t-label` is a <span>; its closest <div> is the Metric root, which is the grid
+    // item whose track could be widened by an over-long value.
+    const a = liq.closest('div').getBoundingClientRect();
+    const b = fall.closest('div').getBoundingClientRect();
+    // Side-by-side columns must not intersect horizontally while sharing a row.
+    const sameRow = Math.abs(a.top - b.top) < 8;
+    return { overlap: sameRow && a.right > b.left + 1, aRight: a.right, bLeft: b.left };
+  });
+  check(
+    'app: the liquidation-price and drop columns never overlap',
+    metricBoxes !== null && !metricBoxes.overlap,
+    metricBoxes
+      ? `right=${Math.round(metricBoxes.aRight)} left=${Math.round(metricBoxes.bLeft)}`
+      : 'labels not found',
+  );
+
+  // No figure anywhere in the dApp may be an unbounded number. Sixteen consecutive
+  // digits is far past any real balance and far short of a 2^255 sentinel.
+  const appBody = await page.locator('main').innerText();
+  check(
+    'app: no figure runs to 16+ digits',
+    !/\d[\d,]{15,}/.test(appBody.replace(/,/g, '')),
+    (appBody.match(/\d[\d,]{15,}/) ?? [''])[0].slice(0, 40),
+  );
+
+  // The empty account: a position that does not exist quotes no liquidation price.
+  await page.getByRole('button', { name: 'Demo controls' }).click();
+  await page.getByRole('button', { name: /New wallet/ }).click();
+  await page.waitForTimeout(900);
+
+  const emptyBody = await page.locator('main').innerText();
+  check(
+    'app (no debt): renders no numeric liquidation price',
+    !/liquidation price[\s\S]{0,40}?[\d]/i.test(emptyBody),
+    'a position with no debt has no liquidation price',
+  );
+  check(
+    'app (no debt): never renders the MAX_CR sentinel as dollars',
+    !/\$\d{12,}/.test(emptyBody.replace(/,/g, '')),
+  );
+  // Counts em dashes used as PLACEHOLDER VALUES — an element whose entire content is a
+  // dash — not em dashes in prose, which are punctuation and perfectly welcome.
+  const placeholderDashes = await page.evaluate(
+    () =>
+      [...document.querySelectorAll('main span, main div')].filter(
+        (el) => el.textContent.trim() === '—',
+      ).length,
+  );
+  check(
+    'app (no debt): shows a purposeful empty state, not a grid of dashes',
+    /No position yet/.test(emptyBody) && placeholderDashes === 0,
+    `${placeholderDashes} placeholder dashes on the empty portfolio`,
+  );
+
+  // And the Vault, whose preview derives the same figures from a hypothetical debt.
+  // The demo store is module-level state, so it resets to the default account on every
+  // navigation and has to be re-selected here rather than carried over.
+  await page.goto(BASE + '/app/vault', { waitUntil: 'networkidle' });
+  await page.waitForTimeout(600);
+  await page.getByRole('button', { name: 'Demo controls' }).click();
+  await page.getByRole('button', { name: /New wallet/ }).click();
+  await page.waitForTimeout(900);
+
+  const emptyVault = await page.locator('main').innerText();
+  check(
+    'vault (no debt): renders no numeric liquidation price',
+    !/liquidation price[\s\S]{0,40}?[\d]/i.test(emptyVault),
+  );
+  check(
+    'vault (no debt): lands on Deposit rather than an unusable Borrow slider',
+    (await page.getByRole('tab', { name: 'Deposit' }).getAttribute('aria-selected')) === 'true',
+  );
+
+  // --- Vault: the slider stops at the 180% floor ---
+  // (navigating resets the demo account to the direct trove)
+  await page.goto(BASE + '/app/vault', { waitUntil: 'networkidle' });
+  await page.waitForTimeout(600);
+
+  const slider = page.locator('input[type=range]');
+  check('vault: borrow control is a real range input', (await slider.count()) === 1);
+  check(
+    'vault: slider is labelled and announces a unit-bearing value',
+    Boolean(await slider.getAttribute('aria-label')) &&
+      /MUSD/.test((await slider.getAttribute('aria-valuetext')) ?? ''),
+    (await slider.getAttribute('aria-valuetext')) ?? '',
+  );
+
+  // Drive it to the maximum with the keyboard, then read the resulting ratio.
+  await slider.focus();
+  await page.keyboard.press('End');
+  await page.waitForTimeout(400);
+  const ratioText = await page.locator('text=Resulting ratio').locator('..').innerText();
+  const ratioAtMax = Number((ratioText.match(/([\d,]+\.\d)%/)?.[1] ?? '0').replace(/,/g, ''));
+  check(
+    'vault: slider at maximum still leaves the position at or above 180%',
+    ratioAtMax >= 180,
+    `resulting ratio ${ratioAtMax}%`,
+  );
+
+  const ringOnSlider = await page.evaluate(() => {
+    const cs = getComputedStyle(document.activeElement);
+    return cs.outlineStyle !== 'none' && parseFloat(cs.outlineWidth) > 0;
+  });
+  check('vault: slider shows a focus ring when focused by keyboard', ringOnSlider);
+
+  // --- Vault: a stale oracle blocks borrowing and leaves repay open ---
+  await page.getByRole('button', { name: 'Demo controls' }).click();
+  await page.getByRole('button', { name: /Stall the oracle/ }).click();
+  await page.waitForTimeout(800);
+
+  check(
+    'vault: stale oracle shows the price-feed-unavailable state',
+    (await page.locator('text=Price feed unavailable').count()) > 0,
+  );
+  const borrowDisabled = await page
+    .getByRole('button', { name: /^Borrow/ })
+    .first()
+    .isDisabled();
+  check('vault: stale oracle disables borrowing', borrowDisabled);
+
+  const staleBanner = await page.locator('text=You can still repay and withdraw').count();
+  check('vault: stale state says repay and withdraw remain open', staleBanner > 0);
+
+  await page.getByRole('tab', { name: 'Repay' }).click();
+  await page.waitForTimeout(400);
+  const repayEnabled = await page
+    .getByRole('button', { name: /^Repay/ })
+    .last()
+    .isEnabled();
+  check('vault: repay stays available while the oracle is stale', repayEnabled);
+
+  // No figure may be computed from the stale price.
+  const staleHealth = await page.evaluate(() =>
+    document.body.innerText.includes('Resulting ratio'),
+  );
+  check('vault: no ratio preview is rendered from a stale price', !staleHealth);
+
+  await page.getByRole('button', { name: /Oracle stalled/ }).click();
+  await page.waitForTimeout(600);
+
+  // --- Pay: the resolved address is shown before confirmation ---
+  await page.goto(BASE + '/app/pay', { waitUntil: 'networkidle' });
+  await page.waitForTimeout(700);
+
+  const resolvedInline = await page.locator('#pay-to-status').innerText();
+  check(
+    'pay: the resolved address is shown beside the handle',
+    /0x[0-9a-fA-F]{40}/.test(resolvedInline),
+    resolvedInline.slice(0, 60),
+  );
+
+  await page.getByRole('button', { name: /^Send / }).click();
+  await page.waitForTimeout(300);
+  const dialog = page.locator('[role=dialog]');
+  check('pay: confirmation is a modal dialog', (await dialog.count()) === 1);
+  check(
+    'pay: dialog is aria-modal and labelled',
+    (await dialog.getAttribute('aria-modal')) === 'true',
+  );
+  const dialogText = await dialog.innerText();
+  check(
+    'pay: confirmation repeats the full resolved address',
+    /0x[0-9a-fA-F]{40}/.test(dialogText),
+  );
+  await page.keyboard.press('Escape');
+  await page.waitForTimeout(200);
+  check('pay: Escape closes the dialog', (await page.locator('[role=dialog]').count()) === 0);
+
+  // --- Earn: no forward APY, anywhere ---
+  await page.goto(BASE + '/app/earn', { waitUntil: 'networkidle' });
+  await page.waitForTimeout(600);
+  const earnText = await page.locator('main').innerText();
+  check(
+    'earn: no forward rate is quoted anywhere on the page',
+    !/\d[\d.,]*\s*%\s*(apy|apr)/i.test(earnText) && !/apy\s*[:of]*\s*\d/i.test(earnText),
+  );
+  check(
+    'earn: the realised figure is labelled backward-looking',
+    /Backward-looking/.test(earnText),
+  );
+  check('earn: says plainly why there is no APY', /does not display an APY/i.test(earnText));
+
+  // --- Activity: status wording and explorer links ---
+  await page.goto(BASE + '/app/activity', { waitUntil: 'networkidle' });
+  await page.waitForTimeout(600);
+  const activityText = await page.locator('main').innerText();
+  check('activity: a failed row says no funds moved', /Failed — no funds moved/.test(activityText));
+  const explorerLinks = await page.locator('main a[href*="explorer"]').count();
+  check('activity: rows link to the Mezo explorer', explorerLinks > 0, `${explorerLinks} links`);
+
+  check('app: no 4xx/5xx responses across the dApp', bad.length === 0, bad.join(', '));
+  await ctx.close();
+}
+
+// ---- 5. reduced motion across the dApp -----------------------------------
+{
+  const ctx = await browser.newContext({
+    viewport: { width: 1440, height: 1000 },
+    reducedMotion: 'reduce',
+  });
+  const page = await ctx.newPage();
+  await page.goto(BASE + '/app', { waitUntil: 'networkidle' });
+  await page.waitForTimeout(900);
+  const canvases = await page.evaluate(() => document.querySelectorAll('canvas').length);
+  check('app reduced-motion: no shader canvas mounted', canvases === 0, `canvases=${canvases}`);
+  const healthVisible = await page.locator('text=Position health').count();
+  check('app reduced-motion: the health card still renders', healthVisible > 0);
+  await ctx.close();
+}
+
+// ---- 6. no horizontal overflow at the narrow end --------------------------
+{
+  const ctx = await browser.newContext({ viewport: { width: 390, height: 844 } });
+  const page = await ctx.newPage();
+  for (const path of ['/app', '/app/vault', '/app/pay', '/app/earn', '/app/activity']) {
+    await page.goto(`${BASE}${path}`, { waitUntil: 'networkidle' });
+    await page.waitForTimeout(400);
+    const overflow = await page.evaluate(
+      () => document.documentElement.scrollWidth - document.documentElement.clientWidth,
+    );
+    check(`390px: ${path} has no horizontal overflow`, overflow === 0, `${overflow}px`);
+  }
   await ctx.close();
 }
 

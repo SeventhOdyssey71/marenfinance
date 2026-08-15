@@ -41,10 +41,7 @@ export function Txt({
 }: MarenTextProps) {
   const base = type[variant] as TextStyle;
   return (
-    <RNText
-      style={[base, tone === 'inherit' ? null : { color: toneColor[tone] }, style]}
-      {...rest}
-    >
+    <RNText style={[base, tone === 'inherit' ? null : { color: toneColor[tone] }, style]} {...rest}>
       {children}
     </RNText>
   );
