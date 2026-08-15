@@ -1,0 +1,85 @@
+[profile.default]
+src = "src"
+out = "out"
+libs = ["lib"]
+test = "test"
+script = "script"
+solc_version = "0.8.28"
+# solc 0.8.28 tops out at cancun. Mezo mainnet has Prague + Osaka active, which is a
+# superset, so cancun bytecode runs unchanged. Do not raise this without bumping solc.
+evm_version = "cancun"
+optimizer = true
+optimizer_runs = 200
+bytecode_hash = "none"
+ffi = false
+gas_reports = ["MarenVault", "MarenPay", "MarenEarn", "MarenRegistry", "MarenForwarder"]
+fs_permissions = [{ access = "read-write", path = "./deployments" }]
+
+[profile.default.fuzz]
+runs = 256
+
+[profile.default.invariant]
+runs = 64
+depth = 64
+fail_on_revert = false
+
+# `FOUNDRY_PROFILE=ci forge test` — heavier fuzzing, used by .github/workflows/ci.yml.
+[profile.ci]
+verbosity = 3
+
+[profile.ci.fuzz]
+runs = 2048
+max_test_rejects = 500000
+
+[profile.ci.invariant]
+runs = 256
+depth = 128
+fail_on_revert = false
+
+[fmt]
+line_length = 110
+tab_width = 4
+bracket_spacing = false
+int_types = "long"
+multiline_func_header = "attributes_first"
+quote_style = "double"
+number_underscore = "preserve"
+sort_imports = true
+
+# Verified 2026-08-15 by executing a real `eth_call`, not just `eth_chainId`.
+#
+# An earlier revision of this comment asserted that https://mezo.drpc.org answers
+# `eth_chainId` and nothing else. That claim is RETRACTED: the same endpoint served
+# eth_call, eth_getLogs and eth_getBlockByNumber correctly 10/10 about an hour later. A
+# degraded backend behind the load balancer reported "unsupported" rather than
+# "unavailable", which is indistinguishable from a capability limit on a single probe.
+# No endpoint is denylisted here. Never certify or condemn one on one probe — repeat it.
+# See packages/sdk/src/chains.ts, which carries the corrected note in full.
+[rpc_endpoints]
+mezo = "https://jsonrpc-mezo.boar.network"
+mezo_mainnet = "https://jsonrpc-mezo.boar.network"
+mezo_mainnet_alt = "https://mainnet.mezo.public.validationcloud.io"
+mezo_testnet = "https://rpc.test.mezo.org"
+
+# CONTRACT VERIFICATION — Mezo runs Blockscout, not Etherscan. Note the `api.` subdomain;
+# `explorer.mezo.org/api` (without it) 404s.
+#
+#   mainnet 31612  https://api.explorer.mezo.org/api
+#   matsnet 31611  https://api.explorer.test.mezo.org/api
+#
+# There is deliberately NO [etherscan] table here. foundry 1.4.3 resolves that table by
+# looking the chain id up in its built-in chain list, and Mezo is not in it, so ANY
+# [etherscan] entry naming 31611 or 31612 makes `forge script` fail outright with
+# "Error: Chain 31611 not supported" — before it does anything else. Verified by bisection.
+#
+# Pass the verifier on the command line instead, which works today:
+#
+#   forge script script/Deploy.s.sol --rpc-url mezo_testnet --broadcast \
+#     --verify --verifier blockscout \
+#     --verifier-url https://api.explorer.test.mezo.org/api
+#
+#   forge verify-contract <address> src/MarenVault.sol:MarenVault \
+#     --verifier blockscout --verifier-url https://api.explorer.test.mezo.org/api \
+#     --compiler-version 0.8.28 --num-of-optimizations 200
+#
+# Revisit if a future foundry accepts an unknown chain id in [etherscan].
