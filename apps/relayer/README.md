@@ -295,14 +295,14 @@ Every rule below is a specific failure from the Talise audit (2026-07-24: 7 Crit
 
 ### Required — the service refuses to relay without these
 
-| Variable                          | Example                          | Notes                                                                                        |
-| --------------------------------- | -------------------------------- | -------------------------------------------------------------------------------------------- |
-| `RELAYER_PRIVATE_KEY`             | `0x…` (32 bytes)                 | **or** the keystore pair below. Exactly one.                                                 |
-| `RELAYER_KEYSTORE_PATH`           | `~/.foundry/keystores/maren`     | A `cast wallet import` keystore.                                                             |
-| `RELAYER_KEYSTORE_PASSWORD`       |                                  | Required with the path.                                                                      |
-| `RELAYER_FORWARDER_ADDRESS`       | `0x…`                            | Falls back to `MAREN_ADDRESSES` in `@maren/sdk`, which is the zero address until deployment. |
-| `RELAYER_ALLOWED_TARGETS`         | `marenPay:0x…,marenRegistry:0x…` | `name:address` pairs. Unknown name ⇒ boot problem. Falls back to the non-zero SDK addresses. |
-| `RELAYER_MAX_DAILY_SPONSORED_BTC` | `0.01`                           | **No default.** Unset ⇒ nothing is sponsored.                                                |
+| Variable                          | Example                          | Notes                                                                                                                                             |
+| --------------------------------- | -------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `RELAYER_PRIVATE_KEY`             | `0x…` (32 bytes)                 | **or** the keystore pair below. Exactly one.                                                                                                      |
+| `RELAYER_KEYSTORE_PATH`           | `~/.foundry/keystores/maren`     | A `cast wallet import` keystore.                                                                                                                  |
+| `RELAYER_KEYSTORE_PASSWORD`       |                                  | Required with the path.                                                                                                                           |
+| `RELAYER_FORWARDER_ADDRESS`       | `0x…`                            | Falls back to `MAREN_ADDRESSES` in `@maren/sdk` — a real `MarenRelayHub` address on matsnet since 15 Aug 2026, still the zero address on mainnet. |
+| `RELAYER_ALLOWED_TARGETS`         | `marenPay:0x…,marenRegistry:0x…` | `name:address` pairs. Unknown name ⇒ boot problem. Falls back to the non-zero SDK addresses.                                                      |
+| `RELAYER_MAX_DAILY_SPONSORED_BTC` | `0.01`                           | **No default.** Unset ⇒ nothing is sponsored.                                                                                                     |
 
 ### Policy
 

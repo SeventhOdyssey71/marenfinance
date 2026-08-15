@@ -80,7 +80,7 @@ money_ is real, and only the transport is stubbed.
 | Transaction **submission** and the receipt source                                | `src/chain/actions.ts` (`submitMock`, `mockClient`) | `mockClient` is typed as the narrow `Pick<PublicClient, 'waitForTransactionReceipt'>` that `confirmTransaction` accepts — drop in a real `PublicClient` and point `submitMock` at `walletClient.writeContract` or the relayer's `POST /relay`.                                                                                    |
 | Handle resolution (`@sele` → address)                                            | `src/data/mock.ts`                                  | `MarenRegistry` forward/reverse resolver.                                                                                                                                                                                                                                                                                         |
 | The auth **backend**                                                             | —                                                   | `src/auth/webAuth.ts` is fully implemented, but no `https://maren.finance/auth/authorize` endpoint exists yet, and the universal link needs an `apple-app-site-association` file published for `applinks:maren.finance`. Until both exist the flow fails closed with a typed error. It does **not** fall back to a custom scheme. |
-| Maren's own contract addresses                                                   | `@maren/sdk` `addresses.ts`                         | All zero — `MarenVault`, `MarenPay`, `MarenForwarder`, `MarenRegistry`, `MarenEarn` are not deployed. `isDeployed()` exists to check.                                                                                                                                                                                             |
+| Maren's own contract addresses                                                   | `@maren/sdk` `addresses.ts`                         | **Live on matsnet** since 15 August 2026 — `MarenVault`, `MarenPay`, `MarenRelayHub`, `MarenRegistry`, `MarenEarn`. Still zero on mainnet. `isDeployed()` exists to check. This app does not read them yet; unlike `apps/web` it has no live path, so it stays on mocks regardless.                                               |
 
 The mock numbers were chosen to exercise the interesting states rather than to flatter
 the product: the demo position sits at ~260% CR (healthy, but one bad week from
@@ -317,7 +317,9 @@ recorded or uploaded.
 - The auth backend and the `apple-app-site-association` file for
   `applinks:maren.finance` do not exist yet, so the R12 flow is implemented but not
   end-to-end exercisable. It fails closed.
-- Maren's own contracts are not deployed; `MAREN_ADDRESSES` is all zeros.
+- Maren's contracts **are** deployed on matsnet, but this app has no live read path and
+  still runs entirely on mocks. `apps/web` switched to live reads on the same commit;
+  this one did not. That asymmetry is the largest single gap in the iOS app.
 - Amount entry on Vault deposit/repay/withdraw uses presets rather than a numeric
   keypad. Borrow — the flow with real risk consequences — has the full slider.
 - No EAS build has been run. `eas.json` and `.easignore` are configured and the R14
