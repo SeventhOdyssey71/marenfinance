@@ -1,7 +1,12 @@
 # `@maren/ios` — Maren Finance for iOS
 
 A Bitcoin-backed account on Mezo Chain. Deposit BTC, draw MUSD against it without
-selling, spend MUSD gaslessly, earn on the idle balance.
+selling, spend MUSD without paying gas, earn on the idle balance.
+
+**One caveat, stated first because the interface states it first:** the opening deposit
+is not gasless. `MarenVault.deposit()` is `payable`, and `MarenRelayHub.execute` reverts
+`ValueNotRelayable` on any request carrying value — so that one transaction is signed and
+paid for by the user. Everything after it is relayed. See [Gas](#gas).
 
 Expo (React Native) + TypeScript strict, `expo-router`, sharing `@maren/sdk` from the
 workspace. Bundle identifier `finance.maren.app`.
@@ -81,6 +86,14 @@ money_ is real, and only the transport is stubbed.
 | Handle resolution (`@sele` → address)                                            | `src/data/mock.ts`                                  | `MarenRegistry` forward/reverse resolver.                                                                                                                                                                                                                                                                                         |
 | The auth **backend**                                                             | —                                                   | `src/auth/webAuth.ts` is fully implemented, but no `https://maren.finance/auth/authorize` endpoint exists yet, and the universal link needs an `apple-app-site-association` file published for `applinks:maren.finance`. Until both exist the flow fails closed with a typed error. It does **not** fall back to a custom scheme. |
 | Maren's own contract addresses                                                   | `@maren/sdk` `addresses.ts`                         | **Live on matsnet** since 15 August 2026 — `MarenVault`, `MarenPay`, `MarenRelayHub`, `MarenRegistry`, `MarenEarn`. Still zero on mainnet. `isDeployed()` exists to check. This app does not read them yet; unlike `apps/web` it has no live path, so it stays on mocks regardless.                                               |
+
+Where the mock meets the real contracts, the shapes are aligned rather than invented: the
+one behaviour the interface asserts about `packages/contracts` — that `deposit` is
+`payable` and therefore cannot be relayed — is read off the deployed source and enforced
+by `src/chain/sponsorship.ts`, not assumed. The remaining read shapes in
+`src/data/types.ts` are the app's own view model; swapping them for `readContract`
+results is the work described in the table above and has not been done. The contracts
+being live on matsnet does not change that: this app still has no live path.
 
 The mock numbers were chosen to exercise the interesting states rather than to flatter
 the product: the demo position sits at ~260% CR (healthy, but one bad week from
@@ -180,10 +193,9 @@ Exercise this: **Settings → Developer → Simulate a stale price feed**.
   used" rather than implying an attestation that does not exist.
 - **R16, explicit typed failure over silent fallback** — `confirmTransaction` returns a
   union rather than throwing; `accessKey` returns `denied` / `missing` distinctly.
-- **Honest gas claims** — Pay and Earn are relayer-sponsored and say "you pay no BTC".
-  Vault operations go through Mezo's own `BorrowerOperationsSignatures` and are _not_
-  sponsored, and those screens say so before you sign. Gas is shown in **sats**, never a
-  raw BTC decimal.
+- **Honest gas claims** — see [Gas](#gas). The rule lives in one dependency-free module
+  and the wording in one copy object, so no screen can drift into promising terms the
+  relayer will refuse. Gas is shown in **sats**, never a raw BTC decimal.
 - **Pooled-trove risk disclosure** — stated on the last onboarding panel, before setup,
   per `ARCHITECTURE.md` §3.4.
 - **No fixed APY on Earn** — the Stability Pool has no token emissions, so the screen
@@ -256,19 +268,73 @@ recorded or uploaded.
 
 ---
 
+## Gas
+
+Mezo settles gas in BTC. Maren's relayer pays it — with exactly one exception, and the
+exception is structural rather than a policy choice.
+
+```solidity
+// packages/contracts/src/MarenVault.sol:312
+function deposit(address upperHint, address lowerHint) external payable nonReentrant {
+
+// packages/contracts/src/MarenRelayHub.sol:236
+if (msg.value != 0 || request.value != 0) revert ValueNotRelayable();
+```
+
+A deposit _sends Bitcoin_. An ERC-2771 forwarder cannot carry the caller's BTC, and if it
+tried, `msg.value` would come from the relayer's own key — which is precisely the funding
+confusion **R1** exists to prevent ("the shielded relayer could be induced to fund an
+attacker's deposit, draining the relayer"). So `MarenRelayHub` refuses value
+unconditionally, and the opening deposit is an ordinary transaction the user signs and
+pays for.
+
+| Action                                         | Relayed | Why                                               |
+| ---------------------------------------------- | ------- | ------------------------------------------------- |
+| `deposit`                                      | **no**  | `payable`; carries BTC, so it cannot be forwarded |
+| `borrow`, `repay`, `withdraw`, `closePosition` | yes     | no value, routed through `MarenForwarder`         |
+| all of Pay — send, request, link, split        | yes     | no value                                          |
+| Earn deposit / withdraw                        | yes     | no value                                          |
+
+**The app does not ship the sentence "no gas, ever."** It is not true, and R13's lesson
+generalises from attestations to fee claims: a promise that exists in the interface and
+not in the contracts is worse than no promise, because it stops people looking.
+
+Three things enforce that:
+
+- `src/chain/sponsorship.ts` — the rule, as a pure function over an action type. It has
+  no imports, so it is testable without the Keychain. Every "gasless" affordance in the
+  UI derives from it; none is hard-coded per screen.
+- `src/lib/copy.ts` `gasCopy` — the wording, written once and reused by onboarding, Pay,
+  Vault and Home.
+- `src/security.test.ts` — asserts the rule, and asserts that no string in `gasCopy`
+  matches `/no gas,? ever/i`, `/zero gas/i`, `/never pay gas/i` or
+  `/without ever holding gas/i`.
+
+Scrolling to the bottom of Activity is the clearest statement of the product the app
+makes: one gas line, on the deposit that opened the position, and "no gas paid" on
+everything since.
+
+> **Note for `apps/web`.** The landing page currently makes the unconditional version of
+> this claim — "Bitcoin-backed liquidity with zero gas" (`src/app/layout.tsx:8`),
+> "without ever holding gas" (`cta-band.tsx:23`), "No transaction, no gas, no BTC balance
+> required" (`visuals/gasless-flow.tsx:7`). Those predate this branch and are not changed
+> here, but they contradict the contracts and should be reconciled before launch.
+
+---
+
 ## Screens
 
-| Route                     | Screen                                                                                                              |
-| ------------------------- | ------------------------------------------------------------------------------------------------------------------- |
-| `app/onboarding.tsx`      | Three panels — Deposit Bitcoin · Draw MUSD · Spend without gas — plus the pooled-trove risk disclosure.             |
-| `app/wallet-setup/`       | Create or import. Leads with how the key will be held.                                                              |
-| `app/(tabs)/index.tsx`    | Home / Portfolio. Position health is the hero: CR, liquidation price, room to fall, threshold scale.                |
-| `app/(tabs)/vault.tsx`    | Deposit / borrow / repay / withdraw. Borrow slider with live CR + liquidation price, hard-capped at the 180% floor. |
-| `app/(tabs)/pay.tsx`      | Send to `@handle` or address, request with QR, gasless stated explicitly.                                           |
-| `app/(tabs)/earn.tsx`     | Trailing realised yield, backward-looking, no APY.                                                                  |
-| `app/(tabs)/activity.tsx` | History with status, memo, explorer link.                                                                           |
-| `app/settings/index.tsx`  | Network switcher, security state, address, sign out, stale-feed simulator.                                          |
-| `app/scan.tsx`            | QR scan-to-pay.                                                                                                     |
+| Route                     | Screen                                                                                                                                                                                        |
+| ------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `app/onboarding.tsx`      | Three panels — Deposit Bitcoin · Draw MUSD · Spend without gas — plus the pooled-trove risk disclosure. Panel three names the first-deposit exception rather than claiming gas never applies. |
+| `app/wallet-setup/`       | Create or import. Leads with how the key will be held.                                                                                                                                        |
+| `app/(tabs)/index.tsx`    | Home / Portfolio. Position health is the hero: CR, liquidation price, room to fall, threshold scale.                                                                                          |
+| `app/(tabs)/vault.tsx`    | Deposit / borrow / repay / withdraw. Borrow slider with live CR + liquidation price, hard-capped at the 180% floor.                                                                           |
+| `app/(tabs)/pay.tsx`      | Send to `@handle` or address, request with QR. Every payment is relayed, so "you pay no BTC" is unconditional _here_ and is stated so.                                                        |
+| `app/(tabs)/earn.tsx`     | Trailing realised yield, backward-looking, no APY.                                                                                                                                            |
+| `app/(tabs)/activity.tsx` | History with status, memo, explorer link.                                                                                                                                                     |
+| `app/settings/index.tsx`  | Network switcher, security state, address, sign out, stale-feed simulator.                                                                                                                    |
+| `app/scan.tsx`            | QR scan-to-pay.                                                                                                                                                                               |
 
 ## Design
 
@@ -306,7 +372,42 @@ recorded or uploaded.
   describing a shape.
 - Reduce Motion is read via `useReducedMotion()` and renders final state rather than
   shortening durations.
+- **Contrast.** `text-subtle` (`#6B6B75`) fails WCAG AA on all four Maren surfaces —
+  3.80:1 on `#08080A`, 3.60:1 on `#101013`, 3.71:1 on `#0C0C0F`, 3.39:1 on `#17171B`. The
+  palette is unchanged, but informational captions and `Label` default to `text-muted`
+  (`#A1A1AA`, 6.97–7.81:1), and `subtle` is reserved for text that is decorative or
+  duplicated by an adjacent accessible label. BRAND.md's preamble settles the conflict:
+  "legible before it is decorative." Worth a decision from whoever owns the palette —
+  either `text-subtle` is for non-text ornament, or its hex should rise to about
+  `#80808B`, which is the darkest grey that clears 4.5:1 on `#17171B`.
 - Errors and blocked states use `accessibilityRole="alert"`.
+
+### Simulator verification
+
+Every screen below was navigated and screenshotted on **iPhone 16 Pro, iOS 18.3**, via
+Expo Go against a local Metro bundler. Screenshots land in `apps/ios/.screenshots/`,
+which is gitignored — they are verification evidence, not source.
+
+| Shot                   | What it proves                                                                                                                                                                    |
+| ---------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `00`–`02` onboarding   | The three panels; panel three states the first-deposit gas exception; pooled-trove risk shown before setup                                                                        |
+| `03` wallet setup      | Key handling explained before the choice is offered                                                                                                                               |
+| `04` key created       | Honest degradation — Expo Go cannot declare `NSFaceIDUsageDescription`, so the app reports "held in memory for this session only" rather than silently writing an unprotected key |
+| `10`–`11` home         | Position health hero, balances, quick actions, the corrected gas card                                                                                                             |
+| `20`–`21` vault        | Collateral/debt/limit rows, borrow slider capped at the 180% floor                                                                                                                |
+| `30`–`31` pay          | Send with the relayed-payment banner and the 80-byte memo counter; request with QR                                                                                                |
+| `40` earn              | Trailing realised MUSD, backward-looking, no APY                                                                                                                                  |
+| `50`–`51` activity     | The failed send reading "Failed — no funds moved" with the amount struck through; one gas line in the whole ledger                                                                |
+| `60`–`61` settings     | Network, key state, the R12 and R13 disclosures, the stale-feed simulator                                                                                                         |
+| `70` home, stale feed  | The health block is **replaced** by "Price feed unavailable"; the USD valuation disappears rather than being computed from a stale price                                          |
+| `71` vault, stale feed | Borrow pinned to 0.00, slider disabled, CTA inert, with the reason: "Price feed is 90s old. Mezo's oracle rejects anything over 60s, so this would revert on-chain."              |
+
+The blue gear floating over the right edge of every shot is **Expo Go's own dev-menu
+launcher**, not Maren UI. It disappears in a development or release build.
+
+Two things this does _not_ prove, and they are the same two the mocked table names: no
+screenshot here involved a chain read or a broadcast transaction, and no EAS build has
+been run.
 
 ---
 

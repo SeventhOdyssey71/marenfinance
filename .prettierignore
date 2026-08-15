@@ -13,3 +13,7 @@ docs/build
 # foundry build output — never format generated artifacts
 packages/contracts/broadcast
 packages/contracts/deployments
+
+# Expo generates this on every start; it is gitignored, so CI never sees it, but a
+# local `pnpm format:check` would fail on it forever otherwise.
+apps/ios/expo-env.d.ts

@@ -43,7 +43,7 @@ export function StatRow({
           {label}
         </Txt>
         {hint ? (
-          <Txt variant="small" tone="subtle" style={styles.hint}>
+          <Txt variant="small" tone="muted" style={styles.hint}>
             {hint}
           </Txt>
         ) : null}

@@ -8,7 +8,7 @@ import { Icon, type IconName } from '../../src/components/Icon';
 import { Sats } from '../../src/components/Money';
 import { Screen } from '../../src/components/Screen';
 import { Label, Num, Txt } from '../../src/components/Text';
-import { base, radius, semantic, space } from '../../src/design/tokens';
+import { base, radius, semantic, space, text as textColors } from '../../src/design/tokens';
 import { activityTitle, statusLabel, timeAgo } from '../../src/lib/copy';
 import type { ActivityItem, ActivityKind, ActivityStatus } from '../../src/data/types';
 import { useActivity } from '../../src/hooks/useChainData';
@@ -77,6 +77,7 @@ function Row({ item, explorer, last }: { item: ActivityItem; explorer: string; l
         ? formatBtc(item.btcWei)
         : '—';
   const direction = outflow(item.kind) ? '−' : '+';
+  const [numeral, unit] = splitAmount(amount);
 
   const label = `${activityTitle(item.kind, item.counterparty)}, ${amount}, ${statusLabel(item.status)}, ${timeAgo(item.at)}`;
 
@@ -99,20 +100,20 @@ function Row({ item, explorer, last }: { item: ActivityItem; explorer: string; l
 
         <View style={styles.rowMeta}>
           <StatusChip status={item.status} />
-          <Txt variant="small" tone="subtle">
+          <Txt variant="small" tone="muted">
             · {timeAgo(item.at)}
           </Txt>
         </View>
 
         {item.memo ? (
-          <Txt variant="small" tone="subtle" style={styles.memo} numberOfLines={1}>
+          <Txt variant="small" tone="muted" style={styles.memo} numberOfLines={1}>
             “{item.memo}”
           </Txt>
         ) : null}
 
         {item.hash ? (
           <View style={styles.hashRow}>
-            <Num size="numericSm" tone="subtle" style={styles.hash}>
+            <Num size="numericSm" tone="muted" style={styles.hash}>
               {shortHash(item.hash)}
             </Num>
             <Icon name="external" size={11} color="#6B6B75" />
@@ -121,30 +122,46 @@ function Row({ item, explorer, last }: { item: ActivityItem; explorer: string; l
       </View>
 
       <View style={styles.rowRight}>
-        <Num
-          size="numeric"
-          tone="inherit"
-          style={[
-            styles.amount,
-            failed
-              ? styles.amountFailed
-              : item.musdWei !== undefined
-                ? styles.amountMusd
-                : styles.amountBtc,
-          ]}
-        >
-          {direction}
-          {amount}
-        </Num>
+        {/*
+          Numeral and unit are separate runs, as everywhere else: the figure carries the
+          value in plain text and the unit carries the asset colour (§2's "asset mark").
+          A failed row strikes the whole pair through and drops it to subtle, so it reads
+          as withdrawn rather than as money that moved.
+        */}
+        <View style={styles.amountPair}>
+          <Num
+            size="numeric"
+            tone="inherit"
+            style={[styles.amount, failed ? styles.amountFailed : styles.amountLive]}
+          >
+            {direction}
+            {numeral}
+          </Num>
+          {unit ? (
+            <Num
+              size="numericSm"
+              tone="inherit"
+              style={
+                failed
+                  ? styles.amountFailed
+                  : item.musdWei !== undefined
+                    ? styles.amountMusd
+                    : styles.amountBtc
+              }
+            >
+              {unit}
+            </Num>
+          ) : null}
+        </View>
 
         {item.sponsored ? (
-          <Txt variant="small" tone="subtle" style={styles.gas}>
+          <Txt variant="small" tone="muted" style={styles.gas}>
             no gas paid
           </Txt>
         ) : item.gasPaidWei > 0n ? (
           <View style={styles.gasRow}>
             <Sats wei={item.gasPaidWei} />
-            <Txt variant="small" tone="subtle">
+            <Txt variant="small" tone="muted">
               {' '}
               gas
             </Txt>
@@ -155,10 +172,27 @@ function Row({ item, explorer, last }: { item: ActivityItem; explorer: string; l
   );
 }
 
+/** "1,500.00 MUSD" -> ["1,500.00", "MUSD"]; "—" survives unsplit. */
+function splitAmount(value: string): [string, string | null] {
+  const at = value.lastIndexOf(' ');
+  if (at < 0) return [value, null];
+  const tail = value.slice(at + 1);
+  return /^[A-Za-z]+$/.test(tail) ? [value.slice(0, at), tail] : [value, null];
+}
+
 function StatusChip({ status }: { status: ActivityStatus }) {
+  /**
+   * Confirmed is the expected outcome of every row in a working ledger, so it is grey.
+   *
+   * Colouring it green meant a healthy history rendered as a wall of green, and BRAND.md
+   * §2 is explicit that "a screen where everything is coloured is a screen where nothing
+   * is important" — the one genuinely important row, the failed send, was the same
+   * weight as everything around it. Only the two states a person must act on take
+   * colour, which is what makes R15's "Failed — no funds moved" impossible to miss.
+   */
   const colour =
     status === 'confirmed'
-      ? semantic.success
+      ? textColors.muted
       : status === 'failed'
         ? semantic.danger
         : semantic.warning;
@@ -263,9 +297,11 @@ const styles = StyleSheet.create({
   hash: { fontSize: 11 },
   rowRight: { alignItems: 'flex-end', gap: 2 },
   amount: { fontSize: 15 },
+  amountPair: { flexDirection: 'row', alignItems: 'baseline', justifyContent: 'flex-end', gap: 6 },
+  amountLive: { color: textColors.primary },
   amountMusd: { color: semantic.musd },
   amountBtc: { color: semantic.btc },
-  amountFailed: { color: '#6B6B75', textDecorationLine: 'line-through' },
+  amountFailed: { color: textColors.subtle, textDecorationLine: 'line-through' },
   gas: { fontSize: 11 },
   gasRow: { flexDirection: 'row', alignItems: 'center' },
   emptyBody: { marginTop: space.sm },

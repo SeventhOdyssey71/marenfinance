@@ -67,7 +67,10 @@ const state = {
   collateralWei: 500_000_000_000_000_000n, // 0.5 BTC
   principalWei: 12_000n * WAD,
   musdWei: 3_420n * WAD,
-  btcWei: 0n, // The user holds no BTC for gas. That is the product.
+  // Zero BTC in the wallet: the deposit already moved it into the trove, and the
+  // relayer pays gas from here on. This is the steady state, not the starting state —
+  // opening the position cost this user gas they no longer need.
+  btcWei: 0n,
   earnSharesWei: 2_500n * WAD,
   earnDepositedWei: 2_450n * WAD,
 };
@@ -190,8 +193,9 @@ export const MOCK_ACTIVITY: ActivityItem[] = [
     at: now - 4 * DAY,
     musdWei: 2_000n * WAD,
     hash: '0xb82f14c07de935a1c6408b7fd25e390174ac6b28de0951f3760a4c8b21eda637' as Hash,
-    sponsored: false,
-    gasPaidWei: 21_000n * 1_200_000_000n,
+    // Relayed, like everything except the deposit below. See chain/sponsorship.ts.
+    sponsored: true,
+    gasPaidWei: 0n,
     network: 'testnet',
   },
   {
@@ -212,6 +216,14 @@ export const MOCK_ACTIVITY: ActivityItem[] = [
     at: now - 31 * DAY,
     btcWei: 500_000_000_000_000_000n,
     hash: '0x7e4a2b90c15df386240a7bc9e05f13782ad4c60b9e173f5a82d0c46be9137a02' as Hash,
+    /**
+     * The one gas payment in this ledger, and deliberately so.
+     *
+     * `MarenVault.deposit()` is payable, and the relayer refuses any request carrying
+     * value — so the transaction that opened this position is the only one the user paid
+     * for. Scrolling to the bottom of Activity is the clearest statement of the product
+     * the app makes: one gas line, thirty-one days ago, and nothing since.
+     */
     sponsored: false,
     gasPaidWei: 21_000n * 1_100_000_000n,
     network: 'testnet',

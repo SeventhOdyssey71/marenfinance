@@ -4,7 +4,7 @@ const steps = [
   {
     k: '01',
     title: 'You sign',
-    body: 'An EIP-712 ForwardRequest. No transaction, no gas, no BTC balance required.',
+    body: 'An EIP-712 ForwardRequest. A signature, not a transaction — so it costs no gas.',
   },
   {
     k: '02',

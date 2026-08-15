@@ -73,12 +73,12 @@ export function PillButton({
       style={({ pressed }) => [
         styles.root,
         block && styles.block,
-        variant === 'primary' && styles.primary,
+        variant === 'primary' && (inert ? styles.primaryInert : styles.primary),
         variant === 'secondary' && styles.secondary,
         variant === 'ghost' && styles.ghost,
         pressed && variant === 'primary' && styles.primaryPressed,
         pressed && variant !== 'primary' && styles.secondaryPressed,
-        inert && styles.inert,
+        inert && variant !== 'primary' && styles.inert,
         style,
       ]}
     >
@@ -93,7 +93,13 @@ export function PillButton({
         <Txt
           style={[
             styles.label,
-            variant === 'primary' ? styles.labelOnWhite : styles.labelOnDark,
+            variant === 'primary'
+              ? inert
+                ? styles.labelInert
+                : styles.labelOnWhite
+              : variant === 'ghost'
+                ? styles.labelGhost
+                : styles.labelOnDark,
             tone === 'danger' && variant !== 'primary' && styles.labelDanger,
           ]}
           numberOfLines={1}
@@ -103,7 +109,7 @@ export function PillButton({
       </View>
 
       {variant === 'primary' && badge ? (
-        <View style={styles.badge} pointerEvents="none">
+        <View style={[styles.badge, inert && styles.badgeInert]} pointerEvents="none">
           {badge}
         </View>
       ) : null}
@@ -130,6 +136,20 @@ const styles = StyleSheet.create({
   },
   primary: { backgroundColor: '#FAFAFA', paddingRight: 6 },
   primaryPressed: { backgroundColor: '#E4E4E7' },
+  /**
+   * A disabled primary is NOT a dimmed white pill.
+   *
+   * `opacity: 0.4` over a white fill produced a large mid-grey slab — the loudest object
+   * on the screen, in a colour that is in no palette, telling the user they cannot act.
+   * A disabled control should recede. This is the secondary surface with a hairline, so
+   * it reads as an outline of the button that will exist once the form is valid.
+   */
+  primaryInert: {
+    backgroundColor: base.surfaceRaised,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: base.border,
+    paddingRight: 6,
+  },
   secondary: {
     backgroundColor: base.surfaceRaised,
     borderWidth: StyleSheet.hairlineWidth,
@@ -144,6 +164,14 @@ const styles = StyleSheet.create({
     letterSpacing: 0,
   },
   labelOnWhite: { color: base.bg },
+  labelInert: { color: '#A1A1AA' },
+  /**
+   * A ghost button is the quietest action on the screen and must read that way. At full
+   * #FAFAFA it had the same weight as the primary CTA sitting directly above it, so the
+   * onboarding footer offered two equally loud choices. The shipped web app renders its
+   * ghost variant `text-text-muted`; this matches it.
+   */
+  labelGhost: { color: '#A1A1AA' },
   labelOnDark: { color: '#FAFAFA' },
   labelDanger: { color: '#F87171' },
   spinner: { marginRight: space.sm },
@@ -156,4 +184,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
+  /** The badge loses its saturation with the button — §2 keeps violet for live CTAs. */
+  badgeInert: { backgroundColor: 'rgba(255,255,255,0.06)' },
 });

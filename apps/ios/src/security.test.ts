@@ -8,7 +8,9 @@ import {
   parseCallback,
   timingSafeEqualString,
 } from './auth/webAuth';
+import { isSponsoredKind } from './chain/sponsorship';
 import { classifyPrice, priceGate, usablePrice, STALE_AFTER_SECONDS } from './chain/price';
+import { gasCopy } from './lib/copy';
 import { confirmTransaction } from './chain/receipt';
 import { parsePaymentPayload, buildPaymentPayload } from './lib/payment';
 
@@ -252,5 +254,55 @@ describe('payment QR parsing is allowlisted', () => {
   it('round-trips what it builds', () => {
     const built = buildPaymentPayload('@sele', '12.34');
     expect(parsePaymentPayload(built)).toEqual({ to: '@sele', amount: '12.34' });
+  });
+});
+
+// ── The gas claim: true, or not shipped ──────────────────────────────────────
+
+describe('gas sponsorship is exactly one exception, and the copy says so', () => {
+  /**
+   * `MarenVault.deposit()` is payable and the relayer refuses any request carrying
+   * value, unconditionally. That makes the first deposit the one action a user pays BTC
+   * gas for. If someone later "simplifies" this to always-true, the app starts promising
+   * something the relayer will refuse — R13's failure mode, applied to a fee claim.
+   */
+  it('sponsors everything except the payable deposit', () => {
+    expect(isSponsoredKind('deposit')).toBe(false);
+
+    const relayed = [
+      'withdraw',
+      'borrow',
+      'repay',
+      'send',
+      'earn-deposit',
+      'earn-withdraw',
+    ] as const;
+
+    for (const kind of relayed) {
+      expect(isSponsoredKind(kind)).toBe(true);
+    }
+  });
+
+  it('never promises gasless without qualification', () => {
+    // The claim the brief forbids, in the shapes it would plausibly be written.
+    const forbidden = [
+      /no gas,? ever/i,
+      /never pay gas/i,
+      /zero gas/i,
+      /without ever holding gas/i,
+      /no gas at all/i,
+    ];
+
+    for (const line of Object.values(gasCopy)) {
+      for (const pattern of forbidden) {
+        expect(line).not.toMatch(pattern);
+      }
+    }
+  });
+
+  it('states the first-deposit exception wherever it makes the broad claim', () => {
+    // Onboarding is where the claim is made most broadly, so it carries the caveat.
+    expect(gasCopy.onboardingBody).toMatch(/first deposit/i);
+    expect(gasCopy.unsponsoredBody).toMatch(/gasless/i);
   });
 });

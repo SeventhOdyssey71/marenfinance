@@ -1,15 +1,19 @@
 import { useMemo, useState } from 'react';
 import { Pressable, StyleSheet, View } from 'react-native';
 import {
-  borrowCeiling,
+  BORROWING_RATE,
+  MAREN_POLICY,
+  assessHealth,
+  collateralRatio,
   formatBtc,
   formatMusd,
   formatUsd,
-  previewBorrow,
-  recommendedBorrow,
+  liquidationPrice,
+  maxNetDebtAt,
+  totalDebtFor,
 } from '@maren/sdk';
 
-import { Btc, Musd, Ratio } from '../../src/components/Money';
+import { Amount, Btc, Musd, Ratio } from '../../src/components/Money';
 import { Card } from '../../src/components/Card';
 import { Icon } from '../../src/components/Icon';
 import { PillButton } from '../../src/components/PillButton';
@@ -21,6 +25,7 @@ import { Label, Num, Txt } from '../../src/components/Text';
 import { TxSheet, useTxRunner } from '../../src/components/TxSheet';
 import {
   base,
+  brand,
   healthLabel,
   healthTone,
   radius,
@@ -28,7 +33,9 @@ import {
   space,
   toneColor,
 } from '../../src/design/tokens';
+import { isSponsoredKind } from '../../src/chain/sponsorship';
 import { priceGate } from '../../src/chain/price';
+import { gasCopy } from '../../src/lib/copy';
 import { useBalances, usePosition, usePrice } from '../../src/hooks/useChainData';
 
 type Mode = 'deposit' | 'borrow' | 'repay' | 'withdraw';
@@ -82,10 +89,10 @@ export default function Vault() {
       <Card style={styles.summary}>
         <StatRow
           label="Collateral"
-          value={position ? <Btc wei={position.collateralWei} /> : <Num tone="subtle">—</Num>}
+          value={position ? <Btc wei={position.collateralWei} /> : <Num tone="muted">—</Num>}
           sub={
             position && livePrice ? (
-              <Txt variant="numericSm" tone="subtle">
+              <Txt variant="numericSm" tone="muted">
                 {formatUsd((position.collateralWei * livePrice) / 10n ** 18n)}
               </Txt>
             ) : null
@@ -94,7 +101,7 @@ export default function Vault() {
         <StatRow
           label="Total debt"
           hint="includes the 200 MUSD gas compensation"
-          value={position ? <Musd wei={position.debtWei} plain /> : <Num tone="subtle">—</Num>}
+          value={position ? <Musd wei={position.debtWei} plain /> : <Num tone="muted">—</Num>}
         />
         <StatRow
           label="Borrow limit"
@@ -103,7 +110,7 @@ export default function Vault() {
             position ? (
               <Musd wei={position.maxBorrowingCapacityWei} plain />
             ) : (
-              <Num tone="subtle">—</Num>
+              <Num tone="muted">—</Num>
             )
           }
           last
@@ -154,7 +161,7 @@ export default function Vault() {
             { label: '0.1 BTC', wei: 10n ** 17n },
           ]}
           format={formatBtc}
-          sponsored={false}
+          sponsored={isSponsoredKind('deposit')}
           disabledReason={gate.allowed ? null : gate.reason}
           cta="Deposit"
           onSubmit={(wei) =>
@@ -171,7 +178,7 @@ export default function Vault() {
           body="Reduces your principal and raises your collateral ratio. Interest is simple and non-compounding, fixed at the rate this trove opened at."
           presets={presetsFor(balances?.musdWei ?? 0n)}
           format={formatMusd}
-          sponsored={false}
+          sponsored={isSponsoredKind('repay')}
           max={balances?.musdWei ?? 0n}
           maxLabel="Your MUSD balance"
           disabledReason={gate.allowed ? null : gate.reason}
@@ -193,7 +200,7 @@ export default function Vault() {
             { label: '0.05 BTC', wei: 5n * 10n ** 16n },
           ]}
           format={formatBtc}
-          sponsored={false}
+          sponsored={isSponsoredKind('withdraw')}
           disabledReason={gate.allowed ? null : gate.reason}
           cta="Withdraw"
           onSubmit={(wei) =>
@@ -220,26 +227,34 @@ function BorrowPanel({
   onSubmit: (wei: bigint) => void;
 }) {
   /**
-   * The hard ceiling and the 250% recommendation, both from `@maren/sdk`.
-   *
-   * This screen used to compute them inline as
-   * `maxNetDebtAt(collateral, price, cr, rate) - principalWei`. That sizes a trove being
-   * OPENED: against a position that already exists it works from net principal and so
-   * drops the accrued interest, over-quoting the maximum by exactly that amount and
-   * putting the slider's "180% floor" stop at 179.3%, where `MarenVault.MIN_BORROW_CR`
-   * reverts. `borrowCeiling` works from total debt and is shared with the web app, so the
-   * two platforms cannot drift again. See `packages/sdk/src/borrow.test.ts`.
+   * The hard ceiling: the additional net debt that lands the position exactly on
+   * MAREN_POLICY.minHealthyCr (180%). Computed by the SDK, then reduced by the debt
+   * already outstanding. Mezo's per-trove `maxBorrowingCapacity` caps it further.
    */
-  const ceiling = useMemo(
-    () => (position && price ? borrowCeiling(position, price).amountWei : 0n),
-    [position, price],
-  );
+  const ceiling = useMemo(() => {
+    if (!position || !price) return 0n;
+
+    const netDebtAtFloor = maxNetDebtAt(
+      position.collateralWei,
+      price,
+      MAREN_POLICY.minHealthyCr,
+      BORROWING_RATE,
+    );
+    const headroom = netDebtAtFloor - position.principalWei;
+    const mezoHeadroom = position.maxBorrowingCapacityWei - position.principalWei;
+    const limit = headroom < mezoHeadroom ? headroom : mezoHeadroom;
+    return limit > 0n ? limit : 0n;
+  }, [position, price]);
 
   /** Where the recommended 250% target sits on that track. */
-  const recommended = useMemo(
-    () => (position && price ? recommendedBorrow(position, price, ceiling) : 0n),
-    [position, price, ceiling],
-  );
+  const recommended = useMemo(() => {
+    if (!position || !price) return 0n;
+    const atTarget =
+      maxNetDebtAt(position.collateralWei, price, MAREN_POLICY.targetCr, BORROWING_RATE) -
+      position.principalWei;
+    const clamped = atTarget < 0n ? 0n : atTarget > ceiling ? ceiling : atTarget;
+    return clamped;
+  }, [position, price, ceiling]);
 
   const [amount, setAmount] = useState<bigint | null>(null);
   const value = amount ?? recommended;
@@ -247,13 +262,16 @@ function BorrowPanel({
   /** The projected position if this borrow goes through. */
   const preview = useMemo(() => {
     if (!position || !price) return null;
-    const next = previewBorrow(position, price, value);
+    const newPrincipal = position.principalWei + value;
+    // totalDebtFor adds the origination fee and the 200 MUSD gas compensation — quoting
+    // net debt as the debt would understate the risk.
+    const newTotalDebt = totalDebtFor(newPrincipal, BORROWING_RATE);
+    const cr = collateralRatio(position.collateralWei, newTotalDebt, price);
     return {
-      cr: next.collateralRatio,
-      liq: next.liquidationPriceWei,
-      totalDebt: next.debtWei,
-      health: next.health,
-      fee: next.originationFeeWei,
+      cr,
+      liq: liquidationPrice(position.collateralWei, newTotalDebt),
+      totalDebt: newTotalDebt,
+      health: assessHealth(position.collateralWei, newTotalDebt, price),
     };
   }, [position, price, value]);
 
@@ -273,12 +291,7 @@ function BorrowPanel({
       <View style={styles.amountBlock}>
         <Label>You borrow</Label>
         <View style={styles.amountRow}>
-          <Num size="numericXl" tone="musd">
-            {formatMusd(value, { unit: false })}
-          </Num>
-          <Txt variant="h3" tone="musd" style={styles.unit}>
-            MUSD
-          </Txt>
+          <Amount value={formatMusd(value)} size="numericXl" unitTone="musd" align="left" />
         </View>
       </View>
 
@@ -295,7 +308,7 @@ function BorrowPanel({
       />
 
       <View style={styles.sliderEnds}>
-        <Txt variant="numericSm" tone="subtle">
+        <Txt variant="numericSm" tone="muted">
           0 MUSD
         </Txt>
         <Pressable
@@ -308,7 +321,7 @@ function BorrowPanel({
             Recommended · 250%
           </Txt>
         </Pressable>
-        <Txt variant="numericSm" tone="subtle">
+        <Txt variant="numericSm" tone="muted">
           {formatMusd(ceiling, { unit: false })}
         </Txt>
       </View>
@@ -330,9 +343,17 @@ function BorrowPanel({
             <View style={[styles.previewCell, styles.previewCellRight]}>
               <Label>Liquidation price</Label>
               <View style={styles.previewValue}>
-                <Num size="numericLg">{formatUsd(preview.liq)}</Num>
+                {/*
+                  numericMd, not numericLg: a six-figure liquidation price is ten
+                  characters, and at 28px mono that wrapped mid-number across two lines
+                  ("$36,283." / "74") in a half-width cell. A wrapped figure is the one
+                  thing BRAND.md §3's tabular column exists to prevent.
+                */}
+                <Num size="numericMd" numberOfLines={1} adjustsFontSizeToFit>
+                  {formatUsd(preview.liq)}
+                </Num>
               </View>
-              <Txt variant="small" tone="subtle">
+              <Txt variant="small" tone="muted">
                 {formatPriceDropCaption(preview.health.priceDropToLiquidationBps)}
               </Txt>
             </View>
@@ -341,7 +362,7 @@ function BorrowPanel({
           <View style={styles.previewFooter}>
             <StatRow
               label="Origination fee (0.1%)"
-              value={<Musd wei={preview.fee} plain size="numericSm" />}
+              value={<Musd wei={(value * BORROWING_RATE) / 10n ** 18n} plain size="numericSm" />}
             />
             <StatRow
               label="Total debt after"
@@ -352,12 +373,17 @@ function BorrowPanel({
         </View>
       ) : null}
 
-      {/* Gas honesty: this path is NOT relayer-sponsored. */}
+      {/*
+        Gas honesty. This note used to say every vault operation cost BTC gas, which was
+        wrong in the direction that matters least but is still wrong: only the deposit is
+        unsponsored, because it is the only payable one.
+      */}
       <View style={styles.gasRow}>
-        <Icon name="alert" size={14} color="#6B6B75" />
-        <Txt variant="small" tone="subtle" style={styles.gasText}>
-          Vault operations go through Mezo’s own signed borrower contract and cost BTC gas. Maren
-          does not sponsor them.
+        <Icon name="shield" size={14} color={brand.violet400} />
+        <Txt variant="small" tone="muted" style={styles.gasText}>
+          Depositing sends Bitcoin, so it is the one action a relayer cannot carry for you — you pay
+          gas on that first transaction. Borrow, repay and withdraw are relayed and cost you
+          nothing.
         </Txt>
       </View>
 
@@ -421,12 +447,12 @@ function AmountPanel({
       <View style={styles.amountBlock}>
         <Label>Amount</Label>
         <View style={styles.amountRow}>
-          <Num size="numericXl" tone={unit === 'BTC' ? 'btc' : 'musd'}>
-            {format(selected).replace(` ${unit}`, '')}
-          </Num>
-          <Txt variant="h3" tone={unit === 'BTC' ? 'btc' : 'musd'} style={styles.unit}>
-            {unit}
-          </Txt>
+          <Amount
+            value={format(selected)}
+            size="numericXl"
+            unitTone={unit === 'BTC' ? 'btc' : 'musd'}
+            align="left"
+          />
         </View>
       </View>
 
@@ -452,7 +478,7 @@ function AmountPanel({
 
       {max !== undefined ? (
         <View style={styles.maxRow}>
-          <Txt variant="small" tone="subtle">
+          <Txt variant="small" tone="muted">
             {maxLabel}
           </Txt>
           <Num
@@ -469,12 +495,10 @@ function AmountPanel({
         <Icon
           name={sponsored ? 'shield' : 'alert'}
           size={14}
-          color={sponsored ? semantic.success : '#6B6B75'}
+          color={sponsored ? brand.violet400 : semantic.warning}
         />
-        <Txt variant="small" tone="subtle" style={styles.gasText}>
-          {sponsored
-            ? 'Gasless. Maren’s relayer pays the BTC gas for this action.'
-            : 'This action costs BTC gas and is not sponsored by Maren.'}
+        <Txt variant="small" tone="muted" style={styles.gasText}>
+          {sponsored ? gasCopy.sponsoredTitle + '.' : gasCopy.unsponsoredBody}
         </Txt>
       </View>
 
