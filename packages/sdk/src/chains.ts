@@ -27,8 +27,39 @@ export const mezoMainnet = defineChain({
     decimals: 18,
   },
   rpcUrls: {
-    default: { http: ['https://jsonrpc-mezo.boar.network'] },
-    public: { http: ['https://jsonrpc-mezo.boar.network'] },
+    // All three verified 2026-08-15 by executing a real eth_call
+    // (TroveManager.getTroveOwnersCount() -> 26), not merely eth_chainId.
+    //
+    // ORDER MATTERS, AND FAILOVER IS NOT OPTIONAL.
+    // Mezo's public RPCs are transiently flaky. During testing, mezo.drpc.org returned
+    //   -32601 "the method ... does not exist/is not available"
+    // for eth_call, eth_getLogs, eth_estimateGas and eth_blockNumber across a full probe
+    // sweep — and then served all of them correctly 10/10 about an hour later. The
+    // methods are supported; a backend behind the load balancer was degraded and
+    // reported "unsupported" rather than "unavailable", which is indistinguishable from
+    // a capability limit if you probe once.
+    //
+    // Two consequences, both load-bearing:
+    //   1. Never certify or condemn an endpoint on a single probe. Repeat it.
+    //   2. Every client MUST use failover across this list rather than pinning one URL.
+    //      A -32601 is not proof of a missing feature on this chain.
+    //
+    // boar is first because it was stable throughout. drpc is retained because it is the
+    // only endpoint advertising WebSocket, which live position-health subscriptions want.
+    default: {
+      http: [
+        'https://jsonrpc-mezo.boar.network',
+        'https://mainnet.mezo.public.validationcloud.io',
+        'https://mezo.drpc.org',
+      ],
+    },
+    public: {
+      http: [
+        'https://jsonrpc-mezo.boar.network',
+        'https://mainnet.mezo.public.validationcloud.io',
+        'https://mezo.drpc.org',
+      ],
+    },
   },
   blockExplorers: {
     default: {
@@ -42,6 +73,8 @@ export const mezoMainnet = defineChain({
   contracts: {
     multicall3: {
       address: '0xcA11bde05977b3631167028862bE2a173976CA11',
+      // Bisected on-chain: no code at 351759, code at 351760.
+      blockCreated: 351760,
     },
   },
   testnet: false,

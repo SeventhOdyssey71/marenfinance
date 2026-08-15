@@ -61,3 +61,6 @@ Thumbs.db
 
 # vercel
 .vercel
+
+# agent worktrees — never commit
+.claude/worktrees/

@@ -103,6 +103,40 @@ export const MEZO_PRICE_ORACLE_PRECOMPILE: Address =
 /** The BTC gas-token precompile on Mezo. */
 export const MEZO_BTC_PRECOMPILE: Address = '0x7b7C000000000000000000000000000000000000';
 
+/** The MEZO token precompile. */
+export const MEZO_TOKEN_PRECOMPILE: Address = '0x7B7c000000000000000000000000000000000001';
+
+/**
+ * x402 — Mezo's first-party gasless MUSD payment rail. LIVE ON MAINNET.
+ *
+ * The buyer signs ONE EIP-712 message (MUSD is permit2 + EIP-2612) and the facilitator
+ * settles on-chain. No on-chain approval, no gas on the buyer's side.
+ *
+ * VERIFIED live 2026-08-15: settlement proxy has 5,829 bytes of code on mainnet.
+ * Docs: https://mezo.org/docs/developers/getting-started/musd-payments-x402/
+ * SDK:  @x402/evm >= 2.15.0
+ *
+ * Same settlement address on both networks. CAIP-2: eip155:31612 / eip155:31611.
+ */
+export const X402_SETTLEMENT: Address = '0x402085c248EeA27D92E8b30b2C58ed07f9E20001';
+export const X402_FACILITATOR_URL = 'https://facilitator.vativ.io';
+
+/** Uniswap Permit2, canonical address. Deployed on Mezo. */
+export const PERMIT2_ADDRESS: Address = '0x000000000022D473030F116dDEE9F6B43aC78BA3';
+
+/**
+ * ERC-4337 EntryPoint v0.7 IS deployed here (verified: 32,073 bytes, byte-identical
+ * to Ethereum L1) — but it is INERT. It has never processed a single UserOperation,
+ * and Mezo's RPCs do not implement `debug_traceCall`, so no ERC-7562-compliant bundler
+ * can run against it.
+ *
+ * Recorded here ONLY so nobody rediscovers it and concludes 4337 is a viable path.
+ * It is not. Maren uses EIP-2612 permit + ERC-2771 relaying, with EIP-7702 as the
+ * upgrade path. See docs/ARCHITECTURE.md §4.
+ */
+export const ERC4337_ENTRYPOINT_V07_INERT: Address =
+  '0x0000000071727De22E5E9d8BAf0edAc6f37da032';
+
 /**
  * Maren's own deployments. Populated by `packages/contracts/script/Deploy.s.sol`,
  * which writes back to this file's companion JSON. Zero address = not yet deployed.

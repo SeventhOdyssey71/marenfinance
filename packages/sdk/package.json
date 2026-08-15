@@ -1,0 +1,29 @@
+{
+  "name": "@maren/sdk",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Verified Mezo chain config, MUSD addresses, ABIs, and position math for Maren Finance.",
+  "type": "module",
+  "main": "./src/index.ts",
+  "types": "./src/index.ts",
+  "exports": {
+    ".": "./src/index.ts",
+    "./chains": "./src/chains.ts",
+    "./addresses": "./src/addresses.ts",
+    "./constants": "./src/constants.ts"
+  },
+  "scripts": {
+    "build": "tsc --noEmit",
+    "typecheck": "tsc --noEmit",
+    "lint": "echo 'no linter configured yet' && exit 0",
+    "test": "vitest run --passWithNoTests",
+    "clean": "rm -rf dist .turbo node_modules"
+  },
+  "dependencies": {
+    "viem": "^2.21.55"
+  },
+  "devDependencies": {
+    "typescript": "^5.7.2",
+    "vitest": "^2.1.8"
+  }
+}
