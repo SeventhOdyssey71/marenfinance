@@ -181,12 +181,28 @@ const check = (name, pass, detail = '') => {
     `got="${firstStop}"`,
   );
 
-  // Borrowing capacity must be the contract's ceiling, not an ICR estimate.
-  const capacityCopy = await page.locator('text=getTroveMaxBorrowingCapacity').count();
+  // Borrowing capacity must be the contract's real ceiling, not an ICR estimate — and
+  // the provenance must still be checkable. It moved out of the card body and behind an
+  // info affordance: BRAND.md keeps contract internals out of the primary surface, but
+  // deleting the claim outright would leave the number unfalsifiable.
+  const capacityProvenance = await page.locator('text=getTroveMaxBorrowingCapacity').count();
   check(
-    'app: borrowing capacity names getTroveMaxBorrowingCapacity()',
-    capacityCopy > 0,
+    'app: borrowing capacity can still be traced to the contract call',
+    capacityProvenance > 0,
     'the real ceiling, not an ICR-derived estimate',
+  );
+
+  // ...but not in the primary copy. `<details>` keeps it in the DOM and out of the way,
+  // so this asserts the name is not visible until the user asks for it.
+  const capacityVisible = await page.evaluate(() =>
+    [...document.querySelectorAll('details')].some(
+      (d) => !d.open && d.textContent.includes('getTroveMaxBorrowingCapacity'),
+    ),
+  );
+  check(
+    'app: the contract name sits behind an info affordance, not in the card body',
+    capacityVisible,
+    'BRAND.md: no function names in the primary UI',
   );
 
   // The gasless claim must never be unconditional. MarenVault.deposit() is payable and
