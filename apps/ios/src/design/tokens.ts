@@ -99,14 +99,21 @@ export const motion = {
 
 /**
  * §5, adapted for iOS: static CSS-equivalent gradients. No shaders on mobile.
+ *
  * The violet core falls off into the page background through the violet-900 mid,
  * which is exactly the MeshGradient ramp the web app renders.
+ *
+ * On the alphas: these started at 0.28–0.34 and read, on a real device, as a saturated
+ * purple slab occupying the top quarter of the screen — closer to a crypto dashboard
+ * than to §5's stated reference, "95% black with a few gradient bleeds". They are now
+ * a bleed: present enough to lift the header off the page, faint enough that the
+ * screen still reads as near-black.
  */
 export const gradients = {
   /** Hero wash behind the portfolio header. Violet core → violet-900 mid → bg. */
-  hero: ['rgba(91,61,245,0.28)', 'rgba(27,17,64,0.30)', 'rgba(8,8,10,0)'] as const,
+  hero: ['rgba(91,61,245,0.15)', 'rgba(27,17,64,0.16)', 'rgba(8,8,10,0)'] as const,
   /** The closing CTA band on onboarding. */
-  ctaBand: ['rgba(91,61,245,0.34)', 'rgba(27,17,64,0.22)', 'rgba(8,8,10,0)'] as const,
+  ctaBand: ['rgba(91,61,245,0.18)', 'rgba(27,17,64,0.12)', 'rgba(8,8,10,0)'] as const,
   /** Neutral card sheen used on the balance hero card only. */
   cardSheen: ['rgba(255,255,255,0.05)', 'rgba(255,255,255,0)'] as const,
 } as const;

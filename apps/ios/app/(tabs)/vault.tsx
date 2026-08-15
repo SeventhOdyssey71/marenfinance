@@ -14,7 +14,7 @@ import {
   totalDebtFor,
 } from '@maren/sdk';
 
-import { Btc, Musd, Ratio } from '../../src/components/Money';
+import { Amount, Btc, Musd, Ratio } from '../../src/components/Money';
 import { Card } from '../../src/components/Card';
 import { Icon } from '../../src/components/Icon';
 import { PillButton } from '../../src/components/PillButton';
@@ -26,6 +26,7 @@ import { Label, Num, Txt } from '../../src/components/Text';
 import { TxSheet, useTxRunner } from '../../src/components/TxSheet';
 import {
   base,
+  brand,
   healthLabel,
   healthTone,
   radius,
@@ -33,7 +34,9 @@ import {
   space,
   toneColor,
 } from '../../src/design/tokens';
+import { isSponsoredKind } from '../../src/chain/sponsorship';
 import { priceGate } from '../../src/chain/price';
+import { gasCopy } from '../../src/lib/copy';
 import { useBalances, usePosition, usePrice } from '../../src/hooks/useChainData';
 
 type Mode = 'deposit' | 'borrow' | 'repay' | 'withdraw';
@@ -87,10 +90,10 @@ export default function Vault() {
       <Card style={styles.summary}>
         <StatRow
           label="Collateral"
-          value={position ? <Btc wei={position.collateralWei} /> : <Num tone="subtle">—</Num>}
+          value={position ? <Btc wei={position.collateralWei} /> : <Num tone="muted">—</Num>}
           sub={
             position && livePrice ? (
-              <Txt variant="numericSm" tone="subtle">
+              <Txt variant="numericSm" tone="muted">
                 {formatUsd((position.collateralWei * livePrice) / 10n ** 18n)}
               </Txt>
             ) : null
@@ -99,13 +102,13 @@ export default function Vault() {
         <StatRow
           label="Total debt"
           hint="includes the 200 MUSD gas compensation"
-          value={position ? <Musd wei={position.debtWei} plain /> : <Num tone="subtle">—</Num>}
+          value={position ? <Musd wei={position.debtWei} plain /> : <Num tone="muted">—</Num>}
         />
         <StatRow
           label="Borrow limit"
           hint="Mezo caps this at the price when the trove opened"
           value={
-            position ? <Musd wei={position.maxBorrowingCapacityWei} plain /> : <Num tone="subtle">—</Num>
+            position ? <Musd wei={position.maxBorrowingCapacityWei} plain /> : <Num tone="muted">—</Num>
           }
           last
         />
@@ -158,7 +161,7 @@ export default function Vault() {
             { label: '0.1 BTC', wei: 10n ** 17n },
           ]}
           format={formatBtc}
-          sponsored={false}
+          sponsored={isSponsoredKind('deposit')}
           disabledReason={gate.allowed ? null : gate.reason}
           cta="Deposit"
           onSubmit={(wei) => runner.run({ type: 'deposit', btcWei: wei }, `Deposit ${formatBtc(wei)}`)}
@@ -173,7 +176,7 @@ export default function Vault() {
           body="Reduces your principal and raises your collateral ratio. Interest is simple and non-compounding, fixed at the rate this trove opened at."
           presets={presetsFor(balances?.musdWei ?? 0n)}
           format={formatMusd}
-          sponsored={false}
+          sponsored={isSponsoredKind('repay')}
           max={balances?.musdWei ?? 0n}
           maxLabel="Your MUSD balance"
           disabledReason={gate.allowed ? null : gate.reason}
@@ -193,7 +196,7 @@ export default function Vault() {
             { label: '0.05 BTC', wei: 5n * 10n ** 16n },
           ]}
           format={formatBtc}
-          sponsored={false}
+          sponsored={isSponsoredKind('withdraw')}
           disabledReason={gate.allowed ? null : gate.reason}
           cta="Withdraw"
           onSubmit={(wei) => runner.run({ type: 'withdraw', btcWei: wei }, `Withdraw ${formatBtc(wei)}`)}
@@ -282,12 +285,7 @@ function BorrowPanel({
       <View style={styles.amountBlock}>
         <Label>You borrow</Label>
         <View style={styles.amountRow}>
-          <Num size="numericXl" tone="musd">
-            {formatMusd(value, { unit: false })}
-          </Num>
-          <Txt variant="h3" tone="musd" style={styles.unit}>
-            MUSD
-          </Txt>
+          <Amount value={formatMusd(value)} size="numericXl" unitTone="musd" align="left" />
         </View>
       </View>
 
@@ -304,7 +302,7 @@ function BorrowPanel({
       />
 
       <View style={styles.sliderEnds}>
-        <Txt variant="numericSm" tone="subtle">
+        <Txt variant="numericSm" tone="muted">
           0 MUSD
         </Txt>
         <Pressable
@@ -317,7 +315,7 @@ function BorrowPanel({
             Recommended · 250%
           </Txt>
         </Pressable>
-        <Txt variant="numericSm" tone="subtle">
+        <Txt variant="numericSm" tone="muted">
           {formatMusd(ceiling, { unit: false })}
         </Txt>
       </View>
@@ -341,7 +339,7 @@ function BorrowPanel({
               <View style={styles.previewValue}>
                 <Num size="numericLg">{formatUsd(preview.liq)}</Num>
               </View>
-              <Txt variant="small" tone="subtle">
+              <Txt variant="small" tone="muted">
                 {formatPriceDropCaption(preview.health.priceDropToLiquidationBps)}
               </Txt>
             </View>
@@ -361,12 +359,17 @@ function BorrowPanel({
         </View>
       ) : null}
 
-      {/* Gas honesty: this path is NOT relayer-sponsored. */}
+      {/*
+        Gas honesty. This note used to say every vault operation cost BTC gas, which was
+        wrong in the direction that matters least but is still wrong: only the deposit is
+        unsponsored, because it is the only payable one.
+      */}
       <View style={styles.gasRow}>
-        <Icon name="alert" size={14} color="#6B6B75" />
-        <Txt variant="small" tone="subtle" style={styles.gasText}>
-          Vault operations go through Mezo’s own signed borrower contract and cost BTC
-          gas. Maren does not sponsor them.
+        <Icon name="shield" size={14} color={brand.violet400} />
+        <Txt variant="small" tone="muted" style={styles.gasText}>
+          Depositing sends Bitcoin, so it is the one action a relayer cannot carry for
+          you — you pay gas on that first transaction. Borrow, repay and withdraw are
+          relayed and cost you nothing.
         </Txt>
       </View>
 
@@ -430,12 +433,12 @@ function AmountPanel({
       <View style={styles.amountBlock}>
         <Label>Amount</Label>
         <View style={styles.amountRow}>
-          <Num size="numericXl" tone={unit === 'BTC' ? 'btc' : 'musd'}>
-            {format(selected).replace(` ${unit}`, '')}
-          </Num>
-          <Txt variant="h3" tone={unit === 'BTC' ? 'btc' : 'musd'} style={styles.unit}>
-            {unit}
-          </Txt>
+          <Amount
+            value={format(selected)}
+            size="numericXl"
+            unitTone={unit === 'BTC' ? 'btc' : 'musd'}
+            align="left"
+          />
         </View>
       </View>
 
@@ -461,7 +464,7 @@ function AmountPanel({
 
       {max !== undefined ? (
         <View style={styles.maxRow}>
-          <Txt variant="small" tone="subtle">
+          <Txt variant="small" tone="muted">
             {maxLabel}
           </Txt>
           <Num size="numericSm" tone={overMax ? 'inherit' : 'muted'} style={overMax ? { color: semantic.danger } : undefined}>
@@ -471,11 +474,13 @@ function AmountPanel({
       ) : null}
 
       <View style={styles.gasRow}>
-        <Icon name={sponsored ? 'shield' : 'alert'} size={14} color={sponsored ? semantic.success : '#6B6B75'} />
-        <Txt variant="small" tone="subtle" style={styles.gasText}>
-          {sponsored
-            ? 'Gasless. Maren’s relayer pays the BTC gas for this action.'
-            : 'This action costs BTC gas and is not sponsored by Maren.'}
+        <Icon
+          name={sponsored ? 'shield' : 'alert'}
+          size={14}
+          color={sponsored ? brand.violet400 : semantic.warning}
+        />
+        <Txt variant="small" tone="muted" style={styles.gasText}>
+          {sponsored ? gasCopy.sponsoredTitle + '.' : gasCopy.unsponsoredBody}
         </Txt>
       </View>
 

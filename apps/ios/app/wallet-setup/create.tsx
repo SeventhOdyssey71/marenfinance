@@ -83,7 +83,7 @@ export default function CreateWallet() {
           <Txt variant="body" style={{ color: semantic.danger }}>
             Key generation failed
           </Txt>
-          <Txt variant="small" tone="subtle" style={styles.body}>
+          <Txt variant="small" tone="muted" style={styles.body}>
             {error}
           </Txt>
           <PillButton label="Try again" onPress={generate} style={styles.retry} />
@@ -95,7 +95,7 @@ export default function CreateWallet() {
             <Num size="numericLg" style={styles.address}>
               {address ? shortAddress(address, 8, 6) : '—'}
             </Num>
-            <Txt variant="small" tone="subtle" style={styles.full} selectable>
+            <Txt variant="small" tone="muted" style={styles.full} selectable>
               {address}
             </Txt>
           </Card>
@@ -117,7 +117,7 @@ export default function CreateWallet() {
                   : 'Held in memory for this session only'}
               </Txt>
             </View>
-            <Txt variant="small" tone="subtle" style={styles.body}>
+            <Txt variant="small" tone="muted" style={styles.body}>
               {stored
                 ? 'The key is unreadable without a successful biometric check, which is required on every signature. It is marked this-device-only, so it is excluded from iCloud Keychain and from encrypted backups.'
                 : protection?.mode === 'session-only'
@@ -127,7 +127,7 @@ export default function CreateWallet() {
           </Card>
 
           <View style={styles.warning}>
-            <Txt variant="small" tone="subtle">
+            <Txt variant="small" tone="muted">
               Maren holds no copy of this key. If you lose the device without an export,
               the funds it controls are gone. Not recoverable by us — gone.
             </Txt>
