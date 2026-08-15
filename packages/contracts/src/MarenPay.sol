@@ -123,6 +123,9 @@ contract MarenPay is ERC2771Context, ReentrancyGuard {
     error ZeroAmount();
     error SelfPayment();
     error Permit2NotConfigured();
+    /// @dev A Permit2 signature names its own token. One that is not MUSD would move that
+    ///      other token instead, so it is rejected with a name that says why.
+    error InvalidPermitToken(address provided, address expected);
     error RequestNotOpen(uint256 requestId, RequestStatus status);
     error NotRequestPayer(address caller, address expected);
     error NotRequester(address caller, address expected);
@@ -208,7 +211,9 @@ contract MarenPay is ERC2771Context, ReentrancyGuard {
         bytes calldata signature
     ) external nonReentrant {
         if (address(permit2) == address(0)) revert Permit2NotConfigured();
-        if (permit.permitted.token != address(musd)) revert ZeroAddress();
+        if (permit.permitted.token != address(musd)) {
+            revert InvalidPermitToken(permit.permitted.token, address(musd));
+        }
         address from = _msgSender();
         _validatePayment(from, to, amount);
 
