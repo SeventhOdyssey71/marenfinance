@@ -85,6 +85,22 @@ describe('liquidationPrice', () => {
   it('returns zero when there is no debt', () => {
     expect(liquidationPrice(WAD, 0n)).toBe(0n);
   });
+
+  it('never returns the MAX_CR sentinel for an empty account', () => {
+    // Regression. The guards used to check collateral before debt, so a brand-new
+    // wallet — no collateral, no debt — got MAX_CR back, and the dApp rendered it
+    // literally as a $5.79e58 liquidation price next to "the protocol liquidates
+    // below 110%". An empty account is at no risk, not infinite risk.
+    expect(liquidationPrice(0n, 0n)).toBe(0n);
+    expect(marenLiquidationPrice(0n, 0n)).toBe(0n);
+
+    // And the value a UI would format must stay small enough to render.
+    expect(liquidationPrice(0n, 0n)).toBeLessThan(MAX_CR);
+  });
+
+  it('still reports MAX_CR for the genuinely impossible case: debt with no collateral', () => {
+    expect(liquidationPrice(0n, musd(100))).toBe(MAX_CR);
+  });
 });
 
 describe('marenLiquidationPrice', () => {
