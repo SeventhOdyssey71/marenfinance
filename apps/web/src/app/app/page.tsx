@@ -7,12 +7,9 @@ import {
   assessHealth,
   collateralValue,
   formatBtc,
-  formatCollateralRatio,
   formatMusd,
   formatUsd,
-  maxNetDebtAt,
   shortAddress,
-  BORROWING_RATE,
 } from '@maren/sdk';
 
 import { HealthChip, HealthScale } from '@/components/app/health';
@@ -22,7 +19,8 @@ import { AppCard, CardTitle, Label, Metric, Note, StatRow } from '@/components/a
 import { LivePulseFrame } from '@/components/shaders/live-pulse';
 import { EarnIcon, PayIcon, VaultIcon } from '@/components/ui/icons';
 import { activityTitle, bufferTitle, statusLabel, timeAgo } from '@/lib/copy';
-import { healthTone, toneShaderColors } from '@/lib/health';
+import { healthTone, policyRatio, toneShaderColors } from '@/lib/health';
+import { borrowCeiling } from '@/lib/vault';
 import {
   useActivity,
   useBalances,
@@ -115,7 +113,7 @@ export default function PortfolioPage() {
             {!health.canBorrow ? (
               <div className="mt-6 border-t border-[var(--border-hairline)] pt-5">
                 <p className="text-sm leading-relaxed text-text-muted" role="status">
-                  Below {formatCollateralRatio(MAREN_POLICY.minHealthyCr)} Maren does not
+                  Below {policyRatio(MAREN_POLICY.minHealthyCr)} Maren does not
                   let you borrow more. Repay or add collateral to reopen borrowing —{' '}
                   <Link href="/app/vault" className="text-violet-400 hover:text-violet-400/80">
                     open the Vault
@@ -168,16 +166,14 @@ export default function PortfolioPage() {
             label="Outstanding debt"
             hint={
               position?.route === 'direct'
-                ? 'principal + interest + the 200 MUSD gas compensation'
-                : 'principal + interest — a pooled position carries no per-user gas compensation'
+                ? 'principal + interest + the 200 MUSD liquidation reserve, at 1.00% APR simple and fixed'
+                : 'principal + interest — a pooled position escrows no reserve of its own'
             }
             value={position ? <Musd wei={position.debtWei} size="lg" /> : <Dash size="lg" />}
             sub={
               position ? (
                 <span className="text-xs text-text-subtle">
-                  {formatMusd(position.interestWei)} of that is interest at{' '}
-                  <span className="num">1.00% APR</span>, simple and fixed for the life of
-                  the loan
+                  {formatMusd(position.interestWei)} interest
                 </span>
               ) : null
             }
@@ -292,32 +288,13 @@ function BorrowingCapacity() {
 
   const ceiling = position.maxBorrowingCapacityWei;
   const drawn = position.principalWei;
-  const mezoHeadroom = ceiling > drawn ? ceiling - drawn : 0n;
 
-  /** What the 180% floor alone would allow — an estimate, and clearly labelled as one. */
-  const ratioHeadroom =
-    livePrice === null
-      ? null
-      : position.route === 'pooled'
-        ? (position.vaultMaxBorrowableWei ?? 0n)
-        : (() => {
-            const atFloor = maxNetDebtAt(
-              position.collateralWei,
-              livePrice,
-              MAREN_POLICY.minHealthyCr,
-              BORROWING_RATE,
-            );
-            return atFloor > drawn ? atFloor - drawn : 0n;
-          })();
-
-  const binding =
-    ratioHeadroom === null
-      ? null
-      : ratioHeadroom <= mezoHeadroom
-        ? 'ratio'
-        : ('ceiling' as const);
-
-  const available = ratioHeadroom === null ? null : ratioHeadroom < mezoHeadroom ? ratioHeadroom : mezoHeadroom;
+  // The same computation the Vault's slider is bounded by — one implementation, so the
+  // two screens can never quote a user different limits.
+  const limits = livePrice === null ? null : borrowCeiling(position, livePrice);
+  const mezoHeadroom = limits?.mezoHeadroomWei ?? (ceiling > drawn ? ceiling - drawn : 0n);
+  const available = limits?.amountWei ?? null;
+  const binding = limits?.binding ?? null;
 
   return (
     <AppCard>
@@ -337,7 +314,9 @@ function BorrowingCapacity() {
               ? 'needs a live price'
               : binding === 'ceiling'
                 ? 'capped by Mezo’s per-trove ceiling'
-                : 'capped by Maren’s 180% floor'
+                : binding === 'ratio'
+                  ? 'capped by Maren’s 180% floor'
+                  : 'nothing available to draw'
           }
         />
         <Metric
