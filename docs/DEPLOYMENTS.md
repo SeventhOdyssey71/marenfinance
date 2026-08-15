@@ -8,14 +8,14 @@ not happened, this file says so in those words rather than leaving a plausible-l
 
 ## Mezo matsnet — chain 31611
 
-| | |
-|---|---|
-| Chain ID | `31611` |
-| RPC | `https://rpc.test.mezo.org` |
-| Explorer | `https://explorer.test.mezo.org` |
-| Blockscout API | `https://api.explorer.test.mezo.org/api` |
-| Native gas token | BTC, 18 decimals |
-| Status | **NOT DEPLOYED — blocked on deployer funding.** See "Blocked" below. |
+|                  |                                                                      |
+| ---------------- | -------------------------------------------------------------------- |
+| Chain ID         | `31611`                                                              |
+| RPC              | `https://rpc.test.mezo.org`                                          |
+| Explorer         | `https://explorer.test.mezo.org`                                     |
+| Blockscout API   | `https://api.explorer.test.mezo.org/api`                             |
+| Native gas token | BTC, 18 decimals                                                     |
+| Status           | **NOT DEPLOYED — blocked on deployer funding.** See "Blocked" below. |
 
 ### Deployer
 
@@ -29,18 +29,18 @@ repository. It has never been written to a tracked file. Balance at the time of 
 
 ### Contract addresses
 
-**Not yet deployed.** The dry run below predicts the addresses that *would* result, but they are
+**Not yet deployed.** The dry run below predicts the addresses that _would_ result, but they are
 a function of the deployer's nonce at broadcast time and are therefore not committed here and
 not written into `packages/sdk/src/addresses.ts`. `MAREN_ADDRESSES.testnet` still holds zero
 addresses, which is the honest value until a broadcast happens.
 
-| Contract | Address | Tx hash | Block |
-|---|---|---|---|
-| `MarenRelayHub` | not deployed | — | — |
-| `MarenRegistry` | not deployed | — | — |
-| `MarenPay` | not deployed | — | — |
-| `MarenVault` | not deployed | — | — |
-| `MarenEarn` | not deployed | — | — |
+| Contract        | Address      | Tx hash | Block |
+| --------------- | ------------ | ------- | ----- |
+| `MarenRelayHub` | not deployed | —       | —     |
+| `MarenRegistry` | not deployed | —       | —     |
+| `MarenPay`      | not deployed | —       | —     |
+| `MarenVault`    | not deployed | —       | —     |
+| `MarenEarn`     | not deployed | —       | —     |
 
 ### Verification
 
@@ -67,17 +67,17 @@ foundry `1.4.3-stable` (commit `fa9f934`).
 Every address the deploy script depends on was re-checked against matsnet rather than trusted
 from the source constants. Read at block ~14,908,690 on 2026-08-15:
 
-| Contract | Address | Live check |
-|---|---|---|
-| MUSD | `0x118917a40FAF1CD7a13dB0Ef56C86De7973Ac503` | `symbol()` → `"MUSD"`, `decimals()` → `18`, 6,437 B of code |
-| BorrowerOperations | `0xCdF7028ceAB81fA0C6971208e83fa7872994beE5` | `minNetDebt()` → `1.8e21`, `musd()` → the MUSD address above |
-| TroveManager | `0xE47c80e8c23f6B4A1aE41c34837a0599D5D16bb0` | `MCR()` → `1.1e18`, `CCR()` → `1.5e18`, `getTroveOwnersCount()` → `229` |
-| StabilityPool | `0x1CCA7E410eE41739792eA0A24e00349Dd247680e` | `getTotalMUSDDeposits()` → `8.623e25` (86.2M MUSD) |
-| PriceFeed | `0x86bCF0841622a5dAC14A313a15f96A95421b9366` | `fetchPrice()` → `62970150000000000000000` ($62,970.15/BTC) |
-| SortedTroves | `0x722E4D24FD6Ff8b0AC679450F3D91294607268fA` | `getSize()` → `229` |
-| HintHelpers | `0x4e4cBA3779d56386ED43631b4dCD6d8EacEcBCF6` | 1,159 B of code (proxy) |
-| Permit2 | `0x000000000022D473030F116dDEE9F6B43aC78BA3` | 9,152 B of code |
-| Oracle precompile | `0x7b7c000000000000000000000000000000000015` | `latestRoundData()` answers; `decimals()` → `18` |
+| Contract           | Address                                      | Live check                                                              |
+| ------------------ | -------------------------------------------- | ----------------------------------------------------------------------- |
+| MUSD               | `0x118917a40FAF1CD7a13dB0Ef56C86De7973Ac503` | `symbol()` → `"MUSD"`, `decimals()` → `18`, 6,437 B of code             |
+| BorrowerOperations | `0xCdF7028ceAB81fA0C6971208e83fa7872994beE5` | `minNetDebt()` → `1.8e21`, `musd()` → the MUSD address above            |
+| TroveManager       | `0xE47c80e8c23f6B4A1aE41c34837a0599D5D16bb0` | `MCR()` → `1.1e18`, `CCR()` → `1.5e18`, `getTroveOwnersCount()` → `229` |
+| StabilityPool      | `0x1CCA7E410eE41739792eA0A24e00349Dd247680e` | `getTotalMUSDDeposits()` → `8.623e25` (86.2M MUSD)                      |
+| PriceFeed          | `0x86bCF0841622a5dAC14A313a15f96A95421b9366` | `fetchPrice()` → `62970150000000000000000` ($62,970.15/BTC)             |
+| SortedTroves       | `0x722E4D24FD6Ff8b0AC679450F3D91294607268fA` | `getSize()` → `229`                                                     |
+| HintHelpers        | `0x4e4cBA3779d56386ED43631b4dCD6d8EacEcBCF6` | 1,159 B of code (proxy)                                                 |
+| Permit2            | `0x000000000022D473030F116dDEE9F6B43aC78BA3` | 9,152 B of code                                                         |
+| Oracle precompile  | `0x7b7c000000000000000000000000000000000015` | `latestRoundData()` answers; `decimals()` → `18`                        |
 
 Note that `PriceFeed.fetchPrice()` **succeeds** against the live chain. It is only under
 `forge`'s EVM that the underlying Skip Connect precompile cannot be replayed — see the fork-test
@@ -93,13 +93,13 @@ forge test          # MEZO_TESTNET_RPC_URL set, so the fork suite runs too
 
 All five deployable contracts are under the 24,576 B EIP-170 limit:
 
-| Contract | Runtime size (B) | Margin (B) |
-|---|---|---|
-| `MarenVault` | 14,508 | 10,068 |
-| `MarenEarn` | 11,396 | 13,180 |
-| `MarenPay` | 9,264 | 15,312 |
-| `MarenRelayHub` | 7,934 | 16,642 |
-| `MarenRegistry` | 4,742 | 19,834 |
+| Contract        | Runtime size (B) | Margin (B) |
+| --------------- | ---------------- | ---------- |
+| `MarenVault`    | 14,508           | 10,068     |
+| `MarenEarn`     | 11,396           | 13,180     |
+| `MarenPay`      | 9,264            | 15,312     |
+| `MarenRelayHub` | 7,934            | 16,642     |
+| `MarenRegistry` | 4,742            | 19,834     |
 
 ```
 Ran 10 test suites in 115.06s: 244 tests passed, 0 failed, 0 skipped (244 total tests)
@@ -202,23 +202,24 @@ This one does not go away by asking the faucet more times. It is arithmetic.
 compensation, so the smallest possible trove carries 2,000 MUSD of debt. At the live
 `fetchPrice()` of $62,970.15/BTC:
 
-| Collateral ratio | BTC required | Faucet drips (0.001 BTC/day) |
-|---|---|---|
-| 110% (protocol floor — would be liquidated immediately) | ~0.0349 BTC | ~35 |
-| 180% (Maren's own borrow floor) | ~0.0572 BTC | ~58 |
-| 250% (responsible, per the README) | ~0.0794 BTC | ~80 |
+| Collateral ratio                                        | BTC required | Faucet drips (0.001 BTC/day) |
+| ------------------------------------------------------- | ------------ | ---------------------------- |
+| 110% (protocol floor — would be liquidated immediately) | ~0.0349 BTC  | ~35                          |
+| 180% (Maren's own borrow floor)                         | ~0.0572 BTC  | ~58                          |
+| 250% (responsible, per the README)                      | ~0.0794 BTC  | ~80                          |
 
 So opening the pooled trove needs on the order of **0.08 BTC**, which is roughly **80 days** of
 faucet output from a single IP.
 
 There is no alternative source of testnet MUSD. Mezo's own x402 quickstart states it plainly:
-MUSD on testnet is *"minted, not faucet-dispensed, you borrow it against testnet BTC."* So MUSD
+MUSD on testnet is _"minted, not faucet-dispensed, you borrow it against testnet BTC."_ So MUSD
 is downstream of the same BTC constraint.
 
 **Consequence for the end-to-end cycle.** With funding at the 0.001–0.01 BTC scale, these steps
 are reachable and these are not:
 
 Reachable:
+
 - `MarenRegistry` `commit` → `register` (a handle costs only gas)
 - `MarenVault.deposit()` — deliberately does not require an open trove; collateral is credited
   and held as `idleCollateral`. Needs `MIN_DEPOSIT` = exactly 0.001 BTC, plus gas
@@ -228,6 +229,7 @@ Reachable:
   ERC-2771 path, the allowlist, and `_msgSender()` recovery for real
 
 Not reachable without ~0.08 BTC:
+
 - `openPooledTrove` — needs 2,000 MUSD of debt
 - `borrow` — reverts with `TroveNotOpen()` until the above happens
 - A gasless **MUSD payment** through `MarenPay` — needs MUSD, which needs the borrow
