@@ -71,6 +71,15 @@ export function timeAgo(unixSeconds: number, now = Math.floor(Date.now() / 1000)
   return `${Math.floor(days / 30)}mo ago`;
 }
 
+/** The forward-looking counterpart: "in 5d", for an expiry. */
+export function timeUntil(unixSeconds: number, now = Math.floor(Date.now() / 1000)): string {
+  const delta = unixSeconds - now;
+  if (delta <= 0) return 'already';
+  if (delta < 3_600) return `in ${Math.floor(delta / 60)}m`;
+  if (delta < 86_400) return `in ${Math.floor(delta / 3_600)}h`;
+  return `in ${Math.floor(delta / 86_400)}d`;
+}
+
 /** "12,000.00 MUSD" with an explicit sign, for a ledger column. */
 export function signedMusd(wei: bigint, direction: 'in' | 'out'): string {
   return `${direction === 'out' ? '−' : '+'}${formatMusd(wei)}`;
