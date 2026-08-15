@@ -2,9 +2,9 @@
 pragma solidity ^0.8.28;
 
 import {MarenEarn} from "../src/MarenEarn.sol";
-import {MarenForwarder} from "../src/MarenForwarder.sol";
 import {MarenPay} from "../src/MarenPay.sol";
 import {MarenRegistry} from "../src/MarenRegistry.sol";
+import {MarenRelayHub} from "../src/MarenRelayHub.sol";
 import {MarenVault} from "../src/MarenVault.sol";
 import {Script} from "forge-std/Script.sol";
 import {console2} from "forge-std/console2.sol";
@@ -32,6 +32,11 @@ import {console2} from "forge-std/console2.sol";
  * DEPLOYMENT ORDER matters: MarenPay takes the registry address, so the registry is first.
  * Nothing here opens the pooled trove — that is a separate, deliberate keeper action
  * (`openPooledTrove`) taken after the deployment has been reviewed.
+ *
+ * THE FORWARDER: this deploys `MarenRelayHub`, which extends `MarenForwarder`, and passes its
+ * address as `trustedForwarder` to all four other contracts. The standalone `MarenForwarder`
+ * is NOT deployed — it is the hub's base class, and trusting two forwarders would give two
+ * independent ways to forge a sender.
  */
 contract Deploy is Script {
     // MUSD protocol, verified live with cast on 2026-08-15. Never edit by hand; re-derive
@@ -92,29 +97,31 @@ contract Deploy is Script {
 
         vm.startBroadcast();
 
-        MarenForwarder forwarder = new MarenForwarder();
-        MarenRegistry registry = new MarenRegistry(address(forwarder));
-        MarenPay pay = new MarenPay(musd.musd, address(registry), PERMIT2, address(forwarder));
+        // EXACTLY ONE TRUSTED FORWARDER. MarenRelayHub IS a MarenForwarder — it extends it and
+        // adds the atomic signed-fee path — so the standalone MarenForwarder is deliberately
+        // NOT deployed here. Deploying both and trusting both would give an attacker two
+        // independent ways to forge a sender, and only one of them would be allowlisted.
+        MarenRelayHub hub = new MarenRelayHub(admin);
+        address forwarder = address(hub);
+
+        MarenRegistry registry = new MarenRegistry(forwarder);
+        MarenPay pay = new MarenPay(musd.musd, address(registry), PERMIT2, forwarder);
 
         MarenVault vault = new MarenVault(
-            musd.borrowerOperations,
-            musd.troveManager,
-            musd.priceFeed,
-            musd.musd,
-            address(forwarder),
-            admin,
-            vaultCap
+            musd.borrowerOperations, musd.troveManager, musd.priceFeed, musd.musd, forwarder, admin, vaultCap
         );
 
         MarenEarn earn =
-            new MarenEarn(musd.musd, musd.stabilityPool, musd.priceFeed, address(forwarder), admin, earnCap);
+            new MarenEarn(musd.musd, musd.stabilityPool, musd.priceFeed, forwarder, admin, earnCap);
 
-        // Roles. The deployer holds DEFAULT_ADMIN_ROLE only if it IS the admin; otherwise the
-        // constructor already granted it to `admin` and the deployer can grant nothing.
+        // Roles and allowlist. The deployer holds DEFAULT_ADMIN_ROLE only if it IS the admin;
+        // otherwise the constructors already granted it to `admin` and the deployer can grant
+        // nothing.
         if (admin == broadcaster) {
             vault.grantRole(vault.KEEPER_ROLE(), keeper);
             vault.grantRole(vault.GUARDIAN_ROLE(), guardian);
             earn.grantRole(earn.KEEPER_ROLE(), keeper);
+            _allowlistRelayableCalls(hub, address(registry), address(pay), address(vault));
         }
 
         vm.stopBroadcast();
@@ -133,16 +140,57 @@ contract Deploy is Script {
 
         if (admin != broadcaster) {
             console2.log("");
-            console2.log("ACTION REQUIRED: admin != deployer, so roles were NOT granted.");
-            console2.log("From the admin account, call:");
+            console2.log("ACTION REQUIRED: admin != deployer, so roles and the relay");
+            console2.log("allowlist were NOT set. From the admin account, call:");
             console2.log("  MarenVault.grantRole(KEEPER_ROLE, keeper)");
             console2.log("  MarenVault.grantRole(GUARDIAN_ROLE, guardian)");
             console2.log("  MarenEarn.grantRole(KEEPER_ROLE, keeper)");
+            console2.log("  MarenRelayHub.setAllowedCalls(target, selectors, true) for each of");
+            console2.log("  MarenRegistry, MarenPay and MarenVault. Until then NOTHING relays.");
         }
         console2.log("");
         console2.log("NEXT: the pooled trove is NOT open. A keeper must call");
         console2.log("MarenVault.openPooledTrove{value: seed}(1800e18, upperHint, lowerHint)");
         console2.log("with hints computed off-chain from SortedTroves/HintHelpers.");
+    }
+
+    /**
+     * @dev The initial relay allowlist. Deliberately per-selector: allowing a whole contract
+     *      would make any function added later relayable without review.
+     *
+     *      `MarenVault.deposit()` is absent ON PURPOSE — it is payable, and the hub refuses to
+     *      relay value. A user pays for their first deposit as an ordinary transaction; every
+     *      action after it is sponsorable.
+     */
+    function _allowlistRelayableCalls(MarenRelayHub hub, address registry, address pay, address vault)
+        internal
+    {
+        bytes4[] memory registryCalls = new bytes4[](4);
+        registryCalls[0] = MarenRegistry.commit.selector;
+        registryCalls[1] = MarenRegistry.register.selector;
+        registryCalls[2] = MarenRegistry.setPrimaryHandle.selector;
+        registryCalls[3] = MarenRegistry.transferHandle.selector;
+        hub.setAllowedCalls(registry, registryCalls, true);
+
+        bytes4[] memory payCalls = new bytes4[](10);
+        payCalls[0] = MarenPay.pay.selector;
+        payCalls[1] = MarenPay.payToHandle.selector;
+        payCalls[2] = MarenPay.payWithPermit.selector;
+        payCalls[3] = MarenPay.payWithPermit2.selector;
+        payCalls[4] = MarenPay.createRequest.selector;
+        payCalls[5] = MarenPay.fulfillRequest.selector;
+        payCalls[6] = MarenPay.fulfillRequestWithPermit.selector;
+        payCalls[7] = MarenPay.cancelRequest.selector;
+        payCalls[8] = MarenPay.split.selector;
+        payCalls[9] = MarenPay.claimLink.selector;
+        hub.setAllowedCalls(pay, payCalls, true);
+
+        bytes4[] memory vaultCalls = new bytes4[](4);
+        vaultCalls[0] = MarenVault.borrow.selector;
+        vaultCalls[1] = MarenVault.repay.selector;
+        vaultCalls[2] = MarenVault.withdraw.selector;
+        vaultCalls[3] = MarenVault.closePosition.selector;
+        hub.setAllowedCalls(vault, vaultCalls, true);
     }
 
     function _report(
@@ -161,7 +209,7 @@ contract Deploy is Script {
         vm.serializeAddress(obj, "admin", admin);
         vm.serializeAddress(obj, "keeper", keeper);
         vm.serializeAddress(obj, "guardian", guardian);
-        vm.serializeAddress(obj, "marenForwarder", forwarder);
+        vm.serializeAddress(obj, "marenRelayHub", forwarder);
         vm.serializeAddress(obj, "marenRegistry", registry);
         vm.serializeAddress(obj, "marenPay", pay);
         vm.serializeAddress(obj, "marenVault", vault);

@@ -42,7 +42,13 @@ export function totalDebtFor(netDebtWei: bigint, borrowingRateWei: bigint): bigi
   return netDebtWei + fee + MUSD_GAS_COMPENSATION;
 }
 
-/** Maximum net debt borrowable against `collateral` while staying at or above `targetCr`. */
+/**
+ * Maximum net debt borrowable against `collateral` while staying at or above `targetCr`.
+ *
+ * DIRECT TROVES ONLY, for the same reason as `collateralRequiredFor` below: it subtracts the
+ * gas compensation and divides out the origination fee. The pooled analogue is
+ * `MarenVault.maxBorrowable`, which does neither. Both round DOWN.
+ */
 export function maxNetDebtAt(
   collateralWei: bigint,
   priceWei: bigint,
@@ -58,7 +64,22 @@ export function maxNetDebtAt(
   return net;
 }
 
-/** Collateral required to borrow `netDebt` at `targetCr`. Rounds UP — ask for more, not less. */
+/**
+ * Collateral required to borrow `netDebt` at `targetCr`. Rounds UP — ask for more, not less.
+ *
+ * DIRECT TROVES ONLY. This grosses `netDebt` up by the origination fee and the 200 MUSD gas
+ * compensation, because that is what a trove of one's own actually carries.
+ *
+ * The pooled route deliberately does NOT match this, and the asymmetry is correct rather than
+ * a bug to be reconciled: see `MarenVault.collateralRequiredForDebt` in
+ * `packages/contracts/src/MarenVault.sol`. A pooled position pays no per-user gas
+ * compensation — one covers the whole pooled trove and the protocol's own seed position has
+ * already paid it — and a borrow served from the vault's MUSD reserve pays no origination fee
+ * at all. Applying this function to a pooled position would over-quote every user by 200 MUSD
+ * of collateral they do not owe.
+ *
+ * Use `assessBorrowRoute` to decide which of the two a given user is being quoted.
+ */
 export function collateralRequiredFor(
   netDebtWei: bigint,
   priceWei: bigint,
