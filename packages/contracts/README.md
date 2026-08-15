@@ -3,10 +3,10 @@
 Solidity contracts for **Maren Finance** on **Mezo Chain**. Foundry, Solidity `0.8.28`,
 OpenZeppelin v5.4.0.
 
-| Network | Chain ID | RPC |
-|---|---|---|
-| Mezo mainnet | `31612` | `https://jsonrpc-mezo.boar.network` |
-| Mezo matsnet | `31611` | `https://rpc.test.mezo.org` |
+| Network      | Chain ID | RPC                                 |
+| ------------ | -------- | ----------------------------------- |
+| Mezo mainnet | `31612`  | `https://jsonrpc-mezo.boar.network` |
+| Mezo matsnet | `31611`  | `https://rpc.test.mezo.org`         |
 
 The native gas token is **BTC** with 18 decimals, passed as `msg.value`. MUSD is a
 Threshold-USD / Liquity-v1 fork operated by Mezo. Every MUSD address and function signature
@@ -18,6 +18,7 @@ per-contract provenance notes.
 ## Contracts
 
 ### `MarenForwarder`
+
 ERC-2771 trusted forwarder, a thin subclass of OpenZeppelin's `ERC2771Forwarder` with domain
 `Maren Forwarder` / version `1`. It adds no logic on purpose: every line added to a forwarder
 is a line that can forge a sender.
@@ -38,6 +39,7 @@ authorisation.
 > than a monolith — a 7702-delegated account can batch them.
 
 ### `MarenRelayHub` — the forwarder actually deployed
+
 `MarenRelayHub` **extends** `MarenForwarder` and adds an atomic, signed-fee relay path. Deploy
 **this**, and pass its address as `trustedForwarder` to every other Maren contract. The
 standalone `MarenForwarder` is its base class and must **not** also be deployed and trusted —
@@ -57,13 +59,13 @@ the nonce, the deadline, **and** `feeToken` / `feeAmount` / `feeRecipient`. The 
 fee and performs the call in the same frame, bubbling any inner revert, so fee and work settle
 together or neither does.
 
-| Property | How it is enforced | Test |
-|---|---|---|
-| Atomic | fee then call in one frame; inner revert is bubbled | `test_property1_revertingWorkRevertsTheFee` |
-| Fee inside the signed payload | all three fee fields are members of the EIP-712 struct | `test_property2_relayerCannotRaiseTheFee` / `…RedirectTheFee` / `…SwapTheFeeToken` |
-| One trusted forwarder | the hub *is* a `MarenForwarder`; `Deploy.s.sol` wires exactly one | `test_property3_hubIsTheSingleTrustedForwarder` |
-| End user survives to the target | ERC-2771 suffix, plus `_isTrustedByTarget` checked first | `test_property4_msgSenderInsideTargetIsTheEndUser` |
-| Target + selector allowlist | per-`(target, selector)`, on the fee path **and** the fee-free `execute` | `test_property5_*` |
+| Property                        | How it is enforced                                                       | Test                                                                               |
+| ------------------------------- | ------------------------------------------------------------------------ | ---------------------------------------------------------------------------------- |
+| Atomic                          | fee then call in one frame; inner revert is bubbled                      | `test_property1_revertingWorkRevertsTheFee`                                        |
+| Fee inside the signed payload   | all three fee fields are members of the EIP-712 struct                   | `test_property2_relayerCannotRaiseTheFee` / `…RedirectTheFee` / `…SwapTheFeeToken` |
+| One trusted forwarder           | the hub _is_ a `MarenForwarder`; `Deploy.s.sol` wires exactly one        | `test_property3_hubIsTheSingleTrustedForwarder`                                    |
+| End user survives to the target | ERC-2771 suffix, plus `_isTrustedByTarget` checked first                 | `test_property4_msgSenderInsideTargetIsTheEndUser`                                 |
+| Target + selector allowlist     | per-`(target, selector)`, on the fee path **and** the fee-free `execute` | `test_property5_*`                                                                 |
 
 `executeBatch` is **disabled** — it reverts with `BatchExecutionDisabled()`. Value is never
 relayed: `RelayedCall` has no `value` field and `execute` rejects a non-zero one, which is why
@@ -74,6 +76,7 @@ Property 4 is the one most likely to go wrong silently, so it is asserted agains
 a direct observation rather than an inference from a payment that moved the right balances.
 
 ### `MarenRegistry`
+
 `@handle` → address, 3–32 characters of `[a-z0-9_]` validated on-chain, with commit-reveal
 registration.
 
@@ -88,6 +91,7 @@ end up hashing to different nodes in a client that forgets to do it too.
 One primary handle per address (reverse resolution), plus transfer and release.
 
 ### `MarenPay`
+
 MUSD payments: `pay`, `payToHandle`, `payWithPermit`, `payWithPermit2`, payment requests,
 claimable links, and N-way `split`.
 
@@ -102,17 +106,18 @@ If you audit one function in this repo, audit that one.
 a stored `keccak256(secret)` — is unusable in a public mempool: the claim transaction reveals
 the preimage and any searcher can copy it, pay more gas, and take the money. Here the "secret"
 is a one-time private key that travels in the URL fragment and never reaches the chain; the
-claimer signs *their own recipient address* with it, so a copied signature is only valid for
+claimer signs _their own recipient address_ with it, so a copied signature is only valid for
 the recipient it already names.
 
 **Permit2** (`0x000000000022D473030F116dDEE9F6B43aC78BA3`, verified deployed on both networks)
-is supported so Maren *interoperates* with Mezo's own x402 rail rather than competing with it.
+is supported so Maren _interoperates_ with Mezo's own x402 rail rather than competing with it.
 Only `SignatureTransfer` is used — single-use and scoped to one amount and one recipient. The
 AllowanceTransfer side, which grants a standing allowance, is deliberately not touched.
 
 ### `MarenVault` — pooled Bitcoin credit
+
 **The differentiator, and the contract that carries real risk.** Maren runs ONE trove on MUSD's
-`BorrowerOperations`; users hold a segregated *accounting* claim inside it and can deposit from
+`BorrowerOperations`; users hold a segregated _accounting_ claim inside it and can deposit from
 **0.001 BTC**.
 
 For scale: opening a direct trove needs 1,800 MUSD of net debt, which at a responsible 250%
@@ -121,6 +126,7 @@ ratio and the live price of $63,071.83 is **0.079346 BTC (~$5,004.50)**. Maren's
 user count, and closing it is the entire reason this contract exists.
 
 #### How the accounting works
+
 The hard problem is distributing the pooled trove's continuously accruing interest across users
 without ever looping over them. Debt is held in **shares** against a monotonically
 non-decreasing `interestIndex`:
@@ -135,7 +141,7 @@ outstandingDebt = troveEntireDebt - 200e18 gas compensation - reserveMUSD
 governable, interest is fixed-at-open, and redistributions from other troves can add debt we
 never asked for — any of which would drift a hand-rolled model out of sync within days.
 `borrow` and `repay` record the trove's outstanding debt before and after and mint or burn
-shares against the *observed* delta, so the vault's books track the protocol's books by
+shares against the _observed_ delta, so the vault's books track the protocol's books by
 construction.
 
 Every rounding decision goes the protocol's way: shares round **up** when minted and **down**
@@ -162,7 +168,7 @@ is exactly what makes `deleverage()` safe.
    collateral — absorbs the first slice. It is not sized for a 2020-03-12.
 3. **The oracle can simply stop.** `PriceFeed.fetchPrice()` reverts when Mezo's Skip Connect
    oracle is >60s stale, and there is no `lastGoodPrice()` fallback. While it is down: no
-   borrowing, no liquidation, no collateral withdrawal *out of the trove*. Deposits and
+   borrowing, no liquidation, no collateral withdrawal _out of the trove_. Deposits and
    repayments still work — they need no price. Every price-dependent path fails with
    `PriceFeedUnavailable()` rather than an opaque revert, so the UI can say so honestly.
 4. **Users large enough for a direct trove should open one.** A direct trove carries none of the
@@ -173,6 +179,7 @@ is exactly what makes `deleverage()` safe.
    spread across other users' balances.
 
 #### Guard rails
+
 - **Entries and exits are separate switches, structurally.** `setDepositsPaused` and
   `setBorrowingPaused` exist; there is no global pause and no pause modifier anywhere on
   `withdraw`, `repay`, `closePosition` or `liquidateUser`. No guardian key — compromised,
@@ -190,6 +197,7 @@ is exactly what makes `deleverage()` safe.
   penalty goes to the insurance buffer.
 
 #### Agreement with `packages/sdk/src/position.ts`
+
 The SDK and this contract must never quote different numbers, or the UI offers users borrows
 the contract then rejects. They use the **same rounding discipline** — collateral ratios round
 DOWN, required collateral and liquidation prices round UP, always in the direction that makes a
@@ -197,10 +205,10 @@ position look less safe — and the same core expressions.
 
 They differ in one deliberate place, and the contract's view functions are named to say so:
 
-| SDK (direct trove) | Vault (pooled) |
-|---|---|
+| SDK (direct trove)                                                                                   | Vault (pooled)                                                          |
+| ---------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------- |
 | `collateralRequiredFor(netDebt, …)` grosses up by the 0.1% fee **and** the 200 MUSD gas compensation | `collateralRequiredForDebt(debt, targetCr)` takes the pooled debt as-is |
-| `maxNetDebtAt(…)` subtracts gas compensation and divides out the fee | `maxBorrowable(user)` does neither |
+| `maxNetDebtAt(…)` subtracts gas compensation and divides out the fee                                 | `maxBorrowable(user)` does neither                                      |
 
 A pooled position carries no per-user gas compensation — there is one for the whole pooled
 trove, already paid by the protocol's own seed position — and a borrow served from
@@ -210,6 +218,7 @@ two a given user is quoted; use the SDK's functions for the direct route and the
 the pooled one.
 
 #### Mezo divergences that shape this contract
+
 - No `_maxFeePercentage` parameter anywhere. A ported Liquity ABI encodes the wrong selector.
 - `maxBorrowingCapacity` is a per-trove ceiling frozen at the price when the trove opened.
   Adding collateral does **not** raise it — only `refinance()` does, which is why
@@ -220,6 +229,7 @@ the pooled one.
 - Recovery Mode does **not** expand liquidations; the threshold stays 110% in both modes.
 
 ### `MarenEarn`
+
 ERC-4626 over MUSD, deposited into the MUSD Stability Pool.
 
 **What the yield actually is:** the Stability Pool has **no token emissions**. The only return
@@ -261,10 +271,11 @@ Fork tests **skip** rather than fail when `MEZO_TESTNET_RPC_URL` is unset or the
 unreachable, so a public testnet cannot break CI.
 
 ### A real limitation of forking Mezo
+
 Mezo's BTC/USD oracle is **Skip Connect**, a consensus-level `x/oracle` module in mezod — not
 Chainlink, not Pyth, and not a deployed contract. `eth_getCode` at
 `0x7b7c000000000000000000000000000000000015` does return bytecode, but that bytecode is a stub
-whose only action is to call *itself*; on Mezo, mezod intercepts and the native handler answers.
+whose only action is to call _itself_; on Mezo, mezod intercepts and the native handler answers.
 Inside foundry's EVM there is no handler, so it recurses and reverts — taking
 `PriceFeed.fetchPrice()` and every borrow/adjust/liquidate path down with it.
 
@@ -282,6 +293,7 @@ out of band with `cast`.
 ## Deploy runbook
 
 ### 1. Pre-flight
+
 ```bash
 forge fmt --check
 forge build --sizes          # all five contracts must be under 24,576 B
@@ -290,12 +302,15 @@ MEZO_TESTNET_RPC_URL=https://rpc.test.mezo.org forge test --match-path 'test/for
 ```
 
 ### 2. Dry run
+
 ```bash
 forge script script/Deploy.s.sol --rpc-url mezo_testnet
 ```
+
 Prints the addresses as JSON and writes `deployments/<chainid>.json`. No key required.
 
 ### 3. Deploy
+
 ```bash
 cast wallet import maren-deployer --interactive   # never use a raw key
 
@@ -314,23 +329,27 @@ pooled trove — that is a separate, deliberate keeper action after the deployme
 
 > **Why verification is on the command line and not in `foundry.toml`.** foundry 1.4.3 resolves
 > its `[etherscan]` table by looking the chain id up in a built-in chain list, and Mezo is not in
-> it. *Any* `[etherscan]` entry naming 31611 or 31612 makes `forge script` fail outright with
+> it. _Any_ `[etherscan]` entry naming 31611 or 31612 makes `forge script` fail outright with
 > `Error: Chain 31611 not supported`, before it does anything else. Verified by bisection. The
 > `--verifier blockscout --verifier-url ...` flags work today. Note the `api.` subdomain —
 > `explorer.mezo.org/api` without it 404s.
 
 ### 4. Open the pooled trove
+
 Compute hints off-chain from `SortedTroves` / `HintHelpers`, then, as `KEEPER_ROLE`:
+
 ```bash
 cast send $VAULT "openPooledTrove(uint256,address,address)" \
   1800000000000000000000 $UPPER_HINT $LOWER_HINT \
   --value 1ether --rpc-url mezo_testnet --account maren-keeper
 ```
+
 The drawn 1,800 MUSD stays in the vault as `reserveMUSD`, so the vault's outstanding debt
 immediately afterwards is only the 0.1% origination fee — which is charged to the protocol's own
 position, not to users.
 
 ### 5. Post-deploy checklist
+
 - [ ] `MAREN_ADMIN` is a multisig on mainnet, not an EOA.
 - [ ] `KEEPER_ROLE` and `GUARDIAN_ROLE` granted, and the deployer's `DEFAULT_ADMIN_ROLE`
       renounced if it was a throwaway.
@@ -354,11 +373,11 @@ position, not to users.
 `test/RelayerIntegration.t.sol` is the contract half of that seam. It pins the exact EIP-712
 constants the relayer must reproduce and proves them with a real `execute` round trip:
 
-| | |
-|---|---|
-| `ForwardRequest` typehash | `0x7f96328b83274ebc7c1cf4f7a3abda602b51a78b7fa1d86a2ce353d75e587cac` |
-| Type string | `ForwardRequest(address from,address to,uint256 value,uint256 gas,uint256 nonce,uint48 deadline,bytes data)` |
-| Domain | name `Maren Forwarder`, version `1`, plus chainId and verifyingContract |
+|                           |                                                                                                              |
+| ------------------------- | ------------------------------------------------------------------------------------------------------------ |
+| `ForwardRequest` typehash | `0x7f96328b83274ebc7c1cf4f7a3abda602b51a78b7fa1d86a2ce353d75e587cac`                                         |
+| Type string               | `ForwardRequest(address from,address to,uint256 value,uint256 gas,uint256 nonce,uint48 deadline,bytes data)` |
+| Domain                    | name `Maren Forwarder`, version `1`, plus chainId and verifyingContract                                      |
 
 Four things the relayer needs to know:
 
@@ -368,14 +387,14 @@ Four things the relayer needs to know:
    than transcribing the type string — a one-character difference means every sponsored
    transaction fails signature recovery in production and nothing catches it first.
 2. **`executeBatch` is NOT atomic for inner-call failures**, in either mode. OpenZeppelin's
-   `atomic` flag governs *validation* only — untrusted target, expired deadline, bad signature.
+   `atomic` flag governs _validation_ only — untrusted target, expired deadline, bad signature.
    The inner call is a raw `call` whose `success` is recorded and used for nothing but refunding
    `value`. So a batched fee leg settles even when the work leg reverts, including with
    `refundReceiver == address(0)`. Proven by `test_executeBatchIsNotAtomicForInnerCallFailures`.
    **This is why `MarenRelayHub` disables `executeBatch` outright.** Single `execute` does
    bubble the inner revert and remains available as the fee-free sponsored path.
 3. **Nothing relays until it is allowlisted.** `MarenRelayHub` enforces a per-`(target,
-   selector)` allowlist on both the fee path and `execute`. `Deploy.s.sol` seeds it; anything
+selector)` allowlist on both the fee path and `execute`. `Deploy.s.sol` seeds it; anything
    added later needs an explicit `setAllowedCalls` from `RELAY_ADMIN_ROLE`.
 4. **Value-bearing calls are not relayable** — the hub rejects them. The vault is built for it:
    `deposit()` is the only payable entrypoint, and `borrow` / `repay` / `withdraw` /
@@ -391,10 +410,10 @@ one that is on-chain and cannot be bypassed by a compromised relayer key.
 
 Git submodules, pinned by tag:
 
-| | Version | Commit |
-|---|---|---|
-| `lib/openzeppelin-contracts` | v5.4.0 | `c64a1edb67b6e3f4a15cca8909c9482ad33a02b0` |
-| `lib/forge-std` | v1.9.7 | `77041d2ce690e692d6e03cc812b57d1ddaa4d505` |
+|                              | Version | Commit                                     |
+| ---------------------------- | ------- | ------------------------------------------ |
+| `lib/openzeppelin-contracts` | v5.4.0  | `c64a1edb67b6e3f4a15cca8909c9482ad33a02b0` |
+| `lib/forge-std`              | v1.9.7  | `77041d2ce690e692d6e03cc812b57d1ddaa4d505` |
 
 ```bash
 git submodule update --init --recursive

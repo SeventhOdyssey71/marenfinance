@@ -22,22 +22,22 @@ export default function AppPlaceholderPage() {
         <Wordmark className="h-5 w-auto" />
       </Link>
 
-      <p className="t-label mt-16 text-text-subtle">Maren App</p>
+      <p className="t-label text-text-subtle mt-16">Maren App</p>
 
       <h1 className="t-h1 mt-5 text-balance">Launching soon</h1>
 
-      <p className="prose-measure mt-6 text-base leading-relaxed text-text-muted">
-        Vault, Pay, Earn and Portfolio ship after the full matsnet deployment and a
-        third-party audit of the two contracts that carry risk. We would rather be late
-        than be sorry with someone else&rsquo;s Bitcoin.
+      <p className="prose-measure text-text-muted mt-6 text-base leading-relaxed">
+        Vault, Pay, Earn and Portfolio ship after the full matsnet deployment and a third-party
+        audit of the two contracts that carry risk. We would rather be late than be sorry with
+        someone else&rsquo;s Bitcoin.
       </p>
 
       <Link
         href="/"
-        className="group mt-11 inline-flex h-12 items-center gap-3 rounded-[var(--radius-pill)] border border-[var(--border-hairline)] bg-surface-raised px-6 text-[0.9375rem] font-medium text-text transition-colors duration-[120ms] ease-out hover:border-[var(--border-strong)]"
+        className="bg-surface-raised text-text group mt-11 inline-flex h-12 items-center gap-3 rounded-[var(--radius-pill)] border border-[var(--border-hairline)] px-6 text-[0.9375rem] font-medium transition-colors duration-[120ms] ease-out hover:border-[var(--border-strong)]"
       >
         <ArrowRight
-          className="size-4 rotate-180 text-text-subtle transition-transform duration-[120ms] ease-out group-hover:-translate-x-0.5"
+          className="text-text-subtle size-4 rotate-180 transition-transform duration-[120ms] ease-out group-hover:-translate-x-0.5"
           aria-hidden
         />
         Back to maren.finance

@@ -39,27 +39,27 @@ Parts of it will inform what goes to Mezo. It is not itself the reply — that d
 Six components. Four are merged to `main`, one is an open pull request, and one is this
 document set.
 
-| Component     | Path                 | State                                       |
-| ------------- | -------------------- | ------------------------------------------- |
-| Contracts     | `packages/contracts` | Merged (PR #3)                              |
-| Landing page  | `apps/web`           | Merged (PR #2)                              |
-| iOS app       | `apps/ios`           | Merged                                      |
-| SDK           | `packages/sdk`       | Merged                                      |
-| Relayer       | `apps/relayer`       | **PR #1, open — not merged**                |
-| Documents     | `docs/src`           | Seven sources, built to branded A4 PDFs     |
+| Component    | Path                 | State                                   |
+| ------------ | -------------------- | --------------------------------------- |
+| Contracts    | `packages/contracts` | Merged (PR #3)                          |
+| Landing page | `apps/web`           | Merged (PR #2)                          |
+| iOS app      | `apps/ios`           | Merged                                  |
+| SDK          | `packages/sdk`       | Merged                                  |
+| Relayer      | `apps/relayer`       | **PR #1, open — not merged**            |
+| Documents    | `docs/src`           | Seven sources, built to branded A4 PDFs |
 
 ### Contracts
 
 Solidity 0.8.28, Foundry, OpenZeppelin v5.4.0. Five contracts are deployed; a sixth,
 `MarenForwarder`, is the hub's base class and is deliberately never deployed on its own.
 
-| Contract        | What it is                                                     |
-| --------------- | -------------------------------------------------------------- |
+| Contract        | What it is                                                                       |
+| --------------- | -------------------------------------------------------------------------------- |
 | `MarenVault`    | The pooled trove. 0.001 BTC floor, 180% borrow floor, 140% internal liquidation. |
-| `MarenPay`      | MUSD payments: direct, by handle, permit, requests, links, split. |
-| `MarenRegistry` | `@handle` to address, commit-reveal, reverse resolution.        |
-| `MarenEarn`     | ERC-4626 over the MUSD Stability Pool.                          |
-| `MarenRelayHub` | The forwarder actually deployed. Atomic, signed-fee relaying.   |
+| `MarenPay`      | MUSD payments: direct, by handle, permit, requests, links, split.                |
+| `MarenRegistry` | `@handle` to address, commit-reveal, reverse resolution.                         |
+| `MarenEarn`     | ERC-4626 over the MUSD Stability Pool.                                           |
+| `MarenRelayHub` | The forwarder actually deployed. Atomic, signed-fee relaying.                    |
 
 `MarenVault` is the differentiator and it is also the only contract that can lose a user
 money through a Maren design failure. That asymmetry is why it holds most of the test
@@ -77,7 +77,7 @@ business knowing about them.
 
 **Batching a fee leg and a work leg through `executeBatch` was rejected because it does
 not do what its name implies.** OpenZeppelin's `ERC2771Forwarder.executeBatch` is **not
-atomic for inner-call failures**. The `atomic` flag governs *validation* only — untrusted
+atomic for inner-call failures**. The `atomic` flag governs _validation_ only — untrusted
 target, expired deadline, bad signature. The inner call is a raw `call` whose `success` is
 recorded and then used for nothing except deciding whether to refund `value`. A batched fee
 leg therefore settles even when the work leg reverts, including with
@@ -92,13 +92,13 @@ inner revert, so the fee and the work settle together or neither does.
 
 Five properties are asserted directly rather than inferred:
 
-| Property                          | Enforced by                                                       |
-| --------------------------------- | ----------------------------------------------------------------- |
-| Atomic                            | fee then call in one frame; the inner revert is bubbled            |
-| Fee is inside the signed payload  | all three fee fields are members of the EIP-712 struct             |
-| Exactly one trusted forwarder     | the hub *is* a `MarenForwarder`; `Deploy.s.sol` wires exactly one  |
-| The end user survives to the target | ERC-2771 suffix, with `_isTrustedByTarget` checked first          |
-| Target and selector allowlist     | per-`(target, selector)`, on the fee path and the fee-free `execute` |
+| Property                            | Enforced by                                                          |
+| ----------------------------------- | -------------------------------------------------------------------- |
+| Atomic                              | fee then call in one frame; the inner revert is bubbled              |
+| Fee is inside the signed payload    | all three fee fields are members of the EIP-712 struct               |
+| Exactly one trusted forwarder       | the hub _is_ a `MarenForwarder`; `Deploy.s.sol` wires exactly one    |
+| The end user survives to the target | ERC-2771 suffix, with `_isTrustedByTarget` checked first             |
+| Target and selector allowlist       | per-`(target, selector)`, on the fee path and the fee-free `execute` |
 
 The fourth is the one most likely to fail silently, so it is asserted against
 `test/mocks/SenderProbe.sol`, which records both `_msgSender()` and the raw `msg.sender`
@@ -123,7 +123,7 @@ that a reduced-motion user cannot opt out of.
 earn, activity, settings, and scan-to-pay. All position math, number formatting, and
 protocol constants come from `@maren/sdk` and are real. Chain reads and transaction
 submission are mocked, and the README enumerates exactly which is which — the split is that
-everything deciding what a user *believes about their money* is real, and only the transport
+everything deciding what a user _believes about their money_ is real, and only the transport
 is stubbed.
 
 ### Documents
@@ -150,17 +150,17 @@ cd packages/contracts && forge test
 tests, which skip rather than fail when no RPC is configured, so that a public testnet
 cannot break CI.
 
-| Suite                        | Tests |
-| ---------------------------- | ----: |
-| `MarenPay.t.sol`             |    61 |
-| `MarenRegistry.t.sol`        |    52 |
-| `MarenVault.t.sol`           |    48 |
-| `MarenRelayHub.t.sol`        |    26 |
-| `MarenEarn.t.sol`            |    20 |
-| `MarenForwarder.t.sol`       |    12 |
-| `RelayerIntegration.t.sol`   |     6 |
-| `MarenVault.invariant.t.sol` |     6 |
-| `MarenVault.fuzz.t.sol`      |     5 |
+| Suite                        |   Tests |
+| ---------------------------- | ------: |
+| `MarenPay.t.sol`             |      61 |
+| `MarenRegistry.t.sol`        |      52 |
+| `MarenVault.t.sol`           |      48 |
+| `MarenRelayHub.t.sol`        |      26 |
+| `MarenEarn.t.sol`            |      20 |
+| `MarenForwarder.t.sol`       |      12 |
+| `RelayerIntegration.t.sol`   |       6 |
+| `MarenVault.invariant.t.sol` |       6 |
+| `MarenVault.fuzz.t.sol`      |       5 |
 | **Total**                    | **236** |
 
 The six invariants each complete **4,096 calls across 64 runs with zero reverts**:
@@ -278,16 +278,16 @@ CI=true pnpm docs:pdf
 **All seven documents build**, 93 pages in total. The six that existed before this one came
 to 75.
 
-| Doc     | Document                            | Pages |
-| ------- | ----------------------------------- | ----: |
-| MRN-001 | Investment & Grant Thesis           |    14 |
-| MRN-002 | Technical Feasibility & Architecture |   26 |
-| MRN-003 | Product Specification               |     7 |
-| MRN-004 | Security & Risk                     |    10 |
-| MRN-005 | Go-to-Market                        |     9 |
-| MRN-006 | Roadmap & Grant Milestones          |     9 |
-| MRN-007 | Work Summary — this document        |    18 |
-| **Total** |                                   | **93** |
+| Doc       | Document                             |  Pages |
+| --------- | ------------------------------------ | -----: |
+| MRN-001   | Investment & Grant Thesis            |     14 |
+| MRN-002   | Technical Feasibility & Architecture |     26 |
+| MRN-003   | Product Specification                |      7 |
+| MRN-004   | Security & Risk                      |     10 |
+| MRN-005   | Go-to-Market                         |      9 |
+| MRN-006   | Roadmap & Grant Milestones           |      9 |
+| MRN-007   | Work Summary — this document         |     18 |
+| **Total** |                                      | **93** |
 
 The build is deterministic: dates are taken from each document's own frontmatter rather than
 from the clock, so rebuilding unchanged sources produces byte-identical files instead of a
@@ -365,7 +365,7 @@ real deployed bytecode**; only the consensus oracle underneath is substituted, b
 cannot be replayed. The live precompile is verified out of band with `cast`.
 
 **foundry 1.4.3 cannot express Mezo in `[etherscan]`.** It resolves that table by looking
-the chain id up in a built-in chain list, and Mezo is not in it, so *any* `[etherscan]`
+the chain id up in a built-in chain list, and Mezo is not in it, so _any_ `[etherscan]`
 entry naming 31611 or 31612 makes `forge script` fail outright with
 `Error: Chain 31611 not supported` before it does anything else. Established by bisection.
 Verification therefore passes `--verifier blockscout --verifier-url ...` on the command

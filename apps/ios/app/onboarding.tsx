@@ -42,8 +42,7 @@ const PANELS: Panel[] = [
   {
     kicker: 'One',
     title: 'Deposit Bitcoin',
-    body:
-      'Your BTC becomes collateral on Mezo. It stays yours, it stays Bitcoin, and you keep every satoshi of the upside. Nothing is sold.',
+    body: 'Your BTC becomes collateral on Mezo. It stays yours, it stays Bitcoin, and you keep every satoshi of the upside. Nothing is sold.',
     icon: 'vault',
     // BTC orange is permitted here: the panel is about a BTC-denominated position.
     accent: semantic.btc,
@@ -51,16 +50,14 @@ const PANELS: Panel[] = [
   {
     kicker: 'Two',
     title: 'Draw MUSD',
-    body:
-      'Borrow dollars against your Bitcoin at 1.00% APR, fixed for the life of the loan. Maren targets a 250% collateral ratio and refuses to let you cross 180%.',
+    body: 'Borrow dollars against your Bitcoin at 1.00% APR, fixed for the life of the loan. Maren targets a 250% collateral ratio and refuses to let you cross 180%.',
     icon: 'earn',
     accent: semantic.musd,
   },
   {
     kicker: 'Three',
     title: 'Spend without gas',
-    body:
-      'Mezo charges gas in BTC. Maren’s relayer pays it for you, so you can send MUSD holding no Bitcoin at all. You sign; we settle.',
+    body: 'Mezo charges gas in BTC. Maren’s relayer pays it for you, so you can send MUSD holding no Bitcoin at all. You sign; we settle.',
     icon: 'send',
     accent: brand.violet400,
   },
@@ -121,9 +118,7 @@ export default function Onboarding() {
               <Icon name={panel.icon} size={26} color={panel.accent} />
             </View>
 
-            <Label style={styles.kicker}>
-              {panel.kicker} of three
-            </Label>
+            <Label style={styles.kicker}>{panel.kicker} of three</Label>
             <Txt variant="h1" style={styles.title}>
               {panel.title}
             </Txt>
@@ -140,10 +135,10 @@ export default function Onboarding() {
                 {/* `muted`, not `subtle`: this is the risk disclosure, and #6B6B75 on
                     #0C0C0F falls under 4.5:1. Risk copy is never the dimmest text. */}
                 <Txt variant="small" tone="muted">
-                  Small positions share one trove. Your collateral is segregated in
-                  accounting, not in custody — a drawdown faster than the keeper can
-                  respond could socialise losses. Above 0.079 BTC, Maren opens you a
-                  direct trove instead, which carries no pooling risk.
+                  Small positions share one trove. Your collateral is segregated in accounting, not
+                  in custody — a drawdown faster than the keeper can respond could socialise losses.
+                  Above 0.079 BTC, Maren opens you a direct trove instead, which carries no pooling
+                  risk.
                 </Txt>
               </View>
             ) : null}

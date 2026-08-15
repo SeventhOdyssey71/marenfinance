@@ -47,7 +47,13 @@ export default function Earn() {
       <Card style={styles.hero}>
         <Label>Your balance in Earn</Label>
         <View style={styles.heroValue}>
-          {earn ? <Musd wei={earn.assetsWei} size="numericXl" /> : <Num size="numericXl" tone="subtle">—</Num>}
+          {earn ? (
+            <Musd wei={earn.assetsWei} size="numericXl" />
+          ) : (
+            <Num size="numericXl" tone="subtle">
+              —
+            </Num>
+          )}
         </View>
 
         {earn ? (
@@ -89,15 +95,14 @@ export default function Earn() {
         */}
         <View style={styles.disclosure}>
           <Txt variant="small" tone="muted">
-            This is MUSD actually realised in the past, not a rate and not a forecast.
-            Maren does not display an APY for Earn because there is no reliable one to
-            display.
+            This is MUSD actually realised in the past, not a rate and not a forecast. Maren does
+            not display an APY for Earn because there is no reliable one to display.
           </Txt>
           <Txt variant="small" tone="subtle" style={styles.disclosureBody}>
-            The MUSD Stability Pool has no token emissions. Its entire yield is the
-            Bitcoin seized in liquidations, sold and compounded back into MUSD. Whether
-            that happens at all depends on whether anyone gets liquidated, so returns
-            arrive in lumps and can be zero for months.
+            The MUSD Stability Pool has no token emissions. Its entire yield is the Bitcoin seized
+            in liquidations, sold and compounded back into MUSD. Whether that happens at all depends
+            on whether anyone gets liquidated, so returns arrive in lumps and can be zero for
+            months.
           </Txt>
         </View>
 
@@ -105,7 +110,12 @@ export default function Earn() {
           <View style={styles.eventsBlock}>
             <StatRow
               label="Liquidation events in window"
-              value={<Num size="numericSm" tone="muted">{`${earn.trailing.liquidationEvents} events`}</Num>}
+              value={
+                <Num
+                  size="numericSm"
+                  tone="muted"
+                >{`${earn.trailing.liquidationEvents} events`}</Num>
+              }
             />
             <StatRow
               label="Most recent gain"
@@ -186,9 +196,9 @@ export default function Earn() {
       {/* Risk, stated plainly. */}
       <Card tone="inset" style={styles.riskCard}>
         <Txt variant="small" tone="muted">
-          Stability Pool deposits absorb liquidated debt. In exchange for the BTC gains
-          you take on the risk that your MUSD is used to close somebody else’s position —
-          historically profitable, not guaranteed, and not principal-protected.
+          Stability Pool deposits absorb liquidated debt. In exchange for the BTC gains you take on
+          the risk that your MUSD is used to close somebody else’s position — historically
+          profitable, not guaranteed, and not principal-protected.
         </Txt>
       </Card>
 

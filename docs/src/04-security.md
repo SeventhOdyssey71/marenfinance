@@ -12,7 +12,7 @@ This document states the risks in Maren Finance plainly, including the ones that
 cost users money and the ones we have chosen to accept.
 
 It is written on a principle borrowed from the security audit of the author's previous
-product: *a security document that only lists successes is not a security document.*
+product: _a security document that only lists successes is not a security document._
 
 Three things a reader should take from it:
 
@@ -33,17 +33,17 @@ Three things a reader should take from it:
 
 Ordered by expected harm, not by likelihood.
 
-| # | Risk | Who bears it | Severity | Status |
-|---|---|---|---|---|
-| R-1 | Pooled vault socialises a loss in a fast BTC drawdown | Pooled users | **Critical** | Mitigated, capped, audit scope |
-| R-2 | MUSD proxy upgrade changes behaviour underneath us | All users | **Critical** | Disclosed, not mitigable |
-| R-3 | Oracle failure or manipulation | All users | **High** | Partially mitigated |
-| R-4 | Keeper fails to act in time | Pooled users | **High** | Mitigated |
-| R-5 | Relayer key compromise | Maren treasury | Medium | Mitigated by design |
-| R-6 | Contract bug in MarenPay / Registry / Earn | Individual users | Medium | Audit + tests |
-| R-7 | Sponsorship abuse drains the gas budget | Maren treasury | Low | Mitigated |
-| R-8 | Handle squatting / impersonation in payments | Individual users | Medium | Mitigated |
-| R-9 | Front-end compromise | All users | **High** | Standard controls |
+| #   | Risk                                                  | Who bears it     | Severity     | Status                         |
+| --- | ----------------------------------------------------- | ---------------- | ------------ | ------------------------------ |
+| R-1 | Pooled vault socialises a loss in a fast BTC drawdown | Pooled users     | **Critical** | Mitigated, capped, audit scope |
+| R-2 | MUSD proxy upgrade changes behaviour underneath us    | All users        | **Critical** | Disclosed, not mitigable       |
+| R-3 | Oracle failure or manipulation                        | All users        | **High**     | Partially mitigated            |
+| R-4 | Keeper fails to act in time                           | Pooled users     | **High**     | Mitigated                      |
+| R-5 | Relayer key compromise                                | Maren treasury   | Medium       | Mitigated by design            |
+| R-6 | Contract bug in MarenPay / Registry / Earn            | Individual users | Medium       | Audit + tests                  |
+| R-7 | Sponsorship abuse drains the gas budget               | Maren treasury   | Low          | Mitigated                      |
+| R-8 | Handle squatting / impersonation in payments          | Individual users | Medium       | Mitigated                      |
+| R-9 | Front-end compromise                                  | All users        | **High**     | Standard controls              |
 
 ---
 
@@ -87,16 +87,16 @@ whatsoever**, and the interface explains why. We lose pooled volume by doing thi
 the correct trade.
 
 **Borrowing pauses before withdrawal does.** This is a hard requirement in the contract
-and has a dedicated test. If the vault must be halted, *entries* close first and *exits*
+and has a dedicated test. If the vault must be halted, _entries_ close first and _exits_
 stay open. A user must never be trapped in a position they want out of.
 
 **Caps that widen on evidence, not on schedule.**
 
-| Phase | Cap | Gate |
-|---|---|---|
-| Mainnet launch | 5 BTC | 14 days, no keeper failure |
-| Post-audit | 25 BTC | Critical/High findings resolved |
-| Post-traction | 100 BTC | 60 days clean liquidation history |
+| Phase          | Cap     | Gate                              |
+| -------------- | ------- | --------------------------------- |
+| Mainnet launch | 5 BTC   | 14 days, no keeper failure        |
+| Post-audit     | 25 BTC  | Critical/High findings resolved   |
+| Post-traction  | 100 BTC | 60 days clean liquidation history |
 
 **An insurance buffer** funded from the 5% internal liquidation penalty, which absorbs
 rounding losses and small shortfalls before any socialisation occurs.
@@ -129,7 +129,7 @@ rather than with tokenholders. Mezo's documentation is explicit that immutabilit
 later-stage goal, so this is a disclosed choice rather than an oversight.
 
 **Maren cannot mitigate this.** We can only disclose it, and avoid compounding it — which
-is why Maren's own upgradeable contracts are behind a multisig *and* a timelock from
+is why Maren's own upgradeable contracts are behind a multisig _and_ a timelock from
 deployment day one, rather than "before mainnet".
 
 **MUSD's backing is not what a casual reader would assume.** Total supply is ~31.08M.
@@ -164,7 +164,7 @@ fed by the validator set. It is not Chainlink and not Pyth.
 - **`fetchPrice()` reverts if the price is more than 60 seconds stale**, and it is a
   `view` function with **no `lastGoodPrice()` fallback**. Every borrow, adjust,
   liquidate, and redeem path can revert for reasons unrelated to the user. Both Maren
-  apps have an explicit *price feed unavailable* state and **will not let a user borrow
+  apps have an explicit _price feed unavailable_ state and **will not let a user borrow
   against a stale number**.
 - The feed is secured by Mezo's validator set rather than an independent third party.
   This is a reasonable design for a chain that wants consensus-level prices; it is also a
@@ -181,37 +181,43 @@ through: it stops opening new debt and continues to permit withdrawals.
 # 5. R-4 to R-9 — Controls
 
 ## Keeper (R-4)
-Runs per-block health checks, is permissionless to *call* for liquidation (so Maren is
+
+Runs per-block health checks, is permissionless to _call_ for liquidation (so Maren is
 not a single point of failure), and has an economic incentive via the 5% penalty. If the
 keeper halts, borrowing stops; withdrawals do not.
 
 ## Relayer (R-5)
+
 **A full compromise of the relayer key costs Maren its BTC gas float and nothing else.**
 The relayer is never an owner, approver, or custodian of user funds. It relays only to
 allowlisted Maren contracts, only for allowlisted selectors, and derives the payer from
-the *recovered* signature rather than from any client-supplied field.
+the _recovered_ signature rather than from any client-supplied field.
 
 At Mezo's base fee, a 100,000-gas transaction costs **$0.0092**, so the float on hand is
 small in absolute terms even when the sponsorship budget is generous.
 
 ## Contracts (R-6)
+
 Full unit and fuzz coverage; invariant tests asserting the vault's per-user ledger cannot
 drift from the trove's real debt, with any rounding error required to fall in the
 protocol's favour; fork tests against the real MUSD contracts on matsnet. `MarenVault` and
 `MarenForwarder` are the audit scope.
 
 ## Sponsorship abuse (R-7)
+
 Per-address and per-IP rate limits, a global daily BTC spend cap that halts relaying, and
 a 25-action free tier after which a fee is taken in-band in MUSD. Exhaustion returns a
 **typed error**, never a silent fallback that spends our money.
 
 ## Handles (R-8)
+
 `MarenRegistry` uses commit-reveal registration to prevent front-running, restricts
 handles to `[a-z0-9_]` to eliminate homoglyph attacks, and the payment interface displays
 the resolved address alongside the handle before any confirmation. A user always sees
 where money is actually going.
 
 ## Front-end (R-9)
+
 Strict CSP, subresource integrity, no third-party analytics on signing paths, and
 transaction simulation with a human-readable summary before every signature.
 
