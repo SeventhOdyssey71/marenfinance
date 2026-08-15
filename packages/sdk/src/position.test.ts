@@ -85,6 +85,27 @@ describe('liquidationPrice', () => {
   it('returns zero when there is no debt', () => {
     expect(liquidationPrice(WAD, 0n)).toBe(0n);
   });
+
+  /**
+   * The empty-account regression.
+   *
+   * An account with neither collateral nor debt used to hit the `collateralWei === 0n`
+   * branch first and come back with MAX_CR, which the Portfolio and Vault then formatted
+   * as a 60-digit dollar figure wide enough to collide with the column beside it. A
+   * brand-new wallet is the default state for anyone arriving at this app, so this is
+   * the single most-seen code path, not an edge case.
+   */
+  it('returns zero for a brand-new account with no collateral and no debt', () => {
+    expect(liquidationPrice(0n, 0n)).toBe(0n);
+    expect(marenLiquidationPrice(0n, 0n)).toBe(0n);
+  });
+
+  it('never returns the MAX_CR sentinel while debt is zero, at any collateral', () => {
+    for (const coll of [0n, 1n, WAD, btc('0.012'), btc('500')]) {
+      expect(liquidationPrice(coll, 0n)).toBe(0n);
+      expect(marenLiquidationPrice(coll, 0n)).toBe(0n);
+    }
+  });
 });
 
 describe('marenLiquidationPrice', () => {
