@@ -1,0 +1,61 @@
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.28;
+
+/**
+ * @title ITroveManager
+ * @notice Mezo's MUSD TroveManager. Verified live on matsnet
+ *         0xE47c80e8c23f6B4A1aE41c34837a0599D5D16bb0 on 2026-08-15 against trove
+ *         0x52d033E64774F31A8B7562806aA5782CbbD29382.
+ */
+interface ITroveManager {
+    /// @notice Native BTC collateral recorded on the trove. Excludes pending redistribution.
+    function getTroveColl(address _borrower) external view returns (uint256);
+
+    /// @notice principal + accrued interest, INCLUDING the 200e18 MUSD gas compensation.
+    ///         Excludes pending redistribution — use getEntireDebtAndColl for the true total.
+    function getTroveDebt(address _borrower) external view returns (uint256);
+
+    /**
+     * @notice Mezo-only per-trove borrow ceiling, fixed at the BTC price when the trove was
+     *         opened. Adding collateral does NOT raise it; only `refinance()` does. This —
+     *         not an ICR-derived number — is the real borrow limit.
+     */
+    function getTroveMaxBorrowingCapacity(address _borrower) external view returns (uint256);
+
+    /// @notice ICR in 1e18 fixed point. `type(uint256).max` when the trove has no debt.
+    function getCurrentICR(address _borrower, uint256 _price) external view returns (uint256);
+
+    function getTCR(uint256 _price) external view returns (uint256);
+
+    /// @notice TCR < 150%. NOTE: Recovery Mode does NOT raise the 110% liquidation threshold
+    ///         on Mezo; it only forces new loans open at >=150% and blocks refinance().
+    function checkRecoveryMode(uint256 _price) external view returns (bool);
+
+    /**
+     * @notice Liquity v1 returns 4 values here; Mezo returns 6 because debt is split into
+     *         principal and interest.
+     * @return coll               collateral recorded on the trove
+     * @return principal          principal debt (includes the 200e18 gas compensation)
+     * @return interest           accrued interest, 1% APR simple, fixed at open
+     * @return pendingCollateral  collateral owed from redistributions, not yet applied
+     * @return pendingPrincipal   principal owed from redistributions, not yet applied
+     * @return pendingInterest    interest owed from redistributions, not yet applied
+     */
+    function getEntireDebtAndColl(address _borrower)
+        external
+        view
+        returns (
+            uint256 coll,
+            uint256 principal,
+            uint256 interest,
+            uint256 pendingCollateral,
+            uint256 pendingPrincipal,
+            uint256 pendingInterest
+        );
+
+    /// @notice 1.1e18. Hardcoded `constant`, not governable.
+    function MCR() external view returns (uint256);
+
+    /// @notice 1.5e18. Hardcoded `constant`, not governable.
+    function CCR() external view returns (uint256);
+}
