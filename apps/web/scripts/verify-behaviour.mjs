@@ -10,6 +10,10 @@
  */
 const pw = await import(process.env.PLAYWRIGHT_CORE ?? 'playwright-core');
 const { chromium } = pw.chromium ? pw : pw.default;
+
+/** Override with BASE_URL when port 3000 is taken. */
+const BASE = process.env.BASE_URL ?? 'http://127.0.0.1:3000';
+
 const browser = await chromium.launch({
   executablePath: process.env.CHROME_EXECUTABLE,
   args: ['--use-gl=angle'],
@@ -28,7 +32,7 @@ const check = (name, pass, detail = '') => {
     reducedMotion: 'reduce',
   });
   const page = await ctx.newPage();
-  await page.goto('http://127.0.0.1:3000/', { waitUntil: 'networkidle' });
+  await page.goto(BASE + '/', { waitUntil: 'networkidle' });
   await page.evaluate(async () => {
     const step = window.innerHeight * 0.6;
     for (let y = 0; y <= document.body.scrollHeight; y += step) {
@@ -65,7 +69,7 @@ const check = (name, pass, detail = '') => {
   page.on('response', (r) => {
     if (r.status() >= 400) bad.push(`${r.status()} ${r.url()}`);
   });
-  await page.goto('http://127.0.0.1:3000/', { waitUntil: 'networkidle' });
+  await page.goto(BASE + '/', { waitUntil: 'networkidle' });
 
   const triggers = page.locator('#faq button[aria-expanded]');
   const n = await triggers.count();
@@ -119,7 +123,7 @@ const check = (name, pass, detail = '') => {
 {
   const ctx = await browser.newContext({ viewport: { width: 1440, height: 900 } });
   const page = await ctx.newPage();
-  await page.goto('http://127.0.0.1:3000/', { waitUntil: 'networkidle' });
+  await page.goto(BASE + '/', { waitUntil: 'networkidle' });
   const h1 = await page.locator('h1').count();
   check('exactly one h1', h1 === 1, `count=${h1}`);
   const landmarks = await page.evaluate(() => ({
@@ -153,7 +157,7 @@ const check = (name, pass, detail = '') => {
   });
 
   // --- Portfolio ---
-  await page.goto('http://127.0.0.1:3000/app', { waitUntil: 'networkidle' });
+  await page.goto(BASE + '/app', { waitUntil: 'networkidle' });
   await page.waitForTimeout(600);
 
   check('app: exactly one h1', (await page.locator('h1').count()) === 1);
@@ -177,20 +181,37 @@ const check = (name, pass, detail = '') => {
     `got="${firstStop}"`,
   );
 
-  // Borrowing capacity must be the contract's ceiling, not an ICR estimate.
-  const capacityCopy = await page.locator('text=getTroveMaxBorrowingCapacity').count();
+  // Borrowing capacity must be the contract's real ceiling, not an ICR estimate — and
+  // the provenance must still be checkable. It moved out of the card body and behind an
+  // info affordance: BRAND.md keeps contract internals out of the primary surface, but
+  // deleting the claim outright would leave the number unfalsifiable.
+  const capacityProvenance = await page.locator('text=getTroveMaxBorrowingCapacity').count();
   check(
-    'app: borrowing capacity names getTroveMaxBorrowingCapacity()',
-    capacityCopy > 0,
+    'app: borrowing capacity can still be traced to the contract call',
+    capacityProvenance > 0,
     'the real ceiling, not an ICR-derived estimate',
+  );
+
+  // ...but not in the primary copy. `<details>` keeps it in the DOM and out of the way,
+  // so this asserts the name is not visible until the user asks for it.
+  const capacityVisible = await page.evaluate(() =>
+    [...document.querySelectorAll('details')].some(
+      (d) => !d.open && d.textContent.includes('getTroveMaxBorrowingCapacity'),
+    ),
+  );
+  check(
+    'app: the contract name sits behind an info affordance, not in the card body',
+    capacityVisible,
+    'BRAND.md: no function names in the primary UI',
   );
 
   // The gasless claim must never be unconditional. MarenVault.deposit() is payable and
   // MarenRelayHub reverts on any request carrying value, so the first deposit costs the
   // user BTC gas. Copy that says otherwise is a lie the contracts will expose.
+  // Located by the data hook rather than the heading text, so retitling the card does
+  // not silently stop this claim from being checked.
   const gasText = await page
-    .locator('section')
-    .filter({ hasText: 'What gasless means here' })
+    .locator('section:has([data-contrast="gas-copy"])')
     .first()
     .innerText();
   check('app: gas copy never promises "no gas, ever"', !/no gas,? ever/i.test(gasText));
@@ -200,8 +221,93 @@ const check = (name, pass, detail = '') => {
     'deposit is payable, therefore never relayable',
   );
 
+  // --- The two figures that broke, checked where they render ---------------
+  //
+  // A live screenshot showed LIQUIDATION PRICE reading
+  // $57,896,044,618,658,097,711,785,492,504,343,953,926,634,992,332,820,282,019,728.79
+  // — MAX_CR formatted as dollars — and overlapping BITCOIN CAN FALL, because a value
+  // that long sets its grid column's minimum width. Both halves are asserted here: the
+  // figure, and the layout that could not survive it.
+
+  const metricBoxes = await page.evaluate(() => {
+    const labels = [...document.querySelectorAll('.t-label')];
+    const liq = labels.find((el) => /liquidation price/i.test(el.textContent));
+    const fall = labels.find((el) => /bitcoin can fall/i.test(el.textContent));
+    if (!liq || !fall) return null;
+    // `.t-label` is a <span>; its closest <div> is the Metric root, which is the grid
+    // item whose track could be widened by an over-long value.
+    const a = liq.closest('div').getBoundingClientRect();
+    const b = fall.closest('div').getBoundingClientRect();
+    // Side-by-side columns must not intersect horizontally while sharing a row.
+    const sameRow = Math.abs(a.top - b.top) < 8;
+    return { overlap: sameRow && a.right > b.left + 1, aRight: a.right, bLeft: b.left };
+  });
+  check(
+    'app: the liquidation-price and drop columns never overlap',
+    metricBoxes !== null && !metricBoxes.overlap,
+    metricBoxes ? `right=${Math.round(metricBoxes.aRight)} left=${Math.round(metricBoxes.bLeft)}` : 'labels not found',
+  );
+
+  // No figure anywhere in the dApp may be an unbounded number. Sixteen consecutive
+  // digits is far past any real balance and far short of a 2^255 sentinel.
+  const appBody = await page.locator('main').innerText();
+  check(
+    'app: no figure runs to 16+ digits',
+    !/\d[\d,]{15,}/.test(appBody.replace(/,/g, '')),
+    (appBody.match(/\d[\d,]{15,}/) ?? [''])[0].slice(0, 40),
+  );
+
+  // The empty account: a position that does not exist quotes no liquidation price.
+  await page.getByRole('button', { name: 'Demo controls' }).click();
+  await page.getByRole('button', { name: /New wallet/ }).click();
+  await page.waitForTimeout(900);
+
+  const emptyBody = await page.locator('main').innerText();
+  check(
+    'app (no debt): renders no numeric liquidation price',
+    !/liquidation price[\s\S]{0,40}?[\d]/i.test(emptyBody),
+    'a position with no debt has no liquidation price',
+  );
+  check(
+    'app (no debt): never renders the MAX_CR sentinel as dollars',
+    !/\$\d{12,}/.test(emptyBody.replace(/,/g, '')),
+  );
+  // Counts em dashes used as PLACEHOLDER VALUES — an element whose entire content is a
+  // dash — not em dashes in prose, which are punctuation and perfectly welcome.
+  const placeholderDashes = await page.evaluate(
+    () =>
+      [...document.querySelectorAll('main span, main div')].filter(
+        (el) => el.textContent.trim() === '—',
+      ).length,
+  );
+  check(
+    'app (no debt): shows a purposeful empty state, not a grid of dashes',
+    /No position yet/.test(emptyBody) && placeholderDashes === 0,
+    `${placeholderDashes} placeholder dashes on the empty portfolio`,
+  );
+
+  // And the Vault, whose preview derives the same figures from a hypothetical debt.
+  // The demo store is module-level state, so it resets to the default account on every
+  // navigation and has to be re-selected here rather than carried over.
+  await page.goto(BASE + '/app/vault', { waitUntil: 'networkidle' });
+  await page.waitForTimeout(600);
+  await page.getByRole('button', { name: 'Demo controls' }).click();
+  await page.getByRole('button', { name: /New wallet/ }).click();
+  await page.waitForTimeout(900);
+
+  const emptyVault = await page.locator('main').innerText();
+  check(
+    'vault (no debt): renders no numeric liquidation price',
+    !/liquidation price[\s\S]{0,40}?[\d]/i.test(emptyVault),
+  );
+  check(
+    'vault (no debt): lands on Deposit rather than an unusable Borrow slider',
+    (await page.getByRole('tab', { name: 'Deposit' }).getAttribute('aria-selected')) === 'true',
+  );
+
   // --- Vault: the slider stops at the 180% floor ---
-  await page.goto('http://127.0.0.1:3000/app/vault', { waitUntil: 'networkidle' });
+  // (navigating resets the demo account to the direct trove)
+  await page.goto(BASE + '/app/vault', { waitUntil: 'networkidle' });
   await page.waitForTimeout(600);
 
   const slider = page.locator('input[type=range]');
@@ -267,7 +373,7 @@ const check = (name, pass, detail = '') => {
   await page.waitForTimeout(600);
 
   // --- Pay: the resolved address is shown before confirmation ---
-  await page.goto('http://127.0.0.1:3000/app/pay', { waitUntil: 'networkidle' });
+  await page.goto(BASE + '/app/pay', { waitUntil: 'networkidle' });
   await page.waitForTimeout(700);
 
   const resolvedInline = await page.locator('#pay-to-status').innerText();
@@ -295,7 +401,7 @@ const check = (name, pass, detail = '') => {
   check('pay: Escape closes the dialog', (await page.locator('[role=dialog]').count()) === 0);
 
   // --- Earn: no forward APY, anywhere ---
-  await page.goto('http://127.0.0.1:3000/app/earn', { waitUntil: 'networkidle' });
+  await page.goto(BASE + '/app/earn', { waitUntil: 'networkidle' });
   await page.waitForTimeout(600);
   const earnText = await page.locator('main').innerText();
   check(
@@ -309,7 +415,7 @@ const check = (name, pass, detail = '') => {
   check('earn: says plainly why there is no APY', /does not display an APY/i.test(earnText));
 
   // --- Activity: status wording and explorer links ---
-  await page.goto('http://127.0.0.1:3000/app/activity', { waitUntil: 'networkidle' });
+  await page.goto(BASE + '/app/activity', { waitUntil: 'networkidle' });
   await page.waitForTimeout(600);
   const activityText = await page.locator('main').innerText();
   check('activity: a failed row says no funds moved', /Failed — no funds moved/.test(activityText));
@@ -327,7 +433,7 @@ const check = (name, pass, detail = '') => {
     reducedMotion: 'reduce',
   });
   const page = await ctx.newPage();
-  await page.goto('http://127.0.0.1:3000/app', { waitUntil: 'networkidle' });
+  await page.goto(BASE + '/app', { waitUntil: 'networkidle' });
   await page.waitForTimeout(900);
   const canvases = await page.evaluate(() => document.querySelectorAll('canvas').length);
   check('app reduced-motion: no shader canvas mounted', canvases === 0, `canvases=${canvases}`);
@@ -341,7 +447,7 @@ const check = (name, pass, detail = '') => {
   const ctx = await browser.newContext({ viewport: { width: 390, height: 844 } });
   const page = await ctx.newPage();
   for (const path of ['/app', '/app/vault', '/app/pay', '/app/earn', '/app/activity']) {
-    await page.goto(`http://127.0.0.1:3000${path}`, { waitUntil: 'networkidle' });
+    await page.goto(`${BASE}${path}`, { waitUntil: 'networkidle' });
     await page.waitForTimeout(400);
     const overflow = await page.evaluate(
       () => document.documentElement.scrollWidth - document.documentElement.clientWidth,

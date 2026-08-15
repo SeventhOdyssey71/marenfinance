@@ -1,4 +1,14 @@
-import { WAD, formatBtc, formatCollateralRatio, formatMusd, formatUsd } from '@maren/sdk';
+import {
+  EM_DASH,
+  WAD,
+  formatBtc,
+  formatCollateralRatio,
+  formatCollateralRatioOrDash,
+  formatDropToLiquidation,
+  formatLiquidationPrice,
+  formatMusd,
+  formatUsd,
+} from '@maren/sdk';
 import type { ReactNode } from 'react';
 
 /**
@@ -139,7 +149,78 @@ export function Ratio({
 export function Dash({ size = 'md' }: { size?: Size }) {
   return (
     <Num size={size} tone="subtle">
-      —
+      {EM_DASH}
+    </Num>
+  );
+}
+
+/**
+ * A liquidation price, or an em dash when the position has no debt.
+ *
+ * There is no such thing as the liquidation price of a position that cannot be
+ * liquidated. Rendering `$0.00` there would read as "liquidated at zero", and rendering
+ * the SDK's no-debt sentinel is what once printed a 66-digit dollar figure across two
+ * columns of the Portfolio. Both are refused here, in the one component every screen
+ * goes through, so no caller has to remember.
+ */
+export function LiquidationPrice({
+  wei,
+  debtWei,
+  size = 'md',
+}: {
+  wei: bigint | null | undefined;
+  debtWei: bigint;
+  size?: Size;
+}) {
+  const text = wei === null || wei === undefined ? EM_DASH : formatLiquidationPrice(wei, debtWei);
+  return (
+    <Num size={size} tone={text === EM_DASH ? 'subtle' : 'default'}>
+      {text}
+    </Num>
+  );
+}
+
+/**
+ * How far Bitcoin can fall before liquidation — or an em dash when nothing is owed and
+ * the question does not apply. Guards `Infinity` and `NaN`, which a bigint cannot be but
+ * this basis-point `number` can.
+ */
+export function DropToLiquidation({
+  bps,
+  debtWei,
+  size = 'md',
+}: {
+  bps: number | null | undefined;
+  debtWei: bigint;
+  size?: Size;
+}) {
+  const text =
+    bps === null || bps === undefined ? EM_DASH : formatDropToLiquidation(bps, debtWei);
+  return (
+    <Num size={size} tone={text === EM_DASH ? 'subtle' : 'default'}>
+      {text}
+    </Num>
+  );
+}
+
+/** A collateral ratio that dashes rather than boasting `∞` when there is no debt. */
+export function RatioOrDash({
+  cr,
+  debtWei,
+  size = 'md',
+  tone = 'default',
+  className = '',
+}: {
+  cr: bigint;
+  debtWei: bigint;
+  size?: Size;
+  tone?: NumTone;
+  className?: string;
+}) {
+  const text = formatCollateralRatioOrDash(cr, debtWei);
+  return (
+    <Num size={size} tone={text === EM_DASH ? 'subtle' : tone} className={className}>
+      {text}
     </Num>
   );
 }

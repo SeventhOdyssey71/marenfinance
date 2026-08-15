@@ -44,10 +44,12 @@ export default function AppLayout({ children }: { children: ReactNode }) {
 
       <footer className="hairline-t">
         <div className="container-maren text-text-subtle flex flex-wrap items-center justify-between gap-4 py-8 text-xs">
+          {/* Kept in full: an unaudited contract holding user funds, and pooled
+              collateral segregated in accounting rather than custody, are the two facts
+              a user most needs and least expects. Tightened to one sentence, not cut. */}
           <p className="max-w-[68ch] leading-relaxed">
-            Pre-audit. MarenVault and MarenPay carry user funds and have not been audited by a third
-            party. Pooled positions share one trove: collateral is segregated in accounting, not in
-            custody.
+            Pre-audit — MarenVault and MarenPay hold user funds and have not been audited. Pooled
+            collateral is segregated in accounting, not custody.
           </p>
           <a
             href="https://github.com/SeventhOdyssey71/marenfinance/tree/main/docs"
