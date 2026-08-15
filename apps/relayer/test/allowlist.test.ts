@@ -1,0 +1,139 @@
+import { describe, expect, it } from 'vitest';
+import { encodeFunctionData, getAddress, parseEther, toFunctionSelector } from 'viem';
+import {
+  buildTestRelayer,
+  MAREN_EARN,
+  makeEnv,
+  NOT_ALLOWLISTED,
+  payCalldata,
+  signedRequest,
+  type ErrorBody,
+} from './helpers.js';
+import { RELAYABLE_FUNCTIONS, allFunctionIds } from '../src/registry.js';
+import { loadConfig } from '../src/config.js';
+
+/**
+ * R4 — allowlist targets AND selectors.
+ *
+ * "A generic 'relay any call' endpoint is how R1 happens." These tests hold the
+ * line in both dimensions, including the case people forget: a selector that is
+ * legitimate on one Maren contract being pointed at another.
+ */
+
+describe('target and selector allowlist', () => {
+  it('rejects a target that is not on the allowlist', async () => {
+    const relayer = await buildTestRelayer();
+    const response = await relayer.post('/relay', await signedRequest({ to: NOT_ALLOWLISTED }));
+
+    expect(response.status).toBe(403);
+    const body = (await response.json()) as ErrorBody;
+    expect(body.error).toBe('TARGET_NOT_ALLOWED');
+    expect(relayer.chainFake.sent).toHaveLength(0);
+    expect(relayer.chainFake.simulations).toBe(0);
+  });
+
+  it('rejects an unknown selector on an allowlisted target', async () => {
+    const relayer = await buildTestRelayer();
+    // A perfectly real ERC-20 call. Real, and not ours.
+    const data = encodeFunctionData({
+      abi: [
+        {
+          type: 'function',
+          name: 'transferFrom',
+          stateMutability: 'nonpayable',
+          inputs: [
+            { name: 'from', type: 'address' },
+            { name: 'to', type: 'address' },
+            { name: 'amount', type: 'uint256' },
+          ],
+          outputs: [{ type: 'bool' }],
+        },
+      ],
+      args: [
+        getAddress('0x5555555555555555555555555555555555555555'),
+        getAddress('0x6666666666666666666666666666666666666666'),
+        parseEther('1'),
+      ],
+    });
+    const response = await relayer.post('/relay', await signedRequest({ data }));
+
+    expect(response.status).toBe(403);
+    const body = (await response.json()) as ErrorBody;
+    expect(body.error).toBe('SELECTOR_NOT_ALLOWED');
+    expect(body.meta['selector']).toBe(
+      toFunctionSelector('function transferFrom(address,address,uint256)'),
+    );
+    expect(relayer.chainFake.sent).toHaveLength(0);
+  });
+
+  it('scopes selectors per target: a MarenPay function is not relayable on MarenEarn', async () => {
+    const relayer = await buildTestRelayer();
+    // Both addresses are allowlisted. The pairing is not.
+    const response = await relayer.post(
+      '/relay',
+      await signedRequest({ to: MAREN_EARN, data: payCalldata() }),
+    );
+
+    expect(response.status).toBe(403);
+    expect(((await response.json()) as ErrorBody).error).toBe('SELECTOR_NOT_ALLOWED');
+  });
+
+  it('rejects calldata too short to contain a selector', async () => {
+    const relayer = await buildTestRelayer();
+    const response = await relayer.post('/relay', await signedRequest({ data: '0xdead' }));
+    expect(response.status).toBe(400);
+    expect(((await response.json()) as ErrorBody).error).toBe('MALFORMED_REQUEST');
+  });
+
+  it('rejects a gas limit above the per-request cap', async () => {
+    const relayer = await buildTestRelayer(makeEnv({ RELAYER_MAX_GAS_PER_REQUEST: '150000' }));
+    const response = await relayer.post('/relay', await signedRequest({ gas: 900_000n }));
+    expect(response.status).toBe(403);
+    expect(((await response.json()) as ErrorBody).error).toBe('GAS_LIMIT_TOO_HIGH');
+  });
+
+  it('never relays to the forwarder itself', () => {
+    expect(RELAYABLE_FUNCTIONS.marenForwarder).toHaveLength(0);
+  });
+
+  it('every relayable function carries an in-band uint256 relayFee (R2)', () => {
+    for (const [, functions] of Object.entries(RELAYABLE_FUNCTIONS)) {
+      for (const fn of functions) {
+        const feeInput = fn.abi.inputs[fn.feeArgIndex];
+        expect(feeInput?.name).toBe('relayFee');
+        expect(feeInput?.type).toBe('uint256');
+      }
+    }
+  });
+
+  describe('configuration can only narrow the code-level registry', () => {
+    it('narrows to the named functions', () => {
+      const { config, problems } = loadConfig(
+        makeEnv({ RELAYER_ALLOWED_FUNCTIONS: 'marenPay.pay' }),
+      );
+      expect(problems).toHaveLength(0);
+      const target = [...config.targets.values()].find((t) => t.name === 'marenPay');
+      expect(target?.functions.size).toBe(1);
+    });
+
+    it('cannot widen: naming a function outside the registry is a problem', () => {
+      const { problems } = loadConfig(
+        makeEnv({ RELAYER_ALLOWED_FUNCTIONS: 'marenPay.drainEverything' }),
+      );
+      expect(problems.join('\n')).toMatch(/not a relayable function/);
+    });
+
+    it('an empty narrowing list allows nothing', async () => {
+      const relayer = await buildTestRelayer(makeEnv({ RELAYER_ALLOWED_FUNCTIONS: '' }));
+      expect(relayer.service.accepting).toBe(false);
+      const response = await relayer.post('/relay', await signedRequest());
+      expect(response.status).toBe(503);
+    });
+
+    it('the registry is a closed, non-empty set', () => {
+      const ids = allFunctionIds();
+      expect(ids.length).toBeGreaterThan(0);
+      expect(new Set(ids).size).toBe(ids.length);
+    });
+  });
+});
