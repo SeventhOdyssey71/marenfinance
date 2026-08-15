@@ -197,6 +197,16 @@ export function useSponsorship() {
   });
 }
 
+/** The account's own `@handle`, from MarenRegistry's reverse resolution. */
+export function usePrimaryHandle() {
+  const { source, version, ctx } = useSource();
+  return useQuery<string | null>({
+    queryKey: key(['primary-handle'], source, version),
+    queryFn: async () =>
+      ctx ? live.reverseResolve(ctx, source.account) : mock.reverseResolve(source.account),
+  });
+}
+
 /**
  * Handle resolution. The resolved address is displayed beside the handle before any
  * confirmation — a user always sees where money is actually going.
