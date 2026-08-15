@@ -87,7 +87,7 @@ describe('liquidationPrice', () => {
   });
 });
 
-describe("marenLiquidationPrice", () => {
+describe('marenLiquidationPrice', () => {
   it('triggers strictly earlier than the protocol, because our threshold is 140% vs 110%', () => {
     const coll = WAD;
     const debt = musd(20_000);
@@ -116,7 +116,12 @@ describe('maxNetDebtAt and collateralRequiredFor round-trip', () => {
   });
 
   it('rounds collateral requirements UP so we never under-quote', () => {
-    const required = collateralRequiredFor(musd(1_800), PRICE, MAREN_POLICY.targetCr, BORROWING_RATE);
+    const required = collateralRequiredFor(
+      musd(1_800),
+      PRICE,
+      MAREN_POLICY.targetCr,
+      BORROWING_RATE,
+    );
     const totalDebt = totalDebtFor(musd(1_800), BORROWING_RATE);
     expect(required * PRICE).toBeGreaterThanOrEqual(totalDebt * MAREN_POLICY.targetCr);
   });
@@ -149,7 +154,12 @@ describe('assessBorrowRoute — the 1,800 MUSD minimum is the reason MarenVault 
   });
 
   it('the boundary collateral really does correspond to the protocol minimum', () => {
-    const required = collateralRequiredFor(MIN_NET_DEBT, PRICE, MAREN_POLICY.targetCr, BORROWING_RATE);
+    const required = collateralRequiredFor(
+      MIN_NET_DEBT,
+      PRICE,
+      MAREN_POLICY.targetCr,
+      BORROWING_RATE,
+    );
     // ~0.0793 BTC. Assert the public "~0.079 BTC" claim is honest to 3 decimal places.
     expect(required).toBeGreaterThan(btc('0.078'));
     expect(required).toBeLessThan(btc('0.080'));
@@ -217,7 +227,9 @@ describe('accruedInterest — MUSD is simple, not compounding', () => {
   it('is linear in time — two years is exactly twice one year, not more', () => {
     const principal = musd(10_000);
     const year = 365 * 24 * 60 * 60;
-    expect(accruedInterest(principal, 100, year * 2)).toBe(accruedInterest(principal, 100, year) * 2n);
+    expect(accruedInterest(principal, 100, year * 2)).toBe(
+      accruedInterest(principal, 100, year) * 2n,
+    );
   });
 
   it('is zero for zero elapsed time', () => {

@@ -36,8 +36,8 @@ every hard barrier: they found Mezo, bridged, acquired MUSD, and hold it. They a
 pre-qualified in a way no advertising can replicate. The only reason they are not
 borrowers is that the minimum excludes them.
 
-The message is not aspirational. It is: *you already use MUSD. Now you can create it
-against your own Bitcoin, from 0.001 BTC.*
+The message is not aspirational. It is: _you already use MUSD. Now you can create it
+against your own Bitcoin, from 0.001 BTC._
 
 They are reachable, because Mezo already knows where they are.
 
@@ -64,15 +64,17 @@ cannot sustain, and capital that arrives for a number leaves for a bigger one.
 # 2. Sequence
 
 ## Phase 0 — Matsnet, weeks 4–5 (Sept)
+
 Public testnet, opened to the Mezo Discord.
 
 **The goal is not signups. It is to find what breaks with real users**, particularly
 around oracle staleness reverts and keeper behaviour under simulated drawdowns — failure
 modes that tests do not surface because tests do not behave like people.
 
-*Success:* 50 testnet users, every core flow exercised, a written list of what broke.
+_Success:_ 50 testnet users, every core flow exercised, a written list of what broke.
 
 ## Phase 1 — Mainnet launch, week 8 (10 Oct)
+
 Vault capped at 5 BTC. Direct troves uncapped.
 
 - Launch post: the 26-vs-29,360 gap, stated with the numbers.
@@ -82,24 +84,27 @@ Vault capped at 5 BTC. Direct troves uncapped.
   and nobody else has written it.
 - Co-marketing with Mezo (Discord, @MezoNetwork, @SupernormalFDN).
 
-*Success:* 50 funded positions, $50k borrowed, zero incidents.
+_Success:_ 50 funded positions, $50k borrowed, zero incidents.
 
 ## Phase 2 — Audit and open the cap, weeks 9–14
+
 Publish the audit in full, including findings. Raise the cap to 25 BTC. Apply for Mezo
 Market listing.
 
-*Success:* audit published, cap raised, listed.
+_Success:_ audit published, cap raised, listed.
 
 ## Phase 3 — Payments as the habit, weeks 15–22
+
 Shift the story from borrowing to spending. Handle registration drive; merchant pilot
 with 3–5 Mezo ecosystem projects accepting MUSD through `MarenPay`.
 
-*Success:* 250 funded positions, $250k borrowed, 1,000 payments (the M3 milestone).
+_Success:_ 250 funded positions, $250k borrowed, 1,000 payments (the M3 milestone).
 
 ## Phase 4 — iOS, weeks 23–28
+
 App Store launch. Mobile is where a payments product becomes a habit or does not.
 
-*Success:* live on the App Store, sustained 30 days.
+_Success:_ live on the App Store, sustained 30 days.
 
 ---
 
@@ -153,12 +158,14 @@ Ranked by value to us, which is not the same as cost to them.
 **Maren — Spend Bitcoin. Never sell it.**
 
 What we say:
+
 - Bitcoin-backed credit from **0.001 BTC**, where the protocol minimum is ~0.079 BTC.
 - **No gas.** You never need to hold BTC to move your money.
 - Payments that work like messaging: `@handle`, requests, splits, links.
 - **No token.** Revenue comes from spread on real usage.
 
 What we deliberately do not say:
+
 - No fixed APY on Earn. The yield is lumpy liquidation gains and we show trailing
   realised returns, labelled as backward-looking.
 - No "100% Bitcoin-backed" claim about MUSD generally — true of the CDP portion, not of
@@ -191,13 +198,13 @@ against any of these — sponsorship is a customer-acquisition cost measured in 
 
 Metrics chosen because they are hard to game, not because they flatter.
 
-| Metric | Why it is honest |
-|---|---|
-| Funded positions | Requires real collateral; cannot be farmed |
-| MUSD borrowed through Maren | On-chain, verifiable by Mezo |
-| Payments settled | Usage, not deposits |
-| **30-day retention of borrowers** | The number that decides whether this is a product |
-| Median position size | Confirms we are reaching small holders, not just large ones |
+| Metric                            | Why it is honest                                            |
+| --------------------------------- | ----------------------------------------------------------- |
+| Funded positions                  | Requires real collateral; cannot be farmed                  |
+| MUSD borrowed through Maren       | On-chain, verifiable by Mezo                                |
+| Payments settled                  | Usage, not deposits                                         |
+| **30-day retention of borrowers** | The number that decides whether this is a product           |
+| Median position size              | Confirms we are reaching small holders, not just large ones |
 
 Deliberately excluded: TVL (measures deposits, not use), waitlist size, social followers,
 and testnet transactions.

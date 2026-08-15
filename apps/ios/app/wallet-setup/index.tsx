@@ -8,7 +8,11 @@ import { Icon } from '../../src/components/Icon';
 import { Screen } from '../../src/components/Screen';
 import { Label, Txt } from '../../src/components/Text';
 import { base, brand, radius, semantic, space } from '../../src/design/tokens';
-import { biometricName, getBiometricCapability, type BiometricCapability } from '../../src/wallet/keystore';
+import {
+  biometricName,
+  getBiometricCapability,
+  type BiometricCapability,
+} from '../../src/wallet/keystore';
 
 /**
  * Create or import.
@@ -32,9 +36,8 @@ export default function WalletSetup() {
       <BackHeader kicker="Step 1 of 2" title="Your signing key" />
 
       <Txt variant="body" tone="muted" style={styles.intro}>
-        Maren is non-custodial. The key that signs your transactions is generated on this
-        device and never leaves it — we cannot see it, move your funds, or recover it for
-        you.
+        Maren is non-custodial. The key that signs your transactions is generated on this device and
+        never leaves it — we cannot see it, move your funds, or recover it for you.
       </Txt>
 
       {/* Key protection, stated before the choice rather than after it. */}

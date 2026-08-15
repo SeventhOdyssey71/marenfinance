@@ -128,8 +128,8 @@ export default function CreateWallet() {
 
           <View style={styles.warning}>
             <Txt variant="small" tone="subtle">
-              Maren holds no copy of this key. If you lose the device without an export,
-              the funds it controls are gone. Not recoverable by us — gone.
+              Maren holds no copy of this key. If you lose the device without an export, the funds
+              it controls are gone. Not recoverable by us — gone.
             </Txt>
           </View>
 

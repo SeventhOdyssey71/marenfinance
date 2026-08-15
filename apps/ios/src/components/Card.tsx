@@ -28,13 +28,7 @@ const fill: Record<NonNullable<CardProps['tone']>, string> = {
   inset: base.surfaceInset,
 };
 
-export function Card({
-  children,
-  tone = 'surface',
-  padded = true,
-  style,
-  ...rest
-}: CardProps) {
+export function Card({ children, tone = 'surface', padded = true, style, ...rest }: CardProps) {
   return (
     <View
       style={[styles.card, { backgroundColor: fill[tone] }, padded && styles.padded, style]}
