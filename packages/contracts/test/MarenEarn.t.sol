@@ -34,12 +34,7 @@ contract MarenEarnTest is Test {
         forwarder = new MarenForwarder();
 
         earn = new MarenEarn(
-            address(musd),
-            address(pool),
-            address(priceFeed),
-            address(forwarder),
-            admin,
-            type(uint256).max
+            address(musd), address(pool), address(priceFeed), address(forwarder), admin, type(uint256).max
         );
 
         // startPrank, not prank: `earn.KEEPER_ROLE()` is itself a call and would consume a

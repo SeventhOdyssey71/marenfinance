@@ -80,7 +80,9 @@ contract MarenVaultFuzzTest is VaultTestBase {
 
     /// @dev Collateral is conserved exactly. Whatever is credited to accounts equals what is
     ///      in the trove plus what is sitting here idle — no third place for it to go.
-    function testFuzz_collateralIsConserved(uint96[6] calldata deposits, uint8[6] calldata whichActor) public {
+    function testFuzz_collateralIsConserved(uint96[6] calldata deposits, uint8[6] calldata whichActor)
+        public
+    {
         address[3] memory actors = [alice, bob, carol];
 
         for (uint256 k; k < deposits.length; ++k) {

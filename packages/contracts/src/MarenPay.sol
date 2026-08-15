@@ -1,9 +1,9 @@
 // SPDX-License-Identifier: MIT
-pragma solidity ^0.8.28;
+pragma solidity 0.8.28;
 
+import {MarenRegistry} from "./MarenRegistry.sol";
 import {IMUSD} from "./interfaces/IMUSD.sol";
 import {IPermit2} from "./interfaces/IPermit2.sol";
-import {MarenRegistry} from "./MarenRegistry.sol";
 import {ERC2771Context} from "@openzeppelin/contracts/metatx/ERC2771Context.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
@@ -101,19 +101,35 @@ contract MarenPay is ERC2771Context, ReentrancyGuard {
     //                               Events                               //
     // ------------------------------------------------------------------ //
 
-    event Paid(address indexed from, address indexed to, uint256 amount, bytes32 indexed memoHash, string memo);
-    event PaidToHandle(bytes32 indexed node, address indexed from, address indexed to, uint256 amount, string handle);
-    event RequestCreated(
-        uint256 indexed requestId, address indexed requester, address indexed payer, uint256 amount, string memo
+    event Paid(
+        address indexed from, address indexed to, uint256 amount, bytes32 indexed memoHash, string memo
     );
-    event RequestFulfilled(uint256 indexed requestId, address indexed payer, address indexed requester, uint256 amount);
+    event PaidToHandle(
+        bytes32 indexed node, address indexed from, address indexed to, uint256 amount, string handle
+    );
+    event RequestCreated(
+        uint256 indexed requestId,
+        address indexed requester,
+        address indexed payer,
+        uint256 amount,
+        string memo
+    );
+    event RequestFulfilled(
+        uint256 indexed requestId, address indexed payer, address indexed requester, uint256 amount
+    );
     event RequestCancelled(uint256 indexed requestId, address indexed requester);
     event LinkCreated(
-        uint256 indexed linkId, address indexed creator, address indexed linkKey, uint256 amount, uint64 expiry
+        uint256 indexed linkId,
+        address indexed creator,
+        address indexed linkKey,
+        uint256 amount,
+        uint64 expiry
     );
     event LinkClaimed(uint256 indexed linkId, address indexed recipient, uint256 amount);
     event LinkReclaimed(uint256 indexed linkId, address indexed creator, uint256 amount);
-    event SplitExecuted(address indexed from, uint256 total, uint256 recipientCount, bytes32 indexed memoHash);
+    event SplitExecuted(
+        address indexed from, uint256 total, uint256 recipientCount, bytes32 indexed memoHash
+    );
 
     // ------------------------------------------------------------------ //
     //                               Errors                               //
@@ -428,9 +444,11 @@ contract MarenPay is ERC2771Context, ReentrancyGuard {
     }
 
     /// @dev See `payWithPermit` for why failure here is tolerated.
-    function _applyPermit(address owner, uint256 amount, uint256 deadline, uint8 v, bytes32 r, bytes32 s) private {
+    function _applyPermit(address owner, uint256 amount, uint256 deadline, uint8 v, bytes32 r, bytes32 s)
+        private
+    {
         try musd.permit(owner, address(this), amount, deadline, v, r, s) {}
-        catch {
+            catch {
             // Permit already consumed (front-run) or otherwise unusable. If the allowance is
             // genuinely missing, the transferFrom that follows reverts, which is correct.
         }
