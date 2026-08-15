@@ -720,9 +720,20 @@ contract MarenVault is AccessControl, ERC2771Context, ReentrancyGuard {
         return _collateralRatio(collateral[user], debt, _price()) < LIQUIDATION_CR;
     }
 
-    /// @notice Additional MUSD `user` may borrow before hitting the 180% floor. Ignores the
-    ///         trove-level checks and the protocol's `maxBorrowingCapacity`, either of which
-    ///         may bind first.
+    /**
+     * @notice Additional MUSD `user` may borrow before hitting the 180% floor.
+     * @dev Ignores the trove-level ICR check and the protocol's `maxBorrowingCapacity`, either
+     *      of which may bind first. Rounds DOWN, matching the SDK's discipline.
+     *
+     *      The pooled analogue of `maxNetDebtAt` in packages/sdk/src/position.ts, and it
+     *      differs from it for the same reason `collateralRequiredForDebt` does: no per-user
+     *      gas compensation, and no origination fee on the portion served from `reserveMUSD`.
+     *      A borrow large enough to draw from the trove DOES pay the 0.1% fee, which is added
+     *      to the borrower's debt and puts them fractionally under 180% if they borrow exactly
+     *      this number. That fee is governable, so modelling it here would be modelling a
+     *      value that can change underneath us; the UI targets 250%, not 180%, and carries its
+     *      own buffer.
+     */
     function maxBorrowable(address user) external view returns (uint256) {
         uint256 price = _price();
         uint256 maxDebt = Math.mulDiv(collateral[user], price, MIN_BORROW_CR, Math.Rounding.Floor);
@@ -731,18 +742,31 @@ contract MarenVault is AccessControl, ERC2771Context, ReentrancyGuard {
     }
 
     /**
-     * @notice BTC needed to support `debt` MUSD at `targetCr`.
-     * @dev Rounds UP, deliberately. Rounding this down would quote a user a collateral figure
-     *      that leaves them one wei short of the ratio they asked for, and the borrow would
-     *      then revert. Matches `collateralRequiredFor` in packages/sdk/src/position.ts —
-     *      the SDK and this contract must never disagree, or the UI quotes numbers the
-     *      contract rejects.
+     * @notice BTC needed to support `debt` MUSD of POOLED debt at `targetCr`.
+     * @dev Rounds UP, deliberately: rounding down would quote a user a collateral figure that
+     *      leaves them a wei short of the ratio they asked for, and the borrow would revert.
+     *      Same discipline as `collateralRequiredFor` in packages/sdk/src/position.ts, and the
+     *      same core expression — `ceil(debt * targetCr / price)`.
      *
-     *      Sanity anchor, at the live oracle price of $63,071.83: reaching MUSD's 1,800 MUSD
-     *      minimum net debt at 250% needs 0.079346 BTC (~$5,004.50). This vault's floor is
-     *      0.001 BTC — 79.3x lower. That gap is the entire reason MarenVault exists.
+     *      THE ONE DELIBERATE DIFFERENCE FROM THE SDK, so nobody "fixes" it: the SDK's
+     *      function takes a trove's NET debt and grosses it up by the 0.1% origination fee and
+     *      the 200 MUSD gas compensation, because that is what a DIRECT trove carries. A
+     *      POOLED position carries neither — there is one gas compensation for the whole
+     *      pooled trove, already paid by the protocol's own seed position, and a borrow served
+     *      from `reserveMUSD` pays no origination fee at all. `debtOf(user)` is therefore the
+     *      complete debt, and grossing it up here would over-quote every pooled user by 200
+     *      MUSD of collateral they do not owe.
+     *
+     *      So: pass a POOLED debt figure (e.g. `debtOf(user)`) to this function, and use the
+     *      SDK's `collateralRequiredFor` for the direct-trove route. `assessBorrowRoute` is
+     *      what decides which of the two a given user is being quoted.
+     *
+     *      Sanity anchor, at the live oracle price of $63,071.83: a DIRECT trove's total debt
+     *      at open (1,800 net + 1.8 fee + 200 gas comp = 2,001.8) at 250% needs 0.079346 BTC
+     *      (~$5,004.50). This vault's floor is 0.001 BTC — 79.3x lower. That gap is the entire
+     *      reason MarenVault exists.
      */
-    function collateralRequiredFor(uint256 debt, uint256 targetCr) external view returns (uint256) {
+    function collateralRequiredForDebt(uint256 debt, uint256 targetCr) external view returns (uint256) {
         if (debt == 0) return 0;
         return Math.mulDiv(debt, targetCr, _price(), Math.Rounding.Ceil);
     }

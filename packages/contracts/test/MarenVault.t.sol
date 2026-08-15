@@ -622,7 +622,7 @@ contract MarenVaultTest is VaultTestBase {
         _borrow(alice, 1000e18);
 
         // Required collateral rounds up: the quoted amount always reaches the target ratio.
-        uint256 required = vault.collateralRequiredFor(1000e18, 2.5e18);
+        uint256 required = vault.collateralRequiredForDebt(1000e18, 2.5e18);
         assertGe((required * BTC_PRICE) / 1000e18, 2.5e18, "rounded up, never short");
 
         // Liquidation price rounds up: never tell a user liquidation is further away than it is.
@@ -642,9 +642,9 @@ contract MarenVaultTest is VaultTestBase {
      *      INCLUDES the 200 MUSD gas compensation, which is why `_troveCollAndNetDebt`
      *      subtracts it before attributing anything to users.
      */
-    function test_collateralRequiredFor_matchesTheDirectTroveAnchor() public view {
+    function test_collateralRequiredForDebt_matchesTheDirectTroveAnchor() public view {
         uint256 totalDebtAtOpen = 1800e18 + 1.8e18 + 200e18;
-        uint256 required = vault.collateralRequiredFor(totalDebtAtOpen, 2.5e18);
+        uint256 required = vault.collateralRequiredForDebt(totalDebtAtOpen, 2.5e18);
         assertApproxEqAbs(required, DIRECT_TROVE_COLLATERAL_AT_250, 1e12, "matches the SDK figure");
         assertEq(vault.MIN_DEPOSIT(), 0.001 ether);
         assertGe(required / vault.MIN_DEPOSIT(), 79, "pooled floor is ~79x lower");
