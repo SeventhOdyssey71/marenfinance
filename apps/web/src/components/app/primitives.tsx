@@ -133,7 +133,7 @@ export function Info({
 }) {
   return (
     <details id={id} className="group mt-4">
-      <summary className="text-text-muted hover:text-text marker:content-none inline-flex cursor-pointer list-none items-center gap-1.5 rounded-[var(--radius-pill)] text-xs transition-colors duration-[120ms] ease-out">
+      <summary className="text-text-muted hover:text-text inline-flex cursor-pointer list-none items-center gap-1.5 rounded-[var(--radius-pill)] text-xs transition-colors duration-[120ms] ease-out marker:content-none">
         <svg viewBox="0 0 16 16" aria-hidden className="size-3.5 shrink-0" fill="currentColor">
           <path d="M8 1.5a6.5 6.5 0 100 13 6.5 6.5 0 000-13zm0 1.2a5.3 5.3 0 110 10.6A5.3 5.3 0 018 2.7zm-.75 2.4h1.5v1.5h-1.5V5.1zm0 2.6h1.5v4h-1.5v-4z" />
         </svg>

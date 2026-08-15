@@ -218,16 +218,16 @@ function RouteCard() {
           disclosure is not the same as removing it. */}
       <p className="text-text-muted mt-4 max-w-[68ch] text-sm leading-relaxed">
         Your deposit shares one trove with other users — segregated in{' '}
-        <em className="text-text not-italic">accounting, not custody</em>, so a drawdown faster
-        than the keeper could socialise losses.
+        <em className="text-text not-italic">accounting, not custody</em>, so a drawdown faster than
+        the keeper could socialise losses.
       </p>
       <Info summary="How Maren limits that risk">
         Maren liquidates a pooled position internally at{' '}
         {policyRatio(MAREN_POLICY.vaultLiquidationCr)}, far above the protocol’s 110%, and backs
         that with a 0.001 BTC floor, per-block keeper checks and an insurance buffer funded from
-        vault fees. These are mitigations, not a guarantee. You are here because a trove of your
-        own needs about {threshold ? formatBtc(threshold) : '0.079 BTC'} — MUSD will not open one
-        below {formatMusd(MIN_NET_DEBT)} of net debt.
+        vault fees. These are mitigations, not a guarantee. You are here because a trove of your own
+        needs about {threshold ? formatBtc(threshold) : '0.079 BTC'} — MUSD will not open one below{' '}
+        {formatMusd(MIN_NET_DEBT)} of net debt.
       </Info>
       {assessment?.eligible && assessment.route === 'direct' ? (
         <p className="text-text-muted mt-4 max-w-[68ch] text-sm leading-relaxed">
@@ -738,8 +738,8 @@ function WithdrawPanel({
     <AppCard className="p-6 md:p-8">
       <CardTitle>Withdraw Bitcoin</CardTitle>
       <p className="text-text-muted mt-3 max-w-[68ch] text-sm leading-relaxed">
-        The amount available is already capped at Maren’s{' '}
-        {policyRatio(MAREN_POLICY.minHealthyCr)} floor.
+        The amount available is already capped at Maren’s {policyRatio(MAREN_POLICY.minHealthyCr)}{' '}
+        floor.
       </p>
 
       <div className="mt-8 max-w-md">

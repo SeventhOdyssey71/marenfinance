@@ -194,8 +194,7 @@ export function DropToLiquidation({
   debtWei: bigint;
   size?: Size;
 }) {
-  const text =
-    bps === null || bps === undefined ? EM_DASH : formatDropToLiquidation(bps, debtWei);
+  const text = bps === null || bps === undefined ? EM_DASH : formatDropToLiquidation(bps, debtWei);
   return (
     <Num size={size} tone={text === EM_DASH ? 'subtle' : 'default'}>
       {text}

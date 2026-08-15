@@ -468,9 +468,7 @@ function LinkPanel({ runner }: { runner: ReturnType<typeof useTxRunner> }) {
               />
               <span className="t-h3 text-text-muted shrink-0">days</span>
             </div>
-            <p className="text-text-subtle mt-3 text-xs">
-              Only you can reclaim it after that.
-            </p>
+            <p className="text-text-subtle mt-3 text-xs">Only you can reclaim it after that.</p>
           </div>
         </div>
 
