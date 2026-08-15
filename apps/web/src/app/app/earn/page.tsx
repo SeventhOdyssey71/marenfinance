@@ -117,64 +117,64 @@ export default function EarnPage() {
           </EmptyState>
         </AppCard>
       ) : (
-      <AppCard className="p-6 md:p-8">
-        <div className="flex flex-wrap items-center justify-between gap-4">
-          <CardTitle>Realised over the last {earn?.trailing.windowDays ?? 90} days</CardTitle>
-          <span className="bg-surface-inset text-text-muted inline-flex items-center gap-2 rounded-[var(--radius-pill)] border border-[var(--border-hairline)] px-3 py-1.5 text-xs">
-            Backward-looking
-          </span>
-        </div>
+        <AppCard className="p-6 md:p-8">
+          <div className="flex flex-wrap items-center justify-between gap-4">
+            <CardTitle>Realised over the last {earn?.trailing.windowDays ?? 90} days</CardTitle>
+            <span className="bg-surface-inset text-text-muted inline-flex items-center gap-2 rounded-[var(--radius-pill)] border border-[var(--border-hairline)] px-3 py-1.5 text-xs">
+              Backward-looking
+            </span>
+          </div>
 
-        <div className="mt-6 flex flex-wrap items-baseline gap-3">
-          {earn ? (
-            <Num size="xl">{formatMusd(earn.trailing.realisedWei, { unit: false })}</Num>
-          ) : (
-            <Dash size="xl" />
-          )}
-          <span className="t-h3 text-text-muted">MUSD</span>
-        </div>
+          <div className="mt-6 flex flex-wrap items-baseline gap-3">
+            {earn ? (
+              <Num size="xl">{formatMusd(earn.trailing.realisedWei, { unit: false })}</Num>
+            ) : (
+              <Dash size="xl" />
+            )}
+            <span className="t-h3 text-text-muted">MUSD</span>
+          </div>
 
-        {/* The disclosure that makes the number honest. Not a footnote, not a tooltip —
+          {/* The disclosure that makes the number honest. Not a footnote, not a tooltip —
             it sits directly under the figure it qualifies. One sentence; the mechanism
             behind it sits one click down rather than being deleted. */}
-        <p
-          data-contrast="earn-disclosure"
-          className="text-text-muted mt-5 max-w-[68ch] text-sm leading-relaxed"
-        >
-          Realised in the past, not a forecast — Maren does not display an APY for Earn because
-          there is no reliable one to display.
-        </p>
-        <Info summary="Why there is no rate">
-          The MUSD Stability Pool has no token emissions. Its entire yield is the Bitcoin seized in
-          liquidations, sold and compounded back into MUSD, so whether it pays at all depends on
-          whether anyone gets liquidated. Returns arrive in lumps and can be zero for months, and
-          annualising three events in ninety days would be a lie with a percent sign on it.
-        </Info>
+          <p
+            data-contrast="earn-disclosure"
+            className="text-text-muted mt-5 max-w-[68ch] text-sm leading-relaxed"
+          >
+            Realised in the past, not a forecast — Maren does not display an APY for Earn because
+            there is no reliable one to display.
+          </p>
+          <Info summary="Why there is no rate">
+            The MUSD Stability Pool has no token emissions. Its entire yield is the Bitcoin seized
+            in liquidations, sold and compounded back into MUSD, so whether it pays at all depends
+            on whether anyone gets liquidated. Returns arrive in lumps and can be zero for months,
+            and annualising three events in ninety days would be a lie with a percent sign on it.
+          </Info>
 
-        {earn ? (
-          <div className="mt-6 grid grid-cols-1 gap-6 sm:grid-cols-3">
-            <Metric
-              label="Liquidation events"
-              value={<Num size="lg">{earn.trailing.liquidationEvents}</Num>}
-              caption="in this window"
-            />
-            <Metric
-              label="Most recent gain"
-              value={
-                <Num size="lg">
-                  {earn.trailing.lastGainAt ? timeAgo(earn.trailing.lastGainAt) : 'none yet'}
-                </Num>
-              }
-              caption="gains are lumpy"
-            />
-            <Metric
-              label="Forward rate"
-              value={<Dash size="lg" />}
-              caption="we would be making it up"
-            />
-          </div>
-        ) : null}
-      </AppCard>
+          {earn ? (
+            <div className="mt-6 grid grid-cols-1 gap-6 sm:grid-cols-3">
+              <Metric
+                label="Liquidation events"
+                value={<Num size="lg">{earn.trailing.liquidationEvents}</Num>}
+                caption="in this window"
+              />
+              <Metric
+                label="Most recent gain"
+                value={
+                  <Num size="lg">
+                    {earn.trailing.lastGainAt ? timeAgo(earn.trailing.lastGainAt) : 'none yet'}
+                  </Num>
+                }
+                caption="gains are lumpy"
+              />
+              <Metric
+                label="Forward rate"
+                value={<Dash size="lg" />}
+                caption="we would be making it up"
+              />
+            </div>
+          ) : null}
+        </AppCard>
       )}
 
       {/* ------------------------------------------------------------- Actions */}
@@ -228,9 +228,7 @@ export default function EarnPage() {
       {/* The risk statement stays. It is the one thing a depositor cannot infer from the
           screen: this is not a savings account, and the principal is at risk. */}
       <Note>
-        <p>
-          Your MUSD absorbs liquidated debt — not principal-protected, and not guaranteed.
-        </p>
+        <p>Your MUSD absorbs liquidated debt — not principal-protected, and not guaranteed.</p>
         <Info summary="What that means in practice">
           Stability Pool deposits are spent closing other people’s positions, and you are paid in
           the Bitcoin seized doing it. Historically profitable, but not guaranteed. The vault also

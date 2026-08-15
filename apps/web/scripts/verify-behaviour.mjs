@@ -210,10 +210,7 @@ const check = (name, pass, detail = '') => {
   // user BTC gas. Copy that says otherwise is a lie the contracts will expose.
   // Located by the data hook rather than the heading text, so retitling the card does
   // not silently stop this claim from being checked.
-  const gasText = await page
-    .locator('section:has([data-contrast="gas-copy"])')
-    .first()
-    .innerText();
+  const gasText = await page.locator('section:has([data-contrast="gas-copy"])').first().innerText();
   check('app: gas copy never promises "no gas, ever"', !/no gas,? ever/i.test(gasText));
   check(
     'app: gas copy states the first-deposit exception',
@@ -245,7 +242,9 @@ const check = (name, pass, detail = '') => {
   check(
     'app: the liquidation-price and drop columns never overlap',
     metricBoxes !== null && !metricBoxes.overlap,
-    metricBoxes ? `right=${Math.round(metricBoxes.aRight)} left=${Math.round(metricBoxes.bLeft)}` : 'labels not found',
+    metricBoxes
+      ? `right=${Math.round(metricBoxes.aRight)} left=${Math.round(metricBoxes.bLeft)}`
+      : 'labels not found',
   );
 
   // No figure anywhere in the dApp may be an unbounded number. Sixteen consecutive

@@ -260,8 +260,7 @@ export default function PortfolioPage() {
         </p>
         <Info summary="After the free tier">
           Maren sponsors 25 actions per address per month. After that the fee is taken in MUSD
-          inside the same transaction and shown before you sign — you are never blocked at the
-          door.
+          inside the same transaction and shown before you sign — you are never blocked at the door.
         </Info>
       </AppCard>
 
@@ -379,8 +378,7 @@ function BorrowingCapacity() {
         {position.route === 'pooled' ? (
           <>
             This ceiling belongs to the pooled trove and is shared by everyone inside it. Your own
-            limit is Maren’s 180% floor on your share — whichever binds first stops the
-            transaction.
+            limit is Maren’s 180% floor on your share — whichever binds first stops the transaction.
           </>
         ) : (
           <>
