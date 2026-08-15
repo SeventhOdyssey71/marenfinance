@@ -24,18 +24,22 @@ import type {
 /**
  * THE MOCK / LIVE SPLIT. This module is the only place that decision is made.
  *
- * Maren's contracts are not deployed yet, so `getMarenAddresses()` returns the zero
- * address for all five and `isDeployed()` is false. Rather than ship an app that renders
- * empty states nobody can evaluate, every read falls through to `./mock.ts` and every
- * screen says so, loudly, in the header.
+ * The switch is `isDeployed(marenVault)` for the configured network, and it has already
+ * fired: matsnet addresses were written into `packages/sdk/src/addresses.ts` on
+ * 15 August 2026, and `resolveNetwork()` defaults to testnet. **The default mode is now
+ * `live`.** Mainnet is still all zeroes and still falls through to `./mock.ts`, where
+ * every screen says so, loudly, in the header.
  *
  * What makes this honest rather than a demo dressed as a product:
  *
  *   1. The live implementations in `./live.ts` are real — real ABIs transcribed from the
  *      Solidity, real addresses from the SDK, real wagmi/viem reads. They are not
- *      stubs waiting to be written.
- *   2. The switch is `isDeployed(marenVault)`. When `Deploy.s.sol` writes addresses into
- *      `packages/sdk/src/addresses.ts`, this flips with no other edit.
+ *      stubs waiting to be written. They are also, as of this writing, not yet exercised
+ *      end to end against the live deployment.
+ *   2. The switch needed no other edit, which was the design goal — and is also the
+ *      hazard: writing an address into a data file changed this app's runtime behaviour
+ *      with nothing in the diff to say so. Deploying is a behavioural change; see
+ *      CONTRIBUTING.md.
  *   3. Nothing downstream branches on the mode except the banner that discloses it, so
  *      there is no second, mock-shaped code path to unwind later.
  *

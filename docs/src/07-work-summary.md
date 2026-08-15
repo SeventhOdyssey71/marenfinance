@@ -3,7 +3,7 @@ title: Maren Finance — Work Summary
 subtitle: What was built, what has been verified, what has not, and what to do next.
 docId: MRN-007
 date: 2026-08-15
-version: '1.0'
+version: '1.1'
 classification: Internal — Maren Finance
 audience: Sele
 colophon: |
@@ -30,7 +30,7 @@ It is organised as four questions:
 4. **What to do next.** In priority order.
 
 Parts of it will inform what goes to Mezo. It is not itself the reply — that draft is
-`docs/OUTREACH-REPLY.md`, and it should stay a separate artefact.
+`docs/research/OUTREACH-REPLY.md`, and it should stay a separate artefact.
 
 <!-- pagebreak -->
 
@@ -295,15 +295,22 @@ diff every time.
 
 ## What is not verified, and what is not done
 
-### Nothing is deployed
+### Matsnet is deployed; mainnet is not
 
-**The contracts are not deployed to any network.** `MAREN_ADDRESSES` in
-`packages/sdk/src/addresses.ts` is all zero addresses on both mainnet and matsnet, and
-`isDeployed()` exists so that every consumer has to confront that rather than discover it.
-A testnet deployment is in progress separately.
+**Superseded on 15 August 2026, later the same day this document was written.** Five
+contracts are deployed and source-verified on Mezo matsnet (31611), and `MAREN_ADDRESSES`
+in `packages/sdk/src/addresses.ts` carries their real addresses. `MarenRegistry.register`,
+`MarenVault.openPooledTrove`, `deposit` and `topUpCollateral` have all executed on-chain
+against real MUSD. Tx hashes are in `docs/DEPLOYMENTS.md`, along with the two findings
+that only appeared by running it — a pooled trove seeded at the protocol minimum can
+never let a user borrow, and `deleverage()` reported success while doing nothing.
 
-This is the single most important line in the document. Everything in section 3 is a
-property of code that has never held a satoshi of anyone's money.
+**Mainnet is still all zero addresses**, and `isDeployed()` still exists so that every
+consumer confronts that rather than discovering it.
+
+The qualification that matters is narrower than it was but has not gone away: everything
+in section 3 remains a property of code that has never held **a stranger's** money. The
+only funds it has touched are the author's own testnet BTC.
 
 ### The relayer is not merged
 
@@ -486,7 +493,7 @@ Mezo to give, which is why it should be asked for early and directly rather than
 the reply goes out turns "I've drafted PRs and can send them whenever" into "they're open" —
 which is a materially stronger sentence, and it costs nothing.
 
-**5. Reply to Judy.** The draft is `docs/OUTREACH-REPLY.md`. Two things to settle first:
+**5. Reply to Judy.** The draft is `docs/research/OUTREACH-REPLY.md`. Two things to settle first:
 re-confirm the trove count on the day it is sent, because it moves, and decide whether the
 repository is public before offering a link. Attach the thesis and the feasibility papers.
 
@@ -496,11 +503,14 @@ while a deployment is being polished.
 
 ## The shape of it
 
-What exists is a complete, tested, undeployed system: five contracts with 236 local tests
-and 8 fork tests against the real protocol, two applications, an SDK, a relayer one
-verification away from merging, and seven documents.
+What exists is a complete, tested system that is now live on matsnet: five contracts with
+236 local tests and 8 fork tests against the real protocol, deployed and source-verified,
+two applications, an SDK, a relayer one verification away from merging, and seven
+documents.
 
-What does not exist is a single address on a single chain holding a single satoshi.
+What does not exist is a mainnet address, an audit, or a single satoshi of anyone else's
+money. The pooled trove on matsnet holds 0.049 BTC of the author's own testnet
+collateral, and the first thing it did was refuse a borrow — correctly.
 
-The distance between those two sentences is the next two weeks, and everything in section 4
-should be said out loud before anyone else has to find it.
+The distance between those two paragraphs is an audit, and everything in section 4 should
+be said out loud before anyone else has to find it.
