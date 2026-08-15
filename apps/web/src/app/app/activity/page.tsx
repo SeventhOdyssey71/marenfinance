@@ -79,8 +79,10 @@ export default function ActivityPage() {
       {/* The status vocabulary is load-bearing — a user deciding whether to retry a
           payment needs to know that a hash is not a result — but it is reference
           material, not something to read on every visit. */}
+      {/* No card around it: a whole panel holding one collapsed link is exactly the kind
+          of container-for-its-own-sake this pass removes. */}
       {rows.length > 0 ? (
-        <AppCard>
+        <div>
           <Info summary="What these statuses mean">
             <ul className="space-y-2">
               <li>
@@ -100,7 +102,7 @@ export default function ActivityPage() {
               </li>
             </ul>
           </Info>
-        </AppCard>
+        </div>
       ) : null}
     </div>
   );

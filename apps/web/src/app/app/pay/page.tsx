@@ -97,8 +97,10 @@ function GaslessBanner() {
       </div>
       {sponsorship ? (
         <p className="text-text-subtle mt-3 text-xs leading-relaxed">
-          After that, {formatMusd(sponsorship.feeAfterFreeTierWei)} in MUSD inside the same
-          transaction, shown before you sign.
+          {/* `formatMusd` already carries the unit — BRAND.md §8. Saying "in MUSD"
+              after it produced "0.02 MUSD in MUSD". */}
+          After that, {formatMusd(sponsorship.feeAfterFreeTierWei)} inside the same transaction,
+          shown before you sign.
         </p>
       ) : null}
     </div>

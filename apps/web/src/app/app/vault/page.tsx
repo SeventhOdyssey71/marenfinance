@@ -114,10 +114,10 @@ export default function VaultPage() {
         <AppCard>
           <div className="flex flex-wrap items-center justify-between gap-4">
             <CardTitle>Your position</CardTitle>
-            {position ? (
-              <span className="t-label text-text-subtle">
-                {position.route === 'pooled' ? 'Pooled' : 'Direct'}
-              </span>
+            {/* Only when the route card above is not already carrying it. A pooled user
+                saw "POOLED" twice in two stacked cards. */}
+            {position && position.route !== 'pooled' ? (
+              <span className="t-label text-text-subtle">Direct</span>
             ) : null}
           </div>
           <div className="mt-2">
