@@ -2,6 +2,19 @@
 // Hermes does not provide. This shim installs it globally before anything else loads.
 import 'react-native-get-random-values';
 
+/**
+ * A spec-compliant WHATWG URL, replacing React Native's built-in one.
+ *
+ * This is a security dependency, not a convenience. RN's `Libraries/Blob/URL.js` is a
+ * regex approximation whose constructor never throws on malformed input and whose
+ * `origin`/`protocol` getters return `''` rather than failing. Our R12 redirect
+ * assertions and the QR payload allowlist are both built on exactly those getters, and
+ * `src/security.test.ts` verifies them against Node's compliant implementation. Without
+ * this polyfill the app would run different URL semantics than the tests prove, which
+ * is the kind of gap that makes a green suite meaningless.
+ */
+import 'react-native-url-polyfill/auto';
+
 import { useEffect } from 'react';
 import { StyleSheet, View } from 'react-native';
 import { Stack } from 'expo-router';

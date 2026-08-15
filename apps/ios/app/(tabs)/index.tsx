@@ -1,12 +1,6 @@
 import { Pressable, StyleSheet, View } from 'react-native';
 import { useRouter } from 'expo-router';
-import {
-  collateralValue,
-  formatCollateralRatio,
-  formatPriceDrop,
-  formatUsd,
-  MAREN_POLICY,
-} from '@maren/sdk';
+import { collateralValue, formatBtc, formatCollateralRatio, formatUsd, MAREN_POLICY } from '@maren/sdk';
 
 import { Btc, Musd, Ratio, Usd } from '../../src/components/Money';
 import { Card } from '../../src/components/Card';
@@ -16,7 +10,16 @@ import { PriceBanner } from '../../src/components/PriceBanner';
 import { StatRow } from '../../src/components/Row';
 import { Screen } from '../../src/components/Screen';
 import { Label, Num, Txt } from '../../src/components/Text';
-import { base, healthLabel, healthTone, hit, radius, space, toneColor } from '../../src/design/tokens';
+import {
+  base,
+  healthHeroColor,
+  healthLabel,
+  healthTone,
+  hit,
+  radius,
+  space,
+  toneColor,
+} from '../../src/design/tokens';
 import { usableTitle } from '../../src/lib/copy';
 import { useBalances, useHealth, usePosition, usePrice } from '../../src/hooks/useChainData';
 import { useAppStore } from '../../src/state/store';
@@ -45,7 +48,10 @@ export default function Home() {
   const health = useHealth();
 
   const tone = health ? healthTone[health.status] ?? 'neutral' : 'neutral';
-  const colour = toneColor[tone];
+  /** Small semantic indicator — keeps the success green. */
+  const pillColour = toneColor[tone];
+  /** Hero numeral — neutral while healthy, per BRAND.md §2. */
+  const heroColour = healthHeroColor[tone];
 
   const collateralUsd =
     position && price.state === 'live'
@@ -82,9 +88,9 @@ export default function Home() {
         <View style={styles.heroTop}>
           <Label>Position health</Label>
           {health ? (
-            <View style={[styles.statusPill, { borderColor: `${colour}55` }]}>
-              <View style={[styles.statusDot, { backgroundColor: colour }]} />
-              <Txt variant="small" style={{ color: colour }}>
+            <View style={[styles.statusPill, { borderColor: `${pillColour}55` }]}>
+              <View style={[styles.statusDot, { backgroundColor: pillColour }]} />
+              <Txt variant="small" style={{ color: pillColour }}>
                 {healthLabel[health.status] ?? health.status}
               </Txt>
             </View>
@@ -98,7 +104,7 @@ export default function Home() {
               accessible
               accessibilityLabel={`Collateral ratio ${formatCollateralRatio(health.collateralRatio)}. Status: ${healthLabel[health.status]}.`}
             >
-              <Ratio cr={health.collateralRatio} size="numericXl" color={colour} />
+              <Ratio cr={health.collateralRatio} size="numericXl" color={heroColour} />
               <Txt variant="small" tone="subtle" style={styles.crCaption}>
                 collateral ratio
               </Txt>
@@ -112,10 +118,19 @@ export default function Home() {
                 value={formatUsd(health.liquidationPrice)}
                 caption="protocol liquidates at 110%"
               />
+              {/*
+                Split into a numeral plus prose. `formatPriceDrop` returns the whole
+                sentence ("57% below today's price"), which set in 16px mono wrapped
+                across two lines and collided with the caption.
+              */}
               <HeroStat
                 label="Room to fall"
-                value={formatPriceDrop(health.priceDropToLiquidationBps)}
-                caption={usableTitle(health.priceDropToLiquidationBps)}
+                value={`${Math.floor(health.priceDropToLiquidationBps / 100)}%`}
+                caption={
+                  health.priceDropToLiquidationBps <= 0
+                    ? 'at or below liquidation'
+                    : `below today’s price · ${usableTitle(health.priceDropToLiquidationBps)}`
+                }
                 align="right"
               />
             </View>
@@ -150,13 +165,13 @@ export default function Home() {
         <View style={styles.balanceBlock}>
           <StatRow
             label="Bitcoin collateral"
-            accessibilityLabel={`Bitcoin collateral ${position ? position.collateralWei : 0} wei`}
-            value={position ? <Btc wei={position.collateralWei} size="numericLg" hidden={hidden} /> : <Dash />}
+            accessibilityLabel={`Bitcoin collateral ${position ? formatBtc(position.collateralWei) : 'unknown'}`}
+            value={position ? <Btc wei={position.collateralWei} size="numericMd" hidden={hidden} /> : <Dash />}
             sub={collateralUsd !== null ? <Usd wei={collateralUsd} hidden={hidden} /> : null}
           />
           <StatRow
             label="MUSD balance"
-            value={balances ? <Musd wei={balances.musdWei} size="numericLg" hidden={hidden} /> : <Dash />}
+            value={balances ? <Musd wei={balances.musdWei} size="numericMd" hidden={hidden} /> : <Dash />}
             sub={
               <Txt variant="small" tone="subtle">
                 spendable

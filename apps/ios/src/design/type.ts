@@ -90,6 +90,14 @@ export const type = {
     letterSpacing: -0.56,
     ...tabular,
   },
+  /** Balance figures inside a label/value row, where numericLg forces the label to wrap. */
+  numericMd: {
+    fontFamily: fonts.monoMedium,
+    fontSize: 21,
+    lineHeight: 26,
+    letterSpacing: -0.42,
+    ...tabular,
+  },
   numeric: {
     fontFamily: fonts.mono,
     fontSize: 16,

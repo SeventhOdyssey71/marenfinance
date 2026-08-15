@@ -1,7 +1,7 @@
 import { StyleSheet, View } from 'react-native';
 import { MAREN_POLICY, MCR, WAD } from '@maren/sdk';
 
-import { base, radius, space, toneColor, type HealthTone } from '../design/tokens';
+import { base, healthFillColor, radius, space, type HealthTone } from '../design/tokens';
 import { Label, Txt } from './Text';
 
 /**
@@ -35,7 +35,8 @@ export interface HealthScaleProps {
 
 export function HealthScale({ collateralRatio, tone }: HealthScaleProps) {
   const pct = positionOf(collateralRatio);
-  const colour = toneColor[tone];
+  // Quiet fill while healthy; saturated only once the position needs attention (§2).
+  const colour = healthFillColor[tone];
 
   return (
     <View style={styles.root} accessibilityElementsHidden importantForAccessibility="no-hide-descendants">

@@ -14,7 +14,11 @@ config.resolver.nodeModulesPaths = [
   path.resolve(projectRoot, 'node_modules'),
   path.resolve(workspaceRoot, 'node_modules'),
 ];
-config.resolver.disableHierarchicalLookup = true;
+
+// NOTE: `disableHierarchicalLookup` must stay OFF here. It is the standard advice for
+// hoisted (npm/yarn) monorepos, but pnpm resolves transitive dependencies through
+// nested `node_modules/.pnpm/…` symlinks — disabling the upward walk breaks every
+// package that reaches a dependency of its own dependency.
 
 // @maren/sdk ships TypeScript source rather than a build artifact (see its package.json
 // "main": "./src/index.ts"), so Metro must transform files that live outside this app.
