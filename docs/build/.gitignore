@@ -1,0 +1,6 @@
+# Built documents are committed intentionally: reviewers, and the Mezo ecosystem team,
+# should be able to open the PDFs from the repository without installing a toolchain.
+# Everything else the build touches stays out.
+*
+!.gitignore
+!*.pdf
