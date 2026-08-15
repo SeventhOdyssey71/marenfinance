@@ -12,12 +12,26 @@
  * initial payload.
  */
 
-import { MeshGradient, GrainGradient, PulsingBorder } from '@paper-design/shaders-react';
+import { Warp, GrainGradient, PulsingBorder } from '@paper-design/shaders-react';
 
-/** BRAND.md §5.1 — violet core -> violet-900 mid -> near-black falloff. */
-const MESH_COLORS = ['#08080A', '#1B1140', '#5B3DF5', '#0B0B14'] as const;
+/**
+ * BRAND.md §5.1 — violet ribbons falling off to near-black.
+ *
+ * This is `Warp`, not `MeshGradient`, and the swap was made against the reference
+ * look rather than by preference. MeshGradient blends colour blobs: on a dark
+ * palette it averages into a soft haze with no structure, which read as a flat
+ * dark rectangle no matter how the palette was tuned. Warp lays a striped base
+ * pattern down first and then folds it with noise and swirl, which is what
+ * produces the sharp diagonal silk folds and the bright specular edges the
+ * reference has.
+ *
+ * The palette carries a real luminance range — near-black through mid violet to a
+ * light violet highlight. Text contrast is protected by the scrims in hero.tsx,
+ * not by keeping the palette dim.
+ */
+const RIBBON_COLORS = ['#08080A', '#241268', '#6C4BFF', '#B9A6FF'] as const;
 
-export function MeshCanvas({
+export function RibbonCanvas({
   running,
   className = '',
   speed = 0.14,
@@ -28,17 +42,25 @@ export function MeshCanvas({
   speed?: number;
 }) {
   return (
-    <MeshGradient
+    <Warp
       className={className}
-      colors={[...MESH_COLORS]}
-      distortion={0.85}
-      swirl={0.55}
+      colors={[...RIBBON_COLORS]}
+      // Striped base, folded hard: this is the silk.
+      shape="stripes"
+      shapeScale={0.32}
+      // Softness low enough to keep an edge on each fold; too high and it
+      // collapses back into the haze this replaced.
+      softness={0.45}
+      proportion={0.42}
+      distortion={0.28}
+      swirl={0.72}
+      swirlIterations={9}
+      // Diagonal, matching the reference's bottom-left to top-right run.
+      rotation={38}
       speed={running ? Math.min(speed, 0.2) : 0}
-      // `frame` is fixed so a paused shader holds a stable, composed image
-      // instead of snapping back to t=0 when it resumes.
-      offsetX={-0.12}
-      offsetY={-0.2}
-      scale={1.15}
+      scale={1.1}
+      offsetX={0.1}
+      offsetY={-0.05}
       fit="cover"
       // Keeps the fragment cost sane on 4K and retina displays.
       maxPixelCount={2_400_000}

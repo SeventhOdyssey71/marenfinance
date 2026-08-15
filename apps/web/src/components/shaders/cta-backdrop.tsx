@@ -3,8 +3,8 @@
 import dynamic from 'next/dynamic';
 import { useShaderGate } from '@/hooks/use-shader-gate';
 
-const MeshCanvas = dynamic(
-  () => import('./canvases').then((m) => ({ default: m.MeshCanvas })),
+const RibbonCanvas = dynamic(
+  () => import('./canvases').then((m) => ({ default: m.RibbonCanvas })),
   { ssr: false },
 );
 
@@ -35,7 +35,7 @@ export function CtaBackdrop() {
       {!reduced && mounted && (
         <>
           <div className="absolute inset-0 animate-[maren-reveal_800ms_ease-out_forwards] opacity-0">
-            <MeshCanvas running={visible} speed={0.1} />
+            <RibbonCanvas running={visible} speed={0.1} />
           </div>
           {/* Texture pass — deliberately faint. */}
           <div className="absolute inset-0 opacity-[0.14] mix-blend-soft-light">
@@ -47,7 +47,10 @@ export function CtaBackdrop() {
       {/* Static grain fallback, and the contrast scrim that keeps the CTA copy
           comfortably above 4.5:1 against the violet core. */}
       {reduced && <div className="grain-fallback absolute inset-0 opacity-60" />}
-      <div className="absolute inset-0 bg-[radial-gradient(120%_120%_at_50%_50%,rgba(8,8,10,0.35)_0%,rgba(8,8,10,0.72)_70%,rgba(8,8,10,0.86)_100%)]" />
+      {/* Warp is far brighter than the MeshGradient this replaced, so the scrim
+          carries more here than it used to. Measured, not guessed: at 0.35 in the
+          centre the CTA subhead fell to 2.76:1. */}
+      <div className="absolute inset-0 bg-[radial-gradient(120%_120%_at_50%_50%,rgba(8,8,10,0.72)_0%,rgba(8,8,10,0.86)_70%,rgba(8,8,10,0.93)_100%)]" />
     </div>
   );
 }

@@ -21,11 +21,16 @@ export function Hero() {
           the empty right half. */}
       <div
         aria-hidden
-        className="pointer-events-none absolute inset-0 -z-10 bg-[linear-gradient(180deg,rgba(8,8,10,0.80)_0%,rgba(8,8,10,0.66)_32%,rgba(8,8,10,0.78)_62%,rgba(8,8,10,0.94)_88%,#08080A_100%)] md:bg-[linear-gradient(180deg,rgba(8,8,10,0.70)_0%,rgba(8,8,10,0.42)_34%,rgba(8,8,10,0.66)_70%,rgba(8,8,10,0.92)_90%,#08080A_100%)]"
+        className="pointer-events-none absolute inset-0 -z-10 bg-[linear-gradient(180deg,rgba(8,8,10,0.84)_0%,rgba(8,8,10,0.76)_32%,rgba(8,8,10,0.82)_62%,rgba(8,8,10,0.94)_88%,#08080A_100%)] md:bg-[linear-gradient(180deg,rgba(8,8,10,0.44)_0%,rgba(8,8,10,0.22)_34%,rgba(8,8,10,0.38)_70%,rgba(8,8,10,0.86)_90%,#08080A_100%)]"
       />
+      {/* From md up the copy sits in the left column, so the horizontal scrim can
+          hold the text side dark and then clear completely — letting the shader
+          run at full strength across the right half, which is where the reference
+          gets its presence. On mobile there is no left/right split, so the
+          vertical scrim above carries the whole legibility budget alone. */}
       <div
         aria-hidden
-        className="pointer-events-none absolute inset-0 -z-10 hidden md:block md:bg-[linear-gradient(90deg,rgba(8,8,10,0.86)_0%,rgba(8,8,10,0.62)_38%,rgba(8,8,10,0.12)_72%,rgba(8,8,10,0)_100%)]"
+        className="pointer-events-none absolute inset-0 -z-10 hidden md:block md:bg-[linear-gradient(90deg,rgba(8,8,10,0.93)_0%,rgba(8,8,10,0.90)_42%,rgba(8,8,10,0.58)_63%,rgba(8,8,10,0.12)_80%,rgba(8,8,10,0)_100%)]"
       />
 
       <div className="container-maren relative">
