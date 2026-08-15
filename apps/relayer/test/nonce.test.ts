@@ -38,7 +38,7 @@ describe('NonceManager', () => {
           issued.push(ctx.nonce);
           return `0x${ctx.nonce.toString(16).padStart(64, '0')}` as Hash;
         },
-        { requestId: 'test', reservedWei: 0n, payer: ADDRESS },
+        { requestId: 'test', reservedWei: 0n, reservedDay: '2026-08-15', payer: ADDRESS },
       ),
     );
 
@@ -72,7 +72,7 @@ describe('NonceManager', () => {
         async () => {
           throw new Error('broadcast failed');
         },
-        { requestId: 'a', reservedWei: 0n, payer: ADDRESS },
+        { requestId: 'a', reservedWei: 0n, reservedDay: '2026-08-15', payer: ADDRESS },
       ),
     ).rejects.toThrow('broadcast failed');
 
@@ -82,7 +82,7 @@ describe('NonceManager', () => {
     const ok = await manager.submit(
       { maxFeePerGas: 10n, maxPriorityFeePerGas: 1n },
       async (ctx) => `0x${ctx.nonce.toString(16).padStart(64, '0')}` as Hash,
-      { requestId: 'b', reservedWei: 0n, payer: ADDRESS },
+      { requestId: 'b', reservedWei: 0n, reservedDay: '2026-08-15', payer: ADDRESS },
     );
     expect(ok.nonce).toBe(6);
     expect(reads).toBe(2);
@@ -99,13 +99,13 @@ describe('NonceManager', () => {
       async () => {
         throw new Error('nope');
       },
-      { requestId: 'a', reservedWei: 0n, payer: ADDRESS },
+      { requestId: 'a', reservedWei: 0n, reservedDay: '2026-08-15', payer: ADDRESS },
     );
     await expect(failing).rejects.toThrow();
     const after = await manager.submit(
       { maxFeePerGas: 1n, maxPriorityFeePerGas: 1n },
       async (ctx) => `0x${ctx.nonce.toString(16).padStart(64, '0')}` as Hash,
-      { requestId: 'b', reservedWei: 0n, payer: ADDRESS },
+      { requestId: 'b', reservedWei: 0n, reservedDay: '2026-08-15', payer: ADDRESS },
     );
     expect(after.nonce).toBe(0);
   });
@@ -126,7 +126,7 @@ describe('NonceManager', () => {
         await gate;
         return `0x${ctx.nonce.toString(16).padStart(64, '0')}` as Hash;
       },
-      { requestId: 'a', reservedWei: 0n, payer: ADDRESS },
+      { requestId: 'a', reservedWei: 0n, reservedDay: '2026-08-15', payer: ADDRESS },
     );
     await new Promise((resolve) => setTimeout(resolve, 5));
     expect(manager.inFlight).toBe(1);
@@ -189,6 +189,7 @@ describe('stuck transaction replacement', () => {
       replacements: 0,
       requestId: 'stuck',
       reservedWei: 0n,
+      reservedDay: '2026-08-15',
       payer: ADDRESS,
     };
     watcher.track(tx);
@@ -233,6 +234,7 @@ describe('stuck transaction replacement', () => {
       replacements: 0,
       requestId: 'done',
       reservedWei: 260_000_000_000n,
+      reservedDay: '2026-08-15',
       payer: ADDRESS,
     });
 

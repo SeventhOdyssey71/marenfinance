@@ -24,8 +24,12 @@ export interface AdmittedCall {
   readonly selector: Hex;
   /** Decoded arguments of the signed calldata. */
   readonly args: readonly unknown[];
-  /** The `relayFee` argument, in MUSD wei, taken from the signed calldata. */
-  readonly signedFeeMusdWei: bigint;
+  /**
+   * The `relayFee` argument in MUSD wei, taken from the SIGNED calldata, or null
+   * when this call shape carries no in-band fee (see the MarenRelayHub TODO in
+   * registry.ts). Null closes the paid tier for the call; it never means free.
+   */
+  readonly signedFeeMusdWei: bigint | null;
 }
 
 export function admitCall(config: RelayerConfig, request: ForwardRequest): AdmittedCall {
@@ -85,12 +89,21 @@ export function admitCall(config: RelayerConfig, request: ForwardRequest): Admit
     );
   }
   const args = decoded.args ?? [];
-  const feeArg = args[fn.feeArgIndex];
-  if (typeof feeArg !== 'bigint') {
-    throw bad('CALLDATA_UNDECODABLE', `could not read relayFee from the signed calldata`, {
-      functionId: fn.id,
-    });
+
+  // TODO(MarenRelayHub): when the hub lands, the fee comes from the hub request
+  // rather than the target's calldata. Read it there and delete this branch.
+  let signedFeeMusdWei: bigint | null = null;
+  if (fn.feeArgIndex !== null) {
+    const feeArg = args[fn.feeArgIndex];
+    if (typeof feeArg !== 'bigint') {
+      // The signature says there is a fee here and we cannot read it. Refuse
+      // rather than guess at the economics of a call.
+      throw bad('CALLDATA_UNDECODABLE', 'could not read relayFee from the signed calldata', {
+        functionId: fn.id,
+      });
+    }
+    signedFeeMusdWei = feeArg;
   }
 
-  return { target, fn, selector, args, signedFeeMusdWei: feeArg };
+  return { target, fn, selector, args, signedFeeMusdWei };
 }

@@ -1,0 +1,11 @@
+# pnpm-lock.yaml is generated. Parallel branches each regenerate it, so a textual
+# three-way merge produces noise and, worse, a lockfile that matches no real
+# resolution. Take one side on conflict and regenerate:
+#     CI=true pnpm install --lockfile-only
+pnpm-lock.yaml -diff -merge linguist-generated=true
+
+# Foundry gas snapshots are generated too.
+packages/contracts/.gas-snapshot -diff
+
+# Keep shell scripts LF on every platform.
+*.sh text eol=lf

@@ -1,13 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { getAddress } from 'viem';
-import {
-  isDeniedRpc,
-  preflightRpcs,
-  probeEndpoint,
-  REQUIRED_RPC_METHODS,
-  RPC_HOST_DENYLIST,
-  VERIFIED_RPCS,
-} from '../src/rpc.js';
+import { preflightRpcs, probeEndpoint, REQUIRED_RPC_METHODS } from '../src/rpc.js';
+import { mezoMainnet, mezoTestnet } from '@maren/sdk';
 import { loadConfig } from '../src/config.js';
 import { createRelayer } from '../src/create.js';
 import { MemoryStore } from '../src/store.js';
@@ -16,14 +10,19 @@ import { makeEnv, signedRequest, SILENT_LOGGER, type ErrorBody } from './helpers
 /**
  * RPC capability preflight.
  *
- * The failure this exists for, measured on 2026-08-15: `https://mezo.drpc.org`
- * answers `eth_chainId` and returns -32601 for everything else without an API
- * key. A relayer whose health check is "can I reach a node" comes up green and
- * then fails every simulation — which is the one check that stops it burning BTC
- * on transactions that were always going to revert.
+ * The property under test is provider-agnostic: ANY endpoint that cannot serve
+ * the relay path right now is dropped, and if none survive the relayer refuses
+ * to relay. A relayer whose health check is "can I reach a node" comes up green
+ * and then fails every simulation — which is the one check that stops it burning
+ * BTC on transactions that were always going to revert. So the preflight asserts
+ * method support, not reachability. R8 applied to infrastructure.
  *
- * So the preflight asserts METHOD SUPPORT, not reachability, and refuses to
- * start when no endpoint has it. R8 applied to infrastructure.
+ * These tests name no provider on purpose. An earlier revision asserted that one
+ * specific host was refused, based on a probe sweep that did not reproduce; the
+ * host served every method 10/10 an hour later. What had been measured was a
+ * degraded backend answering -32601 instead of signalling unavailability. The
+ * durable lesson — a single -32601 proves nothing, so repeat-probe and fail over
+ * — is now tested directly, below.
  */
 
 const CHAIN_ID = 31611;
@@ -70,40 +69,104 @@ function healthyNode(chainId = CHAIN_ID): typeof fetch {
   }) as unknown as typeof fetch;
 }
 
-describe('RPC denylist', () => {
-  it('denies mezo.drpc.org with the measured reason', () => {
-    const reason = isDeniedRpc('https://mezo.drpc.org');
-    expect(reason).not.toBeNull();
-    expect(reason).toMatch(/eth_chainId only/);
-    expect(RPC_HOST_DENYLIST.has('mezo.drpc.org')).toBe(true);
-  });
+describe('endpoint list resolution', () => {
+  const baseEnv = {
+    RELAYER_FORWARDER_ADDRESS: '0x1111111111111111111111111111111111111111',
+    RELAYER_ALLOWED_TARGETS: 'marenPay:0x2222222222222222222222222222222222222222',
+    RELAYER_MAX_DAILY_SPONSORED_BTC: '0.01',
+    RELAYER_PRIVATE_KEY: `0x${'11'.repeat(32)}`,
+  };
 
-  it('does not deny the verified endpoints', () => {
-    for (const url of [...VERIFIED_RPCS.mainnet, ...VERIFIED_RPCS.testnet]) {
-      expect(isDeniedRpc(url)).toBeNull();
-    }
-  });
-
-  it('drops a denylisted host from the default endpoint list', () => {
-    const { config } = loadConfig({
-      RELAYER_NETWORK: 'mainnet',
-      RELAYER_FORWARDER_ADDRESS: '0x1111111111111111111111111111111111111111',
-      RELAYER_ALLOWED_TARGETS: 'marenPay:0x2222222222222222222222222222222222222222',
-      RELAYER_MAX_DAILY_SPONSORED_BTC: '0.01',
-      RELAYER_PRIVATE_KEY: `0x${'11'.repeat(32)}`,
-    });
-    expect(config.rpcUrls).not.toContain('https://mezo.drpc.org');
-    expect(config.rpcUrls[0]).toBe('https://jsonrpc-mezo.boar.network');
+  it('takes every endpoint from the SDK chain definition, in its order', () => {
+    const { config, problems } = loadConfig({ ...baseEnv, RELAYER_NETWORK: 'mainnet' });
+    expect(problems).toEqual([]);
+    // The SDK orders these by observed stability. The relayer does not second-guess it.
+    expect(config.rpcUrls).toEqual([...mezoMainnet.rpcUrls.default.http]);
     expect(config.rpcUrls.length).toBeGreaterThan(1); // failover is configured
   });
 
-  it('makes it a problem when an operator explicitly configures a denylisted host', () => {
-    const { problems } = loadConfig(makeEnv({ RELAYER_RPC_URLS: 'https://mezo.drpc.org' }));
-    expect(problems.join('\n')).toMatch(/not usable by the relayer/);
+  it('blocks no provider: every SDK endpoint survives config resolution', () => {
+    for (const [network, chain] of [
+      ['mainnet', mezoMainnet],
+      ['testnet', mezoTestnet],
+    ] as const) {
+      const { config } = loadConfig({ ...baseEnv, RELAYER_NETWORK: network });
+      for (const url of chain.rpcUrls.default.http) {
+        expect(config.rpcUrls).toContain(url);
+      }
+    }
+  });
+
+  it('accepts any endpoint an operator configures, without opinion', () => {
+    const { config, problems } = loadConfig(
+      makeEnv({ RELAYER_RPC_URLS: 'https://a.test,https://b.test' }),
+    );
+    expect(problems).toEqual([]);
+    expect(config.rpcUrls).toEqual(['https://a.test', 'https://b.test']);
+  });
+
+  it('de-duplicates while preserving order', () => {
+    const { config } = loadConfig(
+      makeEnv({ RELAYER_RPC_URLS: 'https://a.test,https://a.test/,https://b.test' }),
+    );
+    expect(config.rpcUrls).toEqual(['https://a.test', 'https://b.test']);
   });
 });
 
 describe('capability preflight', () => {
+  /**
+   * The regression test for the mistake this file used to encode.
+   *
+   * A backend behind a load balancer answers -32601 for a while and then serves
+   * the method perfectly. Probing once condemns a working provider forever; that
+   * is precisely what produced a bogus in-code host block in an earlier revision.
+   * The probe must ask again before believing it.
+   */
+  it('does not condemn an endpoint whose -32601 was transient', async () => {
+    let calls = 0;
+    const flaky = (async (_url: string | URL | Request, init?: RequestInit) => {
+      calls += 1;
+      // Every method fails on its FIRST attempt and succeeds on the retry —
+      // a degraded backend reporting "unsupported" instead of "unavailable".
+      const failing = calls % 2 === 1;
+      if (failing) {
+        return new Response(
+          JSON.stringify({
+            jsonrpc: '2.0',
+            id: 1,
+            error: { code: -32601, message: 'the method does not exist/is not available' },
+          }),
+          { status: 200 },
+        );
+      }
+      return healthyNode()(_url as string, init);
+    }) as unknown as typeof fetch;
+
+    const report = await probeEndpoint('https://flaky.test', {
+      expectedChainId: CHAIN_ID,
+      probeContract: PROBE_CONTRACT,
+      probeAccount: PROBE_ACCOUNT,
+      fetchImpl: flaky,
+      retryDelayMs: 0,
+    });
+
+    expect(report.ok).toBe(true);
+    expect(report.missing).toEqual([]);
+  });
+
+  it('still fails an endpoint whose methods are missing on every attempt', async () => {
+    const report = await probeEndpoint('https://example-rpc.test', {
+      expectedChainId: CHAIN_ID,
+      probeContract: PROBE_CONTRACT,
+      probeAccount: PROBE_ACCOUNT,
+      fetchImpl: chainIdOnlyNode(),
+      retryDelayMs: 0,
+      attemptsPerMethod: 3,
+    });
+    expect(report.ok).toBe(false);
+    expect(report.reason).toMatch(/after 3 attempts/);
+  });
+
   it('fails an endpoint that only serves eth_chainId', async () => {
     const report = await probeEndpoint('https://example-rpc.test', {
       expectedChainId: CHAIN_ID,
@@ -199,7 +262,7 @@ describe('capability preflight', () => {
 describe('boot refuses when preflight fails', () => {
   it('a chain-id-only RPC means the relayer will not relay', async () => {
     const relayer = await createRelayer({
-      env: makeEnv({ RELAYER_RPC_URLS: 'https://pretend-drpc.test' }),
+      env: makeEnv({ RELAYER_RPC_URLS: 'https://degraded-node.test' }),
       store: new MemoryStore(),
       logger: SILENT_LOGGER,
       fetchImpl: chainIdOnlyNode(),

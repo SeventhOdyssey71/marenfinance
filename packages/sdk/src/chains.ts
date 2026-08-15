@@ -27,19 +27,38 @@ export const mezoMainnet = defineChain({
     decimals: 18,
   },
   rpcUrls: {
-    // dRPC first: it is the only endpoint that also offers WebSocket, which we need
-    // for live position-health subscriptions. All three verified -> 31612 on 2026-08-15.
+    // All three verified 2026-08-15 by executing a real eth_call
+    // (TroveManager.getTroveOwnersCount() -> 26), not merely eth_chainId.
+    //
+    // ORDER MATTERS, AND FAILOVER IS NOT OPTIONAL.
+    // Mezo's public RPCs are transiently flaky. During testing, mezo.drpc.org returned
+    //   -32601 "the method ... does not exist/is not available"
+    // for eth_call, eth_getLogs, eth_estimateGas and eth_blockNumber across a full probe
+    // sweep — and then served all of them correctly 10/10 about an hour later. The
+    // methods are supported; a backend behind the load balancer was degraded and
+    // reported "unsupported" rather than "unavailable", which is indistinguishable from
+    // a capability limit if you probe once.
+    //
+    // Two consequences, both load-bearing:
+    //   1. Never certify or condemn an endpoint on a single probe. Repeat it.
+    //   2. Every client MUST use failover across this list rather than pinning one URL.
+    //      A -32601 is not proof of a missing feature on this chain.
+    //
+    // boar is first because it was stable throughout. drpc is retained because it is the
+    // only endpoint advertising WebSocket, which live position-health subscriptions want.
     default: {
       http: [
-        'https://mezo.drpc.org',
         'https://jsonrpc-mezo.boar.network',
         'https://mainnet.mezo.public.validationcloud.io',
+        'https://mezo.drpc.org',
       ],
-      webSocket: ['wss://mezo.drpc.org'],
     },
     public: {
-      http: ['https://mezo.drpc.org', 'https://jsonrpc-mezo.boar.network'],
-      webSocket: ['wss://mezo.drpc.org'],
+      http: [
+        'https://jsonrpc-mezo.boar.network',
+        'https://mainnet.mezo.public.validationcloud.io',
+        'https://mezo.drpc.org',
+      ],
     },
   },
   blockExplorers: {

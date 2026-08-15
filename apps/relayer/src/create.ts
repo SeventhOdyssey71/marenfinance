@@ -1,8 +1,8 @@
-import type { Hono } from 'hono';
+import type { Context as HonoContext, Hono } from 'hono';
 import { createViemAdapter, resolvePrivateKey, type ChainAdapter } from './chain.js';
 import { loadConfig, type Env, type RelayerConfig } from './config.js';
 import { buildApp } from './app.js';
-import { createLogger, IP_SALT_IS_EPHEMERAL, type Logger } from './logger.js';
+import { createLogger, type Logger } from './logger.js';
 import { NonceManager, TxWatcher } from './nonce.js';
 import { RelayerService } from './service.js';
 import { MemoryStore, RedisStore, type RelayStore } from './store.js';
@@ -46,6 +46,8 @@ export interface CreateRelayerOptions {
    * not be able to turn the check off from config.
    */
   readonly skipPreflight?: boolean;
+  /** Overrides socket-address resolution. Tests only; production uses the runtime's. */
+  readonly socketIp?: (c: HonoContext) => string | undefined;
 }
 
 export async function createRelayer(options: CreateRelayerOptions): Promise<Relayer> {
@@ -53,9 +55,22 @@ export async function createRelayer(options: CreateRelayerOptions): Promise<Rela
   const problems = [...configProblems];
   const logger = options.logger ?? createLogger(config.logLevel);
 
-  if (IP_SALT_IS_EPHEMERAL && options.env['VERCEL'] !== undefined) {
+  const isMultiInstance = options.env['VERCEL'] !== undefined;
+
+  if (config.ipSaltIsEphemeral && isMultiInstance) {
     problems.push(
       'RELAYER_IP_SALT is unset on a multi-instance deployment, so per-IP limits would be counted per instance',
+    );
+  }
+
+  // The in-memory store keeps counters per instance. On a multi-instance
+  // deployment that does not weaken the global daily BTC cap slightly — it
+  // removes it, because every instance believes it has the whole budget. The
+  // budget is the backstop the entire abuse model rests on, so running without
+  // shared storage there is a refusal, not a warning.
+  if (config.store === 'memory' && isMultiInstance) {
+    problems.push(
+      'RELAYER_STORE=memory on a multi-instance deployment makes the global daily BTC budget unenforceable (each instance counts separately); set RELAYER_STORE=redis',
     );
   }
 
@@ -147,7 +162,11 @@ export async function createRelayer(options: CreateRelayerOptions): Promise<Rela
   // Wire settlement reconciliation back into the service's budget accounting.
   watcher?.setOnSettled((tx, settlement) => service.reconcile(tx, settlement));
 
-  const app = buildApp({ service, logger });
+  const app = buildApp({
+    service,
+    logger,
+    ...(options.socketIp === undefined ? {} : { socketIp: options.socketIp }),
+  });
 
   if (problems.length > 0) {
     logger.error(

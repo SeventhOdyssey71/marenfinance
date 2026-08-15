@@ -68,18 +68,23 @@ export function newRequestId(): string {
  * Salted, truncated hash of a client IP. Not reversible to an address in a log
  * dump, but stable enough to rate-limit on.
  *
- * The salt MUST come from `RELAYER_IP_SALT` in any multi-instance deployment:
- * a per-process random salt would give each serverless instance a different key
- * for the same IP, which silently multiplies the per-IP limit by the instance
- * count. When the variable is absent we fall back to a random salt and the
- * caller is expected to surface it as a degraded-posture warning.
+ * The salt is passed in rather than read from `process.env` here, so that the
+ * value actually in use is the one `loadConfig` resolved — a module-level read
+ * would silently ignore an injected environment and could not be tested.
+ *
+ * The salt MUST be fixed (`RELAYER_IP_SALT`) in any multi-instance deployment: a
+ * per-process random salt gives each instance a different key for the same IP,
+ * which multiplies the effective per-IP limit by the instance count. config.ts
+ * generates an ephemeral one when the variable is absent and flags it, and
+ * create.ts turns that into a refusal on a multi-instance host.
  */
-const IP_SALT = process.env['RELAYER_IP_SALT']?.trim() || randomUUID();
+export function hashIp(ip: string, salt: string): string {
+  return createHash('sha256').update(salt).update(ip).digest('hex').slice(0, 24);
+}
 
-export const IP_SALT_IS_EPHEMERAL = !process.env['RELAYER_IP_SALT']?.trim();
-
-export function hashIp(ip: string): string {
-  return createHash('sha256').update(IP_SALT).update(ip).digest('hex').slice(0, 24);
+/** A random salt, for single-process runs where a fixed one is unnecessary. */
+export function ephemeralIpSalt(): string {
+  return randomUUID();
 }
 
 export type { Logger };

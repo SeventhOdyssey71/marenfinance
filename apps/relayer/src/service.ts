@@ -1,8 +1,14 @@
 import { getAddress, isAddress, type Address, type Hash } from 'viem';
 import { admitCall } from './calldata.js';
 import type { RelayerConfig } from './config.js';
-import { bad, isRelayError, unavailable } from './errors.js';
-import { parseForwardRequest, verifyForwardRequest } from './forwarder.js';
+import { bad, conflict, forbidden, isRelayError, unavailable } from './errors.js';
+import {
+  parseForwardRequest,
+  verifyForwardRequest,
+  type ForwardRequest,
+  type VerifiedRequest,
+} from './forwarder.js';
+import type { AdmittedCall } from './calldata.js';
 import type { ChainAdapter } from './chain.js';
 import type { Logger } from './logger.js';
 import { NonceManager, TxWatcher, type PendingTx } from './nonce.js';
@@ -33,6 +39,8 @@ export interface RelayContext {
   readonly requestId: string;
   /** Already hashed by the caller. The raw IP never reaches this module. */
   readonly ipHash: string;
+  /** How the IP was established. Logged so a misconfigured proxy is visible. */
+  readonly ipSource?: string;
 }
 
 export interface RelayResult {
@@ -101,6 +109,8 @@ export class RelayerService {
   #draining = false;
   /** Flipped by the daily budget check; reset when the UTC day rolls over. */
   #budgetHaltedOn: string | null = null;
+  /** `payer:nonce` slots currently being processed. See H3 in `relay`. */
+  readonly #inFlightRequests = new Set<string>();
 
   constructor(deps: RelayerServiceDeps) {
     this.#deps = deps;
@@ -142,7 +152,7 @@ export class RelayerService {
   // -------------------------------------------------------------------------
 
   async relay(body: unknown, ctx: RelayContext): Promise<RelayResult> {
-    const { config, logger } = this.#deps;
+    const { config } = this.#deps;
 
     // 1. posture ------------------------------------------------------------
     if (this.#draining) {
@@ -179,6 +189,63 @@ export class RelayerService {
       maxDeadlineSeconds: config.policy.maxDeadlineSeconds,
       now: Math.floor(this.#now() / 1000),
     });
+    const payer = verified.payer;
+
+    // H4 — contract (ERC-1271 / EIP-7702) signers run arbitrary code during
+    // signature validation, inside the transaction WE pay for. A signer can make
+    // that validation burn the full gas limit and then revert, and unlike an EOA
+    // there is no bound on how expensive it is. Simulation catches the revert,
+    // but a hostile account can make validation succeed in `eth_call` and fail
+    // on-chain. So contract signers get a tighter ceiling than EOAs.
+    if (verified.signerKind === 'contract' && request.gas > config.policy.maxGasContractSigner) {
+      throw forbidden(
+        'GAS_LIMIT_TOO_HIGH',
+        'requested gas exceeds the per-request cap for contract-account signers',
+        {
+          requested: request.gas.toString(),
+          cap: config.policy.maxGasContractSigner.toString(),
+          signerKind: 'contract',
+        },
+      );
+    }
+
+    // H3 — two identical requests arriving together both pass the nonce check
+    // before either is submitted. Only one can land; the other burns our gas
+    // reverting on a consumed nonce. The forwarder nonce is the natural dedupe
+    // key, and it is inside the signed struct.
+    const inFlightKey = `${payer.toLowerCase()}:${request.nonce.toString()}`;
+    if (this.#inFlightRequests.has(inFlightKey)) {
+      throw conflict(
+        'DUPLICATE_REQUEST_IN_FLIGHT',
+        'a request from this signer at this nonce is already being processed',
+        { nonce: request.nonce.toString() },
+      );
+    }
+    this.#inFlightRequests.add(inFlightKey);
+    try {
+      return await this.#relayVerified(request, call, verified, ctx);
+    } finally {
+      this.#inFlightRequests.delete(inFlightKey);
+    }
+  }
+
+  /**
+   * The money-spending half of `relay`, after identity is settled and the
+   * (payer, nonce) slot is held. Split out so the dedupe guard above has a
+   * single, obvious release point in `finally`.
+   */
+  async #relayVerified(
+    request: ForwardRequest,
+    call: AdmittedCall,
+    verified: VerifiedRequest,
+    ctx: RelayContext,
+  ): Promise<RelayResult> {
+    const { config, logger } = this.#deps;
+    const chain = this.#deps.chain;
+    const nonces = this.#deps.nonces;
+    if (chain === null || nonces === null) {
+      throw unavailable('RELAYER_NOT_ACCEPTING', 'the relayer has no chain connection');
+    }
     const payer = verified.payer;
 
     logger.info(
@@ -252,7 +319,7 @@ export class RelayerService {
       pending = await nonces.submit(
         fees,
         (submitCtx) => chain.sendExecute(request, submitCtx, gasLimit),
-        { requestId: ctx.requestId, reservedWei: projectedGasCostWei, payer },
+        { requestId: ctx.requestId, reservedWei: projectedGasCostWei, reservedDay: day, payer },
       );
     } catch (error) {
       await this.#release(payer, ctx.ipHash, day, projectedGasCostWei);
@@ -413,14 +480,28 @@ export class RelayerService {
     );
   }
 
-  /** Reconcile the provisional gas reservation once a receipt exists. */
+  /**
+   * Reconcile the provisional gas reservation once a receipt exists.
+   *
+   * Two things this must get right, both of which were wrong before they were
+   * tested:
+   *   - The adjustment applies to the day the reservation was DEBITED, not
+   *     today. A transaction submitted at 23:59 that confirms at 00:01 would
+   *     otherwise credit a day it never debited, leaving yesterday permanently
+   *     over-counted and today spuriously under-counted.
+   *   - The counter is clamped at zero. Repeated over-refunds could otherwise
+   *     drive the daily spend negative and hand an attacker free budget.
+   */
   async reconcile(tx: PendingTx, settlement: Settlement): Promise<void> {
     if (settlement.gasCostWei === null) return;
     const delta = settlement.gasCostWei - tx.reservedWei;
     if (delta === 0n) return;
-    const day = this.#day();
+    const day = tx.reservedDay;
     try {
-      await this.#deps.store.incrBy(keys.spendDay(day), delta, DAY_SECONDS);
+      const updated = await this.#deps.store.incrBy(keys.spendDay(day), delta, DAY_SECONDS);
+      if (updated < 0n) {
+        await this.#deps.store.incrBy(keys.spendDay(day), -updated, DAY_SECONDS);
+      }
     } catch {
       // A reconciliation we cannot record leaves the budget OVER-counted, which
       // is the safe direction. Log, do not retry into a loop.

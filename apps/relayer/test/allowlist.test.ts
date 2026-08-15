@@ -9,7 +9,7 @@ import {
   signedRequest,
   type ErrorBody,
 } from './helpers.js';
-import { RELAYABLE_FUNCTIONS, allFunctionIds } from '../src/registry.js';
+import { RELAYABLE_FUNCTIONS, allFunctionIds, defineRelayableFunction } from '../src/registry.js';
 import { loadConfig } from '../src/config.js';
 
 /**
@@ -96,14 +96,45 @@ describe('target and selector allowlist', () => {
     expect(RELAYABLE_FUNCTIONS.marenForwarder).toHaveLength(0);
   });
 
-  it('every relayable function carries an in-band uint256 relayFee (R2)', () => {
+  /**
+   * The old invariant — "every relayable function MUST take a trailing
+   * `uint256 relayFee`" — is withdrawn. `ERC2771Forwarder.executeBatch`'s
+   * `atomic` flag covers validation only, so a batched fee leg settles even when
+   * the work leg reverts; the replacement is `MarenRelayHub`, which takes the fee
+   * and calls the target in one atomic forwarded call. See registry.ts.
+   *
+   * What still MUST hold is the R2 property underneath it: if a fee is declared,
+   * it is a real `uint256` we can actually read out of the signed payload. A
+   * parameter that is signed but not enforceable is the shape R13 forbids.
+   */
+  it('a declared relay fee is a readable uint256, or there is none at all', () => {
     for (const [, functions] of Object.entries(RELAYABLE_FUNCTIONS)) {
       for (const fn of functions) {
+        if (fn.feeArgIndex === null) continue;
         const feeInput = fn.abi.inputs[fn.feeArgIndex];
         expect(feeInput?.name).toBe('relayFee');
         expect(feeInput?.type).toBe('uint256');
       }
     }
+  });
+
+  it('accepts a relayable function that declares no fee argument', () => {
+    // The real contracts will not carry a trailing relayFee — the hub does.
+    // Registering one must not throw at module load any more.
+    const defined = defineRelayableFunction(
+      'marenPay',
+      'function pay(address to, uint256 amount, string memo)',
+    );
+    expect(defined.feeArgIndex).toBeNull();
+    expect(defined.selector).toMatch(/^0x[0-9a-f]{8}$/);
+  });
+
+  it('still rejects a relayFee of the wrong type', () => {
+    // A `relayFee` we would decode into something that is not an amount is worse
+    // than no fee at all, because it looks enforced.
+    expect(() =>
+      defineRelayableFunction('marenPay', 'function pay(address to, string relayFee)'),
+    ).toThrow(/must be uint256/);
   });
 
   describe('configuration can only narrow the code-level registry', () => {

@@ -37,6 +37,9 @@ export interface PendingTx {
   readonly requestId: string;
   /** BTC (wei) provisionally debited from the daily budget when we submitted. */
   readonly reservedWei: bigint;
+  /** The UTC day the reservation was debited against. Reconciliation must use
+   *  this, not "today" — a tx submitted at 23:59 can settle after midnight. */
+  readonly reservedDay: string;
   readonly payer: Address;
 }
 
@@ -92,7 +95,7 @@ export class NonceManager {
   async submit(
     fees: GasFees,
     submitter: Submitter,
-    meta: { requestId: string; reservedWei: bigint; payer: Address },
+    meta: { requestId: string; reservedWei: bigint; reservedDay: string; payer: Address },
   ): Promise<PendingTx> {
     return this.#enqueue(async () => {
       this.#inFlight += 1;
@@ -118,6 +121,7 @@ export class NonceManager {
           replacements: 0,
           requestId: meta.requestId,
           reservedWei: meta.reservedWei,
+          reservedDay: meta.reservedDay,
           payer: meta.payer,
         } satisfies PendingTx;
       } finally {

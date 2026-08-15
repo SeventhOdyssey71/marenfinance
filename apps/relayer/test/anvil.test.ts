@@ -102,10 +102,38 @@ async function startAnvil(): Promise<Fork | null> {
   return { process: child, chainId };
 }
 
+/**
+ * A silent skip that always skips is indistinguishable from a passing test.
+ *
+ * Review found that CI ran `pnpm test` on a runner with no Foundry, so all six
+ * of these were skipped 100% of the time and the job exited 0 — the entire
+ * real-chain layer was decorative. The skip stays (a contributor without Foundry
+ * should not be blocked), but it becomes LOUD and, where the environment says
+ * the chain layer is expected, FATAL.
+ *
+ * Set `MEZO_TESTNET_RPC_URL` or `MAREN_REQUIRE_CHAIN_TESTS` (as CI does) to make
+ * an unavailable fork a failure rather than a skip. `test/setup.ts` normalises
+ * the former into the latter before it scrubs the environment.
+ */
 const fork = await startAnvil();
+const forkRequired = Boolean(process.env['MAREN_REQUIRE_CHAIN_TESTS']?.trim());
+
 if (fork === null) {
-  // eslint-disable-next-line no-console
-  console.warn('[anvil] fork unavailable — integration tests skipped (this is not a failure)');
+  const detail = anvilInstalled()
+    ? `anvil is installed but the fork of ${FORK_URL} did not come up`
+    : 'anvil (Foundry) is not installed';
+  if (forkRequired) {
+    throw new Error(
+      `[anvil] the environment marks the chain integration tests REQUIRED, but ${detail}. ` +
+        'Install Foundry (https://getfoundry.sh), or unset MEZO_TESTNET_RPC_URL / ' +
+        'MAREN_REQUIRE_CHAIN_TESTS to allow skipping.',
+    );
+  }
+  console.warn(
+    `[anvil] SKIPPING 6 chain integration tests: ${detail}. ` +
+      'These cover real simulation, broadcast and receipt settlement — a green run without ' +
+      'them has NOT exercised the chain layer. Set MEZO_TESTNET_RPC_URL to make this fatal.',
+  );
 }
 
 const anvilChain = fork === null ? mezoTestnet : defineChain({ ...mezoTestnet, id: fork.chainId });
