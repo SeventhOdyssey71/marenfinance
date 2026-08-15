@@ -12,16 +12,13 @@ export function CtaBand() {
             <CtaBackdrop />
 
             <div className="relative px-6 py-24 text-center sm:px-10 md:py-32">
-              <h2
-                id="cta-title"
-                className="t-display mx-auto max-w-[18ch] text-balance text-text"
-              >
+              <h2 id="cta-title" className="t-display text-text mx-auto max-w-[18ch] text-balance">
                 Ready to put your Bitcoin to work?
               </h2>
 
-              <p className="prose-measure mx-auto mt-7 text-base leading-relaxed text-text-muted md:text-[1.0625rem]">
-                Deposit from 0.001 BTC, draw MUSD, and spend it without ever holding gas.
-                Maren is pre-audit — start small.
+              <p className="prose-measure text-text-muted mx-auto mt-7 text-base leading-relaxed md:text-[1.0625rem]">
+                Deposit from 0.001 BTC, draw MUSD, and spend it without ever holding gas. Maren is
+                pre-audit — start small.
               </p>
 
               <div className="mt-11 flex flex-col items-center justify-center gap-3 sm:flex-row">

@@ -62,7 +62,7 @@ export function HealthScale({
   return (
     <div className="mt-6">
       <div
-        className="relative h-1.5 rounded-[var(--radius-pill)] bg-surface-inset"
+        className="bg-surface-inset relative h-1.5 rounded-[var(--radius-pill)]"
         role="img"
         aria-label={`Collateral ratio ${formatCollateralRatio(collateralRatio)} on a scale from 110% to 300%. Maren's floor is 180%; the protocol liquidates at 110%.`}
       >
@@ -76,12 +76,12 @@ export function HealthScale({
         ))}
         <span
           aria-hidden
-          className={`absolute -top-1 size-3.5 -translate-x-1/2 rounded-[var(--radius-pill)] border-2 border-bg ${tone.dot}`}
+          className={`border-bg absolute -top-1 size-3.5 -translate-x-1/2 rounded-[var(--radius-pill)] border-2 ${tone.dot}`}
           style={{ left: `${position}%` }}
         />
       </div>
 
-      <div className="relative mt-2.5 h-4 text-[0.6875rem] text-text-subtle">
+      <div className="text-text-subtle relative mt-2.5 h-4 text-[0.6875rem]">
         <span className="num absolute left-0">110</span>
         {marks.map((mark) => (
           <span
@@ -97,8 +97,8 @@ export function HealthScale({
         <span className="num absolute right-0">300+</span>
       </div>
       <p className="sr-only">
-        Percentages are collateral ratios. Maren refuses to lend below 180%; the protocol
-        liquidates below 110%.
+        Percentages are collateral ratios. Maren refuses to lend below 180%; the protocol liquidates
+        below 110%.
       </p>
     </div>
   );

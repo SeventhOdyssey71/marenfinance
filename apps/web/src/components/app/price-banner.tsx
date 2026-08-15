@@ -18,11 +18,11 @@ export function PriceBanner({ feed, className = '' }: { feed: PriceFeed; classNa
   if (feed.state === 'live') {
     return (
       <div
-        className={`flex flex-wrap items-center gap-x-3 gap-y-1 text-sm text-text-muted ${className}`}
+        className={`text-text-muted flex flex-wrap items-center gap-x-3 gap-y-1 text-sm ${className}`}
       >
         <span
           aria-hidden
-          className="size-1.5 rounded-[var(--radius-pill)] bg-success shadow-[0_0_8px_1px_rgba(52,211,153,0.5)]"
+          className="bg-success size-1.5 rounded-[var(--radius-pill)] shadow-[0_0_8px_1px_rgba(52,211,153,0.5)]"
         />
         <span>BTC</span>
         <Num tone="default">{formatUsd(feed.priceWei)}</Num>
@@ -35,7 +35,7 @@ export function PriceBanner({ feed, className = '' }: { feed: PriceFeed; classNa
 
   if (feed.state === 'loading') {
     return (
-      <div className={`text-sm text-text-subtle ${className}`} role="status">
+      <div className={`text-text-subtle text-sm ${className}`} role="status">
         Reading the price feed.
       </div>
     );
@@ -49,24 +49,22 @@ export function PriceBanner({ feed, className = '' }: { feed: PriceFeed; classNa
   return (
     <div
       role="status"
-      className={`rounded-[var(--radius-input)] border border-warning/30 bg-surface-inset p-4 ${className}`}
+      className={`border-warning/30 bg-surface-inset rounded-[var(--radius-input)] border p-4 ${className}`}
     >
-      <div className="flex items-center gap-2 text-sm text-warning">
-        <span aria-hidden className="size-1.5 rounded-[var(--radius-pill)] bg-warning" />
+      <div className="text-warning flex items-center gap-2 text-sm">
+        <span aria-hidden className="bg-warning size-1.5 rounded-[var(--radius-pill)]" />
         Price feed unavailable
       </div>
-      <p className="mt-2 max-w-[60ch] text-sm leading-relaxed text-text-muted">
-        {detail} You can still repay and withdraw. New borrowing is paused until it
-        recovers.
+      <p className="text-text-muted mt-2 max-w-[60ch] text-sm leading-relaxed">
+        {detail} You can still repay and withdraw. New borrowing is paused until it recovers.
       </p>
       {feed.state === 'stale' ? (
-        <p className="mt-3 text-xs text-text-subtle">
+        <p className="text-text-subtle mt-3 text-xs">
           Last known price{' '}
-          <span className="num line-through decoration-text-subtle">
+          <span className="num decoration-text-subtle line-through">
             {formatUsd(feed.lastKnownWei)}
           </span>{' '}
-          — shown for context only. It is not the current price and nothing is computed
-          from it.
+          — shown for context only. It is not the current price and nothing is computed from it.
         </p>
       ) : null}
     </div>

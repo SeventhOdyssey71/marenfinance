@@ -32,11 +32,10 @@ export function BuiltOnMezo() {
               <br className="hidden sm:block" />{' '}
               <span className="text-text-muted">not bolted onto it.</span>
             </h2>
-            <p className="prose-measure mt-6 text-base leading-relaxed text-text-muted">
-              Maren does not fork MUSD, wrap BTC, or introduce a second asset. It sits on
-              top of what Mezo already ships and widens the door. Every contract address
-              and chain fact we publish is read from the chain, never transcribed by
-              hand.
+            <p className="prose-measure text-text-muted mt-6 text-base leading-relaxed">
+              Maren does not fork MUSD, wrap BTC, or introduce a second asset. It sits on top of
+              what Mezo already ships and widens the door. Every contract address and chain fact we
+              publish is read from the chain, never transcribed by hand.
             </p>
 
             <div className="mt-9 flex flex-wrap gap-3">
@@ -44,19 +43,19 @@ export function BuiltOnMezo() {
                 href="https://explorer.mezo.org"
                 target="_blank"
                 rel="noreferrer noopener"
-                className="group inline-flex h-11 items-center gap-2.5 rounded-[var(--radius-pill)] border border-[var(--border-hairline)] bg-surface-raised px-5 text-sm font-medium text-text transition-colors duration-[120ms] ease-out hover:border-[var(--border-strong)]"
+                className="bg-surface-raised text-text group inline-flex h-11 items-center gap-2.5 rounded-[var(--radius-pill)] border border-[var(--border-hairline)] px-5 text-sm font-medium transition-colors duration-[120ms] ease-out hover:border-[var(--border-strong)]"
               >
                 Mezo Explorer
-                <ArrowUpRight className="size-3.5 text-text-subtle transition-transform duration-[120ms] ease-out group-hover:-translate-y-px group-hover:translate-x-px" />
+                <ArrowUpRight className="text-text-subtle size-3.5 transition-transform duration-[120ms] ease-out group-hover:-translate-y-px group-hover:translate-x-px" />
               </a>
               <a
                 href="https://mezo.org"
                 target="_blank"
                 rel="noreferrer noopener"
-                className="group inline-flex h-11 items-center gap-2.5 rounded-[var(--radius-pill)] border border-transparent px-5 text-sm font-medium text-text-muted transition-colors duration-[120ms] ease-out hover:text-text"
+                className="text-text-muted hover:text-text group inline-flex h-11 items-center gap-2.5 rounded-[var(--radius-pill)] border border-transparent px-5 text-sm font-medium transition-colors duration-[120ms] ease-out"
               >
                 mezo.org
-                <ArrowUpRight className="size-3.5 text-text-subtle transition-transform duration-[120ms] ease-out group-hover:-translate-y-px group-hover:translate-x-px" />
+                <ArrowUpRight className="text-text-subtle size-3.5 transition-transform duration-[120ms] ease-out group-hover:-translate-y-px group-hover:translate-x-px" />
               </a>
             </div>
           </Reveal>
@@ -69,12 +68,10 @@ export function BuiltOnMezo() {
                   className="grid grid-cols-1 gap-2 p-6 sm:grid-cols-[10rem_1fr] sm:gap-6 md:p-8"
                 >
                   <dt>
-                    <span className="t-label block text-text-subtle">{f.label}</span>
-                    <span className="num mt-2 block text-[0.9375rem] text-text">
-                      {f.value}
-                    </span>
+                    <span className="t-label text-text-subtle block">{f.label}</span>
+                    <span className="num text-text mt-2 block text-[0.9375rem]">{f.value}</span>
                   </dt>
-                  <dd className="text-sm leading-relaxed text-text-muted">{f.body}</dd>
+                  <dd className="text-text-muted text-sm leading-relaxed">{f.body}</dd>
                 </div>
               ))}
             </dl>

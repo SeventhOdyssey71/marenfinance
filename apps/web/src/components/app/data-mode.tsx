@@ -23,9 +23,9 @@ export function DataModeBanner() {
 
   if (source.mode === 'live') {
     return (
-      <p className="text-xs text-text-subtle">
-        Live from Mezo {source.network}. Figures are read from the contracts at the
-        addresses in <span className="num">@maren/sdk</span>.
+      <p className="text-text-subtle text-xs">
+        Live from Mezo {source.network}. Figures are read from the contracts at the addresses in{' '}
+        <span className="num">@maren/sdk</span>.
       </p>
     );
   }
@@ -33,13 +33,13 @@ export function DataModeBanner() {
   const stale = demo.forcedStaleSeconds > 0;
 
   return (
-    <div className="rounded-[var(--radius-card)] border border-[var(--border-hairline)] bg-surface-inset p-4">
+    <div className="bg-surface-inset rounded-[var(--radius-card)] border border-[var(--border-hairline)] p-4">
       <div className="flex flex-wrap items-center justify-between gap-4">
         <div className="max-w-[68ch]">
           <p className="t-label text-warning">Demo data</p>
-          <p className="mt-2 text-sm leading-relaxed text-text-muted">
-            Maren’s contracts are not deployed yet — every figure below is mock data on
-            Mezo {source.network}, and no action broadcasts a transaction.
+          <p className="text-text-muted mt-2 text-sm leading-relaxed">
+            Maren’s contracts are not deployed yet — every figure below is mock data on Mezo{' '}
+            {source.network}, and no action broadcasts a transaction.
           </p>
         </div>
 
@@ -48,7 +48,7 @@ export function DataModeBanner() {
           onClick={() => setOpen((v) => !v)}
           aria-expanded={open}
           aria-controls="demo-controls"
-          className="inline-flex h-11 shrink-0 items-center rounded-[var(--radius-pill)] border border-[var(--border-hairline)] bg-surface-raised px-4 text-sm text-text-muted transition-colors duration-[120ms] ease-out hover:border-[var(--border-strong)] hover:text-text"
+          className="bg-surface-raised text-text-muted hover:text-text inline-flex h-11 shrink-0 items-center rounded-[var(--radius-pill)] border border-[var(--border-hairline)] px-4 text-sm transition-colors duration-[120ms] ease-out hover:border-[var(--border-strong)]"
         >
           {open ? 'Hide demo controls' : 'Demo controls'}
         </button>
@@ -59,12 +59,11 @@ export function DataModeBanner() {
         hidden={!open}
         className="mt-4 border-t border-[var(--border-hairline)] pt-4"
       >
-        <p className="max-w-[68ch] text-sm leading-relaxed text-text-muted">
+        <p className="text-text-muted max-w-[68ch] text-sm leading-relaxed">
           The live reads are written against the real ABIs and gated on{' '}
-          <span className="num">isDeployed()</span>; when{' '}
-          <span className="num">Deploy.s.sol</span> writes addresses into{' '}
-          <span className="num">@maren/sdk</span> this banner disappears and the same
-          screens read from chain. See <span className="num">apps/web/README.md</span>.
+          <span className="num">isDeployed()</span>; when <span className="num">Deploy.s.sol</span>{' '}
+          writes addresses into <span className="num">@maren/sdk</span> this banner disappears and
+          the same screens read from chain. See <span className="num">apps/web/README.md</span>.
         </p>
 
         <div className="mt-5 flex flex-wrap gap-x-10 gap-y-5">
@@ -84,12 +83,12 @@ export function DataModeBanner() {
                   aria-pressed={demo.account === option.key}
                   className={`inline-flex h-11 items-center gap-2 rounded-[var(--radius-pill)] border px-4 text-sm transition-colors duration-[120ms] ease-out ${
                     demo.account === option.key
-                      ? 'border-[var(--border-strong)] bg-surface-raised text-text'
-                      : 'border-[var(--border-hairline)] text-text-muted hover:text-text'
+                      ? 'bg-surface-raised text-text border-[var(--border-strong)]'
+                      : 'text-text-muted hover:text-text border-[var(--border-hairline)]'
                   }`}
                 >
                   {option.label}
-                  <span className="num text-xs text-text-subtle">{option.hint}</span>
+                  <span className="num text-text-subtle text-xs">{option.hint}</span>
                 </button>
               ))}
             </div>
@@ -105,7 +104,7 @@ export function DataModeBanner() {
                 className={`inline-flex h-11 items-center rounded-[var(--radius-pill)] border px-4 text-sm transition-colors duration-[120ms] ease-out ${
                   stale
                     ? 'border-warning/40 bg-surface-raised text-warning'
-                    : 'border-[var(--border-hairline)] text-text-muted hover:text-text'
+                    : 'text-text-muted hover:text-text border-[var(--border-hairline)]'
                 }`}
               >
                 {stale ? 'Oracle stalled — restore it' : 'Stall the oracle (240s)'}
@@ -114,10 +113,10 @@ export function DataModeBanner() {
           </fieldset>
         </div>
 
-        <p className="mt-4 max-w-[68ch] text-xs leading-relaxed text-text-subtle">
-          Stalling the oracle drives the app into the state Mezo produces above 60 seconds
-          of staleness: borrowing is refused, repay stays open, and no figure is computed
-          from the last known price.
+        <p className="text-text-subtle mt-4 max-w-[68ch] text-xs leading-relaxed">
+          Stalling the oracle drives the app into the state Mezo produces above 60 seconds of
+          staleness: borrowing is refused, repay stays open, and no figure is computed from the last
+          known price.
         </p>
       </div>
     </div>

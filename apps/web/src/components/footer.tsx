@@ -53,8 +53,8 @@ export function Footer() {
       <div className="container-maren">
         <div className="grid grid-cols-1 gap-12 py-16 md:grid-cols-12 md:gap-8 md:py-24">
           <div className="md:col-span-5 lg:col-span-4">
-            <Wordmark className="h-[18px] w-auto text-text" />
-            <p className="mt-6 max-w-xs text-sm leading-relaxed text-text-muted">
+            <Wordmark className="text-text h-[18px] w-auto" />
+            <p className="text-text-muted mt-6 max-w-xs text-sm leading-relaxed">
               Bitcoin liquidity, gasless spending, and yield. Built on Mezo.
             </p>
             <ul className="mt-8 flex items-center gap-2">
@@ -65,7 +65,7 @@ export function Footer() {
                     target="_blank"
                     rel="noreferrer noopener"
                     aria-label={label}
-                    className="grid size-11 place-items-center rounded-[var(--radius-pill)] border border-[var(--border-hairline)] bg-surface text-text-muted transition-colors duration-[120ms] ease-out hover:border-[var(--border-strong)] hover:text-text"
+                    className="bg-surface text-text-muted hover:text-text grid size-11 place-items-center rounded-[var(--radius-pill)] border border-[var(--border-hairline)] transition-colors duration-[120ms] ease-out hover:border-[var(--border-strong)]"
                   >
                     <Icon className="size-4" />
                   </a>
@@ -89,14 +89,14 @@ export function Footer() {
                           href={l.href}
                           target="_blank"
                           rel="noreferrer noopener"
-                          className="text-sm text-text-muted transition-colors duration-[120ms] ease-out hover:text-text"
+                          className="text-text-muted hover:text-text text-sm transition-colors duration-[120ms] ease-out"
                         >
                           {l.label}
                         </a>
                       ) : (
                         <Link
                           href={l.href}
-                          className="text-sm text-text-muted transition-colors duration-[120ms] ease-out hover:text-text"
+                          className="text-text-muted hover:text-text text-sm transition-colors duration-[120ms] ease-out"
                         >
                           {l.label}
                         </Link>
@@ -110,11 +110,11 @@ export function Footer() {
         </div>
 
         <div className="hairline-t flex flex-col-reverse gap-4 py-8 sm:flex-row sm:items-center sm:justify-between">
-          <p className="text-xs text-text-subtle">
-            © {new Date().getFullYear()} Maren Finance. Pre-audit software — deposit only
-            what you can afford to lose.
+          <p className="text-text-subtle text-xs">
+            © {new Date().getFullYear()} Maren Finance. Pre-audit software — deposit only what you
+            can afford to lose.
           </p>
-          <p className="inline-flex items-center gap-2.5 text-xs text-text-subtle">
+          <p className="text-text-subtle inline-flex items-center gap-2.5 text-xs">
             <span aria-hidden className="size-1.5 rounded-full bg-violet-500" />
             Built on Mezo
             <span className="num text-text-subtle/70">31612 · 31611</span>

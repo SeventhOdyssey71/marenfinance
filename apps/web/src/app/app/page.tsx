@@ -55,7 +55,9 @@ export default function PortfolioPage() {
   const livePrice = price.state === 'live' ? price.priceWei : null;
 
   const health =
-    position && livePrice ? assessHealth(position.collateralWei, position.debtWei, livePrice) : null;
+    position && livePrice
+      ? assessHealth(position.collateralWei, position.debtWei, livePrice)
+      : null;
 
   const collateralUsd =
     position && livePrice ? collateralValue(position.collateralWei, livePrice) : null;
@@ -66,7 +68,7 @@ export default function PortfolioPage() {
         <div>
           <Label>Account</Label>
           <h1 className="t-h2 mt-2">{handle ?? 'Your position'}</h1>
-          <p className="num mt-2 text-sm text-text-subtle">{shortAddress(source.account, 10, 8)}</p>
+          <p className="num text-text-subtle mt-2 text-sm">{shortAddress(source.account, 10, 8)}</p>
         </div>
         {price.state === 'live' ? <PriceBanner feed={price} /> : null}
       </div>
@@ -82,7 +84,7 @@ export default function PortfolioPage() {
 
             <div className="mt-6 flex flex-wrap items-baseline gap-3">
               <Ratio cr={health.collateralRatio} size="xl" />
-              <span className="text-sm text-text-subtle">collateral ratio</span>
+              <span className="text-text-subtle text-sm">collateral ratio</span>
             </div>
 
             <HealthScale collateralRatio={health.collateralRatio} status={health.status} />
@@ -112,9 +114,9 @@ export default function PortfolioPage() {
 
             {!health.canBorrow ? (
               <div className="mt-6 border-t border-[var(--border-hairline)] pt-5">
-                <p className="text-sm leading-relaxed text-text-muted" role="status">
-                  Below {policyRatio(MAREN_POLICY.minHealthyCr)} Maren does not
-                  let you borrow more. Repay or add collateral to reopen borrowing —{' '}
+                <p className="text-text-muted text-sm leading-relaxed" role="status">
+                  Below {policyRatio(MAREN_POLICY.minHealthyCr)} Maren does not let you borrow more.
+                  Repay or add collateral to reopen borrowing —{' '}
                   <Link href="/app/vault" className="text-violet-400 hover:text-violet-400/80">
                     open the Vault
                   </Link>
@@ -131,10 +133,10 @@ export default function PortfolioPage() {
             <PriceBanner feed={price} />
           </div>
           {position && price.state !== 'loading' ? (
-            <p className="mt-4 max-w-[68ch] text-sm leading-relaxed text-text-subtle">
+            <p className="text-text-subtle mt-4 max-w-[68ch] text-sm leading-relaxed">
               Your collateral is {formatBtc(position.collateralWei)} against{' '}
-              {formatMusd(position.debtWei)} of debt. Health is not shown because it would
-              have to be computed from a price the protocol itself would refuse.
+              {formatMusd(position.debtWei)} of debt. Health is not shown because it would have to
+              be computed from a price the protocol itself would refuse.
             </p>
           ) : null}
         </AppCard>
@@ -172,7 +174,7 @@ export default function PortfolioPage() {
             value={position ? <Musd wei={position.debtWei} size="lg" /> : <Dash size="lg" />}
             sub={
               position ? (
-                <span className="text-xs text-text-subtle">
+                <span className="text-text-subtle text-xs">
                   {formatMusd(position.interestWei)} interest
                 </span>
               ) : null
@@ -209,21 +211,20 @@ export default function PortfolioPage() {
         <CardTitle>What gasless means here</CardTitle>
         <p
           data-contrast="gas-copy"
-          className="mt-4 max-w-[68ch] text-sm leading-relaxed text-text-muted"
+          className="text-text-muted mt-4 max-w-[68ch] text-sm leading-relaxed"
         >
-          Mezo charges gas in BTC. Maren’s relayer pays it for payments, Earn, and pooled
-          borrow, repay and withdraw — you sign an EIP-712 message and hold no Bitcoin for
-          gas.
+          Mezo charges gas in BTC. Maren’s relayer pays it for payments, Earn, and pooled borrow,
+          repay and withdraw — you sign an EIP-712 message and hold no Bitcoin for gas.
         </p>
-        <p className="mt-3 max-w-[68ch] text-sm leading-relaxed text-text-muted">
-          <strong className="font-medium text-text">Your first deposit is the exception.</strong>{' '}
-          Depositing sends Bitcoin with the call, and the relay hub refuses any request
-          carrying value — sponsoring one would mean Maren funding your deposit. So your
-          first deposit costs gas, and everything after it is free.
+        <p className="text-text-muted mt-3 max-w-[68ch] text-sm leading-relaxed">
+          <strong className="text-text font-medium">Your first deposit is the exception.</strong>{' '}
+          Depositing sends Bitcoin with the call, and the relay hub refuses any request carrying
+          value — sponsoring one would mean Maren funding your deposit. So your first deposit costs
+          gas, and everything after it is free.
         </p>
-        <p className="mt-3 text-xs text-text-subtle">
-          After the free tier the relayer fee is taken in MUSD inside the same
-          transaction, and shown before you sign.
+        <p className="text-text-subtle mt-3 text-xs">
+          After the free tier the relayer fee is taken in MUSD inside the same transaction, and
+          shown before you sign.
         </p>
       </AppCard>
 
@@ -233,7 +234,7 @@ export default function PortfolioPage() {
           <CardTitle>Recent activity</CardTitle>
           <Link
             href="/app/activity"
-            className="rounded-[var(--radius-pill)] text-sm text-text-muted transition-colors duration-[120ms] ease-out hover:text-text"
+            className="text-text-muted hover:text-text rounded-[var(--radius-pill)] text-sm transition-colors duration-[120ms] ease-out"
           >
             All activity
           </Link>
@@ -257,7 +258,7 @@ export default function PortfolioPage() {
             />
           ))}
           {activity && activity.length === 0 ? (
-            <p className="py-3 text-sm text-text-subtle">Nothing yet.</p>
+            <p className="text-text-subtle py-3 text-sm">Nothing yet.</p>
           ) : null}
         </div>
       </AppCard>
@@ -283,7 +284,7 @@ function BorrowingCapacity() {
     return (
       <AppCard>
         <CardTitle>Borrowing capacity</CardTitle>
-        <p className="mt-4 text-sm text-text-subtle">Reading your position.</p>
+        <p className="text-text-subtle mt-4 text-sm">Reading your position.</p>
       </AppCard>
     );
   }
@@ -333,7 +334,7 @@ function BorrowingCapacity() {
         />
       </div>
 
-      <p className="mt-6 max-w-[68ch] text-sm leading-relaxed text-text-muted">
+      <p className="text-text-muted mt-6 max-w-[68ch] text-sm leading-relaxed">
         {position.route === 'pooled'
           ? 'The ceiling above belongs to the pooled trove and is shared by everyone inside it. Your own limit is the 180% floor on your share, whichever binds first.'
           : 'This ceiling comes from TroveManager.getTroveMaxBorrowingCapacity(), not from your collateral ratio. Mezo fixes it at the price your trove opened at, and adding collateral does not raise it — only a refinance does.'}
@@ -342,9 +343,9 @@ function BorrowingCapacity() {
       {position.route === 'direct' && mezoHeadroom === 0n ? (
         <div className="mt-4">
           <Note>
-            You are at Mezo’s ceiling. Your ratio may look healthy and the next borrow will
-            still revert. A refinance re-fixes the ceiling at today’s price; it costs a
-            refinancing fee and is blocked while the system is in Recovery Mode.
+            You are at Mezo’s ceiling. Your ratio may look healthy and the next borrow will still
+            revert. A refinance re-fixes the ceiling at today’s price; it costs a refinancing fee
+            and is blocked while the system is in Recovery Mode.
           </Note>
         </div>
       ) : null}
@@ -366,14 +367,14 @@ function QuickLink({
   return (
     <Link
       href={href}
-      className="card group flex items-center gap-4 p-5 transition-colors duration-[120ms] ease-out hover:bg-surface-raised"
+      className="card hover:bg-surface-raised group flex items-center gap-4 p-5 transition-colors duration-[120ms] ease-out"
     >
-      <span className="grid size-10 shrink-0 place-items-center rounded-[var(--radius-pill)] border border-[var(--border-hairline)] bg-surface-raised text-violet-400">
+      <span className="bg-surface-raised grid size-10 shrink-0 place-items-center rounded-[var(--radius-pill)] border border-[var(--border-hairline)] text-violet-400">
         {icon}
       </span>
       <span className="min-w-0">
-        <span className="block text-[0.9375rem] text-text">{label}</span>
-        <span className="block truncate text-xs text-text-subtle">{detail}</span>
+        <span className="text-text block text-[0.9375rem]">{label}</span>
+        <span className="text-text-subtle block truncate text-xs">{detail}</span>
       </span>
     </Link>
   );

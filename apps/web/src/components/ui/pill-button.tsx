@@ -23,8 +23,7 @@ const variants: Record<Variant, string> = {
     'bg-white text-[#08080A] hover:bg-white/90 active:bg-white/80 font-medium border border-transparent',
   secondary:
     'bg-surface-raised text-text border border-[var(--border-hairline)] hover:border-[var(--border-strong)] hover:bg-[#1D1D22] font-medium',
-  ghost:
-    'bg-transparent text-text-muted hover:text-text border border-transparent font-medium',
+  ghost: 'bg-transparent text-text-muted hover:text-text border border-transparent font-medium',
 };
 
 const badgeVariants: Record<Variant, string> = {
@@ -74,13 +73,7 @@ export function PillButton({
 
   if (external) {
     return (
-      <a
-        href={href}
-        className={classes}
-        target="_blank"
-        rel="noreferrer noopener"
-        {...rest}
-      >
+      <a href={href} className={classes} target="_blank" rel="noreferrer noopener" {...rest}>
         {inner}
       </a>
     );
@@ -106,7 +99,7 @@ export function TextPill({
   return (
     <Link
       href={href}
-      className={`inline-flex h-11 items-center rounded-[var(--radius-pill)] border border-[var(--border-hairline)] bg-surface-raised px-5 text-sm font-medium text-text transition-colors duration-[120ms] ease-out hover:border-[var(--border-strong)] ${className}`}
+      className={`bg-surface-raised text-text inline-flex h-11 items-center rounded-[var(--radius-pill)] border border-[var(--border-hairline)] px-5 text-sm font-medium transition-colors duration-[120ms] ease-out hover:border-[var(--border-strong)] ${className}`}
     >
       {children}
     </Link>

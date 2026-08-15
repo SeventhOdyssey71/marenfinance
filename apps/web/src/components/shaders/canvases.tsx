@@ -70,13 +70,7 @@ export function RibbonCanvas({
   );
 }
 
-export function GrainCanvas({
-  running,
-  className = '',
-}: {
-  running: boolean;
-  className?: string;
-}) {
+export function GrainCanvas({ running, className = '' }: { running: boolean; className?: string }) {
   return (
     <GrainGradient
       className={className}

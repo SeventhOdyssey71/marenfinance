@@ -27,14 +27,14 @@ export default function AppLayout({ children }: { children: ReactNode }) {
     <AppProviders>
       <a
         href="#app-content"
-        className="sr-only rounded-[var(--radius-pill)] bg-white px-5 py-3 text-sm font-medium text-[#08080A] focus:not-sr-only focus:absolute focus:top-4 focus:left-4 focus:z-50"
+        className="sr-only rounded-[var(--radius-pill)] bg-white px-5 py-3 text-sm font-medium text-[#08080A] focus:not-sr-only focus:absolute focus:left-4 focus:top-4 focus:z-50"
       >
         Skip to content
       </a>
 
       <AppNav />
 
-      <main id="app-content" className="container-maren pt-8 pb-24">
+      <main id="app-content" className="container-maren pb-24 pt-8">
         <div className="flex flex-col gap-6">
           <NetworkGuard />
           <DataModeBanner />
@@ -43,17 +43,17 @@ export default function AppLayout({ children }: { children: ReactNode }) {
       </main>
 
       <footer className="hairline-t">
-        <div className="container-maren flex flex-wrap items-center justify-between gap-4 py-8 text-xs text-text-subtle">
+        <div className="container-maren text-text-subtle flex flex-wrap items-center justify-between gap-4 py-8 text-xs">
           <p className="max-w-[68ch] leading-relaxed">
-            Pre-audit. MarenVault and MarenPay carry user funds and have not been audited
-            by a third party. Pooled positions share one trove: collateral is segregated
-            in accounting, not in custody.
+            Pre-audit. MarenVault and MarenPay carry user funds and have not been audited by a third
+            party. Pooled positions share one trove: collateral is segregated in accounting, not in
+            custody.
           </p>
           <a
             href="https://github.com/SeventhOdyssey71/marenfinance/tree/main/docs"
             target="_blank"
             rel="noreferrer noopener"
-            className="text-text-muted transition-colors duration-[120ms] ease-out hover:text-text"
+            className="text-text-muted hover:text-text transition-colors duration-[120ms] ease-out"
           >
             Docs
           </a>

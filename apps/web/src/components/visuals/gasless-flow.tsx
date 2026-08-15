@@ -27,25 +27,20 @@ export function GaslessFlow() {
       <ol className="mt-7 space-y-3">
         {steps.map((s, i) => (
           <li key={s.k} className="relative">
-            <div className="flex items-start gap-4 rounded-[var(--radius-card)] bg-surface-inset p-4 sm:p-5">
-              <span className="num mt-0.5 shrink-0 text-xs text-text-subtle">{s.k}</span>
+            <div className="bg-surface-inset flex items-start gap-4 rounded-[var(--radius-card)] p-4 sm:p-5">
+              <span className="num text-text-subtle mt-0.5 shrink-0 text-xs">{s.k}</span>
               <div className="min-w-0">
-                <p className="text-[0.9375rem] font-medium text-text">{s.title}</p>
-                <p className="mt-1.5 text-sm leading-relaxed text-text-muted">{s.body}</p>
+                <p className="text-text text-[0.9375rem] font-medium">{s.title}</p>
+                <p className="text-text-muted mt-1.5 text-sm leading-relaxed">{s.body}</p>
               </div>
             </div>
             {i < steps.length - 1 && (
               <span
                 aria-hidden
-                className="ml-[1.375rem] flex h-3 items-center text-text-subtle sm:ml-[1.75rem]"
+                className="text-text-subtle ml-[1.375rem] flex h-3 items-center sm:ml-[1.75rem]"
               >
                 <svg viewBox="0 0 2 12" className="h-3 w-px" aria-hidden>
-                  <path
-                    d="M1 0v12"
-                    stroke="currentColor"
-                    strokeWidth="1"
-                    strokeDasharray="2 3"
-                  />
+                  <path d="M1 0v12" stroke="currentColor" strokeWidth="1" strokeDasharray="2 3" />
                 </svg>
               </span>
             )}
@@ -53,18 +48,17 @@ export function GaslessFlow() {
         ))}
       </ol>
 
-      <div className="mt-7 flex flex-wrap items-center gap-x-3 gap-y-2 rounded-[var(--radius-card)] border border-violet-500/20 bg-violet-500/6 px-5 py-4">
+      <div className="bg-violet-500/6 mt-7 flex flex-wrap items-center gap-x-3 gap-y-2 rounded-[var(--radius-card)] border border-violet-500/20 px-5 py-4">
         <span className="num text-2xl font-medium text-violet-400">25</span>
-        <span className="text-sm text-text-muted">
-          free actions per address. After that, a small fee is taken in MUSD inside the
-          same transaction — never in BTC.
+        <span className="text-text-muted text-sm">
+          free actions per address. After that, a small fee is taken in MUSD inside the same
+          transaction — never in BTC.
         </span>
       </div>
 
-      <p className="mt-5 flex items-center gap-2 text-xs text-text-subtle">
+      <p className="text-text-subtle mt-5 flex items-center gap-2 text-xs">
         <ArrowRight className="size-3.5 shrink-0" aria-hidden />
-        The relayer never holds user funds. Compromising it costs us gas, not your
-        Bitcoin.
+        The relayer never holds user funds. Compromising it costs us gas, not your Bitcoin.
       </p>
     </div>
   );

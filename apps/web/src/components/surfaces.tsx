@@ -19,32 +19,31 @@ export function Surfaces() {
             <article className="card relative h-full overflow-hidden p-6 md:p-8">
               <span
                 aria-hidden
-                className="pointer-events-none absolute -top-28 -left-20 size-72 rounded-full bg-violet-500/10 blur-3xl"
+                className="pointer-events-none absolute -left-20 -top-28 size-72 rounded-full bg-violet-500/10 blur-3xl"
               />
               <div className="relative flex h-full flex-col">
                 <div className="flex items-center gap-3.5">
-                  <span className="grid size-10 shrink-0 place-items-center rounded-[var(--radius-pill)] border border-[var(--border-hairline)] bg-surface-raised text-violet-400">
+                  <span className="bg-surface-raised grid size-10 shrink-0 place-items-center rounded-[var(--radius-pill)] border border-[var(--border-hairline)] text-violet-400">
                     <VaultIcon className="size-5" />
                   </span>
                   <h3 className="t-h3">Vault</h3>
                 </div>
-                <p className="mt-6 max-w-lg text-[0.9375rem] leading-relaxed text-text-muted">
-                  Deposit BTC, draw MUSD. A direct trove for positions above the
-                  protocol minimum; a pooled trove — from 0.001 BTC — for everyone the
-                  minimum currently excludes.
+                <p className="text-text-muted mt-6 max-w-lg text-[0.9375rem] leading-relaxed">
+                  Deposit BTC, draw MUSD. A direct trove for positions above the protocol minimum; a
+                  pooled trove — from 0.001 BTC — for everyone the minimum currently excludes.
                 </p>
                 <dl className="mt-auto grid grid-cols-2 gap-4 pt-10 sm:grid-cols-3">
                   <div>
                     <dt className="t-label text-text-subtle">Floor</dt>
-                    <dd className="num mt-2 text-lg text-text">0.001 BTC</dd>
+                    <dd className="num text-text mt-2 text-lg">0.001 BTC</dd>
                   </div>
                   <div>
                     <dt className="t-label text-text-subtle">Internal CR</dt>
-                    <dd className="num mt-2 text-lg text-text">140%</dd>
+                    <dd className="num text-text mt-2 text-lg">140%</dd>
                   </div>
                   <div className="col-span-2 sm:col-span-1">
                     <dt className="t-label text-text-subtle">Protocol CR</dt>
-                    <dd className="num mt-2 text-lg text-text-muted">110%</dd>
+                    <dd className="num text-text-muted mt-2 text-lg">110%</dd>
                   </div>
                 </dl>
               </div>
@@ -54,14 +53,14 @@ export function Surfaces() {
           <Reveal delay={80} className="md:col-span-2">
             <article className="card flex h-full flex-col p-6 md:p-8">
               <div className="flex items-center gap-3.5">
-                <span className="grid size-10 shrink-0 place-items-center rounded-[var(--radius-pill)] border border-[var(--border-hairline)] bg-surface-raised text-violet-400">
+                <span className="bg-surface-raised grid size-10 shrink-0 place-items-center rounded-[var(--radius-pill)] border border-[var(--border-hairline)] text-violet-400">
                   <PayIcon className="size-5" />
                 </span>
                 <h3 className="t-h3">Pay</h3>
               </div>
-              <p className="mt-6 text-[0.9375rem] leading-relaxed text-text-muted">
-                Send MUSD to an @handle, a link, a request or a split. Gasless, with an
-                on-chain memo.
+              <p className="text-text-muted mt-6 text-[0.9375rem] leading-relaxed">
+                Send MUSD to an @handle, a link, a request or a split. Gasless, with an on-chain
+                memo.
               </p>
               <ul className="mt-auto space-y-2.5 pt-8">
                 {[
@@ -72,10 +71,10 @@ export function Surfaces() {
                 ].map(([shape, detail]) => (
                   <li
                     key={shape}
-                    className="flex items-center justify-between gap-3 border-b border-[var(--border-hairline)] pb-2.5 text-sm text-text-muted last:border-b-0 last:pb-0"
+                    className="text-text-muted flex items-center justify-between gap-3 border-b border-[var(--border-hairline)] pb-2.5 text-sm last:border-b-0 last:pb-0"
                   >
                     {shape}
-                    <span className="num truncate text-xs text-text-subtle">{detail}</span>
+                    <span className="num text-text-subtle truncate text-xs">{detail}</span>
                   </li>
                 ))}
               </ul>
@@ -85,19 +84,18 @@ export function Surfaces() {
           <Reveal delay={80} className="md:col-span-3">
             <article className="card flex h-full flex-col p-6 md:p-8">
               <div className="flex items-center gap-3.5">
-                <span className="grid size-10 shrink-0 place-items-center rounded-[var(--radius-pill)] border border-[var(--border-hairline)] bg-surface-raised text-violet-400">
+                <span className="bg-surface-raised grid size-10 shrink-0 place-items-center rounded-[var(--radius-pill)] border border-[var(--border-hairline)] text-violet-400">
                   <EarnIcon className="size-5" />
                 </span>
                 <h3 className="t-h3">Earn</h3>
               </div>
-              <p className="mt-6 text-[0.9375rem] leading-relaxed text-text-muted">
-                Idle MUSD into the MUSD Stability Pool through an ERC-4626 vault. BTC
-                liquidation gains are swept and compounded back into MUSD.
+              <p className="text-text-muted mt-6 text-[0.9375rem] leading-relaxed">
+                Idle MUSD into the MUSD Stability Pool through an ERC-4626 vault. BTC liquidation
+                gains are swept and compounded back into MUSD.
               </p>
-              <p className="mt-auto pt-10 text-xs leading-relaxed text-text-subtle">
-                The Stability Pool has no token emissions. Yield is liquidation gains
-                only — lumpy, and shown as trailing realised return, never as a fixed
-                APY.
+              <p className="text-text-subtle mt-auto pt-10 text-xs leading-relaxed">
+                The Stability Pool has no token emissions. Yield is liquidation gains only — lumpy,
+                and shown as trailing realised return, never as a fixed APY.
               </p>
             </article>
           </Reveal>
@@ -105,19 +103,18 @@ export function Surfaces() {
           <Reveal delay={160} className="md:col-span-3">
             <article className="card flex h-full flex-col p-6 md:p-8">
               <div className="flex items-center gap-3.5">
-                <span className="grid size-10 shrink-0 place-items-center rounded-[var(--radius-pill)] border border-[var(--border-hairline)] bg-surface-raised text-violet-400">
+                <span className="bg-surface-raised grid size-10 shrink-0 place-items-center rounded-[var(--radius-pill)] border border-[var(--border-hairline)] text-violet-400">
                   <PortfolioIcon className="size-5" />
                 </span>
                 <h3 className="t-h3">Portfolio</h3>
               </div>
-              <p className="mt-6 text-[0.9375rem] leading-relaxed text-text-muted">
-                Position health, borrowing capacity, history and alerts. If the price
-                feed is stale, Maren says so and stops — it never renders a stale price
-                as though it were live.
+              <p className="text-text-muted mt-6 text-[0.9375rem] leading-relaxed">
+                Position health, borrowing capacity, history and alerts. If the price feed is stale,
+                Maren says so and stops — it never renders a stale price as though it were live.
               </p>
-              <p className="mt-auto pt-10 text-xs leading-relaxed text-text-subtle">
-                Mezo&rsquo;s price feed reverts above 60 seconds of staleness. Both apps
-                have an explicit unavailable state.
+              <p className="text-text-subtle mt-auto pt-10 text-xs leading-relaxed">
+                Mezo&rsquo;s price feed reverts above 60 seconds of staleness. Both apps have an
+                explicit unavailable state.
               </p>
             </article>
           </Reveal>

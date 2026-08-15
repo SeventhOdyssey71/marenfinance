@@ -52,9 +52,9 @@ export default function ActivityPage() {
       <div>
         <Label>Activity</Label>
         <h1 className="t-h2 mt-2">History</h1>
-        <p className="mt-3 max-w-[68ch] text-sm leading-relaxed text-text-muted">
-          Everything Maren has done on your behalf, with the gas each action actually cost
-          you and a link to the receipt on {explorer.name}.
+        <p className="text-text-muted mt-3 max-w-[68ch] text-sm leading-relaxed">
+          Everything Maren has done on your behalf, with the gas each action actually cost you and a
+          link to the receipt on {explorer.name}.
         </p>
       </div>
 
@@ -66,31 +66,30 @@ export default function ActivityPage() {
             <Row key={item.id} item={item} last={index === rows.length - 1} />
           ))}
           {rows.length === 0 ? (
-            <p className="py-8 text-sm text-text-subtle">Nothing in this filter yet.</p>
+            <p className="text-text-subtle py-8 text-sm">Nothing in this filter yet.</p>
           ) : null}
         </div>
       </AppCard>
 
       <AppCard>
         <CardTitle>Reading this ledger</CardTitle>
-        <ul className="mt-4 max-w-[68ch] space-y-2.5 text-sm leading-relaxed text-text-muted">
+        <ul className="text-text-muted mt-4 max-w-[68ch] space-y-2.5 text-sm leading-relaxed">
           <li>
-            <span className="text-text">Confirmed</span> means a receipt came back with
-            status success. A transaction hash on its own is not a result and never
-            appears as one.
+            <span className="text-text">Confirmed</span> means a receipt came back with status
+            success. A transaction hash on its own is not a result and never appears as one.
           </li>
           <li>
-            <span className="text-text">Awaiting receipt</span> means we have a hash and no
-            receipt yet. It may still land — check here before retrying.
+            <span className="text-text">Awaiting receipt</span> means we have a hash and no receipt
+            yet. It may still land — check here before retrying.
           </li>
           <li>
-            <span className="text-text">Failed</span> means the chain mined it and then
-            reverted it. No funds moved.
+            <span className="text-text">Failed</span> means the chain mined it and then reverted it.
+            No funds moved.
           </li>
           <li>
-            <span className="text-text">Gas</span> is what you paid in BTC. Sponsored rows
-            are zero because Maren’s relayer paid instead; a deposit is never sponsored,
-            because it carries value and the relay hub refuses those.
+            <span className="text-text">Gas</span> is what you paid in BTC. Sponsored rows are zero
+            because Maren’s relayer paid instead; a deposit is never sponsored, because it carries
+            value and the relay hub refuses those.
           </li>
         </ul>
       </AppCard>
@@ -121,8 +120,8 @@ function Row({ item, last }: { item: ActivityItem; last: boolean }) {
       }`}
     >
       <div className="min-w-0">
-        <p className="text-[0.9375rem] text-text">{activityTitle(item.kind, item.counterparty)}</p>
-        <p className="mt-1.5 text-xs text-text-subtle">
+        <p className="text-text text-[0.9375rem]">{activityTitle(item.kind, item.counterparty)}</p>
+        <p className="text-text-subtle mt-1.5 text-xs">
           {timeAgo(item.at)} · <span className={statusClass}>{statusLabel(item.status)}</span>
           {item.memo ? ` · ${item.memo}` : ''}
         </p>
@@ -131,7 +130,7 @@ function Row({ item, last }: { item: ActivityItem; last: boolean }) {
             href={`${explorer.url}/tx/${item.hash}`}
             target="_blank"
             rel="noreferrer noopener"
-            className="num mt-2 inline-flex items-center gap-1.5 rounded-[var(--radius-pill)] text-xs text-text-muted transition-colors duration-[120ms] ease-out hover:text-text"
+            className="num text-text-muted hover:text-text mt-2 inline-flex items-center gap-1.5 rounded-[var(--radius-pill)] text-xs transition-colors duration-[120ms] ease-out"
           >
             {shortHash(item.hash)}
             <ArrowUpRight className="size-3" />
@@ -147,7 +146,7 @@ function Row({ item, last }: { item: ActivityItem; last: boolean }) {
             {amount}
           </Num>
         ) : null}
-        <p className="mt-1.5 text-xs text-text-subtle">
+        <p className="text-text-subtle mt-1.5 text-xs">
           {item.sponsored ? (
             'Gas paid by Maren'
           ) : (
