@@ -91,14 +91,19 @@ export default function EarnPage() {
           )}
           <span className="t-h3 text-text-muted">MUSD</span>
         </div>
-        <div className="mt-6">
-          <StatRow
-            label="Deposited"
-            hint="everything you have put in"
-            value={earn ? <Musd wei={earn.depositedWei} /> : <Dash />}
-            last
-          />
-        </div>
+        {/* Only once there is something to compare the balance against. Repeating
+            "0.00 MUSD" directly beneath a 0.00 MUSD headline is a row that carries no
+            information. */}
+        {!earn || earn.depositedWei > 0n ? (
+          <div className="mt-6">
+            <StatRow
+              label="Deposited"
+              hint="everything you have put in"
+              value={earn ? <Musd wei={earn.depositedWei} /> : <Dash />}
+              last
+            />
+          </div>
+        ) : null}
       </AppCard>
 
       {/* --------------------------------------------- Trailing realised yield */}

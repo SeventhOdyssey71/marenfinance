@@ -208,9 +208,10 @@ const check = (name, pass, detail = '') => {
   // The gasless claim must never be unconditional. MarenVault.deposit() is payable and
   // MarenRelayHub reverts on any request carrying value, so the first deposit costs the
   // user BTC gas. Copy that says otherwise is a lie the contracts will expose.
+  // Located by the data hook rather than the heading text, so retitling the card does
+  // not silently stop this claim from being checked.
   const gasText = await page
-    .locator('section')
-    .filter({ hasText: 'What gasless means here' })
+    .locator('section:has([data-contrast="gas-copy"])')
     .first()
     .innerText();
   check('app: gas copy never promises "no gas, ever"', !/no gas,? ever/i.test(gasText));
