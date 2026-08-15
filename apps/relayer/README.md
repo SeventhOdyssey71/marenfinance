@@ -115,7 +115,10 @@ sending traffic at a relayer that will refuse.
   "forwarder": "0x…", "rpcs": ["https://rpc.test.mezo.org"],
   "targets": ["marenPay:0x…"], "store": "redis",
   "inFlight": 0, "watching": 2,
-  "spentTodayWei": "…", "dailyBudgetWei": "…",
+  // spentTodayWei is RESERVED (in-flight + committed); committedTodayWei is what
+  // actually settled and is the only thing that can latch the daily halt.
+  "spentTodayWei": "…", "committedTodayWei": "…", "pendingRefunds": 0,
+  "dailyBudgetWei": "…",
   "problems": []
 }
 ```
@@ -142,7 +145,9 @@ many addresses and many IPs, and read every response we produce.
 | T4 | Drain the gas float with volume | Free tier of 25 lifetime actions per address, then a required in-band MUSD fee; per-address and per-IP daily caps; a global daily BTC cap that halts the whole service when hit. Every one of those limits is decided on the value the counter's own atomic increment returned, so a concurrent burst cannot slip past a stale read — see T4d. |
 | T4b | Forge `x-forwarded-for` to get a fresh IP bucket per request | A forwarding header is read **only** from a configured trusted proxy (`RELAYER_TRUSTED_PROXIES`) or an unforgeable platform header, and then the **rightmost untrusted hop** is taken, not the leftmost. Otherwise the socket address is used. Unattributable traffic shares one bucket. |
 | T4c | Run on many instances so each has its own counters | `RELAYER_STORE=memory` and an ephemeral `RELAYER_IP_SALT` are **boot problems** under `VERCEL`. Per-instance counters do not weaken the global BTC cap, they remove it. |
-| T4d | Fire N requests simultaneously so they all read the same pre-spend counters | Was a real defect: the cap was checked against a `get`, then two RPC round trips ran, then the increment's return value was **discarded**. Measured at 13× the budget on 25 concurrent requests, 130× on 250. Now the increment happens first and the decision is made on what it returned; losers are refunded and rejected. Regression-tested at 25 and 100 concurrent against a store with injected latency. |
+| T4d | Fire N requests simultaneously so they all read the same pre-spend counters | Was a real defect: the cap was checked against a `get`, then two RPC round trips ran, then the increment's return value was **discarded**. Measured at 13× the budget on 25 concurrent requests, 130× on 250. Now the increment happens first and the decision is made on what it returned; losers are refunded and rejected. Independently re-measured at 25/100/250 concurrent: exactly one admitted, zero overshoot. |
+| T4e | Send a burst of doomed requests to trip the budget halt and take the relayer offline for a day | The halt latches on **committed** spend (broadcast and never refunded), never on the reserved counter, which transiently exceeds the cap during any burst. A fully-refunded burst leaves the relayer accepting. This was a real defect introduced by the T4d fix: 60 concurrent reverting requests against a budget for 20 spent nothing and still latched the halt until 00:00 UTC. |
+| T4f | Flap the quota store so refunds fail and the budget silently fills up | Refunds retry, then queue for a reconciler drained on each sweep and at the head of each relay; `/health` reports anything still owed. Swallowing the error meant 10 rejected requests — nothing broadcast — could read as 100% of budget consumed. |
 | T5 | Drain the gas float with reverts | Every request is `eth_call`-simulated before submission and rejected if it would revert. Quota is consumed on submission and **not refunded** on a revert, so deliberate reverts are not a free way to spend our budget. |
 | T5b | Race two copies of one signed request through the nonce check | `(payer, nonce)` is held for the duration of a relay; the second gets `409 DUPLICATE_REQUEST_IN_FLIGHT` instead of burning gas reverting on a consumed nonce. **Per instance** — see Known limitations. |
 | T5c | Use an expensive ERC-1271 validator to burn gas at our cost | Contract-account signers get a tighter ceiling (`RELAYER_MAX_GAS_CONTRACT_SIGNER`, default 500,000, always ≤ the general cap). |
@@ -234,6 +239,14 @@ Every cap debits first and decides on the value the debit returned, refunding an
 rejecting if it lost. A `get`-then-`incrBy` is a race by construction, however atomic
 the store — that was a real defect here, measured at 130× the daily budget under 250
 concurrent requests before it was fixed.
+
+**Two counters, and the distinction matters.** `spend:<day>` is *reserved* — in-flight
+plus committed — and is what the cap is enforced against, because a reservation not yet
+refunded could still become real spend. `committed:<day>` counts only reservations that
+were broadcast and never given back, and is the **only** thing allowed to latch the
+day-long halt. Latching on the reserved counter was a free remote denial of service: a
+burst that is entirely refunded still transiently pushes it past the cap, and the latch
+was never re-evaluated once the refunds landed.
 
 **The two knobs that decide how much money we can lose have no defaults.** If
 `RELAYER_MAX_DAILY_SPONSORED_BTC` is unset, nothing is sponsored at all. If
@@ -337,7 +350,7 @@ correct default state**, and `problems` tells you exactly what to set.
 ### Tests
 
 ```bash
-pnpm --filter @maren/relayer test        # 202 tests
+pnpm --filter @maren/relayer test        # 210 tests
 pnpm --filter @maren/relayer typecheck
 ```
 
@@ -386,7 +399,8 @@ stalls every later transaction. Verified working:
 | Symptom | Cause | Action |
 |---|---|---|
 | `/health` 503, `problems` mentions a variable | Misconfiguration | Set it. The service is refusing on purpose. |
-| `problems: ["daily BTC sponsorship budget is exhausted"]` | `RELAYER_MAX_DAILY_SPONSORED_BTC` hit | Resets at 00:00 UTC. Raise deliberately, not reflexively — check for abuse first. |
+| `problems: ["daily BTC sponsorship budget is exhausted"]` | `RELAYER_MAX_DAILY_SPONSORED_BTC` genuinely **committed** | Resets at 00:00 UTC. Compare `committedTodayWei` against `dailyBudgetWei` before raising it — the halt cannot be tripped by traffic that was refunded. |
+| `problems` mentions "reservation refund(s) could not be written" | The quota store rejected refunds | The reserved counter is inflated until they drain. They retry on each sweep and at the head of each relay; if the number is not falling, the store is down. |
 | `RELAYER_UNDERFUNDED` | Hot key out of BTC | Top up. Keep days of float, not months. |
 | `problems` mentions "no configured RPC endpoint serves the methods" | Every RPC failed the capability preflight | Usually transient — Mezo endpoints can briefly answer `-32601` while a backend is degraded. Re-probe by hand before concluding an endpoint is broken, then restart. Add endpoints to `RELAYER_RPC_URLS` rather than removing them. |
 | `tx.replaced` warnings | Fees too low for current conditions | Normal, self-healing. Persistent ⇒ investigate the queue. |
@@ -481,11 +495,13 @@ document.
 - **Sybil resistance is economic, not cryptographic.** 25 free actions per *address*,
   and addresses are free. The global daily BTC cap is the actual backstop — which is
   why `RELAYER_STORE=memory` under `VERCEL` is a refusal rather than a warning, and why
-  every limit is now decided on an atomic increment's return value rather than on a
-  prior read. The honest bound on the cap is **one request's worth of overshoot per
-  racing instance**, not zero: within a single process the reservation is serialisable,
-  but two instances can each admit a request that, together, cross the line. Shared
-  Redis counters keep that to the width of one request rather than one burst.
+  every limit is decided on an atomic increment's return value rather than on a prior
+  read. With a shared store the overshoot bound is **zero**: `INCRBY` serialises
+  globally, so each racing request gets a distinct post-increment value and exactly one
+  crosses the line. Independently measured at 25, 100 and 250 concurrent against a
+  one-request budget: exactly one admitted, exactly one broadcast, spend exactly to the
+  cap. The multi-instance hazard is not the arithmetic, it is running without a shared
+  store at all — which is why that is now a boot problem.
 - **The `(payer, nonce)` duplicate-request guard is per instance.** It is an in-memory
   `Set` on the service object, so it does **not** hold across the multi-instance
   deployment that `RELAYER_STORE=redis` implies. Two instances can still admit the same

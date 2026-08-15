@@ -141,7 +141,7 @@ describe('sponsorship policy', () => {
     expect(((await second.json()) as ErrorBody).error).toBe('IP_RATE_LIMIT');
   });
 
-  it('halts on the global daily BTC budget and stays halted', async () => {
+  it('rejects a request that would exceed the global daily BTC budget', async () => {
     const store = new MemoryStore();
     // A budget so small that one 200,000-gas request at 2,600,000 wei/gas blows it.
     const relayer = await buildTestRelayer(
@@ -156,15 +156,34 @@ describe('sponsorship policy', () => {
     expect(body.error).toBe('GLOBAL_DAILY_BUDGET_EXHAUSTED');
     expect(body.meta['limitWei']).toBeDefined();
     expect(relayer.chainFake.sent).toHaveLength(0);
+  });
 
-    // Halted: the relayer takes itself out of service rather than re-deciding
-    // per request.
-    expect(relayer.service.accepting).toBe(false);
-    const health = await relayer.get('/health');
-    expect(health.status).toBe(503);
-    expect(((await health.json()) as { problems: string[] }).problems.join()).toMatch(
-      /budget is exhausted/,
+  /**
+   * REWRITTEN after review. This test used to assert that the rejection above
+   * ALSO latched the day-long halt — it was encoding the denial of service.
+   *
+   * Because the reservation now increments before a request can be rejected,
+   * any rejected request transiently pushes the reserved counter past the cap.
+   * Latching on that let anyone take the relayer offline until 00:00 UTC by
+   * sending doomed requests. The halt must come from spend that actually
+   * happened, so a rejected-and-refunded request must leave us accepting.
+   */
+  it('does NOT halt when the over-budget request was refunded', async () => {
+    const store = new MemoryStore();
+    const relayer = await buildTestRelayer(
+      makeEnv({ RELAYER_MAX_DAILY_SPONSORED_BTC: '0.0000000001' }),
+      new FakeChain(),
+      store,
     );
+
+    await relayer.post('/relay', await signedRequest());
+
+    // Nothing was broadcast and nothing was committed, so nothing is spent.
+    expect(relayer.chainFake.sent).toHaveLength(0);
+    expect(await store.get(keys.committedDay(new Date().toISOString().slice(0, 10)))).toBe(0n);
+    // Therefore the relayer is still open.
+    expect(relayer.service.accepting).toBe(true);
+    expect((await relayer.get('/health')).status).toBe(200);
   });
 
   it('the quota endpoint reflects consumed actions', async () => {
