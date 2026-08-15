@@ -136,15 +136,19 @@ function SendPanel({
   return (
     <>
       {/* Gasless, stated up front. */}
-      <View style={styles.gasBanner} accessible accessibilityLabel="This payment is gasless. Maren's relayer pays the Bitcoin gas; you pay none.">
+      <View
+        style={styles.gasBanner}
+        accessible
+        accessibilityLabel="This payment is gasless. Maren's relayer pays the Bitcoin gas; you pay none."
+      >
         <Icon name="shield" size={16} color={semantic.success} />
         <View style={styles.gasBannerBody}>
           <Txt variant="small" style={{ color: semantic.success }}>
             Gasless — you pay no BTC
           </Txt>
           <Txt variant="small" tone="subtle" style={styles.gasBannerCaption}>
-            You sign an EIP-712 message; Maren’s relayer submits it and pays the BTC gas.
-            Your Bitcoin stays collateral.
+            You sign an EIP-712 message; Maren’s relayer submits it and pays the BTC gas. Your
+            Bitcoin stays collateral.
           </Txt>
         </View>
       </View>
@@ -178,7 +182,11 @@ function SendPanel({
             Resolving handle…
           </Txt>
         ) : resolved ? (
-          <View style={styles.resolved} accessible accessibilityLabel={`${resolved.handle} resolves to ${resolved.address}`}>
+          <View
+            style={styles.resolved}
+            accessible
+            accessibilityLabel={`${resolved.handle} resolves to ${resolved.address}`}
+          >
             <Icon name="check" size={14} color={semantic.success} />
             <Num size="numericSm" tone="muted">
               {shortAddress(resolved.address)}
@@ -220,7 +228,9 @@ function SendPanel({
             Available
           </Txt>
           <Pressable
-            onPress={() => balances && setAmount(formatMusd(balances.musdWei, { unit: false }).replace(/,/g, ''))}
+            onPress={() =>
+              balances && setAmount(formatMusd(balances.musdWei, { unit: false }).replace(/,/g, ''))
+            }
             accessibilityRole="button"
             accessibilityLabel="Use full balance"
             hitSlop={8}
@@ -230,7 +240,11 @@ function SendPanel({
         </View>
 
         {overBalance ? (
-          <Txt variant="small" style={[styles.resolveNote, { color: semantic.danger }]} accessibilityRole="alert">
+          <Txt
+            variant="small"
+            style={[styles.resolveNote, { color: semantic.danger }]}
+            accessibilityRole="alert"
+          >
             More than your MUSD balance.
           </Txt>
         ) : null}
@@ -317,8 +331,8 @@ function RequestPanel() {
         ) : null}
 
         <Txt variant="small" tone="muted" style={styles.qrCaption}>
-          Anyone with Maren can scan this and pay you. They pay no BTC gas either — the
-          relayer covers both sides.
+          Anyone with Maren can scan this and pay you. They pay no BTC gas either — the relayer
+          covers both sides.
         </Txt>
       </Card>
 

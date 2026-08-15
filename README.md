@@ -29,10 +29,10 @@ Read [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) for the technical case and
 
 ## Networks
 
-| | Chain ID | RPC | Explorer |
-|---|---|---|---|
-| Mainnet | `31612` | `https://jsonrpc-mezo.boar.network` | [explorer.mezo.org](https://explorer.mezo.org) |
-| Matsnet (testnet) | `31611` | `https://rpc.test.mezo.org` | [explorer.test.mezo.org](https://explorer.test.mezo.org) |
+|                   | Chain ID | RPC                                 | Explorer                                                 |
+| ----------------- | -------- | ----------------------------------- | -------------------------------------------------------- |
+| Mainnet           | `31612`  | `https://jsonrpc-mezo.boar.network` | [explorer.mezo.org](https://explorer.mezo.org)           |
+| Matsnet (testnet) | `31611`  | `https://rpc.test.mezo.org`         | [explorer.test.mezo.org](https://explorer.test.mezo.org) |
 
 Native gas token is **BTC (18 decimals)**.
 

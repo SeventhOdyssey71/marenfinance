@@ -5,9 +5,7 @@
  * `parseCallback` directly, which is where the R12 guarantees actually live.
  */
 export type WebBrowserAuthSessionResult =
-  | { type: 'success'; url: string }
-  | { type: 'cancel' }
-  | { type: 'dismiss' };
+  { type: 'success'; url: string } | { type: 'cancel' } | { type: 'dismiss' };
 
 export async function openAuthSessionAsync(): Promise<WebBrowserAuthSessionResult> {
   throw new Error('openAuthSessionAsync is not available in tests.');

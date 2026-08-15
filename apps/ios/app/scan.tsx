@@ -59,8 +59,8 @@ export default function Scan() {
           Camera access
         </Txt>
         <Txt variant="body" tone="muted" style={styles.permissionBody}>
-          Maren uses the camera only to read payment QR codes. Nothing is recorded, stored
-          or uploaded — the frame is decoded on device and discarded.
+          Maren uses the camera only to read payment QR codes. Nothing is recorded, stored or
+          uploaded — the frame is decoded on device and discarded.
         </Txt>
         <PillButton label="Allow camera" onPress={requestPermission} style={styles.permissionCta} />
         <PillButton label="Not now" variant="ghost" onPress={() => router.back()} />
@@ -135,7 +135,13 @@ const styles = StyleSheet.create({
   tl: { top: 0, left: 0, borderTopWidth: 2, borderLeftWidth: 2, borderTopLeftRadius: 10 },
   tr: { top: 0, right: 0, borderTopWidth: 2, borderRightWidth: 2, borderTopRightRadius: 10 },
   bl: { bottom: 0, left: 0, borderBottomWidth: 2, borderLeftWidth: 2, borderBottomLeftRadius: 10 },
-  br: { bottom: 0, right: 0, borderBottomWidth: 2, borderRightWidth: 2, borderBottomRightRadius: 10 },
+  br: {
+    bottom: 0,
+    right: 0,
+    borderBottomWidth: 2,
+    borderRightWidth: 2,
+    borderBottomRightRadius: 10,
+  },
   hint: { marginTop: space.xl, color: '#FAFAFA' },
   close: {
     position: 'absolute',

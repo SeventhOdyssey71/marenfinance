@@ -105,7 +105,11 @@ export default function Vault() {
           label="Borrow limit"
           hint="Mezo caps this at the price when the trove opened"
           value={
-            position ? <Musd wei={position.maxBorrowingCapacityWei} plain /> : <Num tone="subtle">—</Num>
+            position ? (
+              <Musd wei={position.maxBorrowingCapacityWei} plain />
+            ) : (
+              <Num tone="subtle">—</Num>
+            )
           }
           last
         />
@@ -138,10 +142,7 @@ export default function Vault() {
           price={livePrice}
           gateReason={gate.allowed ? null : gate.reason}
           onSubmit={(wei) =>
-            runner.run(
-              { type: 'borrow', musdWei: wei },
-              `Borrow ${formatMusd(wei)}`,
-            )
+            runner.run({ type: 'borrow', musdWei: wei }, `Borrow ${formatMusd(wei)}`)
           }
         />
       ) : null}
@@ -161,7 +162,9 @@ export default function Vault() {
           sponsored={false}
           disabledReason={gate.allowed ? null : gate.reason}
           cta="Deposit"
-          onSubmit={(wei) => runner.run({ type: 'deposit', btcWei: wei }, `Deposit ${formatBtc(wei)}`)}
+          onSubmit={(wei) =>
+            runner.run({ type: 'deposit', btcWei: wei }, `Deposit ${formatBtc(wei)}`)
+          }
         />
       ) : null}
 
@@ -178,7 +181,9 @@ export default function Vault() {
           maxLabel="Your MUSD balance"
           disabledReason={gate.allowed ? null : gate.reason}
           cta="Repay"
-          onSubmit={(wei) => runner.run({ type: 'repay', musdWei: wei }, `Repay ${formatMusd(wei)}`)}
+          onSubmit={(wei) =>
+            runner.run({ type: 'repay', musdWei: wei }, `Repay ${formatMusd(wei)}`)
+          }
         />
       ) : null}
 
@@ -196,7 +201,9 @@ export default function Vault() {
           sponsored={false}
           disabledReason={gate.allowed ? null : gate.reason}
           cta="Withdraw"
-          onSubmit={(wei) => runner.run({ type: 'withdraw', btcWei: wei }, `Withdraw ${formatBtc(wei)}`)}
+          onSubmit={(wei) =>
+            runner.run({ type: 'withdraw', btcWei: wei }, `Withdraw ${formatBtc(wei)}`)
+          }
         />
       ) : null}
 
@@ -267,15 +274,15 @@ function BorrowPanel({
   }, [position, price, value]);
 
   const disabled = gateReason !== null || ceiling === 0n;
-  const tone = preview ? healthTone[preview.health.status] ?? 'neutral' : 'neutral';
+  const tone = preview ? (healthTone[preview.health.status] ?? 'neutral') : 'neutral';
   const colour = toneColor[tone];
 
   return (
     <Card style={styles.panel}>
       <Txt variant="h3">Borrow MUSD</Txt>
       <Txt variant="small" tone="muted" style={styles.panelBody}>
-        1.00% APR, simple interest, fixed for the life of this loan. The slider stops at
-        Maren’s 180% floor — it will not let you past it.
+        1.00% APR, simple interest, fixed for the life of this loan. The slider stops at Maren’s
+        180% floor — it will not let you past it.
       </Txt>
 
       {/* Amount */}
@@ -365,8 +372,8 @@ function BorrowPanel({
       <View style={styles.gasRow}>
         <Icon name="alert" size={14} color="#6B6B75" />
         <Txt variant="small" tone="subtle" style={styles.gasText}>
-          Vault operations go through Mezo’s own signed borrower contract and cost BTC
-          gas. Maren does not sponsor them.
+          Vault operations go through Mezo’s own signed borrower contract and cost BTC gas. Maren
+          does not sponsor them.
         </Txt>
       </View>
 
@@ -464,14 +471,22 @@ function AmountPanel({
           <Txt variant="small" tone="subtle">
             {maxLabel}
           </Txt>
-          <Num size="numericSm" tone={overMax ? 'inherit' : 'muted'} style={overMax ? { color: semantic.danger } : undefined}>
+          <Num
+            size="numericSm"
+            tone={overMax ? 'inherit' : 'muted'}
+            style={overMax ? { color: semantic.danger } : undefined}
+          >
             {format(max)}
           </Num>
         </View>
       ) : null}
 
       <View style={styles.gasRow}>
-        <Icon name={sponsored ? 'shield' : 'alert'} size={14} color={sponsored ? semantic.success : '#6B6B75'} />
+        <Icon
+          name={sponsored ? 'shield' : 'alert'}
+          size={14}
+          color={sponsored ? semantic.success : '#6B6B75'}
+        />
         <Txt variant="small" tone="subtle" style={styles.gasText}>
           {sponsored
             ? 'Gasless. Maren’s relayer pays the BTC gas for this action.'
