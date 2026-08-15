@@ -605,9 +605,14 @@ contract MarenVault is AccessControl, ERC2771Context, ReentrancyGuard {
     /**
      * @notice Emergency: close the pooled trove and hold all collateral here as idle BTC.
      * @dev Only once every user has repaid — the protocol's `closeTrove` demands the full net
-     *      debt in MUSD, which the vault can only guarantee it holds when the reserve covers
-     *      everything outstanding. After this, users withdraw from idle collateral with no
-     *      oracle dependency at all, which is the safest possible wind-down state.
+     *      debt in MUSD. After this, users withdraw from idle collateral with no oracle
+     *      dependency at all, which is the safest possible wind-down state.
+     *
+     *      The vault is always slightly SHORT of that number by construction: the seed trove's
+     *      0.1% origination fee and its share of accrued interest are real debt for which no
+     *      MUSD was ever minted to this contract. The caller covers that shortfall out of
+     *      their own balance, which is correct — it is the protocol's own cost of having kept
+     *      the pool open, and it must not be taken out of user collateral.
      */
     function closePooledTrove() external onlyRole(DEFAULT_ADMIN_ROLE) nonReentrant {
         if (!troveOpen) revert TroveNotOpen();
@@ -615,6 +620,12 @@ contract MarenVault is AccessControl, ERC2771Context, ReentrancyGuard {
 
         uint256 userShares = totalDebtShares - debtShares[address(this)];
         if (userShares > 0) revert OutstandingUserDebt(userShares);
+
+        (, uint256 netDebt) = _troveCollAndNetDebt();
+        uint256 held = IERC20(address(musd)).balanceOf(address(this));
+        if (netDebt > held) {
+            IERC20(address(musd)).safeTransferFrom(_msgSender(), address(this), netDebt - held);
+        }
 
         uint256 balanceBefore = address(this).balance;
         borrowerOperations.closeTrove();
