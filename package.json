@@ -1,0 +1,29 @@
+{
+  "name": "maren",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Maren Finance — Bitcoin liquidity, gasless spending, earn yield. Built on Mezo Chain.",
+  "license": "MIT",
+  "packageManager": "pnpm@10.19.0",
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {
+    "build": "turbo run build",
+    "dev": "turbo run dev",
+    "lint": "turbo run lint",
+    "typecheck": "turbo run typecheck",
+    "test": "turbo run test",
+    "clean": "turbo run clean && rm -rf node_modules",
+    "contracts:build": "pnpm --filter @maren/contracts build",
+    "contracts:test": "pnpm --filter @maren/contracts test",
+    "docs:pdf": "node tools/pdf/build.mjs",
+    "format": "prettier --write \"**/*.{ts,tsx,js,mjs,json,md,css}\"",
+    "format:check": "prettier --check \"**/*.{ts,tsx,js,mjs,json,md,css}\""
+  },
+  "devDependencies": {
+    "prettier": "^3.4.2",
+    "turbo": "^2.3.3",
+    "typescript": "^5.7.2"
+  }
+}
