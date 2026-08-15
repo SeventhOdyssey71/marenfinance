@@ -207,7 +207,10 @@ function RouteCard() {
         </>
       ) : (
         <>
-          <p className="mt-4 max-w-[68ch] text-sm leading-relaxed text-text-muted">
+          <p
+            data-contrast="route-body"
+            className="mt-4 max-w-[68ch] text-sm leading-relaxed text-text-muted"
+          >
             Your collateral clears the {formatMusd(MIN_NET_DEBT)} minimum net debt MUSD
             requires, so you hold your own trove and take no pooling risk. Maren prefers
             this route whenever it is available, even though pooled volume would be better

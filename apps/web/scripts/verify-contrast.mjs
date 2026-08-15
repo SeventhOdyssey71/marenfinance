@@ -1,8 +1,14 @@
 /**
- * Measures the worst-case contrast of hero copy against whatever the shader
- * actually paints behind it. Hides the text, screenshots the hero, decodes the
- * PNG inside the browser, and finds the LIGHTEST background pixel in each text
- * box — the worst case for light-on-dark copy.
+ * Measures the worst-case contrast of copy against whatever is actually painted
+ * behind it. Hides the text, screenshots the page, decodes the PNG inside the
+ * browser, and finds the LIGHTEST background pixel in each text box — the worst
+ * case for light-on-dark copy.
+ *
+ * Covers the landing page's shader-backed hero and CTA, and the dApp, where the
+ * PulsingBorder on the position-health card paints behind the figures a user
+ * makes liquidation decisions from. Muted and subtle text are measured too: the
+ * app leans on `text-muted` for hints, and a hint nobody can read is a hint that
+ * is not there.
  */
 const pw = await import(process.env.PLAYWRIGHT_CORE ?? 'playwright-core');
 const { chromium } = pw.chromium ? pw : pw.default;
@@ -12,11 +18,38 @@ const browser = await chromium.launch({
   args: ['--use-gl=angle'],
 });
 
-const targets = [
-  { sel: '#hero-title', fg: '#FAFAFA', label: 'hero headline (white)' },
-  { sel: '#hero-title + p', fg: '#A1A1AA', label: 'hero subhead (muted)' },
-  { sel: '#cta-title', fg: '#FAFAFA', label: 'cta headline (white)' },
-  { sel: '#cta-title + p', fg: '#A1A1AA', label: 'cta subhead (muted)' },
+const pages = [
+  {
+    path: '/',
+    targets: [
+      { sel: '#hero-title', fg: '#FAFAFA', label: 'hero headline (white)' },
+      { sel: '#hero-title + p', fg: '#A1A1AA', label: 'hero subhead (muted)' },
+      { sel: '#cta-title', fg: '#FAFAFA', label: 'cta headline (white)' },
+      { sel: '#cta-title + p', fg: '#A1A1AA', label: 'cta subhead (muted)' },
+    ],
+  },
+  {
+    path: '/app',
+    targets: [
+      { sel: 'h1', fg: '#FAFAFA', label: 'account heading (white)' },
+      { sel: '.t-numeric-xl', fg: '#FAFAFA', label: 'collateral ratio (white)' },
+      { sel: '.metric-caption', fg: '#A1A1AA', label: 'metric caption (muted)' },
+      { sel: '[data-contrast="gas-copy"]', fg: '#A1A1AA', label: 'gas explainer (muted)' },
+    ],
+  },
+  {
+    path: '/app/vault',
+    targets: [
+      { sel: 'h1', fg: '#FAFAFA', label: 'vault heading (white)' },
+      { sel: '[data-contrast="route-body"]', fg: '#A1A1AA', label: 'route copy (muted)' },
+    ],
+  },
+  {
+    path: '/app/earn',
+    targets: [
+      { sel: '[data-contrast="earn-disclosure"]', fg: '#A1A1AA', label: 'yield disclosure (muted)' },
+    ],
+  },
 ];
 
 const lum = ([r, g, b]) => {
@@ -32,60 +65,62 @@ const ratio = (a, b) => {
   return (hi + 0.05) / (lo + 0.05);
 };
 
-for (const width of [390, 1440]) {
-  const ctx = await browser.newContext({
-    viewport: { width, height: 900 },
-    deviceScaleFactor: 1,
-  });
-  await ctx.addInitScript(() => {
-    const s = document.createElement('style');
-    s.textContent = 'html{scroll-behavior:auto !important}';
-    document.addEventListener('DOMContentLoaded', () => document.head.append(s));
-  });
-  const page = await ctx.newPage();
-  await page.goto('http://127.0.0.1:3000/', { waitUntil: 'networkidle' });
-  await page.evaluate(async () => {
-    const step = window.innerHeight * 0.6;
-    for (let y = 0; y <= document.body.scrollHeight; y += step) {
-      window.scrollTo(0, y);
-      await new Promise((r) => requestAnimationFrame(() => setTimeout(r, 80)));
-    }
-  });
+let failures = 0;
 
+for (const width of [390, 1440]) {
   console.log(`\n=== ${width}px`);
 
-  for (const t of targets) {
-    const box = await page.evaluate((sel) => {
-      const el = document.querySelector(sel);
-      if (!el) return null;
-      el.scrollIntoView({ block: 'center' });
-      return null;
-    }, t.sel);
-    void box;
-    await page.waitForTimeout(700);
+  for (const target of pages) {
+    const ctx = await browser.newContext({
+      viewport: { width, height: 900 },
+      deviceScaleFactor: 1,
+      colorScheme: 'dark',
+    });
+    await ctx.addInitScript(() => {
+      const s = document.createElement('style');
+      s.textContent = 'html{scroll-behavior:auto !important}';
+      document.addEventListener('DOMContentLoaded', () => document.head.append(s));
+    });
+    const page = await ctx.newPage();
+    await page.goto(`http://127.0.0.1:3000${target.path}`, { waitUntil: 'networkidle' });
+    await page.evaluate(async () => {
+      const step = window.innerHeight * 0.6;
+      for (let y = 0; y <= document.body.scrollHeight; y += step) {
+        window.scrollTo(0, y);
+        await new Promise((r) => requestAnimationFrame(() => setTimeout(r, 80)));
+      }
+    });
 
-    // Hide the text so we can read the background it sits on.
-    const rect = await page.evaluate((sel) => {
-      const el = document.querySelector(sel);
-      if (!el) return null;
-      const r = el.getBoundingClientRect();
-      el.dataset.hidden = '1';
-      el.style.visibility = 'hidden';
-      return { x: r.x, y: r.y, w: r.width, h: r.height };
-    }, t.sel);
-    if (!rect || rect.w < 1) {
-      console.log(`  ${t.label.padEnd(26)} SKIP (not found)`);
-      continue;
-    }
+    console.log(`  ${target.path}`);
 
-    const shot = (await page.screenshot({ type: 'png' })).toString('base64');
+    for (const t of target.targets) {
+      await page.evaluate((sel) => {
+        document.querySelector(sel)?.scrollIntoView({ block: 'center' });
+      }, t.sel);
+      await page.waitForTimeout(700);
 
-    await page.evaluate((sel) => {
-      const el = document.querySelector(sel);
-      if (el) el.style.visibility = '';
-    }, t.sel);
+      // Hide the text so we can read the background it sits on.
+      const rect = await page.evaluate((sel) => {
+        const el = document.querySelector(sel);
+        if (!el) return null;
+        const r = el.getBoundingClientRect();
+        el.style.visibility = 'hidden';
+        return { x: r.x, y: r.y, w: r.width, h: r.height };
+      }, t.sel);
+      if (!rect || rect.w < 1) {
+        console.log(`    ${t.label.padEnd(30)} SKIP (not found)`);
+        failures += 1;
+        continue;
+      }
 
-    const lightest = await page.evaluate(
+      const shot = (await page.screenshot({ type: 'png' })).toString('base64');
+
+      await page.evaluate((sel) => {
+        const el = document.querySelector(sel);
+        if (el) el.style.visibility = '';
+      }, t.sel);
+
+      const lightest = await page.evaluate(
       async ({ shot, rect }) => {
         const img = new Image();
         img.src = 'data:image/png;base64,' + shot;
@@ -115,19 +150,26 @@ for (const width of [390, 1440]) {
       { shot, rect },
     );
 
-    if (!lightest) {
-      console.log(`  ${t.label.padEnd(26)} SKIP (offscreen)`);
-      continue;
+      if (!lightest) {
+        console.log(`    ${t.label.padEnd(30)} SKIP (offscreen)`);
+        failures += 1;
+        continue;
+      }
+      const r = ratio(hexToRgb(t.fg), lightest);
+      const hex = '#' + lightest.map((v) => v.toString(16).padStart(2, '0')).join('');
+      // 4.5:1 is WCAG AA for body text. Every target here is body text or larger.
+      const pass = r >= (t.min ?? 4.5);
+      if (!pass) failures += 1;
+      console.log(
+        `    ${t.label.padEnd(30)} worst-bg=${hex}  contrast=${r.toFixed(2)}:1  ${
+          pass ? 'PASS' : 'FAIL'
+        }`,
+      );
     }
-    const r = ratio(hexToRgb(t.fg), lightest);
-    const hex = '#' + lightest.map((v) => v.toString(16).padStart(2, '0')).join('');
-    console.log(
-      `  ${t.label.padEnd(26)} worst-bg=${hex}  contrast=${r.toFixed(2)}:1  ${
-        r >= 4.5 ? 'PASS' : 'FAIL'
-      }`,
-    );
+    await ctx.close();
   }
-  await ctx.close();
 }
 
 await browser.close();
+console.log(failures === 0 ? '\nAll contrast targets pass.' : `\n${failures} contrast failures.`);
+process.exit(failures ? 1 : 0);

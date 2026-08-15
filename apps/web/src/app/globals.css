@@ -111,16 +111,25 @@
 
 @layer components {
   .container-maren {
+    --container-pad: 24px;
     width: 100%;
     max-width: calc(var(--content-max) + 48px);
     margin-inline: auto;
-    padding-inline: 24px;
+    padding-inline: var(--container-pad);
   }
 
   @media (max-width: 400px) {
     .container-maren {
-      padding-inline: 20px;
+      --container-pad: 20px;
     }
+  }
+
+  /* Runs a scrollable rail edge-to-edge inside the container without overflowing
+     it. Hardcoding -24px here cost 4px of horizontal scroll at 390px, where the
+     container padding drops to 20px. */
+  .bleed-x {
+    margin-inline: calc(-1 * var(--container-pad));
+    padding-inline: var(--container-pad);
   }
 
   /* Card — surface fill, hairline, inner top highlight. No drop shadows. */

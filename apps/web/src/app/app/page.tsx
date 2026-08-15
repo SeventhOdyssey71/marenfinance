@@ -207,17 +207,19 @@ export default function PortfolioPage() {
       {/* ------------------------------------------------------------ Gas truth */}
       <AppCard>
         <CardTitle>What gasless means here</CardTitle>
-        <p className="mt-4 max-w-[68ch] text-sm leading-relaxed text-text-muted">
+        <p
+          data-contrast="gas-copy"
+          className="mt-4 max-w-[68ch] text-sm leading-relaxed text-text-muted"
+        >
           Mezo charges gas in BTC. Maren’s relayer pays it for payments, Earn, and pooled
           borrow, repay and withdraw — you sign an EIP-712 message and hold no Bitcoin for
           gas.
         </p>
         <p className="mt-3 max-w-[68ch] text-sm leading-relaxed text-text-muted">
           <strong className="font-medium text-text">Your first deposit is the exception.</strong>{' '}
-          Depositing sends BTC with the call, and the relay hub refuses any request
-          carrying value — sponsoring one would mean Maren funding your deposit. So the
-          first deposit costs you gas, and everything after it is free. Nobody at Maren
-          will ever tell you there is no gas, ever.
+          Depositing sends Bitcoin with the call, and the relay hub refuses any request
+          carrying value — sponsoring one would mean Maren funding your deposit. So your
+          first deposit costs gas, and everything after it is free.
         </p>
         <p className="mt-3 text-xs text-text-subtle">
           After the free tier the relayer fee is taken in MUSD inside the same
