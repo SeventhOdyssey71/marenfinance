@@ -64,3 +64,9 @@ Thumbs.db
 
 # agent worktrees — never commit
 .claude/worktrees/
+
+# research scratch — agents occasionally drop probe output in the repo root
+/*.tmp
+/r*.json
+/chains.json
+/pim.html
