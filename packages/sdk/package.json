@@ -2,7 +2,7 @@
   "name": "@maren/sdk",
   "version": "0.1.0",
   "private": true,
-  "description": "Verified Mezo chain config, MUSD addresses, ABIs, and position math for Maren Finance.",
+  "description": "Verified Mezo chain config, MUSD addresses, position and borrow math, and number formatting for Maren Finance.",
   "type": "module",
   "main": "./src/index.ts",
   "types": "./src/index.ts",

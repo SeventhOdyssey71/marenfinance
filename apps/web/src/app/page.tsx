@@ -14,7 +14,7 @@ export default function HomePage() {
     <>
       <a
         href="#main"
-        className="sr-only rounded-[var(--radius-pill)] bg-white px-5 py-3 text-sm font-medium text-[#08080A] focus:not-sr-only focus:fixed focus:top-4 focus:left-4 focus:z-[60]"
+        className="sr-only rounded-[var(--radius-pill)] bg-white px-5 py-3 text-sm font-medium text-[#08080A] focus:not-sr-only focus:fixed focus:left-4 focus:top-4 focus:z-[60]"
       >
         Skip to content
       </a>

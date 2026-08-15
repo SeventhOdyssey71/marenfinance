@@ -97,8 +97,7 @@ export const MULTICALL3_ADDRESS: Address = '0xcA11bde05977b3631167028862bE2a1739
  * from ChainlinkAggregatorV3Interface — `description()` reverts.
  * Source: github.com/mezo-org/mezod/precompile/priceoracle/
  */
-export const MEZO_PRICE_ORACLE_PRECOMPILE: Address =
-  '0x7b7c000000000000000000000000000000000015';
+export const MEZO_PRICE_ORACLE_PRECOMPILE: Address = '0x7b7c000000000000000000000000000000000015';
 
 /** The BTC gas-token precompile on Mezo. */
 export const MEZO_BTC_PRECOMPILE: Address = '0x7b7C000000000000000000000000000000000000';
@@ -134,8 +133,7 @@ export const PERMIT2_ADDRESS: Address = '0x000000000022D473030F116dDEE9F6B43aC78
  * It is not. Maren uses EIP-2612 permit + ERC-2771 relaying, with EIP-7702 as the
  * upgrade path. See docs/ARCHITECTURE.md §4.
  */
-export const ERC4337_ENTRYPOINT_V07_INERT: Address =
-  '0x0000000071727De22E5E9d8BAf0edAc6f37da032';
+export const ERC4337_ENTRYPOINT_V07_INERT: Address = '0x0000000071727De22E5E9d8BAf0edAc6f37da032';
 
 /**
  * Maren's own deployments. Populated by `packages/contracts/script/Deploy.s.sol`,
@@ -159,12 +157,20 @@ export const MAREN_ADDRESSES: Record<MezoNetwork, MarenAddresses> = {
     marenRegistry: ZERO,
     marenEarn: ZERO,
   },
+  // Deployed to Mezo matsnet on 2026-08-15 from
+  // 0x54196397D6f01b48739dB3957257cB33cD341885, and source-verified on Blockscout.
+  // Runtime bytecode sizes were checked against the local build before these were
+  // written here: Vault 14,508 · Earn 11,396 · Pay 9,264 · RelayHub 7,934 ·
+  // Registry 4,742. See docs/DEPLOYMENTS.md for tx hashes.
   testnet: {
-    marenVault: ZERO,
-    marenPay: ZERO,
-    marenForwarder: ZERO,
-    marenRegistry: ZERO,
-    marenEarn: ZERO,
+    marenVault: '0x46252B00AB59384518d9dB6D1f210ffF1221645b',
+    marenPay: '0xe475Ff919D54E055809f516E3bed8a5c7a101836',
+    // MarenRelayHub extends MarenForwarder and is the single trusted forwarder;
+    // the standalone forwarder is deliberately not deployed. Verified on-chain:
+    // MarenPay.trustedForwarder() returns this address.
+    marenForwarder: '0x22cC1Adfb0C91D9359746dE3F7E8cB7F2B8eA98C',
+    marenRegistry: '0x9e123Cdd0CD524812CF9F552d3FAB13d8143b77E',
+    marenEarn: '0xE3B02b215085B99Ce61E0F5ea9763Ac637aa7826',
   },
 };
 

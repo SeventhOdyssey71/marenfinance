@@ -54,14 +54,22 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      # No `version:` here on purpose. package.json's `packageManager` field is
+      # authoritative, and pnpm/action-setup@v4 hard-errors when both are set:
+      #   "Multiple versions of pnpm specified"
       - uses: pnpm/action-setup@v4
-        with:
-          version: 10
 
       - uses: actions/setup-node@v4
         with:
           node-version: 22
           cache: pnpm
+
+      # apps/relayer's chain tests need anvil. Without it they skip silently,
+      # which reads exactly like a pass.
+      - name: Install Foundry
+        uses: foundry-rs/foundry-toolchain@v1
+        with:
+          version: stable
 
       - name: Install
         run: pnpm install --frozen-lockfile
@@ -89,9 +97,17 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - uses: pnpm/action-setup@v4
+      # tools/pdf depends on puppeteer-core only — there is no bundled browser to
+      # fall back to — so CI must provide one explicitly.
+      - uses: browser-actions/setup-chrome@v1
+        id: chrome
         with:
-          version: 10
+          chrome-version: stable
+
+      # No `version:` here on purpose. package.json's `packageManager` field is
+      # authoritative, and pnpm/action-setup@v4 hard-errors when both are set:
+      #   "Multiple versions of pnpm specified"
+      - uses: pnpm/action-setup@v4
 
       - uses: actions/setup-node@v4
         with:
@@ -103,6 +119,8 @@ jobs:
 
       - name: Build PDFs
         run: pnpm docs:pdf
+        env:
+          MAREN_PDF_CHROME: ${{ steps.chrome.outputs.chrome-path }}
 
       - name: Upload PDFs
         uses: actions/upload-artifact@v4

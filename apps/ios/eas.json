@@ -1,0 +1,52 @@
+{
+  "cli": {
+    "version": ">= 12.0.0",
+    "appVersionSource": "remote",
+    "requireCommit": true
+  },
+  "build": {
+    "base": {
+      "node": "22.11.0",
+      "env": {
+        "EXPO_NO_TELEMETRY": "1"
+      },
+      "ios": {
+        "resourceClass": "m-medium"
+      }
+    },
+    "development": {
+      "extends": "base",
+      "developmentClient": true,
+      "distribution": "internal",
+      "channel": "development",
+      "env": {
+        "MAREN_NETWORK": "testnet"
+      }
+    },
+    "preview": {
+      "extends": "base",
+      "distribution": "internal",
+      "channel": "preview",
+      "env": {
+        "MAREN_NETWORK": "testnet"
+      }
+    },
+    "production": {
+      "extends": "base",
+      "distribution": "store",
+      "channel": "production",
+      "autoIncrement": true,
+      "env": {
+        "MAREN_NETWORK": "mainnet"
+      }
+    }
+  },
+  "submit": {
+    "production": {
+      "ios": {
+        "ascAppId": "REPLACE_BEFORE_FIRST_SUBMIT",
+        "appleTeamId": "REPLACE_BEFORE_FIRST_SUBMIT"
+      }
+    }
+  }
+}

@@ -85,9 +85,37 @@ describe('liquidationPrice', () => {
   it('returns zero when there is no debt', () => {
     expect(liquidationPrice(WAD, 0n)).toBe(0n);
   });
+
+  it('never returns the MAX_CR sentinel for an empty account', () => {
+    // Regression. The guards used to check collateral before debt, so a brand-new
+    // wallet — no collateral, no debt — got MAX_CR back, and the dApp rendered it
+    // literally as a $5.79e58 liquidation price next to "the protocol liquidates
+    // below 110%". An empty account is at no risk, not infinite risk.
+    expect(liquidationPrice(0n, 0n)).toBe(0n);
+    expect(marenLiquidationPrice(0n, 0n)).toBe(0n);
+
+    // And the value a UI would format must stay small enough to render.
+    expect(liquidationPrice(0n, 0n)).toBeLessThan(MAX_CR);
+  });
+
+  /**
+   * The same rule swept across the collateral axis. A brand-new wallet is the default
+   * state for anyone arriving at this app, and so is a wallet that has deposited but
+   * not yet borrowed — neither has a liquidation price, at any collateral.
+   */
+  it('never returns the MAX_CR sentinel while debt is zero, at any collateral', () => {
+    for (const coll of [0n, 1n, WAD, btc('0.012'), btc('500')]) {
+      expect(liquidationPrice(coll, 0n)).toBe(0n);
+      expect(marenLiquidationPrice(coll, 0n)).toBe(0n);
+    }
+  });
+
+  it('still reports MAX_CR for the genuinely impossible case: debt with no collateral', () => {
+    expect(liquidationPrice(0n, musd(100))).toBe(MAX_CR);
+  });
 });
 
-describe("marenLiquidationPrice", () => {
+describe('marenLiquidationPrice', () => {
   it('triggers strictly earlier than the protocol, because our threshold is 140% vs 110%', () => {
     const coll = WAD;
     const debt = musd(20_000);
@@ -116,7 +144,12 @@ describe('maxNetDebtAt and collateralRequiredFor round-trip', () => {
   });
 
   it('rounds collateral requirements UP so we never under-quote', () => {
-    const required = collateralRequiredFor(musd(1_800), PRICE, MAREN_POLICY.targetCr, BORROWING_RATE);
+    const required = collateralRequiredFor(
+      musd(1_800),
+      PRICE,
+      MAREN_POLICY.targetCr,
+      BORROWING_RATE,
+    );
     const totalDebt = totalDebtFor(musd(1_800), BORROWING_RATE);
     expect(required * PRICE).toBeGreaterThanOrEqual(totalDebt * MAREN_POLICY.targetCr);
   });
@@ -149,7 +182,12 @@ describe('assessBorrowRoute — the 1,800 MUSD minimum is the reason MarenVault 
   });
 
   it('the boundary collateral really does correspond to the protocol minimum', () => {
-    const required = collateralRequiredFor(MIN_NET_DEBT, PRICE, MAREN_POLICY.targetCr, BORROWING_RATE);
+    const required = collateralRequiredFor(
+      MIN_NET_DEBT,
+      PRICE,
+      MAREN_POLICY.targetCr,
+      BORROWING_RATE,
+    );
     // ~0.0793 BTC. Assert the public "~0.079 BTC" claim is honest to 3 decimal places.
     expect(required).toBeGreaterThan(btc('0.078'));
     expect(required).toBeLessThan(btc('0.080'));
@@ -217,7 +255,9 @@ describe('accruedInterest — MUSD is simple, not compounding', () => {
   it('is linear in time — two years is exactly twice one year, not more', () => {
     const principal = musd(10_000);
     const year = 365 * 24 * 60 * 60;
-    expect(accruedInterest(principal, 100, year * 2)).toBe(accruedInterest(principal, 100, year) * 2n);
+    expect(accruedInterest(principal, 100, year * 2)).toBe(
+      accruedInterest(principal, 100, year) * 2n,
+    );
   });
 
   it('is zero for zero elapsed time', () => {

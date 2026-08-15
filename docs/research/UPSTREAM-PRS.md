@@ -12,12 +12,12 @@ brief's description of the musd issue was inaccurate in one important respect an
 
 ## Summary
 
-| # | Target | Branch (on Sele's fork) | Type | One-line |
-|---|--------|--------------------------|------|----------|
-| 1 | `wevm/viem` | `fix/mezo-mainnet-rpc-multicall3` | PR | Mezo mainnet default RPC does not resolve; Multicall3 missing |
-| 2 | `mezo-org/documentation` | `fix/dead-rpc-endpoints` | PR | Three non-resolving hosts in copy-pasteable config/snippets |
-| 3 | `mezo-org/documentation` | `fix/subgraph-network-slug` | PR | Goldsky slug is `mezo`, not `mezo-mainnet`; links to a 404 repo |
-| 4 | `mezo-org/musd` | — | Issue | Two docs-vs-deployed-bytecode questions (framed as questions) |
+| #   | Target                   | Branch (on Sele's fork)           | Type  | One-line                                                        |
+| --- | ------------------------ | --------------------------------- | ----- | --------------------------------------------------------------- |
+| 1   | `wevm/viem`              | `fix/mezo-mainnet-rpc-multicall3` | PR    | Mezo mainnet default RPC does not resolve; Multicall3 missing   |
+| 2   | `mezo-org/documentation` | `fix/dead-rpc-endpoints`          | PR    | Three non-resolving hosts in copy-pasteable config/snippets     |
+| 3   | `mezo-org/documentation` | `fix/subgraph-network-slug`       | PR    | Goldsky slug is `mezo`, not `mezo-mainnet`; links to a 404 repo |
+| 4   | `mezo-org/musd`          | —                                 | Issue | Two docs-vs-deployed-bytecode questions (framed as questions)   |
 
 ---
 
@@ -355,7 +355,7 @@ gh issue create \
 **a) `mezo.drpc.org` — do not cite it as limited.** An early probe (and the coordinator's) showed it
 returning `-32601 method not available` for `eth_getCode`, `eth_getLogs` and `eth_blockNumber`. On
 re-test it served `eth_call`, `eth_getLogs` and `eth_getBlockByNumber` correctly **20/20 times**. The
-earlier failures were transient, not a fixed capability limit. It is therefore *not* defensible to claim
+earlier failures were transient, not a fixed capability limit. It is therefore _not_ defensible to claim
 publicly that it is chain-id-only, and no PR body makes any claim about it. It is simply not proposed as
 viem's default. **The coordinator's suggested PR-2 addition about dRPC being "effectively chain-id-only"
 was dropped for this reason** — it is not currently reproducible, and publishing it would have been the
@@ -384,7 +384,7 @@ different things. The issue is worded accordingly rather than implying the docs 
 
 **Cosmos chain-id.** `developers/chains/index.md` and `mezo-nodes/validator-kit.mdx` use
 `--chain-id mezo-mainnet` / `mezo-testnet`. These are Cosmos chain-ids (mezod is a Cosmos SDK chain), so
-they are a *different* thing from EVM chain id 31612 and must **not** be "fixed" to the Goldsky slug.
+they are a _different_ thing from EVM chain id 31612 and must **not** be "fixed" to the Goldsky slug.
 The real value, read live from a Mezo node, is different again:
 
 ```
