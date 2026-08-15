@@ -9,6 +9,8 @@ import {
   ActionButton,
   AppCard,
   CardTitle,
+  EmptyState,
+  Info,
   Label,
   Metric,
   Note,
@@ -74,8 +76,8 @@ export default function EarnPage() {
         <Label>Earn</Label>
         <h1 className="t-h2 mt-2">Idle MUSD</h1>
         <p className="text-text-muted mt-3 max-w-[68ch] text-sm leading-relaxed">
-          MUSD you are not spending goes into the Stability Pool through an ERC-4626 vault. Returns
-          come from liquidations, which are irregular. Past returns do not predict future ones.
+          MUSD you are not spending goes into the Stability Pool. Returns come from liquidations,
+          which are irregular.
         </p>
       </div>
 
@@ -89,17 +91,32 @@ export default function EarnPage() {
           )}
           <span className="t-h3 text-text-muted">MUSD</span>
         </div>
-        <div className="mt-6">
-          <StatRow
-            label="Deposited"
-            hint="everything you have put in, for computing realised return"
-            value={earn ? <Musd wei={earn.depositedWei} /> : <Dash />}
-            last
-          />
-        </div>
+        {/* Only once there is something to compare the balance against. Repeating
+            "0.00 MUSD" directly beneath a 0.00 MUSD headline is a row that carries no
+            information. */}
+        {!earn || earn.depositedWei > 0n ? (
+          <div className="mt-6">
+            <StatRow
+              label="Deposited"
+              hint="everything you have put in"
+              value={earn ? <Musd wei={earn.depositedWei} /> : <Dash />}
+              last
+            />
+          </div>
+        ) : null}
       </AppCard>
 
       {/* --------------------------------------------- Trailing realised yield */}
+      {/* A window of zero days is not a window. Reporting "0.00 MUSD realised over 0
+          days" to someone who has never deposited states the result of an experiment
+          they did not run, which is the same dishonesty as a forward APY, backdated. */}
+      {earn && earn.trailing.windowDays === 0 ? (
+        <AppCard className="p-6 md:p-8">
+          <EmptyState title="No return to report yet">
+            Returns appear here once you have deposited and a liquidation has been absorbed.
+          </EmptyState>
+        </AppCard>
+      ) : (
       <AppCard className="p-6 md:p-8">
         <div className="flex flex-wrap items-center justify-between gap-4">
           <CardTitle>Realised over the last {earn?.trailing.windowDays ?? 90} days</CardTitle>
@@ -118,19 +135,21 @@ export default function EarnPage() {
         </div>
 
         {/* The disclosure that makes the number honest. Not a footnote, not a tooltip —
-            it sits directly under the figure it qualifies. */}
+            it sits directly under the figure it qualifies. One sentence; the mechanism
+            behind it sits one click down rather than being deleted. */}
         <p
           data-contrast="earn-disclosure"
           className="text-text-muted mt-5 max-w-[68ch] text-sm leading-relaxed"
         >
-          This is MUSD actually realised in the past, not a rate and not a forecast. Maren does not
-          display an APY for Earn because there is no reliable one to display.
+          Realised in the past, not a forecast — Maren does not display an APY for Earn because
+          there is no reliable one to display.
         </p>
-        <p className="text-text-subtle mt-3 max-w-[68ch] text-sm leading-relaxed">
+        <Info summary="Why there is no rate">
           The MUSD Stability Pool has no token emissions. Its entire yield is the Bitcoin seized in
-          liquidations, sold and compounded back into MUSD. Whether that happens at all depends on
-          whether anyone gets liquidated, so returns arrive in lumps and can be zero for months.
-        </p>
+          liquidations, sold and compounded back into MUSD, so whether it pays at all depends on
+          whether anyone gets liquidated. Returns arrive in lumps and can be zero for months, and
+          annualising three events in ninety days would be a lie with a percent sign on it.
+        </Info>
 
         {earn ? (
           <div className="mt-6 grid grid-cols-1 gap-6 sm:grid-cols-3">
@@ -146,16 +165,17 @@ export default function EarnPage() {
                   {earn.trailing.lastGainAt ? timeAgo(earn.trailing.lastGainAt) : 'none yet'}
                 </Num>
               }
-              caption="gains are lumpy by construction"
+              caption="gains are lumpy"
             />
             <Metric
               label="Forward rate"
-              value={<Num size="lg">—</Num>}
-              caption="not shown, because we would be making it up"
+              value={<Dash size="lg" />}
+              caption="we would be making it up"
             />
           </div>
         ) : null}
       </AppCard>
+      )}
 
       {/* ------------------------------------------------------------- Actions */}
       <Segmented
@@ -191,9 +211,7 @@ export default function EarnPage() {
         </div>
 
         <p className="text-text-subtle mt-6 text-xs leading-relaxed">
-          No gas. Maren’s relayer pays the Bitcoin network fee for Earn deposits and withdrawals.
-          Deposits go straight into the Stability Pool; withdrawals come out of idle MUSD first,
-          then the pool.
+          No gas — Maren’s relayer pays it.
         </p>
 
         <div className="mt-7">
@@ -207,12 +225,18 @@ export default function EarnPage() {
         </div>
       </AppCard>
 
+      {/* The risk statement stays. It is the one thing a depositor cannot infer from the
+          screen: this is not a savings account, and the principal is at risk. */}
       <Note>
-        Stability Pool deposits absorb liquidated debt. In exchange for the Bitcoin gains you take
-        on the risk that your MUSD is used to close somebody else’s position — historically
-        profitable, not guaranteed, and not principal-protected. The vault also holds Bitcoin it has
-        not yet converted, so its share price moves with BTC until a swap route Maren has reviewed
-        exists on Mezo.
+        <p>
+          Your MUSD absorbs liquidated debt — not principal-protected, and not guaranteed.
+        </p>
+        <Info summary="What that means in practice">
+          Stability Pool deposits are spent closing other people’s positions, and you are paid in
+          the Bitcoin seized doing it. Historically profitable, but not guaranteed. The vault also
+          holds Bitcoin it has not yet converted, so its share price moves with BTC until a swap
+          route Maren has reviewed exists on Mezo.
+        </Info>
       </Note>
 
       <TxSheet runner={runner} />

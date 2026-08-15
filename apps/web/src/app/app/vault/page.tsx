@@ -21,19 +21,29 @@ import {
 
 import { AmountField, AmountSlider, Segmented } from '@/components/app/controls';
 import { HealthChip } from '@/components/app/health';
-import { Btc, Dash, Musd, Num, Ratio } from '@/components/app/money';
+import {
+  Btc,
+  Dash,
+  DropToLiquidation,
+  LiquidationPrice,
+  Musd,
+  Num,
+  RatioOrDash,
+} from '@/components/app/money';
 import { PriceBanner } from '@/components/app/price-banner';
 import {
   ActionButton,
   AppCard,
   CardTitle,
+  EmptyState,
+  Info,
   Label,
   Metric,
   Note,
   StatRow,
 } from '@/components/app/primitives';
 import { TxSheet, useTxRunner, type TxIntent } from '@/components/app/tx';
-import { ArrowRight } from '@/components/ui/icons';
+import { ArrowRight, VaultIcon } from '@/components/ui/icons';
 import { vaultActionGate } from '@/lib/chain/price';
 import { mutate } from '@/lib/data/mock';
 import { useBalances, usePosition, usePrice } from '@/lib/data/source';
@@ -64,12 +74,21 @@ const MIN_DEPOSIT = 10n ** 15n;
  * this file that touches a user's risk.
  */
 export default function VaultPage() {
-  const [mode, setMode] = useState<Mode>('borrow');
+  const [chosen, setChosen] = useState<Mode | null>(null);
   const price = usePrice();
   const { data: position } = usePosition();
   const runner = useTxRunner();
 
   const livePrice = price.state === 'live' ? price.priceWei : null;
+
+  const empty = position !== undefined && position.collateralWei === 0n && position.debtWei === 0n;
+
+  /**
+   * A wallet with nothing in it can only do one thing here, so that is the tab it lands
+   * on. Deriving the default rather than seeding `useState` means it settles correctly
+   * once the position arrives, while an explicit choice still wins.
+   */
+  const mode: Mode = chosen ?? (empty ? 'deposit' : 'borrow');
   const gate = vaultActionGate(mode, price, { hasDebt: (position?.debtWei ?? 0n) > 0n });
 
   return (
@@ -78,8 +97,7 @@ export default function VaultPage() {
         <Label>Vault</Label>
         <h1 className="t-h2 mt-2">Bitcoin credit</h1>
         <p className="text-text-muted mt-3 max-w-[68ch] text-sm leading-relaxed">
-          Deposit Bitcoin, draw MUSD against it, and never sell the collateral. Repay and withdraw
-          stay open even when borrowing does not.
+          Borrow MUSD against Bitcoin without selling it.
         </p>
       </div>
 
@@ -87,51 +105,65 @@ export default function VaultPage() {
 
       <RouteCard />
 
-      <AppCard>
-        <CardTitle>Your position</CardTitle>
-        <div className="mt-2">
-          <StatRow
-            label="Collateral"
-            value={position ? <Btc wei={position.collateralWei} size="lg" /> : <Dash size="lg" />}
-            sub={
-              position && livePrice ? (
-                <Num size="sm" tone="subtle">
-                  {formatUsd((position.collateralWei * livePrice) / 10n ** 18n)}
-                </Num>
-              ) : null
-            }
-          />
-          <StatRow
-            label="Total debt"
-            hint={
-              position?.route === 'direct'
-                ? 'includes the 200 MUSD liquidation reserve'
-                : 'principal and interest — a pooled position escrows no reserve of its own'
-            }
-            value={position ? <Musd wei={position.debtWei} size="lg" /> : <Dash size="lg" />}
-          />
-          <StatRow
-            label="Borrow limit"
-            hint="Mezo fixes this at the price the trove opened at"
-            value={
-              position ? (
-                <Musd wei={position.maxBorrowingCapacityWei} size="lg" />
-              ) : (
-                <Dash size="lg" />
-              )
-            }
-            last
-          />
-        </div>
-      </AppCard>
+      {/* No position card when there is no position. An empty account lands on the
+          Deposit tab, and the deposit form IS this screen's empty state — a card above
+          it repeating "Deposit Bitcoin" over a second identical button is the kind of
+          stacked redundancy this pass exists to remove. */}
+      {empty ? null : (
+        <AppCard>
+          <div className="flex flex-wrap items-center justify-between gap-4">
+            <CardTitle>Your position</CardTitle>
+            {/* Only when the route card above is not already carrying it. A pooled user
+                saw "POOLED" twice in two stacked cards. */}
+            {position && position.route !== 'pooled' ? (
+              <span className="t-label text-text-subtle">Direct</span>
+            ) : null}
+          </div>
+          <div className="mt-2">
+            <StatRow
+              label="Collateral"
+              value={position ? <Btc wei={position.collateralWei} size="lg" /> : <Dash size="lg" />}
+              sub={
+                position && livePrice ? (
+                  <Num size="sm" tone="subtle">
+                    {formatUsd((position.collateralWei * livePrice) / 10n ** 18n)}
+                  </Num>
+                ) : null
+              }
+            />
+            <StatRow
+              label="Total debt"
+              hint={
+                position?.route === 'direct'
+                  ? 'includes the 200 MUSD liquidation reserve'
+                  : 'no reserve on the pooled route'
+              }
+              value={position ? <Musd wei={position.debtWei} size="lg" /> : <Dash size="lg" />}
+            />
+            <StatRow
+              label="Borrow limit"
+              hint="fixed when this trove opened"
+              value={
+                position ? (
+                  <Musd wei={position.maxBorrowingCapacityWei} size="lg" />
+                ) : (
+                  <Dash size="lg" />
+                )
+              }
+              last
+            />
+          </div>
+        </AppCard>
+      )}
 
-      <Segmented options={MODES} value={mode} onChange={setMode} label="Vault action" />
+      <Segmented options={MODES} value={mode} onChange={setChosen} label="Vault action" />
 
       {mode === 'borrow' ? (
         <BorrowPanel
           runner={runner}
           gateReason={gate.allowed ? null : gate.reason}
           price={livePrice}
+          onDeposit={() => setChosen('deposit')}
         />
       ) : null}
       {mode === 'deposit' ? <DepositPanel runner={runner} price={livePrice} /> : null}
@@ -161,65 +193,47 @@ function RouteCard() {
   const price = usePrice();
   const livePrice = price.state === 'live' ? price.priceWei : null;
 
-  if (!position) return null;
+  /**
+   * Only the POOLED route gets a card of its own, because only the pooled route has
+   * something a user must be told. "You hold your own trove and take no pooling risk"
+   * is good news and one line long; it was filling an entire card on the most important
+   * screen in the app, so it now rides as a chip on the position card's header instead.
+   */
+  if (!position || position.route !== 'pooled') return null;
 
   const assessment = livePrice
     ? assessBorrowRoute(position.collateralWei, livePrice, MAREN_POLICY.targetCr, BORROWING_RATE)
     : null;
   const threshold = livePrice ? directTroveThreshold(livePrice) : null;
-  const onPooled = position.route === 'pooled';
 
   return (
     <AppCard>
       <div className="flex flex-wrap items-center justify-between gap-4">
-        <CardTitle>
-          {onPooled ? 'You are on the pooled route' : 'You are on a direct trove'}
-        </CardTitle>
-        <span className="t-label text-text-subtle">{onPooled ? 'Pooled' : 'Direct'}</span>
+        <CardTitle>Pooled position</CardTitle>
+        <span className="t-label text-text-subtle">Pooled</span>
       </div>
 
-      {onPooled ? (
-        <>
-          <p className="text-text-muted mt-4 max-w-[68ch] text-sm leading-relaxed">
-            A trove of your own needs {threshold ? formatBtc(threshold) : '~0.079 BTC'} at the 250%
-            we recommend, because MUSD will not open one below {formatMusd(MIN_NET_DEBT)} of net
-            debt. You hold {formatBtc(position.collateralWei)}, so your deposit sits inside Maren’s
-            managed trove with a per-user ledger.
-          </p>
-          <div className="mt-4">
-            <Note>
-              Pooled positions share one trove. Your collateral is segregated in{' '}
-              <em className="text-text not-italic">accounting, not custody</em>: a catastrophic,
-              faster-than-keeper drawdown could socialise losses. Maren liquidates a pooled position
-              internally at {policyRatio(MAREN_POLICY.vaultLiquidationCr)} — well above the
-              protocol’s 110% — and the 0.001 BTC floor, per-block keeper checks and an insurance
-              buffer funded from vault fees are the mitigations. They are not a guarantee.
-            </Note>
-          </div>
-          {assessment?.eligible && assessment.route === 'direct' ? (
-            <p className="text-text-muted mt-4 text-sm leading-relaxed">
-              Your collateral now supports a direct trove. Closing this position and opening one of
-              your own would remove the pooling risk entirely.
-            </p>
-          ) : null}
-        </>
-      ) : (
-        <>
-          <p
-            data-contrast="route-body"
-            className="text-text-muted mt-4 max-w-[68ch] text-sm leading-relaxed"
-          >
-            Your collateral clears the {formatMusd(MIN_NET_DEBT)} minimum net debt the protocol
-            requires, so you hold your own trove and take no pooling risk. Maren prefers this route
-            whenever it is available, even though pooled volume would be better for us.
-          </p>
-          <p className="text-text-subtle mt-3 max-w-[68ch] text-sm leading-relaxed">
-            The pooled vault exists for deposits below about{' '}
-            {threshold ? formatBtc(threshold) : '0.079 BTC'} — the level where a trove of one’s own
-            becomes impossible rather than merely uncomfortable.
-          </p>
-        </>
-      )}
+      {/* The pooled-risk statement stays, in one sentence. It is the single most
+          important thing a pooled user does not otherwise know, and shortening a
+          disclosure is not the same as removing it. */}
+      <p className="text-text-muted mt-4 max-w-[68ch] text-sm leading-relaxed">
+        Your deposit shares one trove with other users — segregated in{' '}
+        <em className="text-text not-italic">accounting, not custody</em>, so a drawdown faster
+        than the keeper could socialise losses.
+      </p>
+      <Info summary="How Maren limits that risk">
+        Maren liquidates a pooled position internally at{' '}
+        {policyRatio(MAREN_POLICY.vaultLiquidationCr)}, far above the protocol’s 110%, and backs
+        that with a 0.001 BTC floor, per-block keeper checks and an insurance buffer funded from
+        vault fees. These are mitigations, not a guarantee. You are here because a trove of your
+        own needs about {threshold ? formatBtc(threshold) : '0.079 BTC'} — MUSD will not open one
+        below {formatMusd(MIN_NET_DEBT)} of net debt.
+      </Info>
+      {assessment?.eligible && assessment.route === 'direct' ? (
+        <p className="text-text-muted mt-4 max-w-[68ch] text-sm leading-relaxed">
+          Your collateral now supports a trove of your own, which would remove this risk entirely.
+        </p>
+      ) : null}
     </AppCard>
   );
 }
@@ -228,10 +242,12 @@ function BorrowPanel({
   runner,
   gateReason,
   price,
+  onDeposit,
 }: {
   runner: ReturnType<typeof useTxRunner>;
   gateReason: string | null;
   price: bigint | null;
+  onDeposit: () => void;
 }) {
   const { data: position } = usePosition();
 
@@ -285,49 +301,85 @@ function BorrowPanel({
         value:
           position?.route === 'direct' ? (
             <span className="text-text-muted">
-              <Musd wei={LIQUIDATION_RESERVE} /> — already escrowed, refunded on close
+              <Musd wei={LIQUIDATION_RESERVE} /> — refunded on close
             </span>
           ) : (
-            <span className="text-text-muted">none on the pooled route</span>
+            <span className="text-text-muted">none</span>
           ),
       },
-      { label: 'Interest', value: <span>{formatApr(INTEREST_RATE_BPS)}, simple, fixed</span> },
+      { label: 'Interest', value: <span>{formatApr(INTEREST_RATE_BPS)}, fixed</span> },
       {
         label: 'Total debt after',
         value: preview ? <Musd wei={preview.debtWei} /> : <Dash />,
       },
       {
         label: 'Resulting ratio',
-        value: preview ? <Ratio cr={preview.collateralRatio} /> : <Dash />,
+        value: preview ? (
+          <RatioOrDash cr={preview.collateralRatio} debtWei={preview.debtWei} />
+        ) : (
+          <Dash />
+        ),
       },
       {
         label: 'Liquidation price',
-        value: preview ? <Num>{formatUsd(preview.liquidationPriceWei)}</Num> : <Dash />,
+        value: preview ? (
+          <LiquidationPrice wei={preview.liquidationPriceWei} debtWei={preview.debtWei} />
+        ) : (
+          <Dash />
+        ),
       },
     ],
     gas:
       position?.route === 'pooled'
         ? {
             sponsored: true,
-            note: 'Gasless. A pooled borrow carries no BTC with the call, so Maren’s relayer can submit it and pay the Bitcoin gas.',
+            note: 'Maren’s relayer submits this and pays the Bitcoin gas.',
           }
         : {
             sponsored: false,
-            note: 'This goes through Mezo’s own borrower contract and costs BTC gas. Maren does not sponsor direct-trove operations.',
+            note: 'Costs BTC gas. Maren does not sponsor direct-trove operations.',
           },
     caution: belowRecommendation
-      ? `Bitcoin would only need to fall ${dropPercent}% to liquidate this position. Continue?`
+      ? `Bitcoin would only need to fall ${dropPercent}% to liquidate this position.`
       : undefined,
     confirmLabel: `Borrow ${formatMusd(value)}`,
     simulate: () => mutate.borrow(value),
   });
 
+  // Nothing to borrow against. The slider, the preview and the fee breakdown are all
+  // functions of a position that does not exist, so none of them render.
+  if (position && position.collateralWei === 0n) {
+    return (
+      <AppCard className="p-6 md:p-10">
+        <EmptyState
+          icon={<VaultIcon className="size-6" />}
+          title="Deposit first"
+          action={
+            <ActionButton onClick={onDeposit} icon={<ArrowRight className="size-4" />}>
+              Deposit Bitcoin
+            </ActionButton>
+          }
+        >
+          Borrowing needs collateral. {formatApr(INTEREST_RATE_BPS)}, fixed.
+        </EmptyState>
+      </AppCard>
+    );
+  }
+
   return (
     <AppCard className="p-6 md:p-8">
       <CardTitle>Borrow MUSD</CardTitle>
-      <p className="text-text-muted mt-3 max-w-[68ch] text-sm leading-relaxed">
-        {formatApr(INTEREST_RATE_BPS)}, simple interest, fixed for the life of this loan. The slider
-        stops at Maren’s 180% floor — it will not let you past it.
+      {/* The rate, and nothing else. That the slider stops at the floor is self-evident
+          when it stops, and the cap is named underneath it in any case.
+
+          `data-contrast` is verify-contrast's hook for muted body copy on a card
+          surface, which is the worst case for this token — it used to sit on the route
+          card, which no longer renders on the direct route. */}
+      <p
+        data-contrast="route-body"
+        className="text-text-muted mt-3 max-w-[68ch] text-sm leading-relaxed"
+      >
+        {formatApr(INTEREST_RATE_BPS)}, fixed for the life of this loan.
       </p>
 
       <div className="mt-8">
@@ -375,12 +427,16 @@ function BorrowPanel({
             <HealthChip status={preview.health.status} />
           </div>
 
+          {/* Every figure here is derived from the debt this borrow WOULD create, so
+              each one dashes while that debt is still zero rather than quoting a
+              liquidation price for a loan nobody has taken. */}
           <div className="mt-5 grid grid-cols-1 gap-6 sm:grid-cols-3">
             <Metric
               label="Resulting ratio"
               value={
-                <Ratio
+                <RatioOrDash
                   cr={preview.collateralRatio}
+                  debtWei={preview.debtWei}
                   size="lg"
                   tone={ratioTone ? 'inherit' : 'default'}
                   className={ratioTone?.text ?? ''}
@@ -390,12 +446,24 @@ function BorrowPanel({
             />
             <Metric
               label="Liquidation price"
-              value={<Num size="lg">{formatUsd(preview.liquidationPriceWei)}</Num>}
+              value={
+                <LiquidationPrice
+                  wei={preview.liquidationPriceWei}
+                  debtWei={preview.debtWei}
+                  size="lg"
+                />
+              }
               caption="protocol liquidates at 110%"
             />
             <Metric
               label="Bitcoin can fall"
-              value={<Num size="lg">{dropPercent}%</Num>}
+              value={
+                <DropToLiquidation
+                  bps={preview.health.priceDropToLiquidationBps}
+                  debtWei={preview.debtWei}
+                  size="lg"
+                />
+              }
               caption="from today’s price"
             />
           </div>
@@ -407,7 +475,7 @@ function BorrowPanel({
             />
             <StatRow
               label="Liquidation reserve"
-              hint="200 MUSD, refunded when the trove is closed"
+              hint="refunded when the trove closes"
               value={
                 position?.route === 'direct' ? (
                   <Musd wei={LIQUIDATION_RESERVE} />
@@ -421,8 +489,8 @@ function BorrowPanel({
 
           {belowRecommendation ? (
             <p className="text-warning mt-5 max-w-[68ch] text-sm leading-relaxed" role="status">
-              Bitcoin would only need to fall {dropPercent}% to liquidate this position. That is
-              below the {policyRatio(MAREN_POLICY.targetCr)} we recommend. Continue?
+              Bitcoin would only need to fall {dropPercent}% to liquidate this, below the{' '}
+              {policyRatio(MAREN_POLICY.targetCr)} we recommend.
             </p>
           ) : null}
         </div>
@@ -430,8 +498,8 @@ function BorrowPanel({
 
       <p className="text-text-subtle mt-6 text-xs leading-relaxed">
         {position?.route === 'pooled'
-          ? 'Gasless: a pooled borrow carries no BTC with the call, so Maren’s relayer submits it and pays the Bitcoin gas.'
-          : 'Direct-trove operations go through Mezo’s own borrower contract and cost BTC gas. Maren does not sponsor them.'}
+          ? 'No gas — Maren’s relayer pays it.'
+          : 'Costs BTC gas. Maren does not sponsor direct-trove operations.'}
       </p>
 
       {gateReason ? (
@@ -499,7 +567,7 @@ function DepositPanel({
     ],
     gas: {
       sponsored: false,
-      note: 'A deposit sends Bitcoin with the call, and Maren’s relay hub refuses any request carrying value — sponsoring one would mean Maren funding your deposit. This costs BTC gas. Everything you do afterwards is sponsored.',
+      note: 'A deposit carries Bitcoin with the call, which the relayer cannot sponsor. Everything after it is free.',
     },
     confirmLabel: `Deposit ${formatBtc(wei)}`,
     simulate: () => mutate.depositBtc(wei),
@@ -509,8 +577,7 @@ function DepositPanel({
     <AppCard className="p-6 md:p-8">
       <CardTitle>Deposit Bitcoin</CardTitle>
       <p className="text-text-muted mt-3 max-w-[68ch] text-sm leading-relaxed">
-        Adds collateral and raises your ratio immediately. Note that adding collateral does not
-        raise Mezo’s borrow ceiling — only a refinance does.
+        Adds collateral and raises your ratio immediately.
       </p>
 
       <div className="mt-8 max-w-md">
@@ -540,10 +607,10 @@ function DepositPanel({
         />
       </div>
 
+      {/* The one action Maren cannot sponsor, said before the user signs it. */}
       <p className="text-text-subtle mt-6 max-w-[68ch] text-xs leading-relaxed">
-        Your first deposit costs BTC gas: it carries value, and the relay hub refuses any request
-        that does. Everything after it — borrow, repay, withdraw on the pooled route, and every
-        payment — is sponsored.
+        A deposit costs BTC gas — it carries value, and the relayer cannot sponsor that. Everything
+        after it is free.
       </p>
 
       <div className="mt-7">
@@ -593,8 +660,7 @@ function RepayPanel({ runner }: { runner: ReturnType<typeof useTxRunner> }) {
     <AppCard className="p-6 md:p-8">
       <CardTitle>Repay debt</CardTitle>
       <p className="text-text-muted mt-3 max-w-[68ch] text-sm leading-relaxed">
-        Reduces your principal and raises your ratio. Interest is simple and non-compounding, fixed
-        at the rate this position opened at. Repaying more than you owe repays exactly what you owe.
+        Reduces your principal and raises your ratio. Interest is simple, never compounding.
       </p>
 
       <div className="mt-8 max-w-md">
@@ -615,8 +681,7 @@ function RepayPanel({ runner }: { runner: ReturnType<typeof useTxRunner> }) {
       </div>
 
       <p className="text-text-subtle mt-6 text-xs leading-relaxed">
-        Repay needs no price. It stays available when the oracle is stale and when borrowing is
-        paused.
+        Repay needs no price, so it stays open when the oracle is stale.
       </p>
 
       <div className="mt-7">
@@ -673,9 +738,8 @@ function WithdrawPanel({
     <AppCard className="p-6 md:p-8">
       <CardTitle>Withdraw Bitcoin</CardTitle>
       <p className="text-text-muted mt-3 max-w-[68ch] text-sm leading-relaxed">
-        Removes collateral. Maren refuses any withdrawal that would take the position below{' '}
-        {policyRatio(MAREN_POLICY.minHealthyCr)}, so the amount available here is already limited by
-        what you owe.
+        The amount available is already capped at Maren’s{' '}
+        {policyRatio(MAREN_POLICY.minHealthyCr)} floor.
       </p>
 
       <div className="mt-8 max-w-md">
@@ -701,7 +765,7 @@ function WithdrawPanel({
         </div>
       ) : (
         <p className="text-text-subtle mt-6 text-xs leading-relaxed">
-          Withdrawal is never paused. If Maren halts the vault, entries close and exits stay open.
+          Withdrawal is never paused. If Maren halts the vault, exits stay open.
         </p>
       )}
 

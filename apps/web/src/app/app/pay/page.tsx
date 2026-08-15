@@ -53,8 +53,7 @@ export default function PayPage() {
         <Label>Pay</Label>
         <h1 className="t-h2 mt-2">Move dollars</h1>
         <p className="text-text-muted mt-3 max-w-[68ch] text-sm leading-relaxed">
-          Send MUSD to a handle or an address, ask to be paid, or hand someone a claimable link.
-          None of it needs the recipient to hold Bitcoin.
+          Send MUSD to a handle or an address. The recipient needs no Bitcoin.
         </p>
       </div>
 
@@ -83,14 +82,10 @@ function GaslessBanner() {
 
   return (
     <div className="border-success/25 bg-surface-inset rounded-[var(--radius-card)] border p-5">
-      <div className="flex flex-wrap items-start justify-between gap-4">
-        <div className="max-w-[68ch]">
-          <p className="text-success text-sm">No gas — Maren pays the Bitcoin network fee</p>
-          <p className="text-text-muted mt-2 text-sm leading-relaxed">
-            You sign an EIP-712 message; Maren’s relayer submits it and pays the BTC gas. Your
-            Bitcoin stays collateral. The recipient needs no BTC either.
-          </p>
-        </div>
+      <div className="flex flex-wrap items-center justify-between gap-4">
+        <p className="text-success max-w-[68ch] text-sm">
+          No gas — Maren pays the Bitcoin network fee.
+        </p>
         {sponsorship ? (
           <div className="text-right">
             <Num size="lg">
@@ -102,8 +97,10 @@ function GaslessBanner() {
       </div>
       {sponsorship ? (
         <p className="text-text-subtle mt-3 text-xs leading-relaxed">
-          After that the fee is {formatMusd(sponsorship.feeAfterFreeTierWei)} taken in MUSD inside
-          the same transaction, shown before you sign. You are never blocked at the door.
+          {/* `formatMusd` already carries the unit — BRAND.md §8. Saying "in MUSD"
+              after it produced "0.02 MUSD in MUSD". */}
+          After that, {formatMusd(sponsorship.feeAfterFreeTierWei)} inside the same transaction,
+          shown before you sign.
         </p>
       ) : null}
     </div>
@@ -160,7 +157,9 @@ function SendPanel({ runner }: { runner: ReturnType<typeof useTxRunner> }) {
     ],
     gas: {
       sponsored: true,
-      note: 'No gas. Maren pays the Bitcoin network fee for this transaction. The memo is written on-chain as an event and is publicly readable.',
+      // The memo's visibility stays: it is written on-chain and the user is about to
+      // sign it, so this is the last honest moment to say so.
+      note: 'No gas — Maren pays it. The memo is written on-chain and is publicly readable.',
     },
     confirmLabel: 'Send',
     simulate: () => mutate.send(amountWei, resolved?.handle ?? shortAddress(recipient ?? ''), memo),
@@ -198,15 +197,11 @@ function SendPanel({ runner }: { runner: ReturnType<typeof useTxRunner> }) {
               </Num>
             </span>
           ) : isHandle ? (
-            <span className="text-danger">
-              No such handle on this network. Maren will not fall back to an address.
-            </span>
+            <span className="text-danger">No such handle on this network.</span>
           ) : isAddress ? (
-            <span className="text-text-muted">Valid address. No handle is registered to it.</span>
+            <span className="text-text-muted">Valid address, no handle registered.</span>
           ) : trimmed.length > 0 ? (
-            <span className="text-text-subtle">
-              Enter a handle beginning with @, or a 0x address.
-            </span>
+            <span className="text-text-subtle">Enter an @handle or a 0x address.</span>
           ) : null}
         </div>
       </div>
@@ -237,10 +232,8 @@ function SendPanel({ runner }: { runner: ReturnType<typeof useTxRunner> }) {
           className="text-text placeholder:text-text-subtle/60 mt-3 w-full border-b border-[var(--border-hairline)] bg-transparent pb-3 text-[0.9375rem] outline-none focus:border-[var(--border-strong)]"
         />
         <p id="pay-memo-count" className="text-text-subtle mt-2 text-xs">
-          <span className="num">{memoBytes}</span>/80 bytes · written on-chain and publicly readable
-          {memoBytes > 80 ? (
-            <span className="text-danger"> · too long, MarenPay caps this at 80 bytes</span>
-          ) : null}
+          <span className="num">{memoBytes}</span>/80 bytes · public on-chain
+          {memoBytes > 80 ? <span className="text-danger"> · too long</span> : null}
         </p>
       </div>
 
@@ -298,9 +291,7 @@ function RequestPanel({ runner }: { runner: ReturnType<typeof useTxRunner> }) {
       <AppCard className="p-6 md:p-8">
         <CardTitle>Request payment</CardTitle>
         <p className="text-text-muted mt-3 max-w-[68ch] text-sm leading-relaxed">
-          Creates an on-chain ask that the other side fulfils in a single action. Nothing is
-          escrowed and nothing moves until they do. Leave the handle blank and anyone holding the
-          request may pay it.
+          An ask, not an obligation. Nothing moves until the other side pays it.
         </p>
 
         <div className="mt-8 max-w-xl">
@@ -450,9 +441,7 @@ function LinkPanel({ runner }: { runner: ReturnType<typeof useTxRunner> }) {
       <AppCard className="p-6 md:p-8">
         <CardTitle>Payment link</CardTitle>
         <p className="text-text-muted mt-3 max-w-[68ch] text-sm leading-relaxed">
-          Escrows MUSD against a one-time key and gives you a link. The recipient needs no prior
-          relationship with Maren and no Bitcoin — a person with an empty wallet can receive this
-          and then spend it. Unclaimed links can be reclaimed after they expire.
+          Escrows MUSD against a one-time key. Anyone can claim it — no wallet history, no Bitcoin.
         </p>
 
         <div className="mt-8 grid max-w-2xl grid-cols-1 gap-8 sm:grid-cols-2">
@@ -480,8 +469,7 @@ function LinkPanel({ runner }: { runner: ReturnType<typeof useTxRunner> }) {
               <span className="t-h3 text-text-muted shrink-0">days</span>
             </div>
             <p className="text-text-subtle mt-3 text-xs">
-              MarenPay refuses an expiry in the past, and only the creator can reclaim after it
-              passes.
+              Only you can reclaim it after that.
             </p>
           </div>
         </div>
@@ -552,8 +540,8 @@ function LinkPanel({ runner }: { runner: ReturnType<typeof useTxRunner> }) {
             <p className="text-text-subtle py-3 text-sm">No links yet.</p>
           ) : (
             <p className="text-text-subtle pt-4 text-xs leading-relaxed">
-              Secrets are not stored. A link that has been shown once cannot be shown again — that
-              is the honest behaviour for a bearer secret, and it is why the reclaim path exists.
+              Secrets are never stored, so a link can only be shown once. Reclaim it if it goes
+              astray.
             </p>
           )}
         </div>

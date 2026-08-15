@@ -13,6 +13,9 @@
 const pw = await import(process.env.PLAYWRIGHT_CORE ?? 'playwright-core');
 const { chromium } = pw.chromium ? pw : pw.default;
 
+/** Override with BASE_URL when port 3000 is taken. */
+const BASE = process.env.BASE_URL ?? 'http://127.0.0.1:3000';
+
 const browser = await chromium.launch({
   executablePath: process.env.CHROME_EXECUTABLE,
   args: ['--use-gl=angle'],
@@ -86,7 +89,7 @@ for (const width of [390, 1440]) {
       document.addEventListener('DOMContentLoaded', () => document.head.append(s));
     });
     const page = await ctx.newPage();
-    await page.goto(`http://127.0.0.1:3000${target.path}`, { waitUntil: 'networkidle' });
+    await page.goto(`${BASE}${target.path}`, { waitUntil: 'networkidle' });
     await page.evaluate(async () => {
       const step = window.innerHeight * 0.6;
       for (let y = 0; y <= document.body.scrollHeight; y += step) {

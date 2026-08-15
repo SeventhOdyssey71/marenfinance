@@ -193,7 +193,62 @@ for (const shot of closeups) {
  * where a payment's resolved address is shown before anything is signed. A design review
  * that never sees these has not seen the product.
  */
+const openDemo = async (page, account) => {
+  await page.getByRole('button', { name: 'Demo controls' }).click();
+  await page.getByRole('button', { name: account }).first().click();
+  await page.getByRole('button', { name: 'Hide demo controls' }).click();
+  await page.waitForTimeout(900);
+};
+
 const states = [
+  /**
+   * The empty account, at both widths, on both screens that derive figures from a
+   * position. This is the default state for anyone arriving without a wallet, and it is
+   * the state that used to render a 60-digit liquidation price, so a review that never
+   * looks at it has not looked at the thing most likely to be broken.
+   */
+  {
+    name: 'state-empty-portfolio-1440',
+    path: '/app',
+    width: 1440,
+    height: 1000,
+    act: (page) => openDemo(page, /New wallet/),
+  },
+  {
+    name: 'state-empty-portfolio-390',
+    path: '/app',
+    width: 390,
+    height: 844,
+    act: (page) => openDemo(page, /New wallet/),
+  },
+  {
+    name: 'state-empty-vault-1440',
+    path: '/app/vault',
+    width: 1440,
+    height: 1100,
+    act: (page) => openDemo(page, /New wallet/),
+  },
+  {
+    name: 'state-empty-vault-390',
+    path: '/app/vault',
+    width: 390,
+    height: 844,
+    act: (page) => openDemo(page, /New wallet/),
+  },
+  {
+    name: 'state-empty-earn-1440',
+    path: '/app/earn',
+    width: 1440,
+    height: 1000,
+    act: (page) => openDemo(page, /New wallet/),
+  },
+  {
+    name: 'state-empty-activity-1440',
+    path: '/app/activity',
+    width: 1440,
+    height: 900,
+    act: (page) => openDemo(page, /New wallet/),
+  },
   {
     name: 'state-vault-stale-1440',
     path: '/app/vault',

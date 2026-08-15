@@ -98,6 +98,18 @@ describe('liquidationPrice', () => {
     expect(liquidationPrice(0n, 0n)).toBeLessThan(MAX_CR);
   });
 
+  /**
+   * The same rule swept across the collateral axis. A brand-new wallet is the default
+   * state for anyone arriving at this app, and so is a wallet that has deposited but
+   * not yet borrowed — neither has a liquidation price, at any collateral.
+   */
+  it('never returns the MAX_CR sentinel while debt is zero, at any collateral', () => {
+    for (const coll of [0n, 1n, WAD, btc('0.012'), btc('500')]) {
+      expect(liquidationPrice(coll, 0n)).toBe(0n);
+      expect(marenLiquidationPrice(coll, 0n)).toBe(0n);
+    }
+  });
+
   it('still reports MAX_CR for the genuinely impossible case: debt with no collateral', () => {
     expect(liquidationPrice(0n, musd(100))).toBe(MAX_CR);
   });

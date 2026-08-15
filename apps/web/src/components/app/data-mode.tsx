@@ -24,7 +24,7 @@ export function DataModeBanner() {
   if (source.mode === 'live') {
     return (
       <p className="text-text-subtle text-xs">
-        Live from Mezo {source.network}. Figures are read from the contracts at the addresses in{' '}
+        Live from Mezo {source.network}, read from the contracts in{' '}
         <span className="num">@maren/sdk</span>.
       </p>
     );
@@ -37,10 +37,9 @@ export function DataModeBanner() {
       <div className="flex flex-wrap items-center justify-between gap-4">
         <div className="max-w-[68ch]">
           <p className="t-label text-warning">Demo data</p>
-          <p className="text-text-muted mt-2 text-sm leading-relaxed">
-            Maren’s contracts are not deployed yet — every figure below is mock data on Mezo{' '}
-            {source.network}, and no action broadcasts a transaction.
-          </p>
+          {/* The honest disclosure, in one sentence. It says which of the two reasons
+              applies, because "not deployed" and "not connected" are different promises. */}
+          <p className="text-text-muted mt-2 text-sm leading-relaxed">{source.reason}</p>
         </div>
 
         <button
@@ -59,19 +58,13 @@ export function DataModeBanner() {
         hidden={!open}
         className="mt-4 border-t border-[var(--border-hairline)] pt-4"
       >
-        <p className="text-text-muted max-w-[68ch] text-sm leading-relaxed">
-          The live reads are written against the real ABIs and gated on{' '}
-          <span className="num">isDeployed()</span>; when <span className="num">Deploy.s.sol</span>{' '}
-          writes addresses into <span className="num">@maren/sdk</span> this banner disappears and
-          the same screens read from chain. See <span className="num">apps/web/README.md</span>.
-        </p>
-
-        <div className="mt-5 flex flex-wrap gap-x-10 gap-y-5">
+        <div className="flex flex-wrap gap-x-10 gap-y-5">
           <fieldset>
             <legend className="t-label text-text-subtle">Account</legend>
-            <div className="mt-2.5 flex gap-2">
+            <div className="mt-2.5 flex flex-wrap gap-2">
               {(
                 [
+                  { key: 'empty', label: 'New wallet', hint: 'nothing yet' },
                   { key: 'direct', label: 'Direct trove', hint: '0.5 BTC' },
                   { key: 'pooled', label: 'Pooled', hint: '0.012 BTC' },
                 ] as const
@@ -114,9 +107,7 @@ export function DataModeBanner() {
         </div>
 
         <p className="text-text-subtle mt-4 max-w-[68ch] text-xs leading-relaxed">
-          Stalling the oracle drives the app into the state Mezo produces above 60 seconds of
-          staleness: borrowing is refused, repay stays open, and no figure is computed from the last
-          known price.
+          A stalled oracle refuses new borrowing and leaves repay and withdraw open.
         </p>
       </div>
     </div>
