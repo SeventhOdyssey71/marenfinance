@@ -63,7 +63,22 @@ export function Surfaces() {
                 Send MUSD to an @handle, a link, a request or a split. Gasless, with an
                 on-chain memo.
               </p>
-              <p className="num mt-auto pt-10 text-sm text-musd">MUSD</p>
+              <ul className="mt-auto space-y-2.5 pt-8">
+                {[
+                  ['Handle', '@sele'],
+                  ['Link', 'claimable'],
+                  ['Request', 'invoice'],
+                  ['Split', 'one signature'],
+                ].map(([shape, detail]) => (
+                  <li
+                    key={shape}
+                    className="flex items-center justify-between gap-3 border-b border-[var(--border-hairline)] pb-2.5 text-sm text-text-muted last:border-b-0 last:pb-0"
+                  >
+                    {shape}
+                    <span className="num truncate text-xs text-text-subtle">{detail}</span>
+                  </li>
+                ))}
+              </ul>
             </article>
           </Reveal>
 

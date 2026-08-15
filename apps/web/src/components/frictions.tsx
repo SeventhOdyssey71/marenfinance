@@ -69,11 +69,11 @@ export function Frictions() {
           </h2>
         </Reveal>
 
-        <ol className="mt-16 md:mt-24">
+        <ol className="mt-12 md:mt-16">
           {items.map((item, i) => (
             <li
               key={item.index}
-              className={`grid grid-cols-1 items-start gap-8 py-12 md:grid-cols-12 md:gap-12 md:py-16 ${
+              className={`grid grid-cols-1 items-start gap-8 py-12 md:grid-cols-12 md:gap-12 md:py-14 ${
                 i > 0 ? 'hairline-t' : ''
               }`}
             >
