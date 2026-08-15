@@ -230,10 +230,15 @@ p code, li code, td code, th code {
 /* ── Tables ────────────────────────────────────────────────────────────────── */
 /* Horizontal hairlines only, numeric columns right-aligned in mono (BRAND.md §7). */
 
+/* Keep a table whole where it can be. Chromium moves an unsplittable block to the next
+   page and only breaks it if it still does not fit, so long tables still paginate —
+   but a four-row table can no longer leave a single orphaned row behind a repeated
+   header. */
 .table-wrap {
   width: ${CONTENT_WIDTH_MM}mm;
   margin: 5mm 0 6mm;
-  break-inside: auto;
+  page-break-inside: avoid;
+  break-inside: avoid;
 }
 
 table {

@@ -3,7 +3,7 @@ title: Maren Finance — Investment & Grant Thesis
 subtitle: Mezo's Bitcoin credit primitive works. The constraint is distribution. Maren is the consumer layer that removes it.
 docId: MRN-DOC-001
 date: 2026-08-15
-version: 1.0
+version: '1.0'
 classification: Confidential
 audience: Mezo Ecosystem
 colophon: |
@@ -19,11 +19,11 @@ sell. That is the hard part, and it is already shipped, live on mainnet, and cor
 
 The constraint on Mezo is not the primitive. It is distribution. Three numbers frame it:
 
-| Measure | Value | Read from |
-|---|---|---|
-| MUSD holders | 29,360 | MUSD token contract, mainnet |
-| Troves open on Mezo mainnet | 26 | `TroveManager.getTroveOwnersCount()` |
-| Collateral to open one | 0.079346 BTC ($5,004.50) | `minNetDebt()` at 250% CR, live oracle price |
+| Measure                     | Value                    | Read from                                    |
+| --------------------------- | ------------------------ | -------------------------------------------- |
+| MUSD holders                | 29,360                   | MUSD token contract, mainnet                 |
+| Troves open on Mezo mainnet | 26                       | `TroveManager.getTroveOwnersCount()`         |
+| Collateral to open one      | 0.079346 BTC ($5,004.50) | `minNetDebt()` at 250% CR, live oracle price |
 
 Tens of thousands of people hold MUSD. Twenty-six can mint it. That gap is not a
 marketing problem — it is three mechanical frictions, and every one is fixable in
@@ -62,16 +62,16 @@ and a Stability Pool that pays out in BTC. The collateral is native BTC passed a
 against Bitcoin and keep the Bitcoin. That is the whole promise of the chain and it
 functions today.
 
-The parameters are conservative and, importantly for a consumer product, *stable*:
+The parameters are conservative and, importantly for a consumer product, _stable_:
 
-| Parameter | Value | Notes |
-|---|---|---|
-| Minimum collateral ratio | 110% | Hardcoded `constant`, not governable |
-| Critical (recovery) ratio | 150% | Hardcoded `constant`, not governable |
-| Borrowing fee | 0.10% | Governable, 7-day timelock |
-| Interest rate | 1.00% APR | Simple, non-compounding, fixed for the life of the loan |
-| Redemption fee | 0.75% | Taken in BTC, paid to the PCV |
-| Governance delay | 7 days | On every governable parameter |
+| Parameter                 | Value     | Notes                                                   |
+| ------------------------- | --------- | ------------------------------------------------------- |
+| Minimum collateral ratio  | 110%      | Hardcoded `constant`, not governable                    |
+| Critical (recovery) ratio | 150%      | Hardcoded `constant`, not governable                    |
+| Borrowing fee             | 0.10%     | Governable, 7-day timelock                              |
+| Interest rate             | 1.00% APR | Simple, non-compounding, fixed for the life of the loan |
+| Redemption fee            | 0.75%     | Taken in BTC, paid to the PCV                           |
+| Governance delay          | 7 days    | On every governable parameter                           |
 
 A fixed 1.00% simple APR that a trove keeps forever is a genuinely good consumer credit
 product. It is cheaper than every card, most mortgages, and every other on-chain
@@ -141,11 +141,11 @@ contractor, and their friend can all receive it in one action.
 Maren addresses all three frictions in application code. None of it requires Mezo to
 change a parameter, upgrade a contract, or grant a permission.
 
-| Friction | Today on Mezo | With Maren |
-|---|---|---|
-| Minimum to borrow | 0.079346 BTC ($5,004.50) | **0.001 BTC** ($63.07) |
-| BTC needed to transact | Yes, for every action | **None** |
-| Send MUSD to | A hex address | **`@handle`**, link, request, or split |
+| Friction               | Today on Mezo            | With Maren                             |
+| ---------------------- | ------------------------ | -------------------------------------- |
+| Minimum to borrow      | 0.079346 BTC ($5,004.50) | **0.001 BTC** ($63.07)                 |
+| BTC needed to transact | Yes, for every action    | **None**                               |
+| Send MUSD to           | A hex address            | **`@handle`**, link, request, or split |
 
 ### Pooled Bitcoin credit, from 0.001 BTC
 
@@ -170,10 +170,10 @@ Mezo's base fee is **1,300,000 wei**. A 100,000-gas transaction therefore costs
 below roughly $77,000.
 
 | Sponsored actions | Approximate cost |
-|---|---|
-| 1,000 | $8 |
-| 100,000 | $820 |
-| 1,000,000 | $8,200 |
+| ----------------- | ---------------- |
+| 1,000             | $8               |
+| 100,000           | $820             |
+| 1,000,000         | $8,200           |
 
 > [!VERIFIED]
 > Derived from the live base fee of 1,300,000 wei and BTC at $63,072 as reported by
@@ -183,7 +183,7 @@ below roughly $77,000.
 > holder would be happy about.
 
 Mechanically, Maren combines an ERC-2771 trusted forwarder with MUSD's EIP-2612 `permit`,
-so a first-time user can approve *and* transact in a single signed action while holding
+so a first-time user can approve _and_ transact in a single signed action while holding
 zero BTC. For direct troves we use Mezo's own `BorrowerOperationsSignatures` rather than
 wrapping it — fewer moving parts and no additional trust assumption.
 
@@ -235,12 +235,12 @@ Where Mezo ships a signed-operation contract, Maren calls it instead of wrapping
 Building Maren has required reading Mezo's deployed bytecode rather than its
 documentation, and that produced findings worth handing back regardless of the grant:
 
-| Finding | Status |
-|---|---|
+| Finding                                                                                                                        | Status                                                                     |
+| ------------------------------------------------------------------------------------------------------------------------------ | -------------------------------------------------------------------------- |
 | viem's bundled `mezo` chain definition uses an RPC host that fails DNS, and omits `multicall3` although Multicall3 is deployed | Corrected definition shipped in `packages/sdk/src/chains.ts`; upstreamable |
-| Three hosts published in Mezo's own docs return NXDOMAIN: `rpc.mezo.org`, `testnet-rpc.mezo.org`, `testnet-explorer.mezo.org` | Confirmed; a correcting pull request is prepared |
-| Three places where Mezo's published docs contradict the deployed contracts | Enumerated in `packages/sdk/src/constants.ts`, offered to Mezo as findings |
-| ERC-4337 is deployed on Mezo but structurally unusable, and the reason is specific | Written up in the feasibility document |
+| Three hosts published in Mezo's own docs return NXDOMAIN: `rpc.mezo.org`, `testnet-rpc.mezo.org`, `testnet-explorer.mezo.org`  | Confirmed; a correcting pull request is prepared                           |
+| Three places where Mezo's published docs contradict the deployed contracts                                                     | Enumerated in `packages/sdk/src/constants.ts`, offered to Mezo as findings |
+| ERC-4337 is deployed on Mezo but structurally unusable, and the reason is specific                                             | Written up in the feasibility document                                     |
 
 These are offered as contributions, not complaints. A chain with a thin tooling layer
 benefits from builders who write down what they had to discover.
@@ -252,12 +252,12 @@ Maren is new. The person building it is not.
 **Talise** is a payments application on Sui, built by the same author for Sui Overflow and
 carried past the hackathon into production. What it has, stated as measured:
 
-| Measure | Value |
-|---|---|
-| Waitlist signups | 1,900+ |
-| Handles claimed on-chain | 1,400+ |
+| Measure                  | Value                                                          |
+| ------------------------ | -------------------------------------------------------------- |
+| Waitlist signups         | 1,900+                                                         |
+| Handles claimed on-chain | 1,400+                                                         |
 | Live mainnet deployments | Payments, cheques, streams, payroll, yield router, payment kit |
-| Published security audit | 2026-07-24 |
+| Published security audit | 2026-07-24                                                     |
 
 There is no TVL figure here, no revenue figure, and no monthly-active number, because
 those are not figures we can substantiate. A grant committee should assume any number
@@ -300,11 +300,11 @@ the single largest source of misaligned incentives from the design.
 
 Revenue comes from spread on real usage. The natural lines on Mezo:
 
-| Line | Basis |
-|---|---|
-| Pooled vault spread | A small margin over the protocol's 1.00% APR, charged to pooled borrowers for the service of being under the minimum |
-| Payments fee | A fee on MUSD payment volume above a free tier; the first 25 sponsored actions per address are always free |
-| Earn performance fee | A performance fee on realised `MarenEarn` yield, never on principal |
+| Line                 | Basis                                                                                                                |
+| -------------------- | -------------------------------------------------------------------------------------------------------------------- |
+| Pooled vault spread  | A small margin over the protocol's 1.00% APR, charged to pooled borrowers for the service of being under the minimum |
+| Payments fee         | A fee on MUSD payment volume above a free tier; the first 25 sponsored actions per address are always free           |
+| Earn performance fee | A performance fee on realised `MarenEarn` yield, never on principal                                                  |
 
 For scale, Talise's model ranks four revenue lines — FX/auto-swap spread at 30 bps,
 off-ramp margin at 50 bps, yield rebate at roughly 100 bps of the lending spread, and
@@ -324,12 +324,12 @@ or $1.41M at 100,000 users.
 deployment and the remaining $9,000 released against the milestones below**, plus the
 co-marketing support the ecosystem team offers.
 
-| Milestone | Release | Definition of done |
-|---|---|---|
-| M0 — Mainnet deployment | $6,000 (40%) | All five Maren contracts verified on 31612; pooled vault live with a cap; addresses published |
-| M1 — Audited | $3,000 (20%) | Third-party audit of `MarenVault` and `MarenForwarder` complete and published, findings and remediations in the open |
-| M2 — Borrowers under the floor | $3,000 (20%) | 100 distinct addresses holding a pooled position below the 1,800 MUSD protocol minimum — that is, 100 borrowers Mezo could not otherwise have |
-| M3 — Payments live | $3,000 (20%) | 1,000 settled `MarenPay` transactions and 500 registered handles, all gasless |
+| Milestone                      | Release | Definition of done                                                                                                                            |
+| ------------------------------ | ------- | --------------------------------------------------------------------------------------------------------------------------------------------- |
+| M0 — Mainnet deployment        | $6,000  | All five Maren contracts verified on 31612; pooled vault live with a cap; addresses published                                                 |
+| M1 — Audited                   | $3,000  | Third-party audit of `MarenVault` and `MarenForwarder` complete and published, findings and remediations in the open                          |
+| M2 — Borrowers under the floor | $3,000  | 100 distinct addresses holding a pooled position below the 1,800 MUSD protocol minimum — that is, 100 borrowers Mezo could not otherwise have |
+| M3 — Payments live             | $3,000  | 1,000 settled `MarenPay` transactions and 500 registered handles, all gasless                                                                 |
 
 The milestones are deliberately written as counts of things Mezo does not have today
 rather than as TVL. TVL can be bought. A hundred borrowers below a floor that currently
@@ -349,8 +349,8 @@ A committee that has to discover a risk after funding has been given a worse doc
 than one that names it first.
 
 **Pooled-trove systemic risk.** This is the largest one and it is inherent to the design.
-Users in `MarenVault` share a single trove. A user's collateral is segregated *in
-accounting*, not in custody. A BTC drawdown faster than the keeper can respond could
+Users in `MarenVault` share a single trove. A user's collateral is segregated _in
+accounting_, not in custody. A BTC drawdown faster than the keeper can respond could
 socialise losses across pooled depositors. Mitigations — the 140%-versus-110% buffer,
 per-block keeper checks, the 0.001 BTC deposit floor, halting new borrowing before
 halting withdrawals, and an insurance buffer funded from vault fees — reduce the

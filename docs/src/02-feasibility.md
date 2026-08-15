@@ -3,7 +3,7 @@ title: Maren Finance — Technical Feasibility & Architecture
 subtitle: What Mezo gives us, what we must build, and the specific places where the chain does not behave the way its documentation says it does.
 docId: MRN-DOC-002
 date: 2026-08-15
-version: 1.0
+version: '1.0'
 classification: Confidential
 audience: Mezo Ecosystem
 colophon: |
@@ -46,20 +46,20 @@ Three claims are load-bearing:
 The single most important fact about this project is how much of it is already done by
 somebody else. Maren is an application layer, not a protocol.
 
-| Capability | Mezo provides | Maren must build |
-|---|---|---|
-| BTC-collateralised borrowing | The entire CDP: `BorrowerOperations`, `TroveManager`, liquidation engine, Stability Pool | Nothing. We call it. |
-| Stablecoin | MUSD, with EIP-2612 `permit` and permit2 support | Nothing. |
-| BTC/USD price | Consensus-level oracle exposed as a chain precompile | Staleness handling and an explicit unavailable state |
-| Signed borrower operations | `BorrowerOperationsSignatures`, EIP-712 for every borrower action | Nothing, for direct troves. We call it rather than wrap it. |
-| Gasless payment settlement | x402 settlement proxy, live on both networks | Interoperation, not replacement |
-| Batched reads | Multicall3 at the canonical address on both networks | A corrected chain definition, because viem's omits it |
-| Sub-minimum borrowing | — | `MarenVault`: a pooled trove with per-user accounting |
-| Meta-transactions for our own contracts | — | `MarenForwarder` + relayer |
-| Human-readable payment identity | — | `MarenRegistry` |
-| Consumer payments surface | — | `MarenPay` |
-| Stability Pool yield, tokenised | — | `MarenEarn`, an ERC-4626 wrapper |
-| Indexing | Goldsky support, but no public subgraph | Our own subgraph |
+| Capability                              | Mezo provides                                                                            | Maren must build                                            |
+| --------------------------------------- | ---------------------------------------------------------------------------------------- | ----------------------------------------------------------- |
+| BTC-collateralised borrowing            | The entire CDP: `BorrowerOperations`, `TroveManager`, liquidation engine, Stability Pool | Nothing. We call it.                                        |
+| Stablecoin                              | MUSD, with EIP-2612 `permit` and permit2 support                                         | Nothing.                                                    |
+| BTC/USD price                           | Consensus-level oracle exposed as a chain precompile                                     | Staleness handling and an explicit unavailable state        |
+| Signed borrower operations              | `BorrowerOperationsSignatures`, EIP-712 for every borrower action                        | Nothing, for direct troves. We call it rather than wrap it. |
+| Gasless payment settlement              | x402 settlement proxy, live on both networks                                             | Interoperation, not replacement                             |
+| Batched reads                           | Multicall3 at the canonical address on both networks                                     | A corrected chain definition, because viem's omits it       |
+| Sub-minimum borrowing                   | —                                                                                        | `MarenVault`: a pooled trove with per-user accounting       |
+| Meta-transactions for our own contracts | —                                                                                        | `MarenForwarder` + relayer                                  |
+| Human-readable payment identity         | —                                                                                        | `MarenRegistry`                                             |
+| Consumer payments surface               | —                                                                                        | `MarenPay`                                                  |
+| Stability Pool yield, tokenised         | —                                                                                        | `MarenEarn`, an ERC-4626 wrapper                            |
+| Indexing                                | Goldsky support, but no public subgraph                                                  | Our own subgraph                                            |
 
 Five contracts and one relayer. Everything financial that could be delegated to
 audited, already-deployed Mezo code is delegated to it.
@@ -70,19 +70,19 @@ Everything in this section was confirmed against live RPCs on 2026-08-15. It is
 reproduced here because the published sources disagree with reality often enough that
 a table of what is actually true has real value.
 
-| Fact | Mainnet | Matsnet |
-|---|---|---|
-| Chain ID | 31612 | 31611 |
-| Chain ID, hex | 0x7b7c | 0x7b7b |
-| Gas token | BTC | BTC |
-| Decimals | 18 | 18 |
-| Primary RPC | `https://jsonrpc-mezo.boar.network` | `https://rpc.test.mezo.org` |
-| Fallback RPC | `https://mainnet.mezo.public.validationcloud.io` | — |
-| Explorer | `https://explorer.mezo.org` | `https://explorer.test.mezo.org` |
-| Explorer API | `https://api.explorer.mezo.org/api` | `https://api.explorer.test.mezo.org/api` |
-| Multicall3 | `0xcA11bde05977b3631167028862bE2a173976CA11` | same address, also deployed |
-| Base fee | 1,300,000 wei | — |
-| Gas limit | 10,000,000 | — |
+| Fact          | Mainnet                                          | Matsnet                                  |
+| ------------- | ------------------------------------------------ | ---------------------------------------- |
+| Chain ID      | 31612                                            | 31611                                    |
+| Chain ID, hex | 0x7b7c                                           | 0x7b7b                                   |
+| Gas token     | BTC                                              | BTC                                      |
+| Decimals      | 18                                               | 18                                       |
+| Primary RPC   | `https://jsonrpc-mezo.boar.network`              | `https://rpc.test.mezo.org`              |
+| Fallback RPC  | `https://mainnet.mezo.public.validationcloud.io` | —                                        |
+| Explorer      | `https://explorer.mezo.org`                      | `https://explorer.test.mezo.org`         |
+| Explorer API  | `https://api.explorer.mezo.org/api`              | `https://api.explorer.test.mezo.org/api` |
+| Multicall3    | `0xcA11bde05977b3631167028862bE2a173976CA11`     | same address, also deployed              |
+| Base fee      | 1,300,000 wei                                    | —                                        |
+| Gas limit     | 10,000,000                                       | —                                        |
 
 Two details in that table cost real time to establish.
 
@@ -109,13 +109,13 @@ on the four stacks they have already integrated.
 That architecture also produces a handful of EVM divergences worth knowing before you
 debug them at 2am:
 
-| Behaviour | On Mezo |
-|---|---|
-| `SELFDESTRUCT` | Disabled |
-| `PREVRANDAO` | Returns 0 |
-| Blob transactions (type 3) | Rejected |
-| `requestsHash` in block responses | Omitted, although Prague is active |
-| `debug_traceCall` | Not implemented — absent from the mezod source, not merely unexposed |
+| Behaviour                         | On Mezo                                                              |
+| --------------------------------- | -------------------------------------------------------------------- |
+| `SELFDESTRUCT`                    | Disabled                                                             |
+| `PREVRANDAO`                      | Returns 0                                                            |
+| Blob transactions (type 3)        | Rejected                                                             |
+| `requestsHash` in block responses | Omitted, although Prague is active                                   |
+| `debug_traceCall`                 | Not implemented — absent from the mezod source, not merely unexposed |
 
 The last row is the one that decides Maren's entire gasless architecture. Section 8.
 
@@ -164,16 +164,16 @@ indexing design assumes polling and webhooks, not subscriptions, which is sectio
 
 ### Precompiles and standard infrastructure
 
-| Component | Address | Status |
-|---|---|---|
-| BTC gas-token precompile | `0x7b7C000000000000000000000000000000000000` | Live |
-| Price oracle precompile | `0x7b7c000000000000000000000000000000000015` | Live, Skip Connect |
-| RIP-7212 `P256VERIFY` | `0x0000000000000000000000000000000000000100` | Active |
-| Multicall3 | `0xcA11bde05977b3631167028862bE2a173976CA11` | Deployed, birth block 351760 |
-| Permit2 | canonical | Deployed |
-| CREATE2 deployer | canonical | Deployed |
+| Component                | Address                                      | Status                             |
+| ------------------------ | -------------------------------------------- | ---------------------------------- |
+| BTC gas-token precompile | `0x7b7C000000000000000000000000000000000000` | Live                               |
+| Price oracle precompile  | `0x7b7c000000000000000000000000000000000015` | Live, Skip Connect                 |
+| RIP-7212 `P256VERIFY`    | `0x0000000000000000000000000000000000000100` | Active                             |
+| Multicall3               | `0xcA11bde05977b3631167028862bE2a173976CA11` | Deployed, birth block 351760       |
+| Permit2                  | canonical                                    | Deployed                           |
+| CREATE2 deployer         | canonical                                    | Deployed                           |
 | ERC-4337 EntryPoint v0.7 | `0x0000000071727De22E5E9d8BAf0edAc6f37da032` | Deployed and inert — see section 8 |
-| x402 settlement proxy | `0x402085c248EeA27D92E8b30b2C58ed07f9E20001` | Live on both networks |
+| x402 settlement proxy    | `0x402085c248EeA27D92E8b30b2C58ed07f9E20001` | Live on both networks              |
 
 The active `P256VERIFY` precompile is worth one line beyond the table: on-chain
 passkey and WebAuthn signature verification is native and cheap on Mezo. For a consumer
@@ -185,18 +185,18 @@ and it is available here without a bespoke verifier contract.
 MUSD is a fork of Threshold USD, itself a fork of Liquity v1. All core contracts are
 `TransparentUpgradeableProxy`; we always integrate against the proxy.
 
-| Contract | Mainnet (31612) |
-|---|---|
-| MUSD | `0xdD468A1DDc392dcdbEf6db6e34E89AA338F9F186` |
-| BorrowerOperations | `0x44b1bac67dDA612a41a58AAf779143B181dEe031` |
+| Contract                     | Mainnet (31612)                              |
+| ---------------------------- | -------------------------------------------- |
+| MUSD                         | `0xdD468A1DDc392dcdbEf6db6e34E89AA338F9F186` |
+| BorrowerOperations           | `0x44b1bac67dDA612a41a58AAf779143B181dEe031` |
 | BorrowerOperationsSignatures | `0xB57ab578BF20b3e318f3EFAA587C51DBccE5df7a` |
-| TroveManager | `0x94AfB503dBca74aC3E4929BACEeDfCe19B93c193` |
-| StabilityPool | `0x73245Eff485aB3AAc1158B3c4d8f4b23797B0e32` |
-| PriceFeed | `0xc5aC5A8892230E0A3e1c473881A2de7353fFcA88` |
-| SortedTroves | `0x8C5DB4C62BF29c1C4564390d10c20a47E0b2749f` |
-| HintHelpers | `0xD267b3bE2514375A075fd03C3D9CBa6b95317DC3` |
-| InterestRateManager | `0x4a453700d157717Fe02fB62E7700ED7845048285` |
-| GovernableVariables | `0x560AC4Ea44Fb7EB2D4d3c00608CB1CAb2613d389` |
+| TroveManager                 | `0x94AfB503dBca74aC3E4929BACEeDfCe19B93c193` |
+| StabilityPool                | `0x73245Eff485aB3AAc1158B3c4d8f4b23797B0e32` |
+| PriceFeed                    | `0xc5aC5A8892230E0A3e1c473881A2de7353fFcA88` |
+| SortedTroves                 | `0x8C5DB4C62BF29c1C4564390d10c20a47E0b2749f` |
+| HintHelpers                  | `0xD267b3bE2514375A075fd03C3D9CBa6b95317DC3` |
+| InterestRateManager          | `0x4a453700d157717Fe02fB62E7700ED7845048285` |
+| GovernableVariables          | `0x560AC4Ea44Fb7EB2D4d3c00608CB1CAb2613d389` |
 
 Matsnet equivalents are in `packages/sdk/src/addresses.ts`. All fifteen addresses were
 verified three independent ways: the `mezo-org/musd` deployment artifacts, the
@@ -271,16 +271,16 @@ minimum — is not a calculation performed in a document. It is the output of
 oracle price of $63,071.83, and asserted by a test that requires the result to fall
 between 0.078 and 0.080 BTC:
 
-| Quantity | Value |
-|---|---|
-| Minimum net debt | 1,800 MUSD |
-| Gas compensation | 200 MUSD |
-| Minimum total debt | 2,000 MUSD |
-| Target collateral ratio | 250% |
-| BTC price used | $63,071.83 |
+| Quantity                | Value                        |
+| ----------------------- | ---------------------------- |
+| Minimum net debt        | 1,800 MUSD                   |
+| Gas compensation        | 200 MUSD                     |
+| Minimum total debt      | 2,000 MUSD                   |
+| Target collateral ratio | 250%                         |
+| BTC price used          | $63,071.83                   |
 | **Collateral required** | **0.079346 BTC ($5,004.50)** |
-| Maren pooled floor | 0.001 BTC |
-| Reduction | 79.3× |
+| Maren pooled floor      | 0.001 BTC                    |
+| Reduction               | 79.3×                        |
 
 The reduction is 79.3×. We write "roughly eighty times" and never round it to 100×,
 for the same reason the position math itself rounds in one direction only.
@@ -372,7 +372,7 @@ owes.
 
 > [!WARNING]
 > Six of these seven produce a revert, which is survivable. Two of them — the Recovery
-> Mode threshold and the six-value debt tuple — produce a *plausible wrong number* on a
+> Mode threshold and the six-value debt tuple — produce a _plausible wrong number_ on a
 > screen a user makes financial decisions from. Those are the ones that matter, and they
 > are the reason Maren reads the deployed contracts rather than a reference
 > implementation.
@@ -399,7 +399,7 @@ user who acts on that promise loses 0.75% in BTC.
 
 The docs list the refinance fee as 0.1%. The code sets `refinancingFeePercentage = 20`
 and computes `amount = (refinancingFeePercentage * oldDebt) / 100` — 20% of old net debt
-— then applies the 0.1% borrowing fee to *that* amount. The effective cost is
+— then applies the 0.1% borrowing fee to _that_ amount. The effective cost is
 approximately **0.02% of old net debt**, an order of magnitude cheaper than documented.
 
 **Consequence:** the documented number is wrong in the user's favour, which is the less
@@ -487,14 +487,14 @@ via `transferFrom` under the user's own permit.
 The differentiator, and the risk. One large, conservatively managed trove; users hold a
 proportional claim with a per-user ledger.
 
-| Property | Value |
-|---|---|
-| Minimum deposit | 0.001 BTC |
-| Protocol MCR | 110% |
-| Maren internal liquidation CR | 140% |
-| Maren target CR | 250% |
-| Maren minimum healthy CR | 180% |
-| Internal liquidation penalty | 5% |
+| Property                      | Value     |
+| ----------------------------- | --------- |
+| Minimum deposit               | 0.001 BTC |
+| Protocol MCR                  | 110%      |
+| Maren internal liquidation CR | 140%      |
+| Maren target CR               | 250%      |
+| Maren minimum healthy CR      | 180%      |
+| Internal liquidation penalty  | 5%        |
 
 A keeper tops up collateral, repays debt, and internally liquidates unhealthy users by
 seizing collateral at a 5% penalty and repaying their share of pooled debt. Users can
@@ -525,14 +525,14 @@ EntryPoint v0.7 **is** deployed at `0x0000000071727De22E5E9d8BAf0edAc6f37da032` 
 32,073 bytes, byte-identical to the Ethereum L1 deployment. Everything downstream of it
 is absent:
 
-| Check | Result |
-|---|---|
-| UserOperations ever processed | Zero |
-| Contract verified on the explorer | No |
-| Blockscout account-abstraction indexer | `501 Service is disabled` |
-| `debug_traceCall` on Mezo RPCs | Not implemented |
-| Pimlico, Biconomy, ZeroDev, Alchemy, Candide, Coinbase Paymaster, Gelato | Not listed |
-| OpenZeppelin Defender hosted relaying | Retired 2026-07-01 |
+| Check                                                                    | Result                    |
+| ------------------------------------------------------------------------ | ------------------------- |
+| UserOperations ever processed                                            | Zero                      |
+| Contract verified on the explorer                                        | No                        |
+| Blockscout account-abstraction indexer                                   | `501 Service is disabled` |
+| `debug_traceCall` on Mezo RPCs                                           | Not implemented           |
+| Pimlico, Biconomy, ZeroDev, Alchemy, Candide, Coinbase Paymaster, Gelato | Not listed                |
+| OpenZeppelin Defender hosted relaying                                    | Retired 2026-07-01        |
 
 The root cause is one row of that table. Every ERC-7562-compliant bundler validates a
 UserOperation by tracing it to enforce the opcode and storage-access rules, and that
@@ -677,23 +677,23 @@ nobody can read a price.
 
 ### Failure modes
 
-| Failure | Detection | Response |
-|---|---|---|
-| Oracle stale beyond 60s | `fetchPrice()` reverts | Clients show "price unavailable"; borrowing disabled; keeper holds and retries |
-| Certified RPC degrades | Certification probe fails on `eth_call` | Fail over to the second certified endpoint |
-| Goldsky lag or outage | Indexed head trails chain head | History degrades; balances and positions still read from chain via Multicall3 |
-| Relayer key compromised | Budget anomaly, unexpected selector | Revoke the forwarder's relayer allowlist entry; user funds unaffected |
-| Relayer out of BTC | Balance floor alarm | Sponsorship pauses; users may still self-submit with their own BTC |
-| Pooled trove approaches 140% | Per-block keeper check | Halt new borrowing, top up collateral, then internally liquidate |
-| MUSD proxy upgraded | Implementation address changes | Integration paused pending review; we monitor the proxy admin |
+| Failure                      | Detection                               | Response                                                                       |
+| ---------------------------- | --------------------------------------- | ------------------------------------------------------------------------------ |
+| Oracle stale beyond 60s      | `fetchPrice()` reverts                  | Clients show "price unavailable"; borrowing disabled; keeper holds and retries |
+| Certified RPC degrades       | Certification probe fails on `eth_call` | Fail over to the second certified endpoint                                     |
+| Goldsky lag or outage        | Indexed head trails chain head          | History degrades; balances and positions still read from chain via Multicall3  |
+| Relayer key compromised      | Budget anomaly, unexpected selector     | Revoke the forwarder's relayer allowlist entry; user funds unaffected          |
+| Relayer out of BTC           | Balance floor alarm                     | Sponsorship pauses; users may still self-submit with their own BTC             |
+| Pooled trove approaches 140% | Per-block keeper check                  | Halt new borrowing, top up collateral, then internally liquidate               |
+| MUSD proxy upgraded          | Implementation address changes          | Integration paused pending review; we monitor the proxy admin                  |
 
 ## Delivery plan
 
-| Stage | Network | Gate |
-|---|---|---|
-| 1. Build and integrate | matsnet, 31611 | All five contracts deployed, a pooled trove seeded, the full borrow-pay-earn-exit loop run end to end |
-| 2. Audit | — | Third-party audit of `MarenVault` and `MarenForwarder` — the two contracts that carry risk — with findings and remediations published |
-| 3. Capped mainnet | mainnet, 31612 | Vault deployed with a hard cap; the cap is raised only as the position proves out |
+| Stage                  | Network        | Gate                                                                                                                                  |
+| ---------------------- | -------------- | ------------------------------------------------------------------------------------------------------------------------------------- |
+| 1. Build and integrate | matsnet, 31611 | All five contracts deployed, a pooled trove seeded, the full borrow-pay-earn-exit loop run end to end                                 |
+| 2. Audit               | —              | Third-party audit of `MarenVault` and `MarenForwarder` — the two contracts that carry risk — with findings and remediations published |
+| 3. Capped mainnet      | mainnet, 31612 | Vault deployed with a hard cap; the cap is raised only as the position proves out                                                     |
 
 Mezo Market listing requires MUSD integration, a third-party audit submitted to the
 Supernormal Foundation, and a live mainnet deployment. Deployment itself is

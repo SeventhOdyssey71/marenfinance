@@ -242,7 +242,6 @@ function createMarked(state) {
       const inner = this.parser.parseInline(token.tokens);
       return `<a href="${href}">${inner}</a>`;
     },
-
   };
 
   marked.use({ renderer });
