@@ -29,8 +29,38 @@ const nextConfig: NextConfig = {
      * offers exactly two connectors and Base Account is not one of them. If it ever
      * becomes one, install `@base-org/account`'s optional peers and delete this.
      */
-    config.resolve.alias = { ...config.resolve.alias, '@base-org/account': false };
+    config.resolve.alias = {
+      ...config.resolve.alias,
+      '@base-org/account': false,
+      /**
+       * The same shape of problem, from two more optional dependencies that only
+       * exist for environments Maren is not:
+       *
+       * - `@react-native-async-storage/async-storage` — MetaMask's SDK reaches for it
+       *   to persist a session in React Native. In a browser it falls back to
+       *   localStorage, so the import is unreachable here.
+       * - `pino-pretty` — WalletConnect's logger loads it only when pretty-printing
+       *   is switched on, which it never is in the browser bundle.
+       *
+       * Both resolve eagerly through webpack and each printed a multi-screen
+       * "Module not found" trace on every single compile, which buried real errors
+       * and made `next dev` slow and unreadable. Aliasing them to false is the
+       * accurate statement: these code paths do not exist in this app.
+       */
+      '@react-native-async-storage/async-storage': false,
+      'pino-pretty': false,
+    };
     return config;
+  },
+  // Turbopack resolves independently of the webpack config above, so the same three
+  // optional dependencies have to be stubbed for `next dev` as well or the traces
+  // come straight back.
+  turbopack: {
+    resolveAlias: {
+      '@base-org/account': { browser: './src/lib/empty-module.ts' },
+      '@react-native-async-storage/async-storage': { browser: './src/lib/empty-module.ts' },
+      'pino-pretty': { browser: './src/lib/empty-module.ts' },
+    },
   },
 };
 
