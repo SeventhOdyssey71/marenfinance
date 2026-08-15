@@ -1,1 +1,0 @@
-{"id":1,"jsonrpc":"2.0","error":{"message":"the method eth_getBlockReceipts does not exist/is not available","code":-32601}}
