@@ -206,8 +206,7 @@ export async function renderMermaid(page, sources, { warn }) {
           }
         } catch (err) {
           failed.push(`diagram ${index + 1}: ${err?.message ?? String(err)}`);
-          slot.innerHTML =
-            '<p style="color:#B91C1C;font-size:9pt">diagram failed to render</p>';
+          slot.innerHTML = '<p style="color:#B91C1C;font-size:9pt">diagram failed to render</p>';
         }
       }
       return failed;
@@ -232,10 +231,11 @@ export async function renderMermaid(page, sources, { warn }) {
  * This runs identically on both print passes, so it cannot shift pagination between
  * the measurement pass and the final one.
  */
-async function bindHeadingsToContent(page) {
+async function prepareForPrint(page) {
   await page.evaluate(() => {
     const main = document.querySelector('main');
     if (!main) return;
+
     for (const heading of Array.from(main.querySelectorAll('h1, h2, h3, h4'))) {
       const next = heading.nextElementSibling;
       if (!next || next.classList.contains('pagebreak')) continue;
@@ -244,6 +244,20 @@ async function bindHeadingsToContent(page) {
       heading.parentNode.insertBefore(keep, heading);
       keep.appendChild(heading);
       keep.appendChild(next);
+    }
+
+    // Tables default to staying whole so a short one cannot strand a single row behind
+    // a repeated header. A tall table given the same treatment just moves to the next
+    // page and leaves a hole where it used to be, so anything past half a page is
+    // released to break normally — its header repeats either way.
+    const KEEP_WHOLE_LIMIT_MM = 105;
+    const PX_PER_MM = 96 / 25.4;
+    for (const table of Array.from(document.querySelectorAll('.table-wrap'))) {
+      const heightMm = table.getBoundingClientRect().height / PX_PER_MM;
+      if (heightMm > KEEP_WHOLE_LIMIT_MM) {
+        table.style.breakInside = 'auto';
+        table.style.pageBreakInside = 'auto';
+      }
     }
   });
 }
@@ -255,7 +269,7 @@ export async function loadPage(browser, server, html, { mermaid = [], warn }) {
   await page.goto(`${server.origin}/doc.html`, { waitUntil: 'networkidle0', timeout: 60_000 });
   await page.emulateMediaType('print');
   await renderMermaid(page, mermaid, { warn });
-  await bindHeadingsToContent(page);
+  await prepareForPrint(page);
   await page.evaluate(() => document.fonts.ready);
   return page;
 }
