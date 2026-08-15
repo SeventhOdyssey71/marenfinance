@@ -8,18 +8,32 @@ import { parseAbiItem, toFunctionSelector, type AbiFunction, type Hex } from 'vi
  * environment variables can only ever *narrow* it (see config.ts). There is no
  * env var, header, or request field that can add a selector at runtime.
  *
- * INVARIANT — every relayable Maren function takes `uint256 relayFee` as its
- * final argument. That is what makes the sponsorship fee an *in-band* parameter:
- * it lives inside `ForwardRequest.data`, which is inside the EIP-712 struct the
- * user signed (R2). Nothing that moves value travels beside the signature.
- *   - Free-tier requests sign `relayFee = 0`.
- *   - Post-free-tier requests sign `relayFee >= policy.feeMusd`.
- * The relayer decodes the signed calldata to read the fee. It never reads a fee
- * from the request body, because a body field is not signed and can be swapped
- * after the fact (this is Talise C7, restated as R2).
+ * TODO(MarenRelayHub) — THE FEE PATH ATTACHES HERE.
  *
- * The fee recipient is a constant inside the Maren contract, not a parameter.
- * A caller cannot redirect it, and neither can the relayer.
+ * An earlier design required every relayable function to take a trailing
+ * `uint256 relayFee`, so the fee rode inside `ForwardRequest.data` and was
+ * therefore inside the signed EIP-712 struct (R2). That invariant is WITHDRAWN,
+ * because the two-leg alternative it was competing with turned out to be unsafe
+ * and the single-leg version turned out to be unnecessary:
+ *
+ *   `ERC2771Forwarder.executeBatch`'s `atomic` flag governs VALIDATION only, not
+ *   inner-call failures. A batched fee leg settles even when the work leg
+ *   reverts (including with `refundReceiver == address(0)`), so batching would
+ *   silently charge users for work that did not happen. Single `execute` does
+ *   bubble correctly.
+ *
+ * The replacement is `MarenRelayHub`: one forwarded call that takes the fee and
+ * invokes the target atomically — fee and work settle together or neither does —
+ * with the fee amount, token and recipient inside the signed payload. R2 is
+ * preserved, just relocated from the target's calldata into the hub's request.
+ *
+ * Until the hub exists, `feeArgIndex` may be null. A call with no readable fee
+ * cannot be charged for, so the paid tier is CLOSED for it rather than free:
+ * `policy.ts` returns a typed `SPONSORSHIP_UNAVAILABLE` once the free tier is
+ * spent. That keeps R16 (no silent subsidy) while the contract lands.
+ *
+ * The fee recipient is never a relayer-supplied parameter. A caller cannot
+ * redirect it, and neither can the relayer.
  *
  * These signatures MUST stay byte-identical to `packages/contracts/src/*.sol`.
  * If a contract signature changes, the selector changes, and this relayer will
@@ -44,22 +58,33 @@ export interface RelayableFunction {
   readonly selector: Hex;
   /** `contract.functionName`, the stable identifier used in config and logs. */
   readonly id: string;
-  /** Index of the `uint256 relayFee` argument in the decoded args tuple. */
-  readonly feeArgIndex: number;
+  /**
+   * Index of the `uint256 relayFee` argument in the decoded args tuple, or null
+   * when this call shape carries no in-band fee. Null means the paid tier is
+   * closed for it — see the MarenRelayHub note above.
+   */
+  readonly feeArgIndex: number | null;
+}
+
+/** Exported so tests can assert what the registry will and will not accept. */
+export function defineRelayableFunction(
+  contract: MarenContractName,
+  signature: string,
+): RelayableFunction {
+  return fn(contract, signature);
 }
 
 function fn(contract: MarenContractName, signature: string): RelayableFunction {
   const abi = parseAbiItem(signature) as AbiFunction;
-  const feeArgIndex = abi.inputs.findIndex((input) => input.name === 'relayFee');
-  if (feeArgIndex === -1) {
-    // A relayable function with no in-band fee argument could never charge for
-    // sponsorship, so the free tier would be the only tier. Fail at module load
-    // rather than discover it in production.
-    throw new Error(`relayable function ${signature} is missing a uint256 relayFee argument`);
-  }
-  if (abi.inputs[feeArgIndex]?.type !== 'uint256') {
+  const declared = abi.inputs.findIndex((input) => input.name === 'relayFee');
+  // A missing fee argument is legal. What is NOT legal is a `relayFee` of the
+  // wrong type, because that would decode to something we would then treat as a
+  // fee — a parameter that is signed but not meaningfully enforced is exactly
+  // the security-theatre shape R13 forbids.
+  if (declared !== -1 && abi.inputs[declared]?.type !== 'uint256') {
     throw new Error(`relayFee on ${signature} must be uint256`);
   }
+  const feeArgIndex = declared === -1 ? null : declared;
   return {
     signature,
     abi,

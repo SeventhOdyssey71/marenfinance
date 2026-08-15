@@ -5,6 +5,7 @@ import {
   buildTestRelayer,
   FakeChain,
   MAREN_PAY,
+  MAREN_PAY_2,
   payCalldata,
   signedRequest,
   tamper,
@@ -61,22 +62,45 @@ describe('signature verification', () => {
     expect(relayer.chainFake.simulations).toBe(0);
   });
 
+  /**
+   * REWRITTEN after review: the previous version of this test asserted only
+   * `status !== 202` plus a tautology, so deleting the signer check entirely
+   * still passed it — the subcases fell through to NONCE_MISMATCH or
+   * SELECTOR_NOT_ALLOWED and looked like a pass. A test that survives the
+   * deletion of the control it names is worse than no test.
+   *
+   * Each case below must now fail for the SPECIFIC reason that the recovered
+   * signer no longer matches, which is only true if signature verification runs.
+   * Note `to` is retargeted at a SECOND allowlisted MarenPay deployment so the
+   * request still clears the target and selector allowlists and reaches the
+   * signature check — otherwise the allowlist would mask it.
+   */
   it.each([
-    ['to', { to: getAddress('0x3333333333333333333333333333333333333333') }],
+    ['to', { to: MAREN_PAY_2 }],
     ['gas', { gas: '400000' }],
     ['deadline', { deadline: String(Math.floor(Date.now() / 1000) + 1200) }],
     ['nonce', { nonce: '0' }],
-  ])('rejects a request whose %s was changed after signing', async (field, changes) => {
+  ])('rejects a request whose %s was changed after signing', async (_field, changes) => {
     const relayer = await buildTestRelayer();
-    // Sign with nonce 1 so the "nonce" case is a real change; the fake chain
-    // reports 1 for this user.
+    // Signed at nonce 1, and the fake forwarder reports 1, so a nonce tamper is
+    // a real change to the digest rather than a stale-nonce rejection.
     relayer.chainFake.nonces_.set(USER.address.toLowerCase(), 1n);
-    const original = await signedRequest({ nonce: 1n });
+    const original = await signedRequest({ nonce: 1n, value: 0n, gas: 200_000n });
     const response = await relayer.post('/relay', tamper(original, changes as never));
 
-    expect(response.status).not.toBe(202);
+    expect(response.status).toBe(401);
+    expect(((await response.json()) as ErrorBody).error).toBe('SIGNER_MISMATCH');
     expect(relayer.chainFake.sent).toHaveLength(0);
-    expect(field).toBeTruthy();
+    expect(relayer.chainFake.simulations).toBe(0);
+  });
+
+  it('the tamper cases above really do clear the allowlist first', async () => {
+    // Guards the guard: if MAREN_PAY_2 ever stopped being allowlisted, the `to`
+    // case would start passing for the wrong reason again.
+    const relayer = await buildTestRelayer();
+    relayer.chainFake.nonces_.set(USER.address.toLowerCase(), 1n);
+    const untampered = await signedRequest({ nonce: 1n, to: MAREN_PAY_2 });
+    expect((await relayer.post('/relay', untampered)).status).toBe(202);
   });
 
   it('rejects a signature from a different key for the same payload', async () => {

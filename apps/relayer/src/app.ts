@@ -1,5 +1,7 @@
 import { Hono } from 'hono';
 import type { Context } from 'hono';
+import { getConnInfo } from '@hono/node-server/conninfo';
+import { resolveClientIp } from './clientip.js';
 import { isRelayError, RelayError } from './errors.js';
 import { hashIp, newRequestId, type Logger } from './logger.js';
 import { settlementHttpStatus } from './receipt.js';
@@ -18,6 +20,8 @@ import type { RelayerService } from './service.js';
 export interface AppDeps {
   readonly service: RelayerService;
   readonly logger: Logger;
+  /** Overridable so tests can drive socket-address resolution deterministically. */
+  readonly socketIp?: (c: Context) => string | undefined;
 }
 
 type Vars = { requestId: string };
@@ -35,19 +39,19 @@ function jsonSafe(value: unknown): unknown {
 }
 
 /**
- * Client IP for rate limiting.
+ * The socket peer address, when the runtime exposes one.
  *
- * When we cannot determine one, every such request shares a single bucket named
- * `unknown` rather than being exempted. An unattributable request must not be a
- * cheaper request (R8).
+ * `@hono/node-server` provides it; the Vercel adapter does not, which is exactly
+ * why `RELAYER_CLIENT_IP_HEADER` defaults to the platform's unforgeable header
+ * there. Anything that throws or is absent resolves to `undefined`, and
+ * `resolveClientIp` then falls back to the shared `unknown` bucket.
  */
-function clientIp(c: Context): string {
-  const forwarded = c.req.header('x-forwarded-for');
-  if (forwarded !== undefined && forwarded.length > 0) {
-    const first = forwarded.split(',')[0]?.trim();
-    if (first !== undefined && first.length > 0) return first;
+function defaultSocketIp(c: Context): string | undefined {
+  try {
+    return getConnInfo(c).remote.address;
+  } catch {
+    return undefined;
   }
-  return c.req.header('x-real-ip')?.trim() || c.req.header('cf-connecting-ip')?.trim() || 'unknown';
 }
 
 export function buildApp(deps: AppDeps): Hono<{ Variables: Vars }> {
@@ -99,9 +103,17 @@ export function buildApp(deps: AppDeps): Hono<{ Variables: Vars }> {
     } catch {
       throw new RelayError('MALFORMED_REQUEST', 400, 'body is not valid JSON');
     }
+    const resolved = resolveClientIp({
+      socketIp: (deps.socketIp ?? defaultSocketIp)(c),
+      header: (name) => c.req.header(name),
+      trustedProxies: service.config.trustedProxies,
+      platformHeader: service.config.clientIpHeader,
+    });
     const result = await service.relay(body, {
       requestId: c.get('requestId'),
-      ipHash: hashIp(clientIp(c)),
+      // Hashed here: the raw address never reaches the service or the logger.
+      ipHash: hashIp(resolved.ip, service.config.ipSalt),
+      ipSource: resolved.source,
     });
     // 202, not 200. The transaction is broadcast, not delivered (R15). Poll
     // `statusUrl` until `state === 'confirmed'` before telling a user anything

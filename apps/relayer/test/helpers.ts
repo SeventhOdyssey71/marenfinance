@@ -32,6 +32,9 @@ export const USER = privateKeyToAccount(USER_KEY);
 
 export const FORWARDER: Address = getAddress('0x1111111111111111111111111111111111111111');
 export const MAREN_PAY: Address = getAddress('0x2222222222222222222222222222222222222222');
+/** A second MarenPay deployment, so a `to` tamper can clear the allowlist and
+ *  still be caught by signature verification rather than by R4. */
+export const MAREN_PAY_2: Address = getAddress('0x7777777777777777777777777777777777777777');
 export const MAREN_EARN: Address = getAddress('0x3333333333333333333333333333333333333333');
 export const NOT_ALLOWLISTED: Address = getAddress('0x9999999999999999999999999999999999999999');
 
@@ -43,7 +46,7 @@ export function makeEnv(overrides: Env = {}): Env {
     RELAYER_NETWORK: 'testnet',
     RELAYER_RPC_URLS: 'https://rpc.test.mezo.org',
     RELAYER_FORWARDER_ADDRESS: FORWARDER,
-    RELAYER_ALLOWED_TARGETS: `marenPay:${MAREN_PAY},marenEarn:${MAREN_EARN}`,
+    RELAYER_ALLOWED_TARGETS: `marenPay:${MAREN_PAY},marenPay:${MAREN_PAY_2},marenEarn:${MAREN_EARN}`,
     RELAYER_MAX_DAILY_SPONSORED_BTC: '0.01',
     RELAYER_FEE_MUSD: '0.05',
     RELAYER_PRIVATE_KEY: RELAYER_KEY,
@@ -244,6 +247,9 @@ export async function buildTestRelayer(
     // The fake chain replaces the transport entirely, so there is nothing to
     // preflight. The preflight itself is tested directly in rpc.test.ts.
     skipPreflight: true,
+    // `app.fetch(new Request(...))` has no TCP peer, so tests state the socket
+    // address explicitly via a header the production path never reads.
+    socketIp: (c) => c.req.header('x-test-socket-ip'),
   });
   return {
     ...relayer,

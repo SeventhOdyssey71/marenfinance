@@ -19,6 +19,7 @@ export type RelayErrorCode =
   | 'INVALID_SIGNATURE'
   | 'SIGNER_MISMATCH'
   | 'NONCE_MISMATCH'
+  | 'DUPLICATE_REQUEST_IN_FLIGHT'
   | 'REQUEST_EXPIRED'
   | 'DEADLINE_TOO_FAR'
   // --- allowlist (R4) ------------------------------------------------------

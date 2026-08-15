@@ -30,6 +30,12 @@ export interface SponsorshipPolicy {
   readonly maxActionsPerIpPerDay: number;
   /** Largest `ForwardRequest.gas` we will accept. Bounds the blast radius of one call. */
   readonly maxGasPerRequest: bigint;
+  /**
+   * Tighter ceiling for contract-account (ERC-1271 / EIP-7702) signers, whose
+   * signature validation runs arbitrary code inside the transaction we pay for.
+   * Always <= `maxGasPerRequest`.
+   */
+  readonly maxGasContractSigner: bigint;
   /** Reject a signed request whose deadline is further out than this many seconds. */
   readonly maxDeadlineSeconds: number;
 }
@@ -46,6 +52,7 @@ export const POLICY_DEFAULTS = {
   maxActionsPerAddressPerDay: 50,
   maxActionsPerIpPerDay: 200,
   maxGasPerRequest: 1_500_000n,
+  maxGasContractSigner: 500_000n,
   maxDeadlineSeconds: 3600,
 } as const;
 
@@ -62,8 +69,12 @@ export interface UsageSnapshot {
 
 export interface PolicyInput {
   readonly usage: UsageSnapshot;
-  /** The `relayFee` decoded out of the SIGNED calldata. Never from the request body. */
-  readonly signedFeeMusdWei: bigint;
+  /**
+   * The `relayFee` decoded out of the SIGNED calldata. Never from the request
+   * body. `null` means this call shape carries no readable in-band fee, which
+   * closes the paid tier for it rather than making it free.
+   */
+  readonly signedFeeMusdWei: bigint | null;
   /** Upper bound on what this request could cost us, in wei. */
   readonly projectedGasCostWei: bigint;
 }
@@ -171,6 +182,19 @@ export function evaluatePolicy(policy: SponsorshipPolicy, input: PolicyInput): P
       error: paymentRequired(
         'SPONSORSHIP_UNAVAILABLE',
         `This address has used all ${policy.freeActionsPerAddress} free sponsored actions, and no paid sponsorship fee is configured on this relayer.`,
+        { freeActionsPerAddress: policy.freeActionsPerAddress },
+      ),
+    };
+  }
+  // TODO(MarenRelayHub): a call shape with no in-band fee cannot be charged for.
+  // Until the hub exists, that closes the paid tier for it. Explicitly NOT a
+  // silent free ride (R16).
+  if (input.signedFeeMusdWei === null) {
+    return {
+      ok: false,
+      error: paymentRequired(
+        'SPONSORSHIP_UNAVAILABLE',
+        `This address has used all ${policy.freeActionsPerAddress} free sponsored actions, and this call carries no in-band relay fee, so it cannot be sponsored further.`,
         { freeActionsPerAddress: policy.freeActionsPerAddress },
       ),
     };

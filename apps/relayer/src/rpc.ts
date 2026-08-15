@@ -5,53 +5,36 @@ import type { Address } from 'viem';
  *
  * WHY THIS FILE EXISTS — read before "simplifying" it.
  *
- * `https://mezo.drpc.org` answers `eth_chainId` correctly and returns
- * `-32601 "the method does not exist/is not available"` for `eth_call`,
- * `eth_estimateGas`, `eth_getBalance`, `eth_blockNumber`, `eth_getLogs` and
- * `eth_getBlockByNumber` without an API key (probed 2026-08-15). A relayer that
- * checks connectivity by asking for the chain id would come up healthy and then
- * fail every single simulation, which for this service means failing the one
- * check that stops us burning BTC on doomed transactions.
+ * On Mezo, `-32601 "the method does not exist/is not available"` is NOT proof
+ * that an endpoint lacks a method. During testing `mezo.drpc.org` returned
+ * -32601 for `eth_call`, `eth_getLogs`, `eth_estimateGas` and `eth_blockNumber`
+ * across a full probe sweep, and then served all of them 10/10 about an hour
+ * later. A backend behind the load balancer was degraded and reported
+ * "unsupported" rather than "unavailable" — which is indistinguishable from a
+ * real capability limit if you probe once.
  *
- * So: liveness here is defined as "serves the methods we actually call", not
- * "answers something". That is R8 — fail closed — applied to infrastructure.
- * An endpoint that cannot serve the relay path is dropped at boot, and if none
- * survive the relayer refuses to relay rather than discovering it per request.
+ * Two lessons, both encoded here as behaviour rather than left as a comment:
  *
- * This is also why `@maren/sdk`'s chain defaults are filtered rather than used
- * as-is: the SDK's RPC list is written for read-mostly frontend use, and a bad
- * entry there must not silently become the relayer's transport.
+ *   1. NEVER condemn (or certify) an endpoint on a single probe. `probeEndpoint`
+ *      retries a failing method before recording it as missing, so one degraded
+ *      backend does not get an otherwise healthy provider dropped.
+ *   2. FAILOVER IS NOT OPTIONAL. The relayer runs a `fallback` transport across
+ *      every usable endpoint, because any of them can transiently claim a method
+ *      does not exist.
+ *
+ * This preflight therefore answers "can THIS endpoint serve the relay path RIGHT
+ * NOW", which is a liveness question, not a permanent statement about a provider.
+ * It exists because a relayer that checks liveness by asking for the chain id
+ * would come up healthy and then fail every simulation — and simulation is the
+ * one check that stops us burning BTC on doomed transactions. That is R8 — fail
+ * closed — applied to infrastructure.
+ *
+ * There is deliberately NO host denylist. A static in-code block against a
+ * provider is unfalsifiable from the outside, ages badly, and cannot express
+ * "was broken for an hour". Repeat-probing plus failover handles the real
+ * hazard; a denylist never could. If an endpoint genuinely stops working, it
+ * fails the preflight and is dropped for that boot, automatically.
  */
-
-/**
- * Hosts that must never be used by the relayer, with the reason. Being on this
- * list is a statement about a specific measured failure, not a preference.
- */
-export const RPC_HOST_DENYLIST: ReadonlyMap<string, string> = new Map([
-  [
-    'mezo.drpc.org',
-    'public endpoint serves eth_chainId only; eth_call/eth_estimateGas/eth_getBlockByNumber return -32601 without an API key',
-  ],
-]);
-
-/** Endpoints confirmed to serve a real `eth_call` (TroveManager.getTroveOwnersCount() -> 26). */
-export const VERIFIED_RPCS = {
-  mainnet: [
-    'https://jsonrpc-mezo.boar.network',
-    'https://mainnet.mezo.public.validationcloud.io',
-  ],
-  testnet: ['https://rpc.test.mezo.org'],
-} as const;
-
-export function isDeniedRpc(url: string): string | null {
-  let host: string;
-  try {
-    host = new URL(url).host.toLowerCase();
-  } catch {
-    return 'not a valid URL';
-  }
-  return RPC_HOST_DENYLIST.get(host) ?? null;
-}
 
 // ---------------------------------------------------------------------------
 // capability preflight
@@ -85,6 +68,13 @@ export interface PreflightOptions {
   readonly probeAccount: Address;
   readonly fetchImpl?: typeof fetch;
   readonly timeoutMs?: number;
+  /**
+   * How many times to ask before believing a method is unavailable. Must be > 1:
+   * a single -32601 on Mezo has already been observed to be a degraded backend
+   * rather than a missing feature.
+   */
+  readonly attemptsPerMethod?: number;
+  readonly retryDelayMs?: number;
 }
 
 interface JsonRpcResponse {
@@ -146,13 +136,10 @@ export async function probeEndpoint(
   url: string,
   options: PreflightOptions,
 ): Promise<EndpointReport> {
-  const denied = isDeniedRpc(url);
-  if (denied !== null) {
-    return { url, ok: false, missing: [...REQUIRED_RPC_METHODS], chainId: null, reason: denied };
-  }
-
   const fetchImpl = options.fetchImpl ?? fetch;
   const timeoutMs = options.timeoutMs ?? 8_000;
+  const attempts = Math.max(2, options.attemptsPerMethod ?? 2);
+  const retryDelayMs = options.retryDelayMs ?? 250;
   const missing: RequiredRpcMethod[] = [];
   let chainId: number | null = null;
   let reason: string | null = null;
@@ -169,10 +156,21 @@ export async function probeEndpoint(
   ];
 
   for (const probe of probes) {
-    const outcome = await rpcCall(url, probe.method, probe.params, fetchImpl, timeoutMs);
+    // Ask more than once. A degraded backend answering -32601 recovers; a
+    // genuinely absent method does not. Condemning an endpoint on one answer is
+    // exactly the mistake that produced a bogus provider block in an earlier
+    // revision of this file.
+    let outcome = await rpcCall(url, probe.method, probe.params, fetchImpl, timeoutMs);
+    for (let attempt = 1; attempt < attempts && !outcome.supported; attempt += 1) {
+      if (retryDelayMs > 0) {
+        await new Promise((resolve) => setTimeout(resolve, retryDelayMs));
+      }
+      outcome = await rpcCall(url, probe.method, probe.params, fetchImpl, timeoutMs);
+    }
+
     if (!outcome.supported) {
       missing.push(probe.method);
-      reason ??= `${probe.method}: ${outcome.reason ?? 'unsupported'}`;
+      reason ??= `${probe.method}: ${outcome.reason ?? 'unsupported'} (after ${attempts} attempts)`;
       continue;
     }
     if (probe.method === 'eth_chainId' && typeof outcome.result === 'string') {

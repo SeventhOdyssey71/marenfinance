@@ -140,6 +140,10 @@ many addresses and many IPs, and read every response we produce.
 | T2 | Swap the fee, recipient, or amount after the user signed | Everything that moves value is inside the EIP-712 struct. The fee is decoded out of the *signed* calldata. There is no parameter beside the signature that changes what happens. |
 | T3 | Use the relayer as a generic transaction pump | Target **and** selector allowlist, scoped per target. `claimLink` is a MarenPay function; sending it to MarenEarn is rejected even though both are allowlisted. |
 | T4 | Drain the gas float with volume | Free tier of 25 lifetime actions per address, then a required in-band MUSD fee; per-address and per-IP daily caps; a global daily BTC cap that halts the whole service when hit. |
+| T4b | Forge `x-forwarded-for` to get a fresh IP bucket per request | A forwarding header is read **only** from a configured trusted proxy (`RELAYER_TRUSTED_PROXIES`) or an unforgeable platform header, and then the **rightmost untrusted hop** is taken, not the leftmost. Otherwise the socket address is used. Unattributable traffic shares one bucket. |
+| T4c | Run on many instances so each has its own counters | `RELAYER_STORE=memory` and an ephemeral `RELAYER_IP_SALT` are **boot problems** under `VERCEL`. Per-instance counters do not weaken the global BTC cap, they remove it. |
+| T5b | Race two copies of one signed request through the nonce check | `(payer, nonce)` is held for the duration of a relay; the second gets `409 DUPLICATE_REQUEST_IN_FLIGHT` instead of burning gas reverting on a consumed nonce. |
+| T5c | Use an expensive ERC-1271 validator to burn gas at our cost | Contract-account signers get a tighter ceiling (`RELAYER_MAX_GAS_CONTRACT_SIGNER`, default 500,000, always ≤ the general cap). |
 | T5 | Drain the gas float with reverts | Every request is `eth_call`-simulated before submission and rejected if it would revert. Quota is consumed on submission and **not refunded** on a revert, so deliberate reverts are not a free way to spend our budget. |
 | T6 | Replay a signed request | Forwarder nonce must equal the on-chain nonce, and the deadline must be in the future and no further out than `RELAYER_MAX_DEADLINE_SECONDS`. |
 | T7 | Replay across networks or forwarders | The EIP-712 domain binds chain id and the verifying contract. A mainnet signature does not verify on testnet, and a signature for another forwarder does not verify here. |
@@ -204,12 +208,25 @@ One module — `src/policy.ts` — not constants scattered through handlers.
 **New users are never blocked at the door.** The first 25 actions are free, which
 covers claiming a handle, a first payment, and normal exploration.
 
-**After that, the fee rides inside the signed calldata.** Every relayable Maren
-function takes `uint256 relayFee` as its final argument, so the fee is part of what the
-user signed and is collected on-chain in the same transaction. Free-tier requests sign
-`relayFee = 0`; paid requests sign `relayFee >= RELAYER_FEE_MUSD`. The relayer decodes
-the fee out of `data`. It never reads a fee from the request body, because a body field
-is not signed and can be changed after the fact.
+**After that, the fee must ride inside the signed payload** — never beside the
+signature, because a body field is not signed and can be changed after the fact.
+
+> **The paid tier is not live yet.** The original design gave every relayable function
+> a trailing `uint256 relayFee`. That invariant is **withdrawn**: the contracts author
+> showed that `ERC2771Forwarder.executeBatch`'s `atomic` flag governs *validation* only,
+> not inner-call failures, so a batched fee leg settles even when the work leg reverts
+> (including with `refundReceiver == address(0)`). Charging a user for work that did not
+> happen is not a trade we will make. The replacement is **`MarenRelayHub`**: one
+> forwarded call that takes the fee and invokes the target atomically — fee and work
+> settle together or neither does — with fee amount, token and recipient inside the
+> signed payload. R2 is preserved, relocated from the target's calldata into the hub's
+> request.
+>
+> Until the hub exists, a call with no readable in-band fee has its paid tier **closed**,
+> not made free: once the free 25 are spent the relayer returns
+> `402 SPONSORSHIP_UNAVAILABLE`. A missing fee mechanism must never become an unbounded
+> subsidy (R16). The attachment point is marked `TODO(MarenRelayHub)` in `registry.ts`,
+> `calldata.ts` and `policy.ts`.
 
 **The two knobs that decide how much money we can lose have no defaults.** If
 `RELAYER_MAX_DAILY_SPONSORED_BTC` is unset, nothing is sponsored at all. If
@@ -281,9 +298,12 @@ Every rule below is a specific failure from the Talise audit (2026-07-24: 7 Crit
 
 | Variable | Default | Notes |
 |---|---|---|
-| `RELAYER_STORE` | `memory` | `memory` \| `redis` |
-| `UPSTASH_REDIS_REST_URL` / `UPSTASH_REDIS_REST_TOKEN` | | Required when `RELAYER_STORE=redis` |
-| `RELAYER_IP_SALT` | *random per process* | **Set this on any multi-instance deployment**, or each instance counts per-IP limits separately. |
+| `RELAYER_STORE` | `memory` | `memory` \| `redis`. **`memory` is a boot problem under `VERCEL`** — per-instance counters make the global BTC cap unenforceable. |
+| `UPSTASH_REDIS_REST_URL` / `UPSTASH_REDIS_REST_TOKEN` | | Required when `RELAYER_STORE=redis`. Missing credentials is a boot problem, not a fallback to memory. |
+| `RELAYER_IP_SALT` | *random per process* | **Required under `VERCEL`.** A per-instance salt gives the same IP a different bucket per instance, multiplying the limit. |
+| `RELAYER_TRUSTED_PROXIES` | *(none — trust no proxy)* | Comma-separated IPs/CIDRs. `x-forwarded-for` is read **only** from these. A malformed entry is a boot problem. |
+| `RELAYER_CLIENT_IP_HEADER` | `x-vercel-forwarded-for` under `VERCEL`, else unset | An unforgeable platform header carrying the client IP. |
+| `RELAYER_MAX_GAS_CONTRACT_SIGNER` | `500000` | Tighter gas ceiling for ERC-1271 / EIP-7702 signers. Clamped to `RELAYER_MAX_GAS_PER_REQUEST`. |
 | `PORT` | `8787` | |
 | `LOG_LEVEL` | `info` | |
 | `RELAYER_SHUTDOWN_DRAIN_MS` | `20000` | |
@@ -310,13 +330,22 @@ correct default state**, and `problems` tells you exactly what to set.
 ### Tests
 
 ```bash
-pnpm --filter @maren/relayer test        # 107 tests
+pnpm --filter @maren/relayer test        # 176 tests
 pnpm --filter @maren/relayer typecheck
 ```
 
 Integration tests fork Mezo testnet with `anvil --fork-url https://rpc.test.mezo.org`.
-They **skip gracefully** when foundry is absent or the fork cannot be established, so
-CI stays green without foundry.
+They skip when foundry is absent so a contributor without it is not blocked — but the
+skip is **loud**, and **fatal** when the environment says the chain layer is expected:
+
+```bash
+# CI: an unavailable anvil is a FAILURE, not a silent skip
+MAREN_REQUIRE_CHAIN_TESTS=1 pnpm --filter @maren/relayer test
+```
+
+Setting `MEZO_TESTNET_RPC_URL` has the same effect. This exists because review found
+the 6 chain tests were being skipped 100% of the time on a runner without foundry while
+the job exited 0 — a green build that had never touched a chain.
 
 ### Deploying to Vercel
 
@@ -352,7 +381,7 @@ stalls every later transaction. Verified working:
 | `/health` 503, `problems` mentions a variable | Misconfiguration | Set it. The service is refusing on purpose. |
 | `problems: ["daily BTC sponsorship budget is exhausted"]` | `RELAYER_MAX_DAILY_SPONSORED_BTC` hit | Resets at 00:00 UTC. Raise deliberately, not reflexively — check for abuse first. |
 | `RELAYER_UNDERFUNDED` | Hot key out of BTC | Top up. Keep days of float, not months. |
-| `problems` mentions "no configured RPC endpoint serves the methods" | Every RPC failed the capability preflight | Check the endpoints. Do **not** add `mezo.drpc.org`. |
+| `problems` mentions "no configured RPC endpoint serves the methods" | Every RPC failed the capability preflight | Usually transient — Mezo endpoints can briefly answer `-32601` while a backend is degraded. Re-probe by hand before concluding an endpoint is broken, then restart. Add endpoints to `RELAYER_RPC_URLS` rather than removing them. |
 | `tx.replaced` warnings | Fees too low for current conditions | Normal, self-healing. Persistent ⇒ investigate the queue. |
 | Rising `inFlight` on `/health` | Broadcasts are not completing | Check RPC health; the nonce queue is serialised, so one stuck broadcast blocks the rest. |
 
@@ -413,17 +442,26 @@ document.
   They must stay byte-identical to the Solidity. If they drift, the selector changes
   and this service rejects the call with `SELECTOR_NOT_ALLOWED` — the correct failure
   direction, but a failure nonetheless.
-- **No full forwarder round trip is tested.** The anvil suite exercises real
+- **No full forwarder round trip is tested here.** The anvil suite exercises real
   simulation, broadcast and receipt settlement against a Mezo testnet fork, but there
-  is no `MarenForwarder` to deploy, so `execute` itself is unproven end to end.
-- **`mezo.drpc.org` is denylisted in code.** Probed 2026-08-15: it answers
-  `eth_chainId` and returns `-32601 "the method does not exist/is not available"` for
-  `eth_call`, `eth_estimateGas`, `eth_getBalance`, `eth_blockNumber`, `eth_getLogs`
-  and `eth_getBlockByNumber` without an API key. A naive health check passes while
-  every actual operation fails — which for this service means failing the one check
-  that stops us burning BTC. Hence the boot preflight asserts method support, not
-  reachability. Verified working: `jsonrpc-mezo.boar.network` and
-  `mainnet.mezo.public.validationcloud.io` (mainnet), `rpc.test.mezo.org` (testnet).
+  is no `MarenForwarder` in this package to deploy, so `execute` itself is unproven
+  from the relayer's side. The EIP-712 typehash and field order are no longer an
+  inspection-only assumption, though: `packages/contracts` now has a test that builds a
+  signature from the pinned typehash and domain alone and executes it.
+- **Mezo endpoints transiently claim methods do not exist.** During testing
+  `mezo.drpc.org` returned `-32601 "the method does not exist/is not available"` for
+  `eth_call`, `eth_getLogs`, `eth_estimateGas` and `eth_blockNumber` across a full
+  probe sweep — and then served all of them 10/10 about an hour later. A degraded
+  backend behind the load balancer was reporting "unsupported" rather than
+  "unavailable", which is indistinguishable from a real capability limit if you probe
+  once. **No provider is blocked in this codebase**, and an earlier revision that did
+  block one was wrong. What the service does instead: `probeEndpoint` retries before
+  recording a method as missing, and the transport fails over across every usable
+  endpoint. A boot preflight that asserts method support (rather than mere
+  reachability) is still the right control — it just decides liveness *now*, not a
+  provider's permanent capabilities. If every endpoint fails the preflight the
+  relayer refuses to relay until restarted; on a chain this flaky that is a real
+  availability trade, taken deliberately in favour of never burning BTC blind.
 - **Nonce serialisation is per instance.** Two Vercel instances can still race on
   nonce allocation. The mitigation is that a failed broadcast invalidates the cached
   nonce and forces a chain resync, but a shared nonce lease is the real fix if this
@@ -434,6 +472,15 @@ document.
   must stay below 9.22 BTC. At Mezo's base fee that is ~10 billion sponsored
   transactions per day, so it is theoretical — but it is a real ceiling.
 - **Sybil resistance is economic, not cryptographic.** 25 free actions per *address*,
-  and addresses are free. The global daily BTC cap is the actual backstop.
+  and addresses are free. The global daily BTC cap is the actual backstop — which is
+  why `RELAYER_STORE=memory` under `VERCEL` is now a refusal rather than a warning.
+- **Rate limiting depends on the deployment telling us the truth about the client.**
+  With no trusted proxy and no platform header, everything behind a load balancer
+  resolves to the balancer's address and shares one bucket. That is the safe direction —
+  it over-attributes rather than under-attributes — but it will throttle legitimate
+  traffic if you deploy behind a proxy and forget `RELAYER_TRUSTED_PROXIES`.
+- **The paid tier is closed until `MarenRelayHub` ships.** Post-free-tier requests get
+  `402 SPONSORSHIP_UNAVAILABLE`. Deliberate: a fee mechanism that is signed but not
+  atomically enforced is worse than none (R13).
 - **The Vercel deployment path is unverified.** Configuration is written and committed;
   nothing has been deployed from this branch.

@@ -14,7 +14,8 @@ import {
   type RelayableFunction,
 } from './registry.js';
 import { POLICY_DEFAULTS, type SponsorshipPolicy } from './policy.js';
-import { isDeniedRpc, VERIFIED_RPCS } from './rpc.js';
+import { parseCidr, type Cidr } from './clientip.js';
+import { ephemeralIpSalt } from './logger.js';
 
 /**
  * Configuration, resolved once at boot, FAIL CLOSED.
@@ -56,6 +57,14 @@ export interface RelayerConfig {
   readonly policy: SponsorshipPolicy;
   readonly store: StoreKind;
   readonly redis: { readonly url: string; readonly token: string } | null;
+  /** Proxies whose `x-forwarded-for` we are willing to read. Empty = trust none. */
+  readonly trustedProxies: readonly Cidr[];
+  /** An unforgeable platform header carrying the client IP, if the host sets one. */
+  readonly clientIpHeader: string | null;
+  /** Salt for per-IP rate-limit buckets. */
+  readonly ipSalt: string;
+  /** True when `ipSalt` was generated per process — unsafe on multi-instance hosts. */
+  readonly ipSaltIsEphemeral: boolean;
   readonly key: KeySource | null;
   readonly port: number;
   readonly logLevel: string;
@@ -253,17 +262,19 @@ function buildTargets(
  * Sources, in order:
  *   1. `RELAYER_RPC_URLS` (comma-separated) or the singular `RELAYER_RPC_URL`
  *   2. `MEZO_{MAINNET,TESTNET}_RPC_URL`, which the repo's .env.example already has
- *   3. The endpoints verified to serve a real `eth_call`, then whatever else the
- *      SDK's chain definition lists
+ *   3. `@maren/sdk`'s chain definition, which lists every known endpoint ordered
+ *      by observed stability
  *
- * Denylisted hosts are dropped here and recorded as a problem if that was the
- * operator's explicit choice. `https://mezo.drpc.org` is on that list: it answers
- * `eth_chainId` and nothing else, which is the worst possible failure mode
- * because naive health checks pass. See rpc.ts for the measurement.
+ * NO endpoint is filtered here. An earlier revision carried a host denylist
+ * built from a single probe sweep; the finding did not reproduce — the provider
+ * served every method 10/10 an hour later, and what had been measured was a
+ * degraded backend reporting -32601 instead of unavailability. A static block
+ * against a working provider is a bug, and R13 ("do not claim what you have not
+ * substantiated") cuts both ways.
  *
- * Dropping it silently from the SDK defaults (rather than erroring) is
- * deliberate — @maren/sdk's list is written for frontend reads, and the relayer
- * must not inherit an endpoint it cannot simulate against.
+ * Endpoint health is decided at boot by the capability preflight in rpc.ts,
+ * which repeat-probes and drops only what is failing right now. That handles
+ * the real hazard — transient per-endpoint failures — which a denylist cannot.
  */
 function resolveRpcUrls(
   env: Env,
@@ -280,13 +291,8 @@ function resolveRpcUrls(
   )?.trim();
 
   const candidates =
-    explicit.length > 0
-      ? explicit
-      : perNetwork
-        ? [perNetwork]
-        : [...VERIFIED_RPCS[network], ...chainDefaults];
+    explicit.length > 0 ? explicit : perNetwork ? [perNetwork] : [...chainDefaults];
 
-  const operatorChose = explicit.length > 0 || Boolean(perNetwork);
   const seen = new Set<string>();
   const resolved: string[] = [];
 
@@ -294,13 +300,6 @@ function resolveRpcUrls(
     const url = candidate.replace(/\/+$/, '');
     if (seen.has(url)) continue;
     seen.add(url);
-    const denied = isDeniedRpc(url);
-    if (denied !== null) {
-      if (operatorChose) {
-        problems.push(`RPC ${url} is not usable by the relayer: ${denied}`);
-      }
-      continue;
-    }
     resolved.push(url);
   }
 
@@ -413,6 +412,25 @@ export function loadConfig(env: Env): LoadedConfig {
         min: 0,
       }),
     ),
+    // Never above the general cap: a looser contract-signer ceiling would defeat
+    // the point of having one.
+    maxGasContractSigner: (() => {
+      const configured = BigInt(
+        readInt(
+          env,
+          'RELAYER_MAX_GAS_CONTRACT_SIGNER',
+          Number(POLICY_DEFAULTS.maxGasContractSigner),
+          problems,
+          { min: 0 },
+        ),
+      );
+      const general = BigInt(
+        readInt(env, 'RELAYER_MAX_GAS_PER_REQUEST', Number(POLICY_DEFAULTS.maxGasPerRequest), [], {
+          min: 0,
+        }),
+      );
+      return configured < general ? configured : general;
+    })(),
     maxDeadlineSeconds: readInt(
       env,
       'RELAYER_MAX_DEADLINE_SECONDS',
@@ -443,6 +461,30 @@ export function loadConfig(env: Env): LoadedConfig {
     }
   }
 
+  // Trusted proxies. A malformed entry is a problem, never a silently-trusted
+  // one — the whole point is that this list is the only reason we would believe
+  // an `x-forwarded-for` header at all.
+  const trustedProxies: Cidr[] = [];
+  for (const entry of splitList(env['RELAYER_TRUSTED_PROXIES'])) {
+    const cidr = parseCidr(entry);
+    if (cidr === null) {
+      problems.push(
+        `RELAYER_TRUSTED_PROXIES entry ${JSON.stringify(entry)} is not an IP or CIDR`,
+      );
+      continue;
+    }
+    trustedProxies.push(cidr);
+  }
+
+  // On Vercel the edge overwrites `x-vercel-forwarded-for`, so it cannot be
+  // forged by a client and is the correct source. Elsewhere an operator names
+  // their own platform header explicitly or we fall back to the socket.
+  const clientIpHeader =
+    env['RELAYER_CLIENT_IP_HEADER']?.trim().toLowerCase() ||
+    (env['VERCEL'] !== undefined ? 'x-vercel-forwarded-for' : null);
+
+  const configuredIpSalt = env['RELAYER_IP_SALT']?.trim() || null;
+
   const key = buildKeySource(env, problems);
 
   const config: RelayerConfig = {
@@ -455,6 +497,10 @@ export function loadConfig(env: Env): LoadedConfig {
     policy,
     store,
     redis,
+    trustedProxies,
+    clientIpHeader,
+    ipSalt: configuredIpSalt ?? ephemeralIpSalt(),
+    ipSaltIsEphemeral: configuredIpSalt === null,
     key,
     port: readInt(env, 'PORT', 8787, problems, { min: 1, max: 65535 }),
     logLevel: env['LOG_LEVEL']?.trim() || 'info',
