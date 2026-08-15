@@ -58,41 +58,42 @@ so on screen.
 
 ## What is live and what is mocked
 
-The split is deliberate: everything that decides what a user *believes about their
-money* is real, and only the transport is stubbed.
+The split is deliberate: everything that decides what a user _believes about their
+money_ is real, and only the transport is stubbed.
 
 ### Real — not mocked
 
-| Thing | Where |
-|---|---|
-| All position math — CR, liquidation price, drop-to-liquidation, health bands, max borrowable at a target CR, total debt including fee + gas compensation | `@maren/sdk` `position.ts`, called directly. No arithmetic is reimplemented in this app. |
-| All number formatting — BTC 6dp trimmed, MUSD 2dp grouped, CR rounded **down**, USD, price drop | `@maren/sdk` `format.ts` |
-| Protocol constants — MCR 110%, CCR 150%, min net debt 1,800 MUSD, 200 MUSD gas compensation, 0.1% origination, 1.00% APR, 60s oracle limit, Maren's 140/160/180/250 policy bands | `@maren/sdk` `constants.ts` |
-| Chain config, contract addresses, explorer URLs, chain IDs 31612 / 31611 | `@maren/sdk` `chains.ts`, `addresses.ts` |
-| Key generation and address derivation — secp256k1 via viem/`@noble/curves` | `src/wallet/keystore.ts` |
-| Keychain storage with biometric access control | `src/wallet/keystore.ts` (`expo-secure-store`) |
-| Face ID / Touch ID capability detection and prompting | `src/wallet/keystore.ts` (`expo-local-authentication`) |
-| QR scanning and strict payload parsing | `app/scan.tsx`, `src/lib/payment.ts` (`expo-camera`) |
-| The R12 auth flow — redirect assertions, CSRF generation and constant-time comparison, callback validation | `src/auth/webAuth.ts` |
-| The R15 receipt check | `src/chain/receipt.ts` |
-| Oracle staleness classification and the borrow gate | `src/chain/price.ts` |
+| Thing                                                                                                                                                                            | Where                                                                                    |
+| -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------- |
+| All position math — CR, liquidation price, drop-to-liquidation, health bands, max borrowable at a target CR, total debt including fee + gas compensation                         | `@maren/sdk` `position.ts`, called directly. No arithmetic is reimplemented in this app. |
+| All number formatting — BTC 6dp trimmed, MUSD 2dp grouped, CR rounded **down**, USD, price drop                                                                                  | `@maren/sdk` `format.ts`                                                                 |
+| Protocol constants — MCR 110%, CCR 150%, min net debt 1,800 MUSD, 200 MUSD gas compensation, 0.1% origination, 1.00% APR, 60s oracle limit, Maren's 140/160/180/250 policy bands | `@maren/sdk` `constants.ts`                                                              |
+| Chain config, contract addresses, explorer URLs, chain IDs 31612 / 31611                                                                                                         | `@maren/sdk` `chains.ts`, `addresses.ts`                                                 |
+| Key generation and address derivation — secp256k1 via viem/`@noble/curves`                                                                                                       | `src/wallet/keystore.ts`                                                                 |
+| Keychain storage with biometric access control                                                                                                                                   | `src/wallet/keystore.ts` (`expo-secure-store`)                                           |
+| Face ID / Touch ID capability detection and prompting                                                                                                                            | `src/wallet/keystore.ts` (`expo-local-authentication`)                                   |
+| QR scanning and strict payload parsing                                                                                                                                           | `app/scan.tsx`, `src/lib/payment.ts` (`expo-camera`)                                     |
+| The R12 auth flow — redirect assertions, CSRF generation and constant-time comparison, callback validation                                                                       | `src/auth/webAuth.ts`                                                                    |
+| The R15 receipt check                                                                                                                                                            | `src/chain/receipt.ts`                                                                   |
+| Oracle staleness classification and the borrow gate                                                                                                                              | `src/chain/price.ts`                                                                     |
 
 ### Mocked
 
-| Thing | Where | What replacing it looks like |
-|---|---|---|
-| Chain **reads** — price observation, position, balances, Earn position, activity | `src/data/mock.ts` | Each function is already `async` and already returns the exact type in `src/data/types.ts`. Swap the body for a viem `readContract` / `multicall`. Nothing downstream changes. |
-| Transaction **submission** and the receipt source | `src/chain/actions.ts` (`submitMock`, `mockClient`) | `mockClient` is typed as the narrow `Pick<PublicClient, 'waitForTransactionReceipt'>` that `confirmTransaction` accepts — drop in a real `PublicClient` and point `submitMock` at `walletClient.writeContract` or the relayer's `POST /relay`. |
-| Handle resolution (`@sele` → address) | `src/data/mock.ts` | `MarenRegistry` forward/reverse resolver. |
-| The auth **backend** | — | `src/auth/webAuth.ts` is fully implemented, but no `https://maren.finance/auth/authorize` endpoint exists yet, and the universal link needs an `apple-app-site-association` file published for `applinks:maren.finance`. Until both exist the flow fails closed with a typed error. It does **not** fall back to a custom scheme. |
-| Maren's own contract addresses | `@maren/sdk` `addresses.ts` | All zero. The contracts now exist in `packages/contracts` (`MarenVault`, `MarenPay`, `MarenRegistry`, `MarenEarn`, `MarenRelayHub`, `MarenForwarder`) and their tests pass, but nothing is **deployed**. `isDeployed()` exists to check. |
+| Thing                                                                            | Where                                               | What replacing it looks like                                                                                                                                                                                                                                                                                                      |
+| -------------------------------------------------------------------------------- | --------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Chain **reads** — price observation, position, balances, Earn position, activity | `src/data/mock.ts`                                  | Each function is already `async` and already returns the exact type in `src/data/types.ts`. Swap the body for a viem `readContract` / `multicall`. Nothing downstream changes.                                                                                                                                                    |
+| Transaction **submission** and the receipt source                                | `src/chain/actions.ts` (`submitMock`, `mockClient`) | `mockClient` is typed as the narrow `Pick<PublicClient, 'waitForTransactionReceipt'>` that `confirmTransaction` accepts — drop in a real `PublicClient` and point `submitMock` at `walletClient.writeContract` or the relayer's `POST /relay`.                                                                                    |
+| Handle resolution (`@sele` → address)                                            | `src/data/mock.ts`                                  | `MarenRegistry` forward/reverse resolver.                                                                                                                                                                                                                                                                                         |
+| The auth **backend**                                                             | —                                                   | `src/auth/webAuth.ts` is fully implemented, but no `https://maren.finance/auth/authorize` endpoint exists yet, and the universal link needs an `apple-app-site-association` file published for `applinks:maren.finance`. Until both exist the flow fails closed with a typed error. It does **not** fall back to a custom scheme. |
+| Maren's own contract addresses                                                   | `@maren/sdk` `addresses.ts`                         | **Live on matsnet** since 15 August 2026 — `MarenVault`, `MarenPay`, `MarenRelayHub`, `MarenRegistry`, `MarenEarn`. Still zero on mainnet. `isDeployed()` exists to check. This app does not read them yet; unlike `apps/web` it has no live path, so it stays on mocks regardless.                                               |
 
 Where the mock meets the real contracts, the shapes are aligned rather than invented: the
 one behaviour the interface asserts about `packages/contracts` — that `deposit` is
-`payable` and therefore cannot be relayed — is read off the source and enforced by
-`src/chain/sponsorship.ts`, not assumed. The remaining read shapes in `src/data/types.ts`
-are the app's own view model; swapping them for `readContract` results is the work
-described in the table above and has not been done.
+`payable` and therefore cannot be relayed — is read off the deployed source and enforced
+by `src/chain/sponsorship.ts`, not assumed. The remaining read shapes in
+`src/data/types.ts` are the app's own view model; swapping them for `readContract`
+results is the work described in the table above and has not been done. The contracts
+being live on matsnet does not change that: this app still has no live path.
 
 The mock numbers were chosen to exercise the interesting states rather than to flatter
 the product: the demo position sits at ~260% CR (healthy, but one bad week from
@@ -117,7 +118,7 @@ excluded from iCloud Keychain and from encrypted backups.
 - The key is **never** held in module scope, Zustand, or React state. It is read for the
   duration of one signature and dropped. Every read costs a biometric prompt — that is
   how "Face ID on every signing action" is guaranteed rather than merely intended.
-- The app store (`src/state/store.ts`) records the address and the *protection mode*,
+- The app store (`src/state/store.ts`) records the address and the _protection mode_,
   and has no field capable of holding a key.
 - **No silent downgrade.** If no biometric is enrolled, the app does not write an
   unprotected Keychain item while telling the user it is protected — that would be
@@ -198,7 +199,7 @@ Exercise this: **Settings → Developer → Simulate a stale price feed**.
 - **Pooled-trove risk disclosure** — stated on the last onboarding panel, before setup,
   per `ARCHITECTURE.md` §3.4.
 - **No fixed APY on Earn** — the Stability Pool has no token emissions, so the screen
-  shows trailing *realised* MUSD over an observed window with the liquidation-event
+  shows trailing _realised_ MUSD over an observed window with the liquidation-event
   count, labelled backward-looking, and explains why no APY is shown.
 
 ---
@@ -207,7 +208,7 @@ Exercise this: **Settings → Developer → Simulate a stale price feed**.
 
 > Talise's Critical **C2** was a process failure, not a code one: production database
 > dumps and Apple signing keys were uploaded to a third-party build service on **every**
-> mobile build. R14 requires this enumeration *before* the first EAS build. `eas.json`
+> mobile build. R14 requires this enumeration _before_ the first EAS build. `eas.json`
 > and `.easignore` exist; **no EAS build has been run.**
 
 ### What an `eas build` would upload
@@ -215,12 +216,12 @@ Exercise this: **Settings → Developer → Simulate a stale price feed**.
 EAS tars the project directory and uploads it to Expo's build servers. From this
 project that is:
 
-| Uploaded | Notes |
-|---|---|
-| `app/`, `src/`, `assets/` | Application source, icons, and the six bundled font files. |
-| `package.json`, `pnpm-lock.yaml`, `app.json`, `eas.json`, `babel.config.js`, `metro.config.js` | Build configuration. |
-| `packages/sdk/src/` | Pulled in as a workspace dependency. Public chain addresses and math — no secrets. |
-| The `env` blocks in `eas.json` | `MAREN_NETWORK` only, which is `testnet` or `mainnet`. Not a secret. |
+| Uploaded                                                                                       | Notes                                                                              |
+| ---------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------- |
+| `app/`, `src/`, `assets/`                                                                      | Application source, icons, and the six bundled font files.                         |
+| `package.json`, `pnpm-lock.yaml`, `app.json`, `eas.json`, `babel.config.js`, `metro.config.js` | Build configuration.                                                               |
+| `packages/sdk/src/`                                                                            | Pulled in as a workspace dependency. Public chain addresses and math — no secrets. |
+| The `env` blocks in `eas.json`                                                                 | `MAREN_NETWORK` only, which is `testnet` or `mainnet`. Not a secret.               |
 
 ### What is excluded, and how
 
@@ -280,19 +281,19 @@ function deposit(address upperHint, address lowerHint) external payable nonReent
 if (msg.value != 0 || request.value != 0) revert ValueNotRelayable();
 ```
 
-A deposit *sends Bitcoin*. An ERC-2771 forwarder cannot carry the caller's BTC, and if it
+A deposit _sends Bitcoin_. An ERC-2771 forwarder cannot carry the caller's BTC, and if it
 tried, `msg.value` would come from the relayer's own key — which is precisely the funding
 confusion **R1** exists to prevent ("the shielded relayer could be induced to fund an
 attacker's deposit, draining the relayer"). So `MarenRelayHub` refuses value
 unconditionally, and the opening deposit is an ordinary transaction the user signs and
 pays for.
 
-| Action | Relayed | Why |
-|---|---|---|
-| `deposit` | **no** | `payable`; carries BTC, so it cannot be forwarded |
-| `borrow`, `repay`, `withdraw`, `closePosition` | yes | no value, routed through `MarenForwarder` |
-| all of Pay — send, request, link, split | yes | no value |
-| Earn deposit / withdraw | yes | no value |
+| Action                                         | Relayed | Why                                               |
+| ---------------------------------------------- | ------- | ------------------------------------------------- |
+| `deposit`                                      | **no**  | `payable`; carries BTC, so it cannot be forwarded |
+| `borrow`, `repay`, `withdraw`, `closePosition` | yes     | no value, routed through `MarenForwarder`         |
+| all of Pay — send, request, link, split        | yes     | no value                                          |
+| Earn deposit / withdraw                        | yes     | no value                                          |
 
 **The app does not ship the sentence "no gas, ever."** It is not true, and R13's lesson
 generalises from attestations to fee claims: a promise that exists in the interface and
@@ -323,17 +324,17 @@ everything since.
 
 ## Screens
 
-| Route | Screen |
-|---|---|
-| `app/onboarding.tsx` | Three panels — Deposit Bitcoin · Draw MUSD · Spend without gas — plus the pooled-trove risk disclosure. Panel three names the first-deposit exception rather than claiming gas never applies. |
-| `app/wallet-setup/` | Create or import. Leads with how the key will be held. |
-| `app/(tabs)/index.tsx` | Home / Portfolio. Position health is the hero: CR, liquidation price, room to fall, threshold scale. |
-| `app/(tabs)/vault.tsx` | Deposit / borrow / repay / withdraw. Borrow slider with live CR + liquidation price, hard-capped at the 180% floor. |
-| `app/(tabs)/pay.tsx` | Send to `@handle` or address, request with QR. Every payment is relayed, so "you pay no BTC" is unconditional *here* and is stated so. |
-| `app/(tabs)/earn.tsx` | Trailing realised yield, backward-looking, no APY. |
-| `app/(tabs)/activity.tsx` | History with status, memo, explorer link. |
-| `app/settings/index.tsx` | Network switcher, security state, address, sign out, stale-feed simulator. |
-| `app/scan.tsx` | QR scan-to-pay. |
+| Route                     | Screen                                                                                                                                                                                        |
+| ------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `app/onboarding.tsx`      | Three panels — Deposit Bitcoin · Draw MUSD · Spend without gas — plus the pooled-trove risk disclosure. Panel three names the first-deposit exception rather than claiming gas never applies. |
+| `app/wallet-setup/`       | Create or import. Leads with how the key will be held.                                                                                                                                        |
+| `app/(tabs)/index.tsx`    | Home / Portfolio. Position health is the hero: CR, liquidation price, room to fall, threshold scale.                                                                                          |
+| `app/(tabs)/vault.tsx`    | Deposit / borrow / repay / withdraw. Borrow slider with live CR + liquidation price, hard-capped at the 180% floor.                                                                           |
+| `app/(tabs)/pay.tsx`      | Send to `@handle` or address, request with QR. Every payment is relayed, so "you pay no BTC" is unconditional _here_ and is stated so.                                                        |
+| `app/(tabs)/earn.tsx`     | Trailing realised yield, backward-looking, no APY.                                                                                                                                            |
+| `app/(tabs)/activity.tsx` | History with status, memo, explorer link.                                                                                                                                                     |
+| `app/settings/index.tsx`  | Network switcher, security state, address, sign out, stale-feed simulator.                                                                                                                    |
+| `app/scan.tsx`            | QR scan-to-pay.                                                                                                                                                                               |
 
 ## Design
 
@@ -387,27 +388,26 @@ Every screen below was navigated and screenshotted on **iPhone 16 Pro, iOS 18.3*
 Expo Go against a local Metro bundler. Screenshots land in `apps/ios/.screenshots/`,
 which is gitignored — they are verification evidence, not source.
 
-| Shot | What it proves |
-|---|---|
-| `00`–`02` onboarding | The three panels; panel three states the first-deposit gas exception; pooled-trove risk shown before setup |
-| `03` wallet setup | Key handling explained before the choice is offered |
-| `04` key created | Honest degradation — Expo Go cannot declare `NSFaceIDUsageDescription`, so the app reports "held in memory for this session only" rather than silently writing an unprotected key |
-| `10`–`11` home | Position health hero, balances, quick actions, the corrected gas card |
-| `20`–`21` vault | Collateral/debt/limit rows, borrow slider capped at the 180% floor |
-| `30`–`31` pay | Send with the relayed-payment banner and the 80-byte memo counter; request with QR |
-| `40` earn | Trailing realised MUSD, backward-looking, no APY |
-| `50`–`51` activity | The failed send reading "Failed — no funds moved" with the amount struck through; one gas line in the whole ledger |
-| `60`–`61` settings | Network, key state, the R12 and R13 disclosures, the stale-feed simulator |
-| `70` home, stale feed | The health block is **replaced** by "Price feed unavailable"; the USD valuation disappears rather than being computed from a stale price |
-| `71` vault, stale feed | Borrow pinned to 0.00, slider disabled, CTA inert, with the reason: "Price feed is 90s old. Mezo's oracle rejects anything over 60s, so this would revert on-chain." |
+| Shot                   | What it proves                                                                                                                                                                    |
+| ---------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `00`–`02` onboarding   | The three panels; panel three states the first-deposit gas exception; pooled-trove risk shown before setup                                                                        |
+| `03` wallet setup      | Key handling explained before the choice is offered                                                                                                                               |
+| `04` key created       | Honest degradation — Expo Go cannot declare `NSFaceIDUsageDescription`, so the app reports "held in memory for this session only" rather than silently writing an unprotected key |
+| `10`–`11` home         | Position health hero, balances, quick actions, the corrected gas card                                                                                                             |
+| `20`–`21` vault        | Collateral/debt/limit rows, borrow slider capped at the 180% floor                                                                                                                |
+| `30`–`31` pay          | Send with the relayed-payment banner and the 80-byte memo counter; request with QR                                                                                                |
+| `40` earn              | Trailing realised MUSD, backward-looking, no APY                                                                                                                                  |
+| `50`–`51` activity     | The failed send reading "Failed — no funds moved" with the amount struck through; one gas line in the whole ledger                                                                |
+| `60`–`61` settings     | Network, key state, the R12 and R13 disclosures, the stale-feed simulator                                                                                                         |
+| `70` home, stale feed  | The health block is **replaced** by "Price feed unavailable"; the USD valuation disappears rather than being computed from a stale price                                          |
+| `71` vault, stale feed | Borrow pinned to 0.00, slider disabled, CTA inert, with the reason: "Price feed is 90s old. Mezo's oracle rejects anything over 60s, so this would revert on-chain."              |
 
 The blue gear floating over the right edge of every shot is **Expo Go's own dev-menu
 launcher**, not Maren UI. It disappears in a development or release build.
 
-Two things this does *not* prove, and they are the same two the mocked table names: no
+Two things this does _not_ prove, and they are the same two the mocked table names: no
 screenshot here involved a chain read or a broadcast transaction, and no EAS build has
 been run.
-
 
 ---
 
@@ -418,7 +418,9 @@ been run.
 - The auth backend and the `apple-app-site-association` file for
   `applinks:maren.finance` do not exist yet, so the R12 flow is implemented but not
   end-to-end exercisable. It fails closed.
-- Maren's own contracts are not deployed; `MAREN_ADDRESSES` is all zeros.
+- Maren's contracts **are** deployed on matsnet, but this app has no live read path and
+  still runs entirely on mocks. `apps/web` switched to live reads on the same commit;
+  this one did not. That asymmetry is the largest single gap in the iOS app.
 - Amount entry on Vault deposit/repay/withdraw uses presets rather than a numeric
   keypad. Borrow — the flow with real risk consequences — has the full slider.
 - No EAS build has been run. `eas.json` and `.easignore` are configured and the R14

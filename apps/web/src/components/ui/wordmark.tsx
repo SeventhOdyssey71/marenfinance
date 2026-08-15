@@ -19,12 +19,7 @@ export function Wordmark({ className = '' }: { className?: string }) {
         strokeWidth="2.6"
         strokeLinecap="round"
       />
-      <path
-        d="M17.7 18V9.8"
-        stroke="#5B3DF5"
-        strokeWidth="2.6"
-        strokeLinecap="round"
-      />
+      <path d="M17.7 18V9.8" stroke="#5B3DF5" strokeWidth="2.6" strokeLinecap="round" />
       {/* Wordmark */}
       <text
         x="30"

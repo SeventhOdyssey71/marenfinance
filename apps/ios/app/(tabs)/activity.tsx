@@ -49,8 +49,7 @@ export default function Activity() {
         <Card>
           <Txt variant="h3">Nothing yet</Txt>
           <Txt variant="small" tone="muted" style={styles.emptyBody}>
-            Deposits, borrows and payments appear here the moment they have an on-chain
-            receipt.
+            Deposits, borrows and payments appear here the moment they have an on-chain receipt.
           </Txt>
         </Card>
       ) : (
@@ -59,12 +58,7 @@ export default function Activity() {
             <Label style={styles.dayLabel}>{day}</Label>
             <Card padded={false} style={styles.group}>
               {rows.map((item, i) => (
-                <Row
-                  key={item.id}
-                  item={item}
-                  explorer={explorer}
-                  last={i === rows.length - 1}
-                />
+                <Row key={item.id} item={item} explorer={explorer} last={i === rows.length - 1} />
               ))}
             </Card>
           </Fragment>
@@ -74,17 +68,14 @@ export default function Activity() {
   );
 }
 
-function Row({
-  item,
-  explorer,
-  last,
-}: {
-  item: ActivityItem;
-  explorer: string;
-  last: boolean;
-}) {
+function Row({ item, explorer, last }: { item: ActivityItem; explorer: string; last: boolean }) {
   const failed = item.status === 'failed';
-  const amount = item.musdWei !== undefined ? formatMusd(item.musdWei) : item.btcWei !== undefined ? formatBtc(item.btcWei) : '—';
+  const amount =
+    item.musdWei !== undefined
+      ? formatMusd(item.musdWei)
+      : item.btcWei !== undefined
+        ? formatBtc(item.btcWei)
+        : '—';
   const direction = outflow(item.kind) ? '−' : '+';
   const [numeral, unit] = splitAmount(amount);
 
@@ -99,11 +90,7 @@ function Row({
       style={({ pressed }) => [styles.row, !last && styles.rowDivider, pressed && styles.pressed]}
     >
       <View style={[styles.rowIcon, failed && styles.rowIconFailed]}>
-        <Icon
-          name={iconFor(item.kind)}
-          size={17}
-          color={failed ? semantic.danger : '#A1A1AA'}
-        />
+        <Icon name={iconFor(item.kind)} size={17} color={failed ? semantic.danger : '#A1A1AA'} />
       </View>
 
       <View style={styles.rowBody}>
@@ -175,7 +162,8 @@ function Row({
           <View style={styles.gasRow}>
             <Sats wei={item.gasPaidWei} />
             <Txt variant="small" tone="muted">
-              {' '}gas
+              {' '}
+              gas
             </Txt>
           </View>
         ) : null}
@@ -203,7 +191,11 @@ function StatusChip({ status }: { status: ActivityStatus }) {
    * colour, which is what makes R15's "Failed — no funds moved" impossible to miss.
    */
   const colour =
-    status === 'confirmed' ? textColors.muted : status === 'failed' ? semantic.danger : semantic.warning;
+    status === 'confirmed'
+      ? textColors.muted
+      : status === 'failed'
+        ? semantic.danger
+        : semantic.warning;
 
   return (
     <View style={styles.chip}>

@@ -48,10 +48,13 @@ sort_imports = true
 
 # Verified 2026-08-15 by executing a real `eth_call`, not just `eth_chainId`.
 #
-# DO NOT ADD https://mezo.drpc.org. Its public tier answers `eth_chainId` and nothing else —
-# eth_call, eth_getLogs, eth_getBlockByNumber, eth_getBalance and eth_estimateGas all return
-# -32601 "the method does not exist/is not available" without an API key, so
-# `vm.createSelectFork` against it fails. See packages/sdk/src/chains.ts for the same note.
+# An earlier revision of this comment asserted that https://mezo.drpc.org answers
+# `eth_chainId` and nothing else. That claim is RETRACTED: the same endpoint served
+# eth_call, eth_getLogs and eth_getBlockByNumber correctly 10/10 about an hour later. A
+# degraded backend behind the load balancer reported "unsupported" rather than
+# "unavailable", which is indistinguishable from a capability limit on a single probe.
+# No endpoint is denylisted here. Never certify or condemn one on one probe — repeat it.
+# See packages/sdk/src/chains.ts, which carries the corrected note in full.
 [rpc_endpoints]
 mezo = "https://jsonrpc-mezo.boar.network"
 mezo_mainnet = "https://jsonrpc-mezo.boar.network"

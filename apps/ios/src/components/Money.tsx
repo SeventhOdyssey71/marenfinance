@@ -167,7 +167,12 @@ export function Ratio({
 }) {
   const value = formatCollateralRatio(cr);
   return (
-    <Num size={size} tone="inherit" style={color ? { color } : undefined} accessibilityLabel={`Collateral ratio ${value}`}>
+    <Num
+      size={size}
+      tone="inherit"
+      style={color ? { color } : undefined}
+      accessibilityLabel={`Collateral ratio ${value}`}
+    >
       {value}
     </Num>
   );

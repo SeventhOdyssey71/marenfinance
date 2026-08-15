@@ -20,7 +20,11 @@ import { Num, Txt } from './Text';
 export function PriceBanner({ feed }: { feed: PriceFeed }) {
   if (feed.state === 'live') {
     return (
-      <View style={styles.live} accessible accessibilityLabel={`Bitcoin price ${formatUsd(feed.priceWei)}, updated ${feed.ageSeconds} seconds ago`}>
+      <View
+        style={styles.live}
+        accessible
+        accessibilityLabel={`Bitcoin price ${formatUsd(feed.priceWei)}, updated ${feed.ageSeconds} seconds ago`}
+      >
         <View style={styles.dot} />
         <Txt variant="small" tone="muted">
           BTC

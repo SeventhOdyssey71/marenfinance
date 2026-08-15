@@ -39,7 +39,11 @@ export function HealthScale({ collateralRatio, tone }: HealthScaleProps) {
   const colour = healthFillColor[tone];
 
   return (
-    <View style={styles.root} accessibilityElementsHidden importantForAccessibility="no-hide-descendants">
+    <View
+      style={styles.root}
+      accessibilityElementsHidden
+      importantForAccessibility="no-hide-descendants"
+    >
       <View style={styles.track}>
         {/* Filled portion, up to the current ratio. */}
         <View style={[styles.fill, { width: `${pct}%`, backgroundColor: colour }]} />

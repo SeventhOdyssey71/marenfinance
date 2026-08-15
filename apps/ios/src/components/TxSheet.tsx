@@ -61,7 +61,10 @@ export function useTxRunner(onDelivered?: () => void): TxRunner {
         return;
       }
 
-      const outcome = result.kind === 'ok' ? { kind: 'delivered' as const, receipt: result.outcome.receipt } : result.outcome;
+      const outcome =
+        result.kind === 'ok'
+          ? { kind: 'delivered' as const, receipt: result.outcome.receipt }
+          : result.outcome;
       setState({ phase: 'settled', title, outcome });
 
       if (result.kind === 'ok') {
@@ -113,7 +116,12 @@ export function TxSheet({ runner }: { runner: TxRunner }) {
           ) : null}
 
           {state.phase === 'settled' ? (
-            <Settled outcome={state.outcome} title={state.title} explorer={explorer} onDismiss={dismiss} />
+            <Settled
+              outcome={state.outcome}
+              title={state.title}
+              explorer={explorer}
+              onDismiss={dismiss}
+            />
           ) : null}
         </View>
       </View>
@@ -161,7 +169,11 @@ function Settled({
   return (
     <View style={styles.body}>
       <View style={[styles.mark, { borderColor: `${colour}55` }]}>
-        <Icon name={delivered ? 'check' : outcome.kind === 'reverted' ? 'close' : 'clock'} size={22} color={colour} />
+        <Icon
+          name={delivered ? 'check' : outcome.kind === 'reverted' ? 'close' : 'clock'}
+          size={22}
+          color={colour}
+        />
       </View>
 
       <Txt variant="h3" style={styles.title}>
