@@ -33,7 +33,15 @@ const shots = [
   { name: 'home-390', path: '/', width: 390, height: 844 },
   { name: 'home-360', path: '/', width: 360, height: 780 },
   { name: 'home-2560', path: '/', width: 2560, height: 1400 },
+  // The dApp. Every route at desktop, and the two most layout-sensitive at 390px.
   { name: 'app-1440', path: '/app', width: 1440, height: 1000 },
+  { name: 'app-390', path: '/app', width: 390, height: 844 },
+  { name: 'app-vault-1440', path: '/app/vault', width: 1440, height: 1000 },
+  { name: 'app-vault-390', path: '/app/vault', width: 390, height: 844 },
+  { name: 'app-pay-1440', path: '/app/pay', width: 1440, height: 1000 },
+  { name: 'app-pay-390', path: '/app/pay', width: 390, height: 844 },
+  { name: 'app-earn-1440', path: '/app/earn', width: 1440, height: 1000 },
+  { name: 'app-activity-1440', path: '/app/activity', width: 1440, height: 1000 },
 ];
 
 /** Retina closeups, captured at viewport size rather than full page. */
@@ -52,6 +60,12 @@ const closeups = [
   { name: 'x2-cta-1440', path: '/', width: 1440, height: 900, scrollTo: '#cta-title' },
   { name: 'x2-hero-390', path: '/', width: 390, height: 844, scrollTo: null },
   { name: 'x2-frictions-390', path: '/', width: 390, height: 844, scrollTo: '#frictions' },
+  // The health hero and the borrow slider are where this design either holds or
+  // falls apart, so both get a retina closeup.
+  { name: 'x2-app-health-1440', path: '/app', width: 1440, height: 900, scrollTo: null },
+  { name: 'x2-vault-1440', path: '/app/vault', width: 1440, height: 980, scrollTo: null },
+  { name: 'x2-pay-1440', path: '/app/pay', width: 1440, height: 900, scrollTo: null },
+  { name: 'x2-earn-1440', path: '/app/earn', width: 1440, height: 900, scrollTo: null },
 ];
 
 const specifier = process.env.PLAYWRIGHT_CORE ?? 'playwright-core';
