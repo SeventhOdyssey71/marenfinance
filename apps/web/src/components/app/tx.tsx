@@ -205,16 +205,16 @@ export function TxSheet({ runner }: { runner: TxRunner }) {
                   key={detail.label}
                   className="flex items-start justify-between gap-6 border-b border-[var(--border-hairline)] py-3 last:border-b-0"
                 >
-                  <dt className="text-sm text-text-muted">{detail.label}</dt>
+                  <dt className="text-text-muted text-sm">{detail.label}</dt>
                   <dd className="text-right text-sm">{detail.value}</dd>
                 </div>
               ))}
             </dl>
 
-            <p className="mt-4 text-xs leading-relaxed text-text-subtle">{intent.gas.note}</p>
+            <p className="text-text-subtle mt-4 text-xs leading-relaxed">{intent.gas.note}</p>
 
             {intent.caution ? (
-              <p className="mt-4 text-sm leading-relaxed text-warning" role="alert">
+              <p className="text-warning mt-4 text-sm leading-relaxed" role="alert">
                 {intent.caution}
               </p>
             ) : null}
@@ -236,12 +236,12 @@ export function TxSheet({ runner }: { runner: TxRunner }) {
 
         {phase.name === 'pending' ? (
           <div className="mt-5" role="status">
-            <p className="text-sm leading-relaxed text-text-muted">
-              Submitted. Waiting for a receipt — a transaction hash is not a result, so
-              nothing is marked delivered until the chain returns one with
+            <p className="text-text-muted text-sm leading-relaxed">
+              Submitted. Waiting for a receipt — a transaction hash is not a result, so nothing is
+              marked delivered until the chain returns one with
               <span className="num"> status success</span>.
             </p>
-            <p className="num mt-3 text-xs break-all text-text-subtle">{phase.hash}</p>
+            <p className="num text-text-subtle mt-3 break-all text-xs">{phase.hash}</p>
           </div>
         ) : null}
 
@@ -249,19 +249,18 @@ export function TxSheet({ runner }: { runner: TxRunner }) {
 
         {phase.name === 'simulated' ? (
           <div className="mt-5" role="status">
-            <p className="text-sm text-warning">Simulated — nothing was broadcast</p>
-            <p className="mt-2 text-sm leading-relaxed text-text-muted">
-              Maren’s contracts are not deployed yet, so this action updated the demo
-              figures only. No transaction was signed, no receipt was fetched, and no
-              funds moved.
+            <p className="text-warning text-sm">Simulated — nothing was broadcast</p>
+            <p className="text-text-muted mt-2 text-sm leading-relaxed">
+              Maren’s contracts are not deployed yet, so this action updated the demo figures only.
+              No transaction was signed, no receipt was fetched, and no funds moved.
             </p>
           </div>
         ) : null}
 
         {phase.name === 'error' ? (
           <div className="mt-5" role="alert">
-            <p className="text-sm text-danger">Not submitted</p>
-            <p className="mt-2 text-sm leading-relaxed break-words text-text-muted">
+            <p className="text-danger text-sm">Not submitted</p>
+            <p className="text-text-muted mt-2 break-words text-sm leading-relaxed">
               {phase.message}
             </p>
           </div>
@@ -285,11 +284,11 @@ function Settled({ outcome }: { outcome: TxOutcome }) {
   return (
     <div className="mt-5" role="status">
       <p className={`text-sm ${good ? 'text-success' : 'text-danger'}`}>{described.title}</p>
-      <p className="mt-2 text-sm leading-relaxed text-text-muted">{described.detail}</p>
+      <p className="text-text-muted mt-2 text-sm leading-relaxed">{described.detail}</p>
       {'hash' in outcome ? (
-        <p className="num mt-3 text-xs break-all text-text-subtle">{outcome.hash}</p>
+        <p className="num text-text-subtle mt-3 break-all text-xs">{outcome.hash}</p>
       ) : (
-        <p className="num mt-3 text-xs break-all text-text-subtle">{outcome.receipt.hash}</p>
+        <p className="num text-text-subtle mt-3 break-all text-xs">{outcome.receipt.hash}</p>
       )}
     </div>
   );

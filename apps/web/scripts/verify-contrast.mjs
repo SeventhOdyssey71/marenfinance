@@ -47,7 +47,11 @@ const pages = [
   {
     path: '/app/earn',
     targets: [
-      { sel: '[data-contrast="earn-disclosure"]', fg: '#A1A1AA', label: 'yield disclosure (muted)' },
+      {
+        sel: '[data-contrast="earn-disclosure"]',
+        fg: '#A1A1AA',
+        label: 'yield disclosure (muted)',
+      },
     ],
   },
 ];
@@ -121,34 +125,34 @@ for (const width of [390, 1440]) {
       }, t.sel);
 
       const lightest = await page.evaluate(
-      async ({ shot, rect }) => {
-        const img = new Image();
-        img.src = 'data:image/png;base64,' + shot;
-        await img.decode();
-        const c = document.createElement('canvas');
-        c.width = img.width;
-        c.height = img.height;
-        const g = c.getContext('2d');
-        g.drawImage(img, 0, 0);
-        const x = Math.max(0, Math.round(rect.x));
-        const y = Math.max(0, Math.round(rect.y));
-        const w = Math.min(Math.round(rect.w), c.width - x);
-        const h = Math.min(Math.round(rect.h), c.height - y);
-        if (w <= 0 || h <= 0) return null;
-        const d = g.getImageData(x, y, w, h).data;
-        let best = null;
-        let bestL = -1;
-        for (let i = 0; i < d.length; i += 4) {
-          const l = 0.2126 * d[i] + 0.7152 * d[i + 1] + 0.0722 * d[i + 2];
-          if (l > bestL) {
-            bestL = l;
-            best = [d[i], d[i + 1], d[i + 2]];
+        async ({ shot, rect }) => {
+          const img = new Image();
+          img.src = 'data:image/png;base64,' + shot;
+          await img.decode();
+          const c = document.createElement('canvas');
+          c.width = img.width;
+          c.height = img.height;
+          const g = c.getContext('2d');
+          g.drawImage(img, 0, 0);
+          const x = Math.max(0, Math.round(rect.x));
+          const y = Math.max(0, Math.round(rect.y));
+          const w = Math.min(Math.round(rect.w), c.width - x);
+          const h = Math.min(Math.round(rect.h), c.height - y);
+          if (w <= 0 || h <= 0) return null;
+          const d = g.getImageData(x, y, w, h).data;
+          let best = null;
+          let bestL = -1;
+          for (let i = 0; i < d.length; i += 4) {
+            const l = 0.2126 * d[i] + 0.7152 * d[i + 1] + 0.0722 * d[i + 2];
+            if (l > bestL) {
+              bestL = l;
+              best = [d[i], d[i + 1], d[i + 2]];
+            }
           }
-        }
-        return best;
-      },
-      { shot, rect },
-    );
+          return best;
+        },
+        { shot, rect },
+      );
 
       if (!lightest) {
         console.log(`    ${t.label.padEnd(30)} SKIP (offscreen)`);

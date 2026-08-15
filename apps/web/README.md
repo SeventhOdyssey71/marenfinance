@@ -26,10 +26,10 @@ answer it, which looks exactly like a network hang.
 
 ### Environment
 
-| Variable | Default | Effect |
-|---|---|---|
-| `NEXT_PUBLIC_MEZO_NETWORK` | `testnet` | `testnet` (31611) or `mainnet` (31612). Resolved through `resolveNetwork()` in `@maren/sdk`, which defaults to testnet for safety. |
-| `NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID` | unset | Adds the WalletConnect connector. Without it only the injected connector is offered — a connector that throws when clicked is worse than one that is not there. |
+| Variable                               | Default   | Effect                                                                                                                                                          |
+| -------------------------------------- | --------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `NEXT_PUBLIC_MEZO_NETWORK`             | `testnet` | `testnet` (31611) or `mainnet` (31612). Resolved through `resolveNetwork()` in `@maren/sdk`, which defaults to testnet for safety.                              |
+| `NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID` | unset     | Adds the WalletConnect connector. Without it only the injected connector is offered — a connector that throws when clicked is worse than one that is not there. |
 
 ---
 
@@ -52,13 +52,13 @@ Everything downstream calls the same hooks — `usePosition()`, `usePrice()`,
 branches on the mode; the only component that knows about it is the banner that discloses
 it.
 
-| File | Role |
-|---|---|
-| `src/lib/data/source.ts` | **The gate.** Hooks, query keys, and the `isDeployed()` check. |
-| `src/lib/data/live.ts` | Real viem reads against real ABIs and the SDK's verified addresses. Compiled and typechecked today; selected the moment addresses land. |
-| `src/lib/data/mock.ts` | Demo state. Two accounts (direct trove, pooled), a drifting BTC price, seeded activity, requests and links. |
-| `src/lib/data/demo.ts` | The demo controls — switch account, stall the oracle. Mock mode only. |
-| `src/lib/chain/abis.ts` | ABIs transcribed from `packages/contracts/src/*.sol`. Nothing invented. |
+| File                     | Role                                                                                                                                    |
+| ------------------------ | --------------------------------------------------------------------------------------------------------------------------------------- |
+| `src/lib/data/source.ts` | **The gate.** Hooks, query keys, and the `isDeployed()` check.                                                                          |
+| `src/lib/data/live.ts`   | Real viem reads against real ABIs and the SDK's verified addresses. Compiled and typechecked today; selected the moment addresses land. |
+| `src/lib/data/mock.ts`   | Demo state. Two accounts (direct trove, pooled), a drifting BTC price, seeded activity, requests and links.                             |
+| `src/lib/data/demo.ts`   | The demo controls — switch account, stall the oracle. Mock mode only.                                                                   |
+| `src/lib/chain/abis.ts`  | ABIs transcribed from `packages/contracts/src/*.sol`. Nothing invented.                                                                 |
 
 ### Turning it live
 
@@ -86,7 +86,7 @@ These are product commitments, not implementation details. Each has a check in
 **A transaction hash is not a success.** `src/lib/chain/receipt.ts` is the only place that
 decides what "delivered" means, and it means a receipt with `status === 'success'`. The
 `Delivered` type carries a unique symbol, so it cannot be constructed without going
-through that check. In mock mode the sheet says *Simulated — nothing was broadcast*; it
+through that check. In mock mode the sheet says _Simulated — nothing was broadcast_; it
 never borrows the language of a receipt it did not fetch.
 
 **A stale price is never rendered as live.** Mezo's oracle reverts above 60 seconds of

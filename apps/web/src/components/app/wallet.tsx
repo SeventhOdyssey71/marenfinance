@@ -50,15 +50,15 @@ export function ConnectButton() {
           onClick={() => setOpen((v) => !v)}
           aria-expanded={open}
           aria-haspopup="menu"
-          className="inline-flex h-11 items-center gap-2.5 rounded-[var(--radius-pill)] border border-[var(--border-hairline)] bg-surface-raised px-4 text-sm transition-colors duration-[120ms] ease-out hover:border-[var(--border-strong)]"
+          className="bg-surface-raised inline-flex h-11 items-center gap-2.5 rounded-[var(--radius-pill)] border border-[var(--border-hairline)] px-4 text-sm transition-colors duration-[120ms] ease-out hover:border-[var(--border-strong)]"
         >
-          <span aria-hidden className="size-1.5 rounded-[var(--radius-pill)] bg-success" />
+          <span aria-hidden className="bg-success size-1.5 rounded-[var(--radius-pill)]" />
           <span className="num text-text">{shortAddress(address)}</span>
         </button>
         {open ? (
           <div
             role="menu"
-            className="absolute right-0 z-50 mt-2 w-56 rounded-[var(--radius-card)] border border-[var(--border-hairline)] bg-surface-raised p-2"
+            className="bg-surface-raised absolute right-0 z-50 mt-2 w-56 rounded-[var(--radius-card)] border border-[var(--border-hairline)] p-2"
           >
             <button
               type="button"
@@ -67,7 +67,7 @@ export function ConnectButton() {
                 disconnect();
                 setOpen(false);
               }}
-              className="flex h-11 w-full items-center rounded-[var(--radius-pill)] px-4 text-sm text-text-muted transition-colors duration-[120ms] ease-out hover:bg-white/[0.04] hover:text-text"
+              className="text-text-muted hover:text-text flex h-11 w-full items-center rounded-[var(--radius-pill)] px-4 text-sm transition-colors duration-[120ms] ease-out hover:bg-white/[0.04]"
             >
               Disconnect
             </button>
@@ -84,14 +84,20 @@ export function ConnectButton() {
         onClick={() => setOpen((v) => !v)}
         aria-expanded={open}
         aria-haspopup="menu"
-        className="group inline-flex h-11 items-center gap-3 rounded-[var(--radius-pill)] bg-white pr-2 pl-5 text-sm font-medium text-[#08080A] transition-colors duration-[120ms] ease-out hover:bg-white/90"
+        className="group inline-flex h-11 items-center gap-3 rounded-[var(--radius-pill)] bg-white pl-5 pr-2 text-sm font-medium text-[#08080A] transition-colors duration-[120ms] ease-out hover:bg-white/90"
       >
         {isPending ? 'Connecting…' : 'Connect wallet'}
         <span
           aria-hidden
           className="grid size-8 shrink-0 place-items-center rounded-[var(--radius-pill)] bg-violet-500 text-white transition-transform duration-[120ms] ease-out group-hover:translate-x-0.5"
         >
-          <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth={1.6} className="size-4">
+          <svg
+            viewBox="0 0 16 16"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth={1.6}
+            className="size-4"
+          >
             <path d="M3 8h10" strokeLinecap="round" />
             <path d="M9 4l4 4-4 4" strokeLinecap="round" strokeLinejoin="round" />
           </svg>
@@ -101,7 +107,7 @@ export function ConnectButton() {
       {open ? (
         <div
           role="menu"
-          className="absolute right-0 z-50 mt-2 w-64 rounded-[var(--radius-card)] border border-[var(--border-hairline)] bg-surface-raised p-2"
+          className="bg-surface-raised absolute right-0 z-50 mt-2 w-64 rounded-[var(--radius-card)] border border-[var(--border-hairline)] p-2"
         >
           {connectors.map((connector) => (
             <button
@@ -112,12 +118,12 @@ export function ConnectButton() {
                 connect({ connector, chainId: targetChain.id });
                 setOpen(false);
               }}
-              className="flex h-11 w-full items-center rounded-[var(--radius-pill)] px-4 text-sm text-text-muted transition-colors duration-[120ms] ease-out hover:bg-white/[0.04] hover:text-text"
+              className="text-text-muted hover:text-text flex h-11 w-full items-center rounded-[var(--radius-pill)] px-4 text-sm transition-colors duration-[120ms] ease-out hover:bg-white/[0.04]"
             >
               {connector.name}
             </button>
           ))}
-          <p className="px-4 py-2 text-xs leading-relaxed text-text-subtle">
+          <p className="text-text-subtle px-4 py-2 text-xs leading-relaxed">
             Mezo is a standard EVM chain. Any wallet that can add a network works.
           </p>
         </div>
@@ -147,10 +153,10 @@ export function NetworkGuard() {
           <p className="text-warning">Wrong network</p>
           <p className="mt-1">
             Your wallet is on chain <span className="num">{chainId}</span>. Maren runs on{' '}
-            {targetChain.name} (<span className="num">{targetChain.id}</span>). Nothing on
-            this screen reads your position until you switch.
+            {targetChain.name} (<span className="num">{targetChain.id}</span>). Nothing on this
+            screen reads your position until you switch.
           </p>
-          {error ? <p className="mt-2 text-danger">{error.message}</p> : null}
+          {error ? <p className="text-danger mt-2">{error.message}</p> : null}
         </div>
         <ActionButton
           variant="secondary"

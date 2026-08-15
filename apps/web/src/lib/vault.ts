@@ -99,7 +99,8 @@ export function borrowCeiling(position: Position, priceWei: bigint): BorrowCeili
    */
   const ratioHeadroomWei =
     position.route === 'pooled'
-      ? (position.vaultMaxBorrowableWei ?? headroomAt(position, priceWei, MAREN_POLICY.minHealthyCr))
+      ? (position.vaultMaxBorrowableWei ??
+        headroomAt(position, priceWei, MAREN_POLICY.minHealthyCr))
       : headroomAt(position, priceWei, MAREN_POLICY.minHealthyCr);
 
   const mezoHeadroomWei =
@@ -144,8 +145,7 @@ export function previewBorrow(
   priceWei: bigint,
   amountWei: bigint,
 ): BorrowPreview {
-  const originationFeeWei =
-    position.route === 'pooled' ? 0n : (amountWei * BORROWING_RATE) / WAD;
+  const originationFeeWei = position.route === 'pooled' ? 0n : (amountWei * BORROWING_RATE) / WAD;
   const debtWei = position.debtWei + amountWei + originationFeeWei;
 
   return {
@@ -184,12 +184,7 @@ export function maxWithdrawable(position: Position, priceWei: bigint): bigint {
  * the single largest constraint on who can use Mezo at all — around 0.079 BTC at $63k.
  */
 export function directTroveThreshold(priceWei: bigint): bigint {
-  return collateralRequiredFor(
-    1_800n * WAD,
-    priceWei,
-    MAREN_POLICY.targetCr,
-    BORROWING_RATE,
-  );
+  return collateralRequiredFor(1_800n * WAD, priceWei, MAREN_POLICY.targetCr, BORROWING_RATE);
 }
 
 /** The liquidation reserve a direct trove escrows at open and gets back on close. */

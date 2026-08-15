@@ -53,11 +53,7 @@ export default function EarnPage() {
       { label: 'Amount', value: <Musd wei={wei} /> },
       {
         label: mode === 'deposit' ? 'In Earn after' : 'Spendable after',
-        value: (
-          <Musd
-            wei={mode === 'deposit' ? inEarn + wei : spendable + wei}
-          />
-        ),
+        value: <Musd wei={mode === 'deposit' ? inEarn + wei : spendable + wei} />,
       },
       {
         label: 'Return',
@@ -77,10 +73,9 @@ export default function EarnPage() {
       <div>
         <Label>Earn</Label>
         <h1 className="t-h2 mt-2">Idle MUSD</h1>
-        <p className="mt-3 max-w-[68ch] text-sm leading-relaxed text-text-muted">
-          MUSD you are not spending goes into the Stability Pool through an ERC-4626 vault.
-          Returns come from liquidations, which are irregular. Past returns do not predict
-          future ones.
+        <p className="text-text-muted mt-3 max-w-[68ch] text-sm leading-relaxed">
+          MUSD you are not spending goes into the Stability Pool through an ERC-4626 vault. Returns
+          come from liquidations, which are irregular. Past returns do not predict future ones.
         </p>
       </div>
 
@@ -108,7 +103,7 @@ export default function EarnPage() {
       <AppCard className="p-6 md:p-8">
         <div className="flex flex-wrap items-center justify-between gap-4">
           <CardTitle>Realised over the last {earn?.trailing.windowDays ?? 90} days</CardTitle>
-          <span className="inline-flex items-center gap-2 rounded-[var(--radius-pill)] border border-[var(--border-hairline)] bg-surface-inset px-3 py-1.5 text-xs text-text-muted">
+          <span className="bg-surface-inset text-text-muted inline-flex items-center gap-2 rounded-[var(--radius-pill)] border border-[var(--border-hairline)] px-3 py-1.5 text-xs">
             Backward-looking
           </span>
         </div>
@@ -126,16 +121,15 @@ export default function EarnPage() {
             it sits directly under the figure it qualifies. */}
         <p
           data-contrast="earn-disclosure"
-          className="mt-5 max-w-[68ch] text-sm leading-relaxed text-text-muted"
+          className="text-text-muted mt-5 max-w-[68ch] text-sm leading-relaxed"
         >
-          This is MUSD actually realised in the past, not a rate and not a forecast. Maren
-          does not display an APY for Earn because there is no reliable one to display.
+          This is MUSD actually realised in the past, not a rate and not a forecast. Maren does not
+          display an APY for Earn because there is no reliable one to display.
         </p>
-        <p className="mt-3 max-w-[68ch] text-sm leading-relaxed text-text-subtle">
-          The MUSD Stability Pool has no token emissions. Its entire yield is the Bitcoin
-          seized in liquidations, sold and compounded back into MUSD. Whether that happens
-          at all depends on whether anyone gets liquidated, so returns arrive in lumps and
-          can be zero for months.
+        <p className="text-text-subtle mt-3 max-w-[68ch] text-sm leading-relaxed">
+          The MUSD Stability Pool has no token emissions. Its entire yield is the Bitcoin seized in
+          liquidations, sold and compounded back into MUSD. Whether that happens at all depends on
+          whether anyone gets liquidated, so returns arrive in lumps and can be zero for months.
         </p>
 
         {earn ? (
@@ -196,10 +190,10 @@ export default function EarnPage() {
           />
         </div>
 
-        <p className="mt-6 text-xs leading-relaxed text-text-subtle">
-          No gas. Maren’s relayer pays the Bitcoin network fee for Earn deposits and
-          withdrawals. Deposits go straight into the Stability Pool; withdrawals come out
-          of idle MUSD first, then the pool.
+        <p className="text-text-subtle mt-6 text-xs leading-relaxed">
+          No gas. Maren’s relayer pays the Bitcoin network fee for Earn deposits and withdrawals.
+          Deposits go straight into the Stability Pool; withdrawals come out of idle MUSD first,
+          then the pool.
         </p>
 
         <div className="mt-7">
@@ -214,11 +208,11 @@ export default function EarnPage() {
       </AppCard>
 
       <Note>
-        Stability Pool deposits absorb liquidated debt. In exchange for the Bitcoin gains
-        you take on the risk that your MUSD is used to close somebody else’s position —
-        historically profitable, not guaranteed, and not principal-protected. The vault
-        also holds Bitcoin it has not yet converted, so its share price moves with BTC
-        until a swap route Maren has reviewed exists on Mezo.
+        Stability Pool deposits absorb liquidated debt. In exchange for the Bitcoin gains you take
+        on the risk that your MUSD is used to close somebody else’s position — historically
+        profitable, not guaranteed, and not principal-protected. The vault also holds Bitcoin it has
+        not yet converted, so its share price moves with BTC until a swap route Maren has reviewed
+        exists on Mezo.
       </Note>
 
       <TxSheet runner={runner} />

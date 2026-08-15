@@ -52,9 +52,9 @@ export default function PayPage() {
       <div>
         <Label>Pay</Label>
         <h1 className="t-h2 mt-2">Move dollars</h1>
-        <p className="mt-3 max-w-[68ch] text-sm leading-relaxed text-text-muted">
-          Send MUSD to a handle or an address, ask to be paid, or hand someone a claimable
-          link. None of it needs the recipient to hold Bitcoin.
+        <p className="text-text-muted mt-3 max-w-[68ch] text-sm leading-relaxed">
+          Send MUSD to a handle or an address, ask to be paid, or hand someone a claimable link.
+          None of it needs the recipient to hold Bitcoin.
         </p>
       </div>
 
@@ -82,13 +82,13 @@ function GaslessBanner() {
   const { data: sponsorship } = useSponsorship();
 
   return (
-    <div className="rounded-[var(--radius-card)] border border-success/25 bg-surface-inset p-5">
+    <div className="border-success/25 bg-surface-inset rounded-[var(--radius-card)] border p-5">
       <div className="flex flex-wrap items-start justify-between gap-4">
         <div className="max-w-[68ch]">
-          <p className="text-sm text-success">No gas — Maren pays the Bitcoin network fee</p>
-          <p className="mt-2 text-sm leading-relaxed text-text-muted">
-            You sign an EIP-712 message; Maren’s relayer submits it and pays the BTC gas.
-            Your Bitcoin stays collateral. The recipient needs no BTC either.
+          <p className="text-success text-sm">No gas — Maren pays the Bitcoin network fee</p>
+          <p className="text-text-muted mt-2 text-sm leading-relaxed">
+            You sign an EIP-712 message; Maren’s relayer submits it and pays the BTC gas. Your
+            Bitcoin stays collateral. The recipient needs no BTC either.
           </p>
         </div>
         {sponsorship ? (
@@ -96,15 +96,14 @@ function GaslessBanner() {
             <Num size="lg">
               {sponsorship.freeActionsRemaining}/{sponsorship.freeActionsPerMonth}
             </Num>
-            <p className="mt-1 text-xs text-text-subtle">free actions left this month</p>
+            <p className="text-text-subtle mt-1 text-xs">free actions left this month</p>
           </div>
         ) : null}
       </div>
       {sponsorship ? (
-        <p className="mt-3 text-xs leading-relaxed text-text-subtle">
-          After that the fee is {formatMusd(sponsorship.feeAfterFreeTierWei)} taken in MUSD
-          inside the same transaction, shown before you sign. You are never blocked at the
-          door.
+        <p className="text-text-subtle mt-3 text-xs leading-relaxed">
+          After that the fee is {formatMusd(sponsorship.feeAfterFreeTierWei)} taken in MUSD inside
+          the same transaction, shown before you sign. You are never blocked at the door.
         </p>
       ) : null}
     </div>
@@ -141,11 +140,11 @@ function SendPanel({ runner }: { runner: ReturnType<typeof useTxRunner> }) {
           <span>
             {isHandle && resolved ? (
               <>
-                <span className="block text-text">{resolved.handle}</span>
-                <span className="num block text-xs text-text-subtle">{resolved.address}</span>
+                <span className="text-text block">{resolved.handle}</span>
+                <span className="num text-text-subtle block text-xs">{resolved.address}</span>
               </>
             ) : (
-              <span className="num text-xs break-all text-text-subtle">{recipient}</span>
+              <span className="num text-text-subtle break-all text-xs">{recipient}</span>
             )}
           </span>
         ),
@@ -172,7 +171,7 @@ function SendPanel({ runner }: { runner: ReturnType<typeof useTxRunner> }) {
       <CardTitle>Send</CardTitle>
 
       <div className="mt-6 max-w-xl">
-        <label htmlFor="pay-to" className="t-label block text-text-subtle">
+        <label htmlFor="pay-to" className="t-label text-text-subtle block">
           To
         </label>
         <input
@@ -183,7 +182,7 @@ function SendPanel({ runner }: { runner: ReturnType<typeof useTxRunner> }) {
           autoComplete="off"
           spellCheck={false}
           aria-describedby="pay-to-status"
-          className="num mt-3 w-full border-b border-[var(--border-hairline)] bg-transparent pb-3 text-lg text-text outline-none placeholder:text-text-subtle/60 focus:border-[var(--border-strong)]"
+          className="num text-text placeholder:text-text-subtle/60 mt-3 w-full border-b border-[var(--border-hairline)] bg-transparent pb-3 text-lg outline-none focus:border-[var(--border-strong)]"
         />
 
         {/* The resolved address, always, before anything is signed. */}
@@ -192,7 +191,7 @@ function SendPanel({ runner }: { runner: ReturnType<typeof useTxRunner> }) {
             <span className="text-text-subtle">Resolving handle…</span>
           ) : isHandle && resolved ? (
             <span className="flex flex-wrap items-center gap-2">
-              <span aria-hidden className="size-1.5 rounded-[var(--radius-pill)] bg-success" />
+              <span aria-hidden className="bg-success size-1.5 rounded-[var(--radius-pill)]" />
               <span className="text-text-muted">{resolved.handle} resolves to</span>
               <Num size="sm" tone="default">
                 {resolved.address}
@@ -203,9 +202,7 @@ function SendPanel({ runner }: { runner: ReturnType<typeof useTxRunner> }) {
               No such handle on this network. Maren will not fall back to an address.
             </span>
           ) : isAddress ? (
-            <span className="text-text-muted">
-              Valid address. No handle is registered to it.
-            </span>
+            <span className="text-text-muted">Valid address. No handle is registered to it.</span>
           ) : trimmed.length > 0 ? (
             <span className="text-text-subtle">
               Enter a handle beginning with @, or a 0x address.
@@ -228,7 +225,7 @@ function SendPanel({ runner }: { runner: ReturnType<typeof useTxRunner> }) {
       </div>
 
       <div className="mt-8 max-w-xl">
-        <label htmlFor="pay-memo" className="t-label block text-text-subtle">
+        <label htmlFor="pay-memo" className="t-label text-text-subtle block">
           Memo (optional)
         </label>
         <input
@@ -237,11 +234,10 @@ function SendPanel({ runner }: { runner: ReturnType<typeof useTxRunner> }) {
           onChange={(event) => setMemo(event.target.value)}
           placeholder="What is this for?"
           aria-describedby="pay-memo-count"
-          className="mt-3 w-full border-b border-[var(--border-hairline)] bg-transparent pb-3 text-[0.9375rem] text-text outline-none placeholder:text-text-subtle/60 focus:border-[var(--border-strong)]"
+          className="text-text placeholder:text-text-subtle/60 mt-3 w-full border-b border-[var(--border-hairline)] bg-transparent pb-3 text-[0.9375rem] outline-none focus:border-[var(--border-strong)]"
         />
-        <p id="pay-memo-count" className="mt-2 text-xs text-text-subtle">
-          <span className="num">{memoBytes}</span>/80 bytes · written on-chain and publicly
-          readable
+        <p id="pay-memo-count" className="text-text-subtle mt-2 text-xs">
+          <span className="num">{memoBytes}</span>/80 bytes · written on-chain and publicly readable
           {memoBytes > 80 ? (
             <span className="text-danger"> · too long, MarenPay caps this at 80 bytes</span>
           ) : null}
@@ -280,8 +276,8 @@ function RequestPanel({ runner }: { runner: ReturnType<typeof useTxRunner> }) {
         label: 'From',
         value: resolved ? (
           <span>
-            <span className="block text-text">{resolved.handle}</span>
-            <span className="num block text-xs text-text-subtle">{resolved.address}</span>
+            <span className="text-text block">{resolved.handle}</span>
+            <span className="num text-text-subtle block text-xs">{resolved.address}</span>
           </span>
         ) : (
           <span className="text-text-muted">anyone with the request</span>
@@ -301,10 +297,10 @@ function RequestPanel({ runner }: { runner: ReturnType<typeof useTxRunner> }) {
     <>
       <AppCard className="p-6 md:p-8">
         <CardTitle>Request payment</CardTitle>
-        <p className="mt-3 max-w-[68ch] text-sm leading-relaxed text-text-muted">
-          Creates an on-chain ask that the other side fulfils in a single action. Nothing
-          is escrowed and nothing moves until they do. Leave the handle blank and anyone
-          holding the request may pay it.
+        <p className="text-text-muted mt-3 max-w-[68ch] text-sm leading-relaxed">
+          Creates an on-chain ask that the other side fulfils in a single action. Nothing is
+          escrowed and nothing moves until they do. Leave the handle blank and anyone holding the
+          request may pay it.
         </p>
 
         <div className="mt-8 max-w-xl">
@@ -312,7 +308,7 @@ function RequestPanel({ runner }: { runner: ReturnType<typeof useTxRunner> }) {
         </div>
 
         <div className="mt-8 max-w-xl">
-          <label htmlFor="request-from" className="t-label block text-text-subtle">
+          <label htmlFor="request-from" className="t-label text-text-subtle block">
             From (optional)
           </label>
           <input
@@ -322,7 +318,7 @@ function RequestPanel({ runner }: { runner: ReturnType<typeof useTxRunner> }) {
             placeholder="@handle"
             autoComplete="off"
             spellCheck={false}
-            className="num mt-3 w-full border-b border-[var(--border-hairline)] bg-transparent pb-3 text-lg text-text outline-none placeholder:text-text-subtle/60 focus:border-[var(--border-strong)]"
+            className="num text-text placeholder:text-text-subtle/60 mt-3 w-full border-b border-[var(--border-hairline)] bg-transparent pb-3 text-lg outline-none focus:border-[var(--border-strong)]"
           />
           <p className="mt-3 min-h-[1.25rem] text-sm" role="status">
             {isHandle && resolved ? (
@@ -339,7 +335,7 @@ function RequestPanel({ runner }: { runner: ReturnType<typeof useTxRunner> }) {
         </div>
 
         <div className="mt-8 max-w-xl">
-          <label htmlFor="request-memo" className="t-label block text-text-subtle">
+          <label htmlFor="request-memo" className="t-label text-text-subtle block">
             Memo (optional)
           </label>
           <input
@@ -347,7 +343,7 @@ function RequestPanel({ runner }: { runner: ReturnType<typeof useTxRunner> }) {
             value={memo}
             onChange={(event) => setMemo(event.target.value)}
             placeholder="Invoice 0044"
-            className="mt-3 w-full border-b border-[var(--border-hairline)] bg-transparent pb-3 text-[0.9375rem] text-text outline-none placeholder:text-text-subtle/60 focus:border-[var(--border-strong)]"
+            className="text-text placeholder:text-text-subtle/60 mt-3 w-full border-b border-[var(--border-hairline)] bg-transparent pb-3 text-[0.9375rem] outline-none focus:border-[var(--border-strong)]"
           />
         </div>
 
@@ -374,14 +370,18 @@ function RequestPanel({ runner }: { runner: ReturnType<typeof useTxRunner> }) {
                   : `${request.payerHandle ?? 'Someone'} asked you`
               }
               hint={`${request.memo || 'No memo'} · ${timeAgo(request.createdAt)} · ${
-                request.status === 'open' ? 'Open' : request.status === 'fulfilled' ? 'Fulfilled' : 'Cancelled'
+                request.status === 'open'
+                  ? 'Open'
+                  : request.status === 'fulfilled'
+                    ? 'Fulfilled'
+                    : 'Cancelled'
               }`}
               value={<Musd wei={request.amountWei} />}
               last={index === list.length - 1}
             />
           ))}
           {requests && requests.length === 0 ? (
-            <p className="py-3 text-sm text-text-subtle">No open requests.</p>
+            <p className="text-text-subtle py-3 text-sm">No open requests.</p>
           ) : null}
         </div>
       </AppCard>
@@ -428,7 +428,7 @@ function LinkPanel({ runner }: { runner: ReturnType<typeof useTxRunner> }) {
         { label: 'Expires', value: <span className="text-text-muted">in {expiryDays} days</span> },
         {
           label: 'Locked to key',
-          value: <span className="num text-xs break-all text-text-subtle">{linkKey}</span>,
+          value: <span className="num text-text-subtle break-all text-xs">{linkKey}</span>,
         },
       ],
       gas: {
@@ -449,11 +449,10 @@ function LinkPanel({ runner }: { runner: ReturnType<typeof useTxRunner> }) {
     <>
       <AppCard className="p-6 md:p-8">
         <CardTitle>Payment link</CardTitle>
-        <p className="mt-3 max-w-[68ch] text-sm leading-relaxed text-text-muted">
-          Escrows MUSD against a one-time key and gives you a link. The recipient needs no
-          prior relationship with Maren and no Bitcoin — a person with an empty wallet can
-          receive this and then spend it. Unclaimed links can be reclaimed after they
-          expire.
+        <p className="text-text-muted mt-3 max-w-[68ch] text-sm leading-relaxed">
+          Escrows MUSD against a one-time key and gives you a link. The recipient needs no prior
+          relationship with Maren and no Bitcoin — a person with an empty wallet can receive this
+          and then spend it. Unclaimed links can be reclaimed after they expire.
         </p>
 
         <div className="mt-8 grid max-w-2xl grid-cols-1 gap-8 sm:grid-cols-2">
@@ -467,7 +466,7 @@ function LinkPanel({ runner }: { runner: ReturnType<typeof useTxRunner> }) {
             error={overBalance ? 'More than your MUSD balance.' : null}
           />
           <div>
-            <label htmlFor="link-expiry" className="t-label block text-text-subtle">
+            <label htmlFor="link-expiry" className="t-label text-text-subtle block">
               Expires in
             </label>
             <div className="mt-3 flex items-baseline gap-3 border-b border-[var(--border-hairline)] pb-3 focus-within:border-[var(--border-strong)]">
@@ -476,19 +475,19 @@ function LinkPanel({ runner }: { runner: ReturnType<typeof useTxRunner> }) {
                 value={days}
                 onChange={(event) => setDays(event.target.value)}
                 inputMode="numeric"
-                className="num min-w-0 flex-1 bg-transparent text-3xl text-text outline-none"
+                className="num text-text min-w-0 flex-1 bg-transparent text-3xl outline-none"
               />
-              <span className="t-h3 shrink-0 text-text-muted">days</span>
+              <span className="t-h3 text-text-muted shrink-0">days</span>
             </div>
-            <p className="mt-3 text-xs text-text-subtle">
-              MarenPay refuses an expiry in the past, and only the creator can reclaim
-              after it passes.
+            <p className="text-text-subtle mt-3 text-xs">
+              MarenPay refuses an expiry in the past, and only the creator can reclaim after it
+              passes.
             </p>
           </div>
         </div>
 
         <div className="mt-8 max-w-xl">
-          <label htmlFor="link-memo" className="t-label block text-text-subtle">
+          <label htmlFor="link-memo" className="t-label text-text-subtle block">
             Memo (optional)
           </label>
           <input
@@ -496,7 +495,7 @@ function LinkPanel({ runner }: { runner: ReturnType<typeof useTxRunner> }) {
             value={memo}
             onChange={(event) => setMemo(event.target.value)}
             placeholder="Coffee fund"
-            className="mt-3 w-full border-b border-[var(--border-hairline)] bg-transparent pb-3 text-[0.9375rem] text-text outline-none placeholder:text-text-subtle/60 focus:border-[var(--border-strong)]"
+            className="text-text placeholder:text-text-subtle/60 mt-3 w-full border-b border-[var(--border-hairline)] bg-transparent pb-3 text-[0.9375rem] outline-none focus:border-[var(--border-strong)]"
           />
         </div>
 
@@ -514,7 +513,7 @@ function LinkPanel({ runner }: { runner: ReturnType<typeof useTxRunner> }) {
           <div className="mt-6">
             <Note tone="warning">
               <p className="text-text">Copy this now — it is shown once.</p>
-              <p className="num mt-2 text-xs break-all text-text-muted">{created.url}</p>
+              <p className="num text-text-muted mt-2 break-all text-xs">{created.url}</p>
               <div className="mt-4">
                 <ActionButton
                   variant="secondary"
@@ -550,12 +549,11 @@ function LinkPanel({ runner }: { runner: ReturnType<typeof useTxRunner> }) {
             />
           ))}
           {links && links.length === 0 ? (
-            <p className="py-3 text-sm text-text-subtle">No links yet.</p>
+            <p className="text-text-subtle py-3 text-sm">No links yet.</p>
           ) : (
-            <p className="pt-4 text-xs leading-relaxed text-text-subtle">
-              Secrets are not stored. A link that has been shown once cannot be shown
-              again — that is the honest behaviour for a bearer secret, and it is why the
-              reclaim path exists.
+            <p className="text-text-subtle pt-4 text-xs leading-relaxed">
+              Secrets are not stored. A link that has been shown once cannot be shown again — that
+              is the honest behaviour for a bearer secret, and it is why the reclaim path exists.
             </p>
           )}
         </div>

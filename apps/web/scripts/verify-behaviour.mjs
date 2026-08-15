@@ -171,7 +171,11 @@ const check = (name, pass, detail = '') => {
 
   await page.keyboard.press('Tab');
   const firstStop = await page.evaluate(() => document.activeElement?.textContent?.trim());
-  check('app: skip link is the first tab stop', firstStop === 'Skip to content', `got="${firstStop}"`);
+  check(
+    'app: skip link is the first tab stop',
+    firstStop === 'Skip to content',
+    `got="${firstStop}"`,
+  );
 
   // Borrowing capacity must be the contract's ceiling, not an ICR estimate.
   const capacityCopy = await page.locator('text=getTroveMaxBorrowingCapacity').count();
@@ -277,7 +281,10 @@ const check = (name, pass, detail = '') => {
   await page.waitForTimeout(300);
   const dialog = page.locator('[role=dialog]');
   check('pay: confirmation is a modal dialog', (await dialog.count()) === 1);
-  check('pay: dialog is aria-modal and labelled', (await dialog.getAttribute('aria-modal')) === 'true');
+  check(
+    'pay: dialog is aria-modal and labelled',
+    (await dialog.getAttribute('aria-modal')) === 'true',
+  );
   const dialogText = await dialog.innerText();
   check(
     'pay: confirmation repeats the full resolved address',
@@ -295,20 +302,17 @@ const check = (name, pass, detail = '') => {
     'earn: no forward rate is quoted anywhere on the page',
     !/\d[\d.,]*\s*%\s*(apy|apr)/i.test(earnText) && !/apy\s*[:of]*\s*\d/i.test(earnText),
   );
-  check('earn: the realised figure is labelled backward-looking', /Backward-looking/.test(earnText));
   check(
-    'earn: says plainly why there is no APY',
-    /does not display an APY/i.test(earnText),
+    'earn: the realised figure is labelled backward-looking',
+    /Backward-looking/.test(earnText),
   );
+  check('earn: says plainly why there is no APY', /does not display an APY/i.test(earnText));
 
   // --- Activity: status wording and explorer links ---
   await page.goto('http://127.0.0.1:3000/app/activity', { waitUntil: 'networkidle' });
   await page.waitForTimeout(600);
   const activityText = await page.locator('main').innerText();
-  check(
-    'activity: a failed row says no funds moved',
-    /Failed — no funds moved/.test(activityText),
-  );
+  check('activity: a failed row says no funds moved', /Failed — no funds moved/.test(activityText));
   const explorerLinks = await page.locator('main a[href*="explorer"]').count();
   check('activity: rows link to the Mezo explorer', explorerLinks > 0, `${explorerLinks} links`);
 
