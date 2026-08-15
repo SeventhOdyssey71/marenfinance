@@ -5,7 +5,7 @@ import { formatBtc, formatMusd, getChain, shortHash } from '@maren/sdk';
 
 import { Segmented } from '@/components/app/controls';
 import { Num } from '@/components/app/money';
-import { AppCard, CardTitle, Label } from '@/components/app/primitives';
+import { AppCard, EmptyState, Info, Label } from '@/components/app/primitives';
 import { ArrowUpRight } from '@/components/ui/icons';
 import { activityDirection, activityTitle, statusLabel, timeAgo } from '@/lib/copy';
 import { NETWORK, useActivity } from '@/lib/data/source';
@@ -53,8 +53,7 @@ export default function ActivityPage() {
         <Label>Activity</Label>
         <h1 className="t-h2 mt-2">History</h1>
         <p className="text-text-muted mt-3 max-w-[68ch] text-sm leading-relaxed">
-          Everything Maren has done on your behalf, with the gas each action actually cost you and a
-          link to the receipt on {explorer.name}.
+          Every action, its gas, and a receipt on {explorer.name}.
         </p>
       </div>
 
@@ -66,33 +65,43 @@ export default function ActivityPage() {
             <Row key={item.id} item={item} last={index === rows.length - 1} />
           ))}
           {rows.length === 0 ? (
-            <p className="text-text-subtle py-8 text-sm">Nothing in this filter yet.</p>
+            <div className="py-6">
+              <EmptyState title="Nothing here yet">
+                {filter === 'all'
+                  ? 'Your deposits, borrows and payments will appear here.'
+                  : 'Nothing in this filter.'}
+              </EmptyState>
+            </div>
           ) : null}
         </div>
       </AppCard>
 
-      <AppCard>
-        <CardTitle>Reading this ledger</CardTitle>
-        <ul className="text-text-muted mt-4 max-w-[68ch] space-y-2.5 text-sm leading-relaxed">
-          <li>
-            <span className="text-text">Confirmed</span> means a receipt came back with status
-            success. A transaction hash on its own is not a result and never appears as one.
-          </li>
-          <li>
-            <span className="text-text">Awaiting receipt</span> means we have a hash and no receipt
-            yet. It may still land — check here before retrying.
-          </li>
-          <li>
-            <span className="text-text">Failed</span> means the chain mined it and then reverted it.
-            No funds moved.
-          </li>
-          <li>
-            <span className="text-text">Gas</span> is what you paid in BTC. Sponsored rows are zero
-            because Maren’s relayer paid instead; a deposit is never sponsored, because it carries
-            value and the relay hub refuses those.
-          </li>
-        </ul>
-      </AppCard>
+      {/* The status vocabulary is load-bearing — a user deciding whether to retry a
+          payment needs to know that a hash is not a result — but it is reference
+          material, not something to read on every visit. */}
+      {rows.length > 0 ? (
+        <AppCard>
+          <Info summary="What these statuses mean">
+            <ul className="space-y-2">
+              <li>
+                <span className="text-text">Confirmed</span> — a receipt came back successful. A
+                transaction hash on its own is never shown as a result.
+              </li>
+              <li>
+                <span className="text-text">Awaiting receipt</span> — we have a hash and no receipt
+                yet. It may still land; check here before retrying.
+              </li>
+              <li>
+                <span className="text-text">Failed</span> — mined, then reverted. No funds moved.
+              </li>
+              <li>
+                <span className="text-text">Gas</span> — what you paid in BTC. Sponsored rows are
+                zero because Maren’s relayer paid instead. A deposit is never sponsored.
+              </li>
+            </ul>
+          </Info>
+        </AppCard>
+      ) : null}
     </div>
   );
 }
