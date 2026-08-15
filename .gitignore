@@ -20,7 +20,11 @@ out/
 # foundry
 packages/contracts/out/
 packages/contracts/cache/
-packages/contracts/broadcast/*/dry-run/
+# Dry-run artifacts are throwaway simulation output. Real broadcast artifacts
+# (broadcast/<script>/<chainid>/run-*.json) ARE committed — they carry the tx hashes.
+# NOTE: the glob needs `**`; the path is broadcast/<script>/<chainid>/dry-run/, which is
+# one level deeper than a single `*` matches.
+packages/contracts/broadcast/**/dry-run/
 packages/contracts/lib/
 
 # env & secrets — NEVER commit
