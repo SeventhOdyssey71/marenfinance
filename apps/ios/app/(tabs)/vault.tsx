@@ -1,17 +1,12 @@
 import { useMemo, useState } from 'react';
 import { Pressable, StyleSheet, View } from 'react-native';
 import {
-  BORROWING_RATE,
-  MAREN_POLICY,
-  assessHealth,
-  collateralRatio,
+  borrowCeiling,
   formatBtc,
-  formatCollateralRatio,
   formatMusd,
   formatUsd,
-  liquidationPrice,
-  maxNetDebtAt,
-  totalDebtFor,
+  previewBorrow,
+  recommendedBorrow,
 } from '@maren/sdk';
 
 import { Btc, Musd, Ratio } from '../../src/components/Money';
@@ -225,34 +220,26 @@ function BorrowPanel({
   onSubmit: (wei: bigint) => void;
 }) {
   /**
-   * The hard ceiling: the additional net debt that lands the position exactly on
-   * MAREN_POLICY.minHealthyCr (180%). Computed by the SDK, then reduced by the debt
-   * already outstanding. Mezo's per-trove `maxBorrowingCapacity` caps it further.
+   * The hard ceiling and the 250% recommendation, both from `@maren/sdk`.
+   *
+   * This screen used to compute them inline as
+   * `maxNetDebtAt(collateral, price, cr, rate) - principalWei`. That sizes a trove being
+   * OPENED: against a position that already exists it works from net principal and so
+   * drops the accrued interest, over-quoting the maximum by exactly that amount and
+   * putting the slider's "180% floor" stop at 179.3%, where `MarenVault.MIN_BORROW_CR`
+   * reverts. `borrowCeiling` works from total debt and is shared with the web app, so the
+   * two platforms cannot drift again. See `packages/sdk/src/borrow.test.ts`.
    */
-  const ceiling = useMemo(() => {
-    if (!position || !price) return 0n;
-
-    const netDebtAtFloor = maxNetDebtAt(
-      position.collateralWei,
-      price,
-      MAREN_POLICY.minHealthyCr,
-      BORROWING_RATE,
-    );
-    const headroom = netDebtAtFloor - position.principalWei;
-    const mezoHeadroom = position.maxBorrowingCapacityWei - position.principalWei;
-    const limit = headroom < mezoHeadroom ? headroom : mezoHeadroom;
-    return limit > 0n ? limit : 0n;
-  }, [position, price]);
+  const ceiling = useMemo(
+    () => (position && price ? borrowCeiling(position, price).amountWei : 0n),
+    [position, price],
+  );
 
   /** Where the recommended 250% target sits on that track. */
-  const recommended = useMemo(() => {
-    if (!position || !price) return 0n;
-    const atTarget =
-      maxNetDebtAt(position.collateralWei, price, MAREN_POLICY.targetCr, BORROWING_RATE) -
-      position.principalWei;
-    const clamped = atTarget < 0n ? 0n : atTarget > ceiling ? ceiling : atTarget;
-    return clamped;
-  }, [position, price, ceiling]);
+  const recommended = useMemo(
+    () => (position && price ? recommendedBorrow(position, price, ceiling) : 0n),
+    [position, price, ceiling],
+  );
 
   const [amount, setAmount] = useState<bigint | null>(null);
   const value = amount ?? recommended;
@@ -260,16 +247,13 @@ function BorrowPanel({
   /** The projected position if this borrow goes through. */
   const preview = useMemo(() => {
     if (!position || !price) return null;
-    const newPrincipal = position.principalWei + value;
-    // totalDebtFor adds the origination fee and the 200 MUSD gas compensation — quoting
-    // net debt as the debt would understate the risk.
-    const newTotalDebt = totalDebtFor(newPrincipal, BORROWING_RATE);
-    const cr = collateralRatio(position.collateralWei, newTotalDebt, price);
+    const next = previewBorrow(position, price, value);
     return {
-      cr,
-      liq: liquidationPrice(position.collateralWei, newTotalDebt),
-      totalDebt: newTotalDebt,
-      health: assessHealth(position.collateralWei, newTotalDebt, price),
+      cr: next.collateralRatio,
+      liq: next.liquidationPriceWei,
+      totalDebt: next.debtWei,
+      health: next.health,
+      fee: next.originationFeeWei,
     };
   }, [position, price, value]);
 
@@ -357,7 +341,7 @@ function BorrowPanel({
           <View style={styles.previewFooter}>
             <StatRow
               label="Origination fee (0.1%)"
-              value={<Musd wei={(value * BORROWING_RATE) / 10n ** 18n} plain size="numericSm" />}
+              value={<Musd wei={preview.fee} plain size="numericSm" />}
             />
             <StatRow
               label="Total debt after"

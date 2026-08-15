@@ -3,14 +3,20 @@
 import { useMemo, useState } from 'react';
 import {
   BORROWING_RATE,
+  LIQUIDATION_RESERVE,
   MAREN_POLICY,
   MIN_NET_DEBT,
   assessBorrowRoute,
+  borrowCeiling,
+  directTroveThreshold,
   formatApr,
   formatBtc,
   formatMusd,
   formatUsd,
   INTEREST_RATE_BPS,
+  maxWithdrawable,
+  previewBorrow,
+  recommendedBorrow,
 } from '@maren/sdk';
 
 import { AmountField, AmountSlider, Segmented } from '@/components/app/controls';
@@ -33,14 +39,6 @@ import { mutate } from '@/lib/data/mock';
 import { useBalances, usePosition, usePrice } from '@/lib/data/source';
 import { parseUnitsSafe } from '@/lib/copy';
 import { healthLabel, healthTone, policyRatio, toneClasses } from '@/lib/health';
-import {
-  LIQUIDATION_RESERVE,
-  borrowCeiling,
-  directTroveThreshold,
-  maxWithdrawable,
-  previewBorrow,
-  recommendedBorrow,
-} from '@/lib/vault';
 
 type Mode = 'deposit' | 'borrow' | 'repay' | 'withdraw';
 
