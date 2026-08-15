@@ -1,0 +1,143 @@
+import type { Address } from 'viem';
+import type { MezoNetwork } from './chains';
+
+/**
+ * MUSD protocol addresses on Mezo.
+ *
+ * PROVENANCE — these were verified three independent ways before being committed:
+ *   1. `mezo-org/musd` repo deployment artifacts (solidity/artifacts/deployments/)
+ *   2. The OpenZeppelin proxy manifest (solidity/.openzeppelin/unknown-31612.json), 14/14 match
+ *   3. Live `eth_getCode` + functional calls against both RPCs
+ *
+ * Spot-checked live on 2026-08-15:
+ *   MUSD.symbol()                -> "MUSD"   (both networks)
+ *   MUSD.decimals()              -> 18
+ *   BorrowerOperations.minNetDebt() -> 1.8e21
+ *   TroveManager.MCR()           -> 1.1e18
+ *   TroveManager.CCR()           -> 1.5e18
+ *
+ * All core contracts are TransparentUpgradeableProxy — always integrate against the
+ * proxy address below, never an implementation address.
+ *
+ * DO NOT edit these by hand. Re-derive from @mezo-org/musd-contracts and re-verify
+ * on-chain. A wrong address here silently sends user funds nowhere.
+ */
+export interface MusdAddresses {
+  musd: Address;
+  borrowerOperations: Address;
+  borrowerOperationsSignatures: Address;
+  troveManager: Address;
+  stabilityPool: Address;
+  priceFeed: Address;
+  sortedTroves: Address;
+  hintHelpers: Address;
+  activePool: Address;
+  defaultPool: Address;
+  collSurplusPool: Address;
+  gasPool: Address;
+  pcv: Address;
+  interestRateManager: Address;
+  governableVariables: Address;
+}
+
+const MAINNET: MusdAddresses = {
+  musd: '0xdD468A1DDc392dcdbEf6db6e34E89AA338F9F186',
+  borrowerOperations: '0x44b1bac67dDA612a41a58AAf779143B181dEe031',
+  borrowerOperationsSignatures: '0xB57ab578BF20b3e318f3EFAA587C51DBccE5df7a',
+  troveManager: '0x94AfB503dBca74aC3E4929BACEeDfCe19B93c193',
+  stabilityPool: '0x73245Eff485aB3AAc1158B3c4d8f4b23797B0e32',
+  priceFeed: '0xc5aC5A8892230E0A3e1c473881A2de7353fFcA88',
+  sortedTroves: '0x8C5DB4C62BF29c1C4564390d10c20a47E0b2749f',
+  hintHelpers: '0xD267b3bE2514375A075fd03C3D9CBa6b95317DC3',
+  activePool: '0x3012C2fE1240e3754E5C200A0946bb0E07474876',
+  defaultPool: '0xE4B5913C0c82dB2eFC553b95c0173efb90a07c8B',
+  collSurplusPool: '0xBF51807ACb3394B8550f0554FB9098856Ef5F491',
+  gasPool: '0x3EB418BdBE95b4b9cf465ecfBD8424685ACD1Bc1',
+  pcv: '0x391EcC7ffEFc48cff41D0F2Bb36e38b82180B993',
+  interestRateManager: '0x4a453700d157717Fe02fB62E7700ED7845048285',
+  governableVariables: '0x560AC4Ea44Fb7EB2D4d3c00608CB1CAb2613d389',
+};
+
+const TESTNET: MusdAddresses = {
+  musd: '0x118917a40FAF1CD7a13dB0Ef56C86De7973Ac503',
+  borrowerOperations: '0xCdF7028ceAB81fA0C6971208e83fa7872994beE5',
+  borrowerOperationsSignatures: '0xD757e3646AF370b15f32EB557F0F8380Df7D639e',
+  troveManager: '0xE47c80e8c23f6B4A1aE41c34837a0599D5D16bb0',
+  stabilityPool: '0x1CCA7E410eE41739792eA0A24e00349Dd247680e',
+  priceFeed: '0x86bCF0841622a5dAC14A313a15f96A95421b9366',
+  sortedTroves: '0x722E4D24FD6Ff8b0AC679450F3D91294607268fA',
+  hintHelpers: '0x4e4cBA3779d56386ED43631b4dCD6d8EacEcBCF6',
+  activePool: '0x143A063F62340DA3A8bEA1C5642d18C6D0F7FF51',
+  defaultPool: '0x59851D252090283f9367c159f0C9036e75483300',
+  collSurplusPool: '0xB4C35747c26E4aB5F1a7CdC7E875B5946eFa6fa9',
+  gasPool: '0x8fa3EF45137C3AFF337e42f98023C1D7dd3666C0',
+  pcv: '0x4dDD70f4C603b6089c07875Be02fEdFD626b80Af',
+  interestRateManager: '0xD4D6c36A592A2c5e86035A6bca1d57747a567f37',
+  governableVariables: '0x6552059B6eFc6aA4AE3ea45f28ED4D92acE020cD',
+};
+
+export const MUSD_ADDRESSES: Record<MezoNetwork, MusdAddresses> = {
+  mainnet: MAINNET,
+  testnet: TESTNET,
+};
+
+export function getMusdAddresses(network: MezoNetwork): MusdAddresses {
+  return MUSD_ADDRESSES[network];
+}
+
+/**
+ * Multicall3 at the canonical cross-chain address.
+ * VERIFIED live 2026-08-15: 7,619 bytes of code present on BOTH 31612 and 31611.
+ */
+export const MULTICALL3_ADDRESS: Address = '0xcA11bde05977b3631167028862bE2a173976CA11';
+
+/**
+ * Mezo's BTC/USD price oracle is a NATIVE CHAIN PRECOMPILE, not a deployed
+ * Chainlink/Pyth contract. It implements only `decimals()` and `latestRoundData()`
+ * from ChainlinkAggregatorV3Interface — `description()` reverts.
+ * Source: github.com/mezo-org/mezod/precompile/priceoracle/
+ */
+export const MEZO_PRICE_ORACLE_PRECOMPILE: Address =
+  '0x7b7c000000000000000000000000000000000015';
+
+/** The BTC gas-token precompile on Mezo. */
+export const MEZO_BTC_PRECOMPILE: Address = '0x7b7C000000000000000000000000000000000000';
+
+/**
+ * Maren's own deployments. Populated by `packages/contracts/script/Deploy.s.sol`,
+ * which writes back to this file's companion JSON. Zero address = not yet deployed.
+ */
+export interface MarenAddresses {
+  marenVault: Address;
+  marenPay: Address;
+  marenForwarder: Address;
+  marenRegistry: Address;
+  marenEarn: Address;
+}
+
+const ZERO = '0x0000000000000000000000000000000000000000' as const;
+
+export const MAREN_ADDRESSES: Record<MezoNetwork, MarenAddresses> = {
+  mainnet: {
+    marenVault: ZERO,
+    marenPay: ZERO,
+    marenForwarder: ZERO,
+    marenRegistry: ZERO,
+    marenEarn: ZERO,
+  },
+  testnet: {
+    marenVault: ZERO,
+    marenPay: ZERO,
+    marenForwarder: ZERO,
+    marenRegistry: ZERO,
+    marenEarn: ZERO,
+  },
+};
+
+export function getMarenAddresses(network: MezoNetwork): MarenAddresses {
+  return MAREN_ADDRESSES[network];
+}
+
+export function isDeployed(address: Address): boolean {
+  return address !== ZERO;
+}

@@ -1,0 +1,8 @@
+# Default owner for everything in the repo.
+*                       @SeventhOdyssey71
+
+# Anything touching money, chain config, or signing gets explicit review.
+/packages/contracts/    @SeventhOdyssey71
+/packages/sdk/src/chains.ts @SeventhOdyssey71
+/apps/relayer/          @SeventhOdyssey71
+/.github/workflows/     @SeventhOdyssey71
