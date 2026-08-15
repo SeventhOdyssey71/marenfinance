@@ -148,8 +148,7 @@ export function usePrice(): PriceFeed {
   if (query.error) {
     return {
       state: 'unavailable',
-      reason:
-        'Mezo’s oracle did not answer. Its price feed reverts above 60 seconds of staleness, so this is the same condition the protocol would refuse on.',
+      reason: 'Mezo’s oracle did not answer.',
     };
   }
   return classifyPrice(query.data ?? null, nowSeconds);
