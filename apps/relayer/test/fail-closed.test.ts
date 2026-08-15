@@ -50,13 +50,36 @@ describe('fail-closed boot', () => {
   });
 
   it('names every missing gate rather than defaulting one of them open', async () => {
-    const { problems } = loadConfig({});
+    // Pinned to mainnet on purpose. The forwarder falls back to MAREN_ADDRESSES in
+    // @maren/sdk, and matsnet now carries a real deployed MarenRelayHub — so on
+    // testnet there is legitimately no forwarder problem to report. Mainnet is still
+    // the zero address, which is where the missing-forwarder path actually lives.
+    const { problems } = loadConfig({ RELAYER_NETWORK: 'mainnet' });
     const joined = problems.join('\n');
 
     expect(joined).toMatch(/forwarder/i);
     expect(joined).toMatch(/allowlist is empty/i);
     expect(joined).toMatch(/RELAYER_MAX_DAILY_SPONSORED_BTC/);
     expect(joined).toMatch(/no signing key configured/i);
+  });
+
+  it('resolves the forwarder and allowlist from the SDK once a network has a deployment', () => {
+    // The counterpart to the test above: on matsnet the deployed hub and the Maren
+    // targets are found without RELAYER_FORWARDER_ADDRESS or RELAYER_ALLOWED_TARGETS
+    // being set, and neither is a problem. If this ever starts reporting one, the
+    // deployed addresses have been lost from @maren/sdk.
+    const joined = loadConfig({ RELAYER_NETWORK: 'testnet' }).problems.join('\n');
+    expect(joined).not.toMatch(/forwarder/i);
+    expect(joined).not.toMatch(/allowlist is empty/i);
+  });
+
+  it('still refuses on a network with no deployment', () => {
+    // Mainnet is undeployed, so both gates must fail closed there. This is the
+    // assertion that would catch a regression where an empty allowlist is treated as
+    // "allow everything" rather than "allow nothing".
+    const joined = loadConfig({ RELAYER_NETWORK: 'mainnet' }).problems.join('\n');
+    expect(joined).toMatch(/forwarder/i);
+    expect(joined).toMatch(/allowlist is empty/i);
   });
 
   it('reports a refusing relayer as unhealthy on /health', async () => {
@@ -76,8 +99,11 @@ describe('fail-closed boot', () => {
     ['RELAYER_MAX_DAILY_SPONSORED_BTC', ''],
     ['RELAYER_MAX_DAILY_SPONSORED_BTC', 'not-a-number'],
     ['RELAYER_MAX_DAILY_SPONSORED_BTC', '0'],
-    ['RELAYER_FORWARDER_ADDRESS', ''],
-    ['RELAYER_ALLOWED_TARGETS', ''],
+    // RELAYER_FORWARDER_ADDRESS and RELAYER_ALLOWED_TARGETS are deliberately absent
+    // from this table. On testnet both now fall through to the real deployment in
+    // @maren/sdk — the hub, and an allowlist seeded from the deployed Maren contracts —
+    // which is correct rather than a gate left open. Their missing paths are covered
+    // against mainnet, where MAREN_ADDRESSES is still zero.
     ['RELAYER_PRIVATE_KEY', ''],
   ])('refuses when %s is %j', async (key, value) => {
     const relayer = await buildTestRelayer(makeEnv({ [key]: value }), new FakeChain());
