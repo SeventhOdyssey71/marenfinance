@@ -1,0 +1,74 @@
+import { PillButton } from './ui/pill-button';
+import { EyebrowPill } from './ui/section';
+import { ArrowDown } from './ui/icons';
+import { HeroMesh } from './shaders/hero-mesh';
+
+const heroFacts = [
+  { value: '0.001 BTC', label: 'Minimum deposit' },
+  { value: '140%', label: 'Maren liquidation CR' },
+  { value: '25', label: 'Free actions, no gas' },
+] as const;
+
+export function Hero() {
+  return (
+    <section className="relative isolate overflow-hidden" aria-labelledby="hero-title">
+      <HeroMesh />
+
+      {/* Legibility floor: the mesh never sits under body copy at a contrast
+          that drops below 4.5:1. This scrim guarantees it. */}
+      <div
+        aria-hidden
+        className="pointer-events-none absolute inset-0 -z-10 bg-[linear-gradient(180deg,rgba(8,8,10,0.62)_0%,rgba(8,8,10,0.34)_38%,rgba(8,8,10,0.88)_88%,#08080A_100%)]"
+      />
+
+      <div className="container-maren relative">
+        <div className="flex min-h-[92svh] flex-col justify-center pt-[136px] pb-24 md:min-h-[94svh] md:pt-40 md:pb-32">
+          <div className="max-w-[62rem]">
+            <EyebrowPill>Built on Mezo</EyebrowPill>
+
+            <h1
+              id="hero-title"
+              className="t-display mt-8 text-balance text-text md:mt-10"
+            >
+              Spend Bitcoin.
+              <br />
+              <span className="text-text-muted">Never sell it.</span>
+            </h1>
+
+            <p className="prose-measure mt-7 text-[1.0625rem] leading-relaxed text-text-muted md:mt-8 md:text-lg">
+              Maren turns Bitcoin into spendable liquidity on Mezo. Deposit from{' '}
+              <span className="num text-text">0.001 BTC</span>, draw MUSD against it, and
+              pay anyone — without holding a gas balance, and without selling a satoshi.
+            </p>
+
+            <div className="mt-10 flex flex-col gap-3 sm:flex-row sm:items-center md:mt-12">
+              <PillButton href="/app" size="lg">
+                Launch App
+              </PillButton>
+              <PillButton
+                href="#problem"
+                variant="secondary"
+                size="lg"
+                icon={<ArrowDown className="size-4" />}
+              >
+                Read the thesis
+              </PillButton>
+            </div>
+          </div>
+
+          {/* Hard numbers, stated exactly. Nothing here is an estimate. */}
+          <dl className="mt-20 grid max-w-3xl grid-cols-1 gap-px overflow-hidden rounded-[var(--radius-card)] border border-[var(--border-hairline)] bg-[var(--border-hairline)] sm:grid-cols-3 md:mt-24">
+            {heroFacts.map((f) => (
+              <div key={f.label} className="bg-[#0A0A0D]/80 px-6 py-5 backdrop-blur-sm">
+                <dt className="t-label text-text-subtle">{f.label}</dt>
+                <dd className="num mt-2 text-2xl font-medium tracking-tight text-text">
+                  {f.value}
+                </dd>
+              </div>
+            ))}
+          </dl>
+        </div>
+      </div>
+    </section>
+  );
+}
