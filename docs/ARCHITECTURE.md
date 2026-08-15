@@ -93,7 +93,10 @@ proportional claim inside it with a per-user ledger.
 - Deposit from **0.001 BTC** — ~80× below the protocol minimum.
 - Per-user `collateral` and `debt` accounting; per-user ICR computed off the same oracle.
 - **Maren enforces a stricter 140% internal liquidation CR** against the protocol's
-  110%, so the pooled trove is never near the protocol cliff.
+  110%, so the pooled trove is never near the protocol cliff. A separate, higher
+  **180% floor (`MIN_BORROW_CR`) gates borrowing** — a user may not draw MUSD that puts
+  them below it. Both were read back off the deployed bytecode on matsnet and match
+  source: `LIQUIDATION_CR = 1.4e18`, `MIN_BORROW_CR = 1.8e18`.
 - Keeper (`MarenKeeper` role) rebalances: tops up collateral, repays debt, and
   internally liquidates unhealthy users by seizing their collateral at a 5% penalty
   and repaying their share of the pooled debt.
@@ -163,7 +166,17 @@ state; we never display a stale price as if it were live.
 | Shaders | `@paper-design/shaders-react` — three usages, per `docs/BRAND.md` §5                            |
 | State   | TanStack Query for chain reads; Zustand for local UI                                            |
 | iOS     | Expo (React Native), sharing `@maren/sdk`                                                       |
-| ABIs    | `@mezo-org/musd-contracts` — never hand-transcribed                                             |
+| ABIs    | Hand-transcribed in `apps/web/src/lib/chain/abis.ts` — see the caveat below                     |
+
+> **ABI caveat — this is a known deviation from R17.** An earlier version of this
+> document claimed ABIs came from `@mezo-org/musd-contracts` and were "never
+> hand-transcribed". That package is not a dependency of this repo and never has been.
+> The ABIs are 660 lines of hand-written literals in `apps/web/src/lib/chain/abis.ts`,
+> listing only the members the app calls. They were transcribed from the Solidity
+> sources in `packages/contracts/src/` and verified against the live chain, and the
+> file's own header says so — but a transcription is exactly the failure mode R17 warns
+> about, and it is unverified by any test. Pulling the ABIs from the compiled artifacts
+> (`forge build` output, or the published package) is the correct fix and is not done.
 
 `@mezo-org/passport` is **not** required: it exists to let Bitcoin-native wallets
 (Unisat/Xverse/OKX) act as Mezo EVM accounts. We may add it later as an onboarding
@@ -179,18 +192,29 @@ apps/
   ios/        Expo — iOS app
   relayer/    Hono — gasless relayer
 packages/
-  contracts/  Foundry — Maren contracts
-  sdk/        @maren/sdk — chains, addresses, ABIs, hooks, math
-  ui/         shared design-system primitives
+  contracts/  Foundry — Maren contracts (NOT a pnpm workspace; no package.json)
+  sdk/        @maren/sdk — chains, addresses, position + borrow math, formatting
 docs/         Markdown sources -> branded PDFs (tools/pdf)
+tools/pdf/    The PDF builder
 ```
+
+There is no `packages/ui`. Both apps consume `docs/BRAND.md` directly — web as CSS
+custom properties in `globals.css`, iOS as a token object in `src/design/tokens.ts`.
+The two are kept in sync by hand and currently agree exactly. A shared package cannot
+express both a stylesheet and a React Native object without a build step, which is why
+it does not exist; the cost is that BRAND.md is the only thing keeping them honest.
 
 ---
 
 ## 7. Deployment order
 
-1. matsnet (31611): deploy all contracts, seed a pooled trove, run the full flow end to end.
-2. Third-party audit of `MarenVault` + `MarenForwarder` (the two that hold risk).
+1. ~~matsnet (31611): deploy all contracts~~ — **done, 15 August 2026.** Five contracts
+   deployed and source-verified; a handle registered, a pooled trove opened, collateral
+   deposited and topped up on-chain. Seeding the trove and running the _full_ flow is
+   not finished: a user borrow is blocked at 154% against the 180% floor, and no relayed
+   meta-transaction has been broadcast. Addresses, tx hashes, and the two findings that
+   came out of it are in [`DEPLOYMENTS.md`](DEPLOYMENTS.md).
+2. Third-party audit of `MarenVault` + `MarenRelayHub` (the two that hold risk).
 3. Mainnet (31612) with the vault capped, raised as the position proves out.
 
 Mezo Market listing requires MUSD integration, a third-party audit submitted to the
