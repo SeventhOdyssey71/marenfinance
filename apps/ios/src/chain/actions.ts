@@ -1,6 +1,7 @@
 import type { Hash, TransactionReceipt } from 'viem';
 
 import { mutate } from '../data/mock';
+import { isSponsoredKind as isSponsoredKindImpl } from './sponsorship';
 import { accessKey } from '../wallet/keystore';
 import { confirmTransaction, type TxOutcome } from './receipt';
 
@@ -37,24 +38,14 @@ export type ActionKind =
 /**
  * Whether the relayer sponsors this action.
  *
- * Everything routed through MarenForwarder is gasless. Direct-trove operations go
- * through Mezo's own BorrowerOperationsSignatures and are not Maren-sponsored, so we
- * say so rather than showing "$0 gas" on a screen where it is not true (R13: do not
- * claim a control you have not implemented — the same discipline applies to a claim
- * about who paid).
+ * The rule and its justification live in `./sponsorship`, which has no dependencies so
+ * that it can be tested without pulling in the Keychain. Re-exported here so call sites
+ * that already hold an `ActionKind` do not have to reach for the string themselves.
  */
+export { isSponsoredKind, type ActionType } from './sponsorship';
+
 export function isSponsored(action: ActionKind): boolean {
-  switch (action.type) {
-    case 'send':
-    case 'earn-deposit':
-    case 'earn-withdraw':
-      return true;
-    case 'deposit':
-    case 'withdraw':
-    case 'borrow':
-    case 'repay':
-      return false;
-  }
+  return isSponsoredKindImpl(action.type);
 }
 
 export async function submitAction(action: ActionKind): Promise<ActionResult> {

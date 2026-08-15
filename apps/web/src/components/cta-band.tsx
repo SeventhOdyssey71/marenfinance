@@ -17,8 +17,8 @@ export function CtaBand() {
               </h2>
 
               <p className="prose-measure text-text-muted mx-auto mt-7 text-base leading-relaxed md:text-[1.0625rem]">
-                Deposit from 0.001 BTC, draw MUSD, and spend it without ever holding gas. Maren is
-                pre-audit — start small.
+                Deposit from 0.001 BTC, draw MUSD, and spend it without keeping a gas balance. Maren
+                is pre-audit — start small.
               </p>
 
               <div className="mt-11 flex flex-col items-center justify-center gap-3 sm:flex-row">

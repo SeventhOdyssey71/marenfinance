@@ -5,7 +5,7 @@ import './globals.css';
 
 const title = 'Maren Finance — Spend Bitcoin. Never sell it.';
 const description =
-  'Bitcoin-backed liquidity with zero gas. Deposit from 0.001 BTC, draw MUSD, and spend it without ever holding gas. Built on Mezo.';
+  'Bitcoin-backed liquidity. Deposit from 0.001 BTC, draw MUSD, and spend it without holding a gas balance. Built on Mezo.';
 
 export const metadata: Metadata = {
   metadataBase: new URL('https://maren.finance'),

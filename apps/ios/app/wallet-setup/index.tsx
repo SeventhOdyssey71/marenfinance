@@ -57,7 +57,7 @@ export default function WalletSetup() {
           </Txt>
         </View>
 
-        <Txt variant="small" tone="subtle" style={styles.protectionBody}>
+        <Txt variant="small" tone="muted" style={styles.protectionBody}>
           {cap === null
             ? 'Reading the Secure Enclave capabilities.'
             : protectedByBiometrics

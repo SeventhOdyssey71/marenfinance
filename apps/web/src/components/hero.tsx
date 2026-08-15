@@ -49,7 +49,7 @@ export function Hero() {
             <p className="prose-measure text-text-muted mt-7 text-[1.0625rem] leading-relaxed md:mt-8 md:text-lg">
               Maren turns Bitcoin into spendable liquidity on Mezo. Deposit from{' '}
               <span className="num text-text">0.001 BTC</span>, draw MUSD against it, and pay anyone
-              — without holding a gas balance, and without selling a satoshi.
+              — without keeping a gas balance, and without selling a satoshi.
             </p>
 
             <div className="mt-10 flex flex-col gap-3 sm:flex-row sm:items-center md:mt-12">

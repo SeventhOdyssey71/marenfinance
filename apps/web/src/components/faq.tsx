@@ -65,11 +65,17 @@ const items: readonly Item[] = [
           own hot key.
         </p>
         <p>
+          One exception, and it is the first thing you will do: depositing BTC sends BTC, and a
+          transaction carrying value cannot be relayed by anyone. So your{' '}
+          <span className="text-text">first deposit costs gas</span>. Everything after it — borrow,
+          repay, withdraw, and every payment — is sponsored.
+        </p>
+        <p>
           The first <span className="num text-text">25</span> actions per address are free. After
-          that a small fee is taken in MUSD inside the same transaction, so you still never need a
-          BTC balance. New users are never blocked at the door. The relayer is allowlisted to Maren
-          contracts and known function selectors only, is rate limited per address and per IP, and
-          never holds user funds — compromising its key costs us gas, not your Bitcoin.
+          that a small fee is taken in MUSD inside the same transaction. New users are never blocked
+          at the door. The relayer is allowlisted to Maren contracts and known function selectors
+          only, is rate limited per address and per IP, and never holds user funds — compromising
+          its key costs us gas, not your Bitcoin.
         </p>
       </>
     ),

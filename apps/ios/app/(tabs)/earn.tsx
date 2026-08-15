@@ -1,8 +1,8 @@
 import { useState } from 'react';
 import { Pressable, StyleSheet, View } from 'react-native';
-import { formatMusd, formatUsd } from '@maren/sdk';
+import { formatMusd } from '@maren/sdk';
 
-import { Musd } from '../../src/components/Money';
+import { Amount, Musd } from '../../src/components/Money';
 import { Card } from '../../src/components/Card';
 import { Icon } from '../../src/components/Icon';
 import { PillButton } from '../../src/components/PillButton';
@@ -50,7 +50,7 @@ export default function Earn() {
           {earn ? (
             <Musd wei={earn.assetsWei} size="numericXl" />
           ) : (
-            <Num size="numericXl" tone="subtle">
+            <Num size="numericXl" tone="muted">
               —
             </Num>
           )}
@@ -79,11 +79,14 @@ export default function Earn() {
 
         <View style={styles.yieldValue}>
           {earn ? (
-            <Num size="numericXl" tone="musd">
-              {formatMusd(earn.trailing.realisedWei)}
-            </Num>
+            <Amount
+              value={formatMusd(earn.trailing.realisedWei)}
+              size="numericXl"
+              unitTone="musd"
+              align="left"
+            />
           ) : (
-            <Num size="numericXl" tone="subtle">
+            <Num size="numericXl" tone="muted">
               —
             </Num>
           )}
@@ -98,7 +101,7 @@ export default function Earn() {
             This is MUSD actually realised in the past, not a rate and not a forecast. Maren does
             not display an APY for Earn because there is no reliable one to display.
           </Txt>
-          <Txt variant="small" tone="subtle" style={styles.disclosureBody}>
+          <Txt variant="small" tone="muted" style={styles.disclosureBody}>
             The MUSD Stability Pool has no token emissions. Its entire yield is the Bitcoin seized
             in liquidations, sold and compounded back into MUSD. Whether that happens at all depends
             on whether anyone gets liquidated, so returns arrive in lumps and can be zero for
@@ -154,13 +157,11 @@ export default function Earn() {
       <Card style={styles.actionCard}>
         <Label>{mode === 'deposit' ? 'Move into Earn' : 'Move back to spendable'}</Label>
         <View style={styles.actionValue}>
-          <Num size="numericLg" tone="musd">
-            {formatMusd(preset)}
-          </Num>
+          <Amount value={formatMusd(preset)} size="numericLg" unitTone="musd" align="left" />
         </View>
 
         <View style={styles.availableRow}>
-          <Txt variant="small" tone="subtle">
+          <Txt variant="small" tone="muted">
             {mode === 'deposit' ? 'Spendable MUSD' : 'In Earn'}
           </Txt>
           <Num size="numericSm" tone="muted">
@@ -172,7 +173,7 @@ export default function Earn() {
 
         <View style={styles.gasRow}>
           <Icon name="shield" size={14} color={semantic.success} />
-          <Txt variant="small" tone="subtle" style={styles.gasText}>
+          <Txt variant="small" tone="muted" style={styles.gasText}>
             Gasless. Maren’s relayer pays the BTC gas for Earn deposits and withdrawals.
           </Txt>
         </View>

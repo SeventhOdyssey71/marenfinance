@@ -1,8 +1,8 @@
 import { useCallback, useRef, useState } from 'react';
 import {
-  PanResponder,
   StyleSheet,
   View,
+  type GestureResponderEvent,
   type LayoutChangeEvent,
   type ViewStyle,
 } from 'react-native';
@@ -58,61 +58,73 @@ export function Slider({
   const [width, setWidth] = useState(0);
   const reduceMotion = useReducedMotion();
 
-  // Refs so the PanResponder closure always reads current geometry without being
-  // recreated on every render (which would drop an in-flight gesture).
-  const widthRef = useRef(0);
-  const maxRef = useRef(max);
-  const onChangeRef = useRef(onChange);
-  const disabledRef = useRef(disabled);
-  const lastHapticStep = useRef(-1);
-
-  widthRef.current = width;
-  maxRef.current = max;
-  onChangeRef.current = onChange;
-  disabledRef.current = disabled;
-
-  const setFromX = useCallback((x: number) => {
-    const w = widthRef.current;
-    if (w <= 0 || maxRef.current <= 0n) return;
-    const clamped = Math.max(0, Math.min(w, x));
-    // Convert through a 1e6 integer fraction so the bigint conversion is exact at the
-    // endpoints — dragging fully right must land on `max`, not max minus a rounding.
-    const fraction = BigInt(Math.round((clamped / w) * 1_000_000));
-    const next = (maxRef.current * fraction) / 1_000_000n;
-
-    const step = Math.round((clamped / w) * 10);
-    if (step !== lastHapticStep.current) {
-      lastHapticStep.current = step;
-      Haptics.selectionAsync().catch(() => {});
-    }
-
-    onChangeRef.current(next);
-  }, []);
-
-  const responder = useRef(
-    PanResponder.create({
-      onStartShouldSetPanResponder: () => !disabledRef.current,
-      onMoveShouldSetPanResponder: () => !disabledRef.current,
-      onPanResponderGrant: (e) => setFromX(e.nativeEvent.locationX),
-      onPanResponderMove: (_e, gesture) => {
-        // moveX is window-relative; subtract the track's page offset.
-        setFromX(gesture.moveX - trackPageX.current);
-      },
-      onPanResponderRelease: () => {
-        lastHapticStep.current = -1;
-      },
-    }),
-  ).current;
-
   const trackPageX = useRef(0);
   const trackRef = useRef<View>(null);
+  const lastHapticStep = useRef(-1);
 
-  const onLayout = (e: LayoutChangeEvent) => {
+  /**
+   * Map an x offset within the track to a value, and emit it.
+   *
+   * `width` and `max` come straight from render scope rather than from mirror refs.
+   * The old shape kept `widthRef`/`maxRef`/`onChangeRef` in sync by assigning during
+   * render, which is the thing React's purity rules exist to stop; the only reason it
+   * existed was to keep a `PanResponder` instance stable across renders, and this
+   * component no longer creates one.
+   */
+  const setFromX = useCallback(
+    (x: number) => {
+      if (width <= 0 || max <= 0n) return;
+      const clamped = Math.max(0, Math.min(width, x));
+      // Convert through a 1e6 integer fraction so the bigint conversion is exact at the
+      // endpoints — dragging fully right must land on `max`, not max minus a rounding.
+      const fraction = BigInt(Math.round((clamped / width) * 1_000_000));
+      const next = (max * fraction) / 1_000_000n;
+
+      const step = Math.round((clamped / width) * 10);
+      if (step !== lastHapticStep.current) {
+        lastHapticStep.current = step;
+        Haptics.selectionAsync().catch(() => {});
+      }
+
+      onChange(next);
+    },
+    [width, max, onChange],
+  );
+
+  /**
+   * The gesture is handled with the View responder props rather than `PanResponder`.
+   *
+   * `PanResponder.create` has to run somewhere, and every place to put it in a function
+   * component is either during render or behind a ref read during render. These are
+   * plain event-handler props, which is where reading a ref is legitimate — and it
+   * removes an indirection rather than adding one.
+   *
+   * `pageX` with the measured track offset, not `locationX`: `locationX` is relative to
+   * whichever child the touch actually landed on, so dragging across the thumb would
+   * jump.
+   */
+  const shouldRespond = useCallback(() => !disabled, [disabled]);
+
+  const onGrant = useCallback(
+    (e: GestureResponderEvent) => setFromX(e.nativeEvent.pageX - trackPageX.current),
+    [setFromX],
+  );
+
+  const onMove = useCallback(
+    (e: GestureResponderEvent) => setFromX(e.nativeEvent.pageX - trackPageX.current),
+    [setFromX],
+  );
+
+  const onRelease = useCallback(() => {
+    lastHapticStep.current = -1;
+  }, []);
+
+  const onLayout = useCallback((e: LayoutChangeEvent) => {
     setWidth(e.nativeEvent.layout.width);
     trackRef.current?.measureInWindow((x) => {
       trackPageX.current = x;
     });
-  };
+  }, []);
 
   const pct = max > 0n ? Number((value * 1000n) / max) / 10 : 0;
   const markerPct =
@@ -129,7 +141,12 @@ export function Slider({
       <View
         ref={trackRef}
         onLayout={onLayout}
-        {...responder.panHandlers}
+        onStartShouldSetResponder={shouldRespond}
+        onMoveShouldSetResponder={shouldRespond}
+        onResponderGrant={onGrant}
+        onResponderMove={onMove}
+        onResponderRelease={onRelease}
+        onResponderTerminate={onRelease}
         // The whole 44pt band is grabbable, not just the 8pt visual track.
         style={styles.hitArea}
         accessible

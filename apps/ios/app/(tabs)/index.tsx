@@ -18,6 +18,7 @@ import { Screen } from '../../src/components/Screen';
 import { Label, Num, Txt } from '../../src/components/Text';
 import {
   base,
+  brand,
   healthHeroColor,
   healthLabel,
   healthTone,
@@ -107,7 +108,7 @@ export default function Home() {
               accessibilityLabel={`Collateral ratio ${formatCollateralRatio(health.collateralRatio)}. Status: ${healthLabel[health.status]}.`}
             >
               <Ratio cr={health.collateralRatio} size="numericXl" color={heroColour} />
-              <Txt variant="small" tone="subtle" style={styles.crCaption}>
+              <Txt variant="small" tone="muted" style={styles.crCaption}>
                 collateral ratio
               </Txt>
             </View>
@@ -183,7 +184,7 @@ export default function Home() {
               balances ? <Musd wei={balances.musdWei} size="numericMd" hidden={hidden} /> : <Dash />
             }
             sub={
-              <Txt variant="small" tone="subtle">
+              <Txt variant="small" tone="muted">
                 spendable
               </Txt>
             }
@@ -205,18 +206,24 @@ export default function Home() {
         <QuickAction icon="earn" label="Earn" onPress={() => router.push('/(tabs)/earn')} />
       </View>
 
-      {/* The gas story, stated once on the home screen. */}
+      {/*
+        The gas story, stated once on the home screen.
+
+        The heading used to read "You hold no Bitcoin for gas", and the body used to say
+        vault operations were unsponsored. Both were wrong, in opposite directions: every
+        vault operation except the deposit IS relayed, and the deposit is payable, so a
+        user does need BTC — once — to open the position. The claim is now the true one.
+      */}
       <Card tone="inset" style={styles.gasNote}>
         <View style={styles.gasHead}>
-          <Icon name="shield" size={16} color={toneColor.success} />
-          <Txt variant="small" style={{ color: toneColor.success }}>
-            You hold no Bitcoin for gas
-          </Txt>
+          <Icon name="shield" size={16} color={brand.violet400} />
+          <Txt variant="small">No gas after your first deposit</Txt>
         </View>
-        <Txt variant="small" tone="subtle" style={styles.gasBody}>
-          Mezo charges gas in BTC. Maren’s relayer pays it for every payment and Earn action, so
-          your BTC stays collateral. Vault operations go through Mezo’s own signed borrower contract
-          and are not sponsored — the Vault screen says so before you sign.
+        <Txt variant="small" tone="muted" style={styles.gasBody}>
+          Mezo charges gas in BTC. Depositing sends Bitcoin, so a relayer cannot carry it for you
+          and you pay gas on that one transaction. Everything after it — borrow, repay, withdraw,
+          every payment and every Earn move — is signed by you, submitted by Maren’s relayer, and
+          costs you nothing.
         </Txt>
       </Card>
     </Screen>
@@ -225,7 +232,7 @@ export default function Home() {
 
 function Dash() {
   return (
-    <Num size="numericLg" tone="subtle">
+    <Num size="numericLg" tone="muted">
       —
     </Num>
   );
@@ -252,7 +259,7 @@ function HeroStat({
       <Num size="numeric" style={styles.heroStatValue}>
         {value}
       </Num>
-      <Txt variant="small" tone="subtle" style={styles.heroStatCaption}>
+      <Txt variant="small" tone="muted" style={styles.heroStatCaption}>
         {caption}
       </Txt>
     </View>

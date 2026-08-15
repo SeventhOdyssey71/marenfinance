@@ -98,7 +98,7 @@ export default function ImportWallet() {
           <Num size="numericLg" style={styles.preview}>
             {shortAddress(preview, 8, 6)}
           </Num>
-          <Txt variant="small" tone="subtle" style={styles.previewFull} selectable>
+          <Txt variant="small" tone="muted" style={styles.previewFull} selectable>
             {preview}
           </Txt>
           <Txt variant="small" tone="muted" style={styles.check}>

@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { StyleSheet, View } from 'react-native';
 import { useRouter } from 'expo-router';
 import { shortAddress } from '@maren/sdk';
@@ -40,8 +40,10 @@ export default function CreateWallet() {
   const [error, setError] = useState<string | null>(null);
 
   const generate = useCallback(async () => {
-    setBusy(true);
-    setError(null);
+    // Yield before touching state so nothing here lands synchronously inside the mount
+    // effect below — a synchronous setState in an effect body is a cascading render, and
+    // `busy` already starts true so there is nothing to set on the way in anyway.
+    await Promise.resolve();
     try {
       const key: Hex = createPrivateKey();
       const derived = deriveAddress(key);
@@ -56,8 +58,20 @@ export default function CreateWallet() {
     }
   }, []);
 
+  /** Explicit retry: this one *is* a user event, so resetting state here is correct. */
+  const retry = useCallback(() => {
+    setBusy(true);
+    setError(null);
+    void generate();
+  }, [generate]);
+
+  // Generate exactly once. The ref guard matters because this writes to the Keychain and
+  // raises a Face ID prompt — running it twice would prompt the user twice.
+  const started = useRef(false);
   useEffect(() => {
-    generate();
+    if (started.current) return;
+    started.current = true;
+    void generate();
   }, [generate]);
 
   const finish = () => {
@@ -83,10 +97,10 @@ export default function CreateWallet() {
           <Txt variant="body" style={{ color: semantic.danger }}>
             Key generation failed
           </Txt>
-          <Txt variant="small" tone="subtle" style={styles.body}>
+          <Txt variant="small" tone="muted" style={styles.body}>
             {error}
           </Txt>
-          <PillButton label="Try again" onPress={generate} style={styles.retry} />
+          <PillButton label="Try again" onPress={retry} style={styles.retry} />
         </Card>
       ) : (
         <>
@@ -95,7 +109,7 @@ export default function CreateWallet() {
             <Num size="numericLg" style={styles.address}>
               {address ? shortAddress(address, 8, 6) : '—'}
             </Num>
-            <Txt variant="small" tone="subtle" style={styles.full} selectable>
+            <Txt variant="small" tone="muted" style={styles.full} selectable>
               {address}
             </Txt>
           </Card>
@@ -117,7 +131,7 @@ export default function CreateWallet() {
                   : 'Held in memory for this session only'}
               </Txt>
             </View>
-            <Txt variant="small" tone="subtle" style={styles.body}>
+            <Txt variant="small" tone="muted" style={styles.body}>
               {stored
                 ? 'The key is unreadable without a successful biometric check, which is required on every signature. It is marked this-device-only, so it is excluded from iCloud Keychain and from encrypted backups.'
                 : protection?.mode === 'session-only'
@@ -127,7 +141,7 @@ export default function CreateWallet() {
           </Card>
 
           <View style={styles.warning}>
-            <Txt variant="small" tone="subtle">
+            <Txt variant="small" tone="muted">
               Maren holds no copy of this key. If you lose the device without an export, the funds
               it controls are gone. Not recoverable by us — gone.
             </Txt>

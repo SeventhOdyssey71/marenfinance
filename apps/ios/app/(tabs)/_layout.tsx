@@ -74,7 +74,13 @@ function icon(name: IconName) {
   // React Navigation types `color` as ColorValue (which admits an opaque platform
   // colour). Everything we pass in is a plain hex string from the design tokens, so
   // narrowing here is safe and keeps Icon's own prop honest.
-  return ({ color }: { color: ColorValue }) => <Icon name={name} size={22} color={String(color)} />;
+  function TabBarIcon({ color }: { color: ColorValue }) {
+    return <Icon name={name} size={22} color={String(color)} />;
+  }
+  // Named rather than an arrow, so a tab shows as <TabBarIcon> in the inspector
+  // instead of <Unknown> — and so react/display-name is satisfied honestly.
+  TabBarIcon.displayName = `TabBarIcon(${name})`;
+  return TabBarIcon;
 }
 
 const styles = StyleSheet.create({
