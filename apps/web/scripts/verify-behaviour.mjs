@@ -10,6 +10,10 @@
  */
 const pw = await import(process.env.PLAYWRIGHT_CORE ?? 'playwright-core');
 const { chromium } = pw.chromium ? pw : pw.default;
+
+/** Override with BASE_URL when port 3000 is taken. */
+const BASE = process.env.BASE_URL ?? 'http://127.0.0.1:3000';
+
 const browser = await chromium.launch({
   executablePath: process.env.CHROME_EXECUTABLE,
   args: ['--use-gl=angle'],
@@ -28,7 +32,7 @@ const check = (name, pass, detail = '') => {
     reducedMotion: 'reduce',
   });
   const page = await ctx.newPage();
-  await page.goto('http://127.0.0.1:3000/', { waitUntil: 'networkidle' });
+  await page.goto(BASE + '/', { waitUntil: 'networkidle' });
   await page.evaluate(async () => {
     const step = window.innerHeight * 0.6;
     for (let y = 0; y <= document.body.scrollHeight; y += step) {
@@ -65,7 +69,7 @@ const check = (name, pass, detail = '') => {
   page.on('response', (r) => {
     if (r.status() >= 400) bad.push(`${r.status()} ${r.url()}`);
   });
-  await page.goto('http://127.0.0.1:3000/', { waitUntil: 'networkidle' });
+  await page.goto(BASE + '/', { waitUntil: 'networkidle' });
 
   const triggers = page.locator('#faq button[aria-expanded]');
   const n = await triggers.count();
@@ -119,7 +123,7 @@ const check = (name, pass, detail = '') => {
 {
   const ctx = await browser.newContext({ viewport: { width: 1440, height: 900 } });
   const page = await ctx.newPage();
-  await page.goto('http://127.0.0.1:3000/', { waitUntil: 'networkidle' });
+  await page.goto(BASE + '/', { waitUntil: 'networkidle' });
   const h1 = await page.locator('h1').count();
   check('exactly one h1', h1 === 1, `count=${h1}`);
   const landmarks = await page.evaluate(() => ({
@@ -153,7 +157,7 @@ const check = (name, pass, detail = '') => {
   });
 
   // --- Portfolio ---
-  await page.goto('http://127.0.0.1:3000/app', { waitUntil: 'networkidle' });
+  await page.goto(BASE + '/app', { waitUntil: 'networkidle' });
   await page.waitForTimeout(600);
 
   check('app: exactly one h1', (await page.locator('h1').count()) === 1);
@@ -201,7 +205,7 @@ const check = (name, pass, detail = '') => {
   );
 
   // --- Vault: the slider stops at the 180% floor ---
-  await page.goto('http://127.0.0.1:3000/app/vault', { waitUntil: 'networkidle' });
+  await page.goto(BASE + '/app/vault', { waitUntil: 'networkidle' });
   await page.waitForTimeout(600);
 
   const slider = page.locator('input[type=range]');
@@ -267,7 +271,7 @@ const check = (name, pass, detail = '') => {
   await page.waitForTimeout(600);
 
   // --- Pay: the resolved address is shown before confirmation ---
-  await page.goto('http://127.0.0.1:3000/app/pay', { waitUntil: 'networkidle' });
+  await page.goto(BASE + '/app/pay', { waitUntil: 'networkidle' });
   await page.waitForTimeout(700);
 
   const resolvedInline = await page.locator('#pay-to-status').innerText();
@@ -295,7 +299,7 @@ const check = (name, pass, detail = '') => {
   check('pay: Escape closes the dialog', (await page.locator('[role=dialog]').count()) === 0);
 
   // --- Earn: no forward APY, anywhere ---
-  await page.goto('http://127.0.0.1:3000/app/earn', { waitUntil: 'networkidle' });
+  await page.goto(BASE + '/app/earn', { waitUntil: 'networkidle' });
   await page.waitForTimeout(600);
   const earnText = await page.locator('main').innerText();
   check(
@@ -309,7 +313,7 @@ const check = (name, pass, detail = '') => {
   check('earn: says plainly why there is no APY', /does not display an APY/i.test(earnText));
 
   // --- Activity: status wording and explorer links ---
-  await page.goto('http://127.0.0.1:3000/app/activity', { waitUntil: 'networkidle' });
+  await page.goto(BASE + '/app/activity', { waitUntil: 'networkidle' });
   await page.waitForTimeout(600);
   const activityText = await page.locator('main').innerText();
   check('activity: a failed row says no funds moved', /Failed — no funds moved/.test(activityText));
@@ -327,7 +331,7 @@ const check = (name, pass, detail = '') => {
     reducedMotion: 'reduce',
   });
   const page = await ctx.newPage();
-  await page.goto('http://127.0.0.1:3000/app', { waitUntil: 'networkidle' });
+  await page.goto(BASE + '/app', { waitUntil: 'networkidle' });
   await page.waitForTimeout(900);
   const canvases = await page.evaluate(() => document.querySelectorAll('canvas').length);
   check('app reduced-motion: no shader canvas mounted', canvases === 0, `canvases=${canvases}`);
@@ -341,7 +345,7 @@ const check = (name, pass, detail = '') => {
   const ctx = await browser.newContext({ viewport: { width: 390, height: 844 } });
   const page = await ctx.newPage();
   for (const path of ['/app', '/app/vault', '/app/pay', '/app/earn', '/app/activity']) {
-    await page.goto(`http://127.0.0.1:3000${path}`, { waitUntil: 'networkidle' });
+    await page.goto(`${BASE}${path}`, { waitUntil: 'networkidle' });
     await page.waitForTimeout(400);
     const overflow = await page.evaluate(
       () => document.documentElement.scrollWidth - document.documentElement.clientWidth,
