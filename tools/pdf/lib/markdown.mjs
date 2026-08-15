@@ -105,41 +105,52 @@ function isHexCell(text) {
 /**
  * Build the renderer. `state` collects the TOC and the mermaid blocks as a side effect
  * of rendering, which keeps a single pass over the document.
+ *
+ * `outline` carries the two facts that can only be known by looking at the whole
+ * document before rendering any of it: which heading level its sections start at, and
+ * whether it numbers them itself. See `readOutline`.
  */
-function createMarked(state) {
+function createMarked(state, outline) {
   const marked = new Marked({ gfm: true, breaks: false });
   const usedSlugs = new Set();
   const counters = [0, 0, 0];
 
   const renderer = {
     heading(token) {
-      const depth = token.depth;
       const inline = this.parser.parseInline(token.tokens);
       const text = plain(token.text);
 
+      // A document that starts its sections at `#` and one that starts them at `##` are
+      // the same document as far as the reader is concerned, so both are rendered as
+      // h2/h3. Normalising here rather than in the sources means the six documents share
+      // one visual hierarchy without any of them having to be rewritten.
+      const level = Math.min(token.depth - outline.minDepth + 2, 4);
+
       // Sections and subsections are numbered and indexed; anything deeper is neither.
       let number = '';
-      if (depth === 2) {
-        counters[0] += 1;
-        counters[1] = 0;
-        number = `${counters[0]}`;
-      } else if (depth === 3) {
-        counters[1] += 1;
-        number = `${counters[0]}.${counters[1]}`;
+      if (outline.autoNumber) {
+        if (level === 2) {
+          counters[0] += 1;
+          counters[1] = 0;
+          number = `${counters[0]}`;
+        } else if (level === 3) {
+          counters[1] += 1;
+          number = `${counters[0]}.${counters[1]}`;
+        }
       }
 
       const slug = slugify(text, usedSlugs);
       const mark =
-        depth <= 3
+        level <= 3
           ? `<span class="pgmark">${escapeHtml(MARK_PREFIX + slug + MARK_SUFFIX)}</span>`
           : '';
 
-      if (depth === 2 || depth === 3) {
-        state.toc.push({ slug, depth, number, text });
+      if (level === 2 || level === 3) {
+        state.toc.push({ slug, depth: level, number, text });
       }
 
       const num = number ? `<span class="h-num">${number}</span>` : '';
-      return `<h${depth} id="${slug}">${num}${inline}${mark}</h${depth}>\n`;
+      return `<h${level} id="${slug}">${num}${inline}${mark}</h${level}>\n`;
     },
 
     code(token) {
@@ -278,11 +289,54 @@ function typographic(source) {
 }
 
 /**
+ * A heading that already carries its own identifier: "1. Onboarding", "M1 — Mainnet
+ * deployment", "R-1 — The pooled vault", "Phase 2".
+ */
+const SELF_NUMBERED_RE = /^(?:\d+[.)]\s|[A-Z]{1,2}-?\d+\b|Phase\s+\d)/;
+
+/**
+ * Look at every heading before rendering any of them.
+ *
+ * Two documents in this set start their sections at `#` and four start at `##`; both
+ * conventions are legitimate markdown and neither should be the one the pipeline
+ * happens to support. Rendering keyed off the raw depth silently dropped every `#`
+ * from the contents page and promoted the subsections in its place, so the contents
+ * of a document could list the wrong things entirely.
+ *
+ * The second fact is whether the document numbers its own sections. Some do, in the
+ * heading text, and cross-reference those numbers in their prose. Auto-numbering those
+ * as well produces "2 1. Onboarding" and renumbers sections out from under their own
+ * cross-references. A document therefore either numbers itself or is numbered by the
+ * pipeline, and this decides which.
+ */
+function readOutline(source) {
+  const tokens = new Marked({ gfm: true, breaks: false }).lexer(source);
+  const headings = [];
+  const walk = (list) => {
+    for (const token of list ?? []) {
+      if (token.type === 'heading') headings.push(token);
+      if (Array.isArray(token.tokens) && token.type !== 'heading') walk(token.tokens);
+    }
+  };
+  walk(tokens);
+
+  if (headings.length === 0) return { minDepth: 2, autoNumber: true };
+
+  const minDepth = Math.min(...headings.map((h) => h.depth));
+  const sections = headings.filter((h) => h.depth === minDepth);
+  const selfNumbered = sections.filter((h) => SELF_NUMBERED_RE.test(plain(h.text))).length;
+
+  // One stray "1. …" is not a convention; two or more is.
+  return { minDepth, autoNumber: selfNumbered < 2 };
+}
+
+/**
  * @returns {{ html: string, toc: Array, mermaid: string[] }}
  */
 export function renderMarkdown(source) {
   const state = { toc: [], mermaid: [] };
-  const marked = createMarked(state);
-  const html = marked.parse(typographic(source));
+  const prepared = typographic(source);
+  const marked = createMarked(state, readOutline(prepared));
+  const html = marked.parse(prepared);
   return { html, toc: state.toc, mermaid: state.mermaid };
 }

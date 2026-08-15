@@ -239,7 +239,41 @@ async function prepareForPrint(page) {
     const main = document.querySelector('main');
     if (!main) return;
 
-    for (const heading of Array.from(main.querySelectorAll('h1, h2, h3, h4'))) {
+    const PX_PER_MM = 96 / 25.4;
+
+    // One number governs this whole pass: the tallest thing allowed to be unbreakable.
+    //
+    // When an unbreakable block does not fit the space left on a page it moves to the
+    // next page entire, and the gap it leaves behind is exactly its own height. Capping
+    // every unbreakable unit at roughly a quarter of the 257mm text block therefore caps
+    // the worst hole the document can contain. Nothing here is allowed to buy a nicer
+    // page break at the cost of a bigger hole somewhere else.
+    const MAX_UNBREAKABLE_MM = 65;
+    const MIN_GROUP_MM = 30;
+
+    const mm = (el) => el.getBoundingClientRect().height / PX_PER_MM;
+
+    const release = (el) => {
+      el.style.breakInside = 'auto';
+      el.style.pageBreakInside = 'auto';
+    };
+
+    // Tables and code listings default to staying whole, so a short one cannot strand a
+    // single row behind a repeated header or leave one line of code on its own. A tall
+    // one is released, which usually just means it fills space it was previously too
+    // proud to occupy, and only sometimes means it splits — the table header repeats
+    // either way. This runs first so that heading binding sees final heights.
+    for (const block of Array.from(document.querySelectorAll('.table-wrap, .codeblock'))) {
+      if (mm(block) > MAX_UNBREAKABLE_MM) release(block);
+    }
+
+    // Headings are processed last-first. A section heading whose own first block is
+    // short needs to absorb the subsection that follows it, and that subsection has to
+    // have been bound to its own content already for it to move as one piece. Walking
+    // backwards is what makes the deeper group available to the shallower one.
+    const headings = Array.from(main.querySelectorAll('h1, h2, h3, h4')).reverse();
+
+    for (const heading of headings) {
       const next = heading.nextElementSibling;
       if (!next || next.classList.contains('pagebreak')) continue;
       const keep = document.createElement('div');
@@ -247,20 +281,27 @@ async function prepareForPrint(page) {
       heading.parentNode.insertBefore(keep, heading);
       keep.appendChild(heading);
       keep.appendChild(next);
-    }
 
-    // Tables default to staying whole so a short one cannot strand a single row behind
-    // a repeated header. A tall table given the same treatment just moves to the next
-    // page and leaves a hole where it used to be, so anything past half a page is
-    // released to break normally — its header repeats either way.
-    const KEEP_WHOLE_LIMIT_MM = 105;
-    const PX_PER_MM = 96 / 25.4;
-    for (const table of Array.from(document.querySelectorAll('.table-wrap'))) {
-      const heightMm = table.getBoundingClientRect().height / PX_PER_MM;
-      if (heightMm > KEEP_WHOLE_LIMIT_MM) {
-        table.style.breakInside = 'auto';
-        table.style.pageBreakInside = 'auto';
+      // Binding a heading to exactly one following block is not always enough: a heading
+      // followed by a single short line satisfies the rule and still lands at the foot of
+      // a page, stranded from the section it opens. The group keeps absorbing blocks
+      // until it is tall enough to read as the start of a section.
+      while (mm(keep) < MIN_GROUP_MM) {
+        const candidate = keep.nextElementSibling;
+        if (!candidate) break;
+        if (candidate.classList.contains('pagebreak')) break;
+        // A bare heading is never swallowed — that would bind two sections together.
+        // An already-bound group is, because it carries its own content with it.
+        if (/^H[1-4]$/.test(candidate.tagName)) break;
+        if (mm(keep) + mm(candidate) > MAX_UNBREAKABLE_MM) break;
+        keep.appendChild(candidate);
       }
+
+      // A heading whose first block is a full-page table is bound to it unconditionally
+      // above, so the group can exceed the cap no matter how carefully it was grown.
+      // Releasing it lets the block split beneath its heading instead of dragging the
+      // heading onto the next page and leaving a quarter-page hole behind.
+      if (mm(keep) > MAX_UNBREAKABLE_MM) release(keep);
     }
   });
 }
