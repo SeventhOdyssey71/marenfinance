@@ -1,14 +1,7 @@
 import { getAddress, isAddress, type Address, type Hash } from 'viem';
 import { admitCall } from './calldata.js';
 import type { RelayerConfig } from './config.js';
-import {
-  bad,
-  conflict,
-  forbidden,
-  isRelayError,
-  unavailable,
-  type RelayError,
-} from './errors.js';
+import { bad, conflict, forbidden, isRelayError, unavailable, type RelayError } from './errors.js';
 import {
   parseForwardRequest,
   verifyForwardRequest,
@@ -342,6 +335,14 @@ export class RelayerService {
 
     // Everything from here holds a reservation, so every failure path must give
     // it back or we leak budget on each error.
+    //
+    // The reservation is held across BOTH the balance read and the simulation
+    // and the broadcast, with no reclaim timer. Every exit path below refunds,
+    // so this does not leak — but it does mean a slow RPC pins budget for the
+    // duration. The bound is viem's transport timeout (15s, x2 retries) inside
+    // whatever the host allows, so the residual is availability, not solvency:
+    // worst case some budget is briefly unavailable to other callers. A reclaim
+    // sweep would tighten it if hold times ever became material.
     let pending: PendingTx;
     try {
       // Refuse to start work we cannot finish. An empty hot key mid-queue is
@@ -563,11 +564,7 @@ export class RelayerService {
       }
       // Committed spend tracks the same correction, or the halt would be latched
       // off a number that never converges on what we actually paid.
-      const committed = await this.#deps.store.incrBy(
-        keys.committedDay(day),
-        delta,
-        DAY_SECONDS,
-      );
+      const committed = await this.#deps.store.incrBy(keys.committedDay(day), delta, DAY_SECONDS);
       if (committed < 0n) {
         await this.#deps.store.incrBy(keys.committedDay(day), -committed, DAY_SECONDS);
       }
@@ -724,12 +721,39 @@ export class RelayerService {
     ]);
   }
 
+  /**
+   * Apply one refund and CLAMP THE COUNTER AT ZERO.
+   *
+   * `decrBy` is a bare DECRBY with no idempotency key, so a command that lands
+   * but whose response is lost gets applied again by the retry below. Without a
+   * clamp that drives counters negative, and negative counters are free money:
+   * one refunded request was measured taking `spend:<day>` to -1.56e12 and
+   * `lifetime` to -3, after which `/quota` advertised 28 free actions against a
+   * configured 25 and the reserved budget had headroom ABOVE the operator's
+   * daily cap. Wrong direction for money, and one lost TCP response away.
+   *
+   * A counter that only ever accumulates today's activity has a true floor of
+   * zero, so clamping is sound as a bound. It is a BOUND, not exactness: with
+   * other reservations in flight an over-applied refund can still credit part of
+   * their reservation before the floor is reached. The exact fix is a per
+   * (reservation, counter) idempotency key, which needs a `SET NX` primitive on
+   * the store interface; recorded in the README rather than half-built here.
+   */
+  async #applyRefundOnce(key: string, amount: bigint): Promise<void> {
+    const { store } = this.#deps;
+    const updated = await store.decrBy(key, amount);
+    if (updated < 0n) {
+      // Put back exactly the overshoot. Same shape as reconcile()'s clamp.
+      await store.incrBy(key, -updated, NO_TTL);
+    }
+  }
+
   /** One counter's refund, with retries, then the queue. */
   async #refund(key: string, amount: bigint): Promise<void> {
-    const { store, logger } = this.#deps;
+    const { logger } = this.#deps;
     for (let attempt = 0; attempt < REFUND_ATTEMPTS; attempt += 1) {
       try {
-        await store.decrBy(key, amount);
+        await this.#applyRefundOnce(key, amount);
         return;
       } catch {
         if (attempt < REFUND_ATTEMPTS - 1) {
@@ -757,7 +781,8 @@ export class RelayerService {
     let recovered = 0;
     for (const entry of queued) {
       try {
-        await this.#deps.store.decrBy(entry.key, entry.amount);
+        // Clamped, for the same reason as #refund: this path retries too.
+        await this.#applyRefundOnce(entry.key, entry.amount);
         recovered += 1;
       } catch {
         this.#pendingRefunds.push(entry);

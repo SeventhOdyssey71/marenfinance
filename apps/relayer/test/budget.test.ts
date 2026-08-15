@@ -144,6 +144,72 @@ describe('gas reservation reconciliation', () => {
     expect(await store.get(keys.spendDay('2026-08-15'))).toBe(42n);
   });
 
+  /**
+   * The headline mechanism of the committed-spend fix, and it had no coverage:
+   * replacing this delta with `0n` left all 210 tests green. `committed:<day>`
+   * is what latches the day-long halt, so if it never converges on what we
+   * actually paid the halt fires at the wrong time in one direction or the
+   * other. Tested here independent of whether it is currently correct.
+   */
+  it('corrects committed spend downward when a transaction cost less than reserved', async () => {
+    const store = new MemoryStore();
+    const relayer = await buildTestRelayer(makeEnv(), new FakeChain(), store);
+    await store.incrBy(keys.spendDay('2026-08-15'), 1_000_000n, 0);
+    await store.incrBy(keys.committedDay('2026-08-15'), 1_000_000n, 0);
+
+    await relayer.service.reconcile(pending({ reservedWei: 1_000_000n }), {
+      hash: pending().hash,
+      state: 'confirmed',
+      success: true,
+      blockNumber: 1n,
+      gasUsed: 100n,
+      effectiveGasPrice: 3_000n,
+      gasCostWei: 300_000n,
+      from: null,
+    });
+
+    // Both counters converge on the real cost. If committed did not move, the
+    // halt would latch off a number 3x the truth.
+    expect(await store.get(keys.spendDay('2026-08-15'))).toBe(300_000n);
+    expect(await store.get(keys.committedDay('2026-08-15'))).toBe(300_000n);
+  });
+
+  it('corrects committed spend upward when a transaction cost more than reserved', async () => {
+    const store = new MemoryStore();
+    const relayer = await buildTestRelayer(makeEnv(), new FakeChain(), store);
+    await store.incrBy(keys.spendDay('2026-08-15'), 1_000_000n, 0);
+    await store.incrBy(keys.committedDay('2026-08-15'), 1_000_000n, 0);
+
+    await relayer.service.reconcile(pending({ reservedWei: 1_000_000n }), {
+      hash: pending().hash,
+      state: 'confirmed',
+      success: true,
+      blockNumber: 1n,
+      gasUsed: 100n,
+      effectiveGasPrice: 3_000n,
+      gasCostWei: 1_500_000n,
+      from: null,
+    });
+    expect(await store.get(keys.committedDay('2026-08-15'))).toBe(1_500_000n);
+  });
+
+  it('clamps committed spend at zero, never negative', async () => {
+    const store = new MemoryStore();
+    const relayer = await buildTestRelayer(makeEnv(), new FakeChain(), store);
+    // No committed spend recorded, but a large downward correction arrives.
+    await relayer.service.reconcile(pending({ reservedWei: 5_000_000n }), {
+      hash: pending().hash,
+      state: 'confirmed',
+      success: true,
+      blockNumber: 1n,
+      gasUsed: 1n,
+      effectiveGasPrice: 1n,
+      gasCostWei: 1_000n,
+      from: null,
+    });
+    expect(await store.get(keys.committedDay('2026-08-15'))).toBe(0n);
+  });
+
   it('is wired to the watcher, so a settled transaction actually reconciles', async () => {
     const store = new MemoryStore();
     const relayer = await buildTestRelayer(makeEnv(), new FakeChain(), store);
@@ -253,7 +319,14 @@ describe('multi-instance storage requirements', () => {
     expect(problems.join('\n')).toMatch(/RELAYER_IP_SALT is unset/);
   });
 
-  it('accepts redis + a fixed salt under VERCEL', async () => {
+  /**
+   * The serverless target is not supported and refuses rather than running
+   * degraded: `reconcile()` and `retryPendingRefunds()` are reachable only from
+   * the sweep, which needs a process that outlives a request. Without them a
+   * reservation permanently holds ~25x the real cost and a rejected refund is
+   * lost on instance recycle while `/health` reports clean.
+   */
+  it('refuses under VERCEL even with redis and a fixed salt', async () => {
     const relayer = await createRelayer({
       env: makeEnv({
         VERCEL: '1',
@@ -266,7 +339,28 @@ describe('multi-instance storage requirements', () => {
       logger: SILENT_LOGGER,
       skipPreflight: true,
     });
+    expect(relayer.problems.join('\n')).toMatch(/serverless \(Vercel\) target is not supported/);
+    expect(relayer.service.accepting).toBe(false);
+
+    const response = await relayer.app.fetch(
+      new Request('http://relayer.test/relay', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify(await signedRequest()),
+      }),
+    );
+    expect(response.status).toBe(503);
+  });
+
+  it('accepts a correctly configured standalone deployment', async () => {
+    const relayer = await createRelayer({
+      env: makeEnv(),
+      chain: new FakeChain(),
+      logger: SILENT_LOGGER,
+      skipPreflight: true,
+    });
     expect(relayer.problems).toEqual([]);
+    expect(relayer.service.accepting).toBe(true);
   });
 
   it('treats redis without credentials as a problem, not a silent memory fallback', () => {
@@ -321,7 +415,10 @@ describe('contract-signer gas ceiling (H4)', () => {
     const chain = new FakeChain();
     chain.contractAccounts.add(USER.address.toLowerCase());
     const relayer = await buildTestRelayer(
-      makeEnv({ RELAYER_MAX_GAS_PER_REQUEST: '1500000', RELAYER_MAX_GAS_CONTRACT_SIGNER: '300000' }),
+      makeEnv({
+        RELAYER_MAX_GAS_PER_REQUEST: '1500000',
+        RELAYER_MAX_GAS_CONTRACT_SIGNER: '300000',
+      }),
       chain,
     );
 
@@ -335,7 +432,10 @@ describe('contract-signer gas ceiling (H4)', () => {
 
   it('lets an EOA use the full per-request cap', async () => {
     const relayer = await buildTestRelayer(
-      makeEnv({ RELAYER_MAX_GAS_PER_REQUEST: '1500000', RELAYER_MAX_GAS_CONTRACT_SIGNER: '300000' }),
+      makeEnv({
+        RELAYER_MAX_GAS_PER_REQUEST: '1500000',
+        RELAYER_MAX_GAS_CONTRACT_SIGNER: '300000',
+      }),
     );
     const response = await relayer.post('/relay', await signedRequest({ gas: 900_000n }));
     expect(response.status).toBe(202);

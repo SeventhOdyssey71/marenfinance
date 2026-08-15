@@ -56,7 +56,11 @@ describe('RedisStore', () => {
   });
 
   it('reads a missing key as zero', async () => {
-    const store = new RedisStore('https://redis.test', 'token', upstash(() => [{ result: null }]));
+    const store = new RedisStore(
+      'https://redis.test',
+      'token',
+      upstash(() => [{ result: null }]),
+    );
     expect(await store.get('nope')).toBe(0n);
   });
 

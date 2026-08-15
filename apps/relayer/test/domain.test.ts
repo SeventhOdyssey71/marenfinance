@@ -119,9 +119,7 @@ describe('a signature is bound to the pinned domain', () => {
     const account = privateKeyToAccount(
       '0x59c6995e998f97a5a0044966f0945389dc9e86dae88c7a8412f4603b6b78690d',
     );
-    const verifyingContract: Address = getAddress(
-      '0x1111111111111111111111111111111111111111',
-    );
+    const verifyingContract: Address = getAddress('0x1111111111111111111111111111111111111111');
     const message = {
       from: account.address,
       to: getAddress('0x2222222222222222222222222222222222222222'),

@@ -1,12 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { privateKeyToAccount } from 'viem/accounts';
-import {
-  ipInCidr,
-  parseCidr,
-  parseIp,
-  resolveClientIp,
-  type Cidr,
-} from '../src/clientip.js';
+import { ipInCidr, parseCidr, parseIp, resolveClientIp, type Cidr } from '../src/clientip.js';
 import { loadConfig } from '../src/config.js';
 import { buildTestRelayer, FakeChain, makeEnv, signedRequest, type ErrorBody } from './helpers.js';
 

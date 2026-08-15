@@ -19,9 +19,7 @@ import { makeEnv, RELAYER_KEY } from './helpers.js';
 const HASH = '0xdead000000000000000000000000000000000000000000000000000000000001' as Hash;
 
 function adapter() {
-  const { config, problems } = loadConfig(
-    makeEnv({ RELAYER_RPC_URLS: 'http://stub-node.test' }),
-  );
+  const { config, problems } = loadConfig(makeEnv({ RELAYER_RPC_URLS: 'http://stub-node.test' }));
   expect(problems).toEqual([]);
   return createViemAdapter({
     config,

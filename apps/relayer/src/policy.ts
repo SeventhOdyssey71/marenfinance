@@ -236,7 +236,15 @@ export function evaluatePolicy(policy: SponsorshipPolicy, input: PolicyInput): P
   };
 }
 
-/** Free actions left for an address, for `GET /quota/:address`. */
+/**
+ * Free actions left for an address, for `GET /quota/:address`.
+ *
+ * Clamped at BOTH ends. The upper clamp is not defensive decoration: a counter
+ * driven negative by an over-applied refund made this advertise 28 free actions
+ * against a configured 25. A quota endpoint must never promise more than the
+ * policy allows, whatever the counter says.
+ */
 export function freeActionsRemaining(policy: SponsorshipPolicy, lifetimeActions: number): number {
-  return Math.max(0, policy.freeActionsPerAddress - lifetimeActions);
+  const remaining = policy.freeActionsPerAddress - Math.max(0, lifetimeActions);
+  return Math.min(policy.freeActionsPerAddress, Math.max(0, remaining));
 }

@@ -57,6 +57,29 @@ export async function createRelayer(options: CreateRelayerOptions): Promise<Rela
 
   const isMultiInstance = options.env['VERCEL'] !== undefined;
 
+  // The serverless target is NOT supported, and refuses rather than running
+  // degraded. Two mechanisms this service depends on are wired only through the
+  // stuck-transaction sweep, which needs a process that outlives a request:
+  //
+  //   - `reconcile()` never runs, so a reservation permanently holds the
+  //     signer-chosen `request.gas * maxFeePerGas` instead of converging on what
+  //     the transaction actually cost. Measured at ~25x real cost, so an
+  //     operator's stated daily cap would deliver roughly 1/25 of the sponsored
+  //     transactions they configured — silently.
+  //   - `#pendingRefunds` is an in-process array, so an instance recycle erases
+  //     it. The leak persists in the shared store while `/health` comes back
+  //     reporting `accepting: true, problems: []` — a day-long outage with zero
+  //     spend and no operator signal.
+  //
+  // Running degraded here would be exactly the "documented in the README but
+  // broken in the code" shape R13 forbids. Lift this once reconciliation and
+  // refund draining have a home that does not depend on the sweep.
+  if (isMultiInstance) {
+    problems.push(
+      'the serverless (Vercel) target is not supported: settlement reconciliation and deferred refund draining run only in the standalone server, so reserved budget would never converge on real spend and queued refunds would be lost on instance recycle — run `pnpm --filter @maren/relayer start`',
+    );
+  }
+
   if (config.ipSaltIsEphemeral && isMultiInstance) {
     problems.push(
       'RELAYER_IP_SALT is unset on a multi-instance deployment, so per-IP limits would be counted per instance',

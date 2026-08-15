@@ -100,7 +100,10 @@ const addressString = z
   .regex(/^0x[0-9a-fA-F]{40}$/, 'must be a 20-byte address')
   .transform((value) => getAddress(value));
 const uintString = z
-  .union([z.string().regex(/^[0-9]+$/, 'must be a base-10 integer string'), z.number().int().nonnegative()])
+  .union([
+    z.string().regex(/^[0-9]+$/, 'must be a base-10 integer string'),
+    z.number().int().nonnegative(),
+  ])
   .transform((value) => BigInt(value));
 
 /**

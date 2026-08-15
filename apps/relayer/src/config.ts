@@ -217,9 +217,7 @@ function buildTargets(
   const allowedIdsRaw = env['RELAYER_ALLOWED_FUNCTIONS'];
   const narrowing = allowedIdsRaw === undefined ? null : new Set(splitList(allowedIdsRaw));
   if (narrowing !== null) {
-    const known = new Set(
-      pairs.flatMap(({ name }) => functionsFor(name).map((f) => f.id)),
-    );
+    const known = new Set(pairs.flatMap(({ name }) => functionsFor(name).map((f) => f.id)));
     for (const id of narrowing) {
       if (!known.has(id)) {
         problems.push(
@@ -318,7 +316,12 @@ function buildKeySource(env: Env, problems: string[]): KeySource | null {
   const keystorePath = env['RELAYER_KEYSTORE_PATH']?.trim();
   const keystorePassword = env['RELAYER_KEYSTORE_PASSWORD'];
 
-  if (privateKey !== undefined && privateKey !== '' && keystorePath !== undefined && keystorePath !== '') {
+  if (
+    privateKey !== undefined &&
+    privateKey !== '' &&
+    keystorePath !== undefined &&
+    keystorePath !== ''
+  ) {
     problems.push(
       'RELAYER_PRIVATE_KEY and RELAYER_KEYSTORE_PATH are both set; set exactly one so there is no ambiguity about which key signs',
     );
@@ -408,9 +411,15 @@ export function loadConfig(env: Env): LoadedConfig {
       { min: 0 },
     ),
     maxGasPerRequest: BigInt(
-      readInt(env, 'RELAYER_MAX_GAS_PER_REQUEST', Number(POLICY_DEFAULTS.maxGasPerRequest), problems, {
-        min: 0,
-      }),
+      readInt(
+        env,
+        'RELAYER_MAX_GAS_PER_REQUEST',
+        Number(POLICY_DEFAULTS.maxGasPerRequest),
+        problems,
+        {
+          min: 0,
+        },
+      ),
     ),
     // Never above the general cap: a looser contract-signer ceiling would defeat
     // the point of having one.
@@ -468,9 +477,7 @@ export function loadConfig(env: Env): LoadedConfig {
   for (const entry of splitList(env['RELAYER_TRUSTED_PROXIES'])) {
     const cidr = parseCidr(entry);
     if (cidr === null) {
-      problems.push(
-        `RELAYER_TRUSTED_PROXIES entry ${JSON.stringify(entry)} is not an IP or CIDR`,
-      );
+      problems.push(`RELAYER_TRUSTED_PROXIES entry ${JSON.stringify(entry)} is not an IP or CIDR`);
       continue;
     }
     trustedProxies.push(cidr);

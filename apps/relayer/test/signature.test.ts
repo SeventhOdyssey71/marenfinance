@@ -47,7 +47,12 @@ describe('signature verification', () => {
       () =>
         encodeFunctionData({
           abi: [PAY.abi],
-          args: [getAddress('0x5555555555555555555555555555555555555555'), parseEther('10'), 'lunch', parseEther('99')],
+          args: [
+            getAddress('0x5555555555555555555555555555555555555555'),
+            parseEther('10'),
+            'lunch',
+            parseEther('99'),
+          ],
         }),
     ],
   ])('rejects a request whose signed calldata was tampered with (%s)', async (_label, build) => {
@@ -110,7 +115,10 @@ describe('signature verification', () => {
     );
     const mine = await signedRequest();
     const theirs = await signedRequest({ account: other });
-    const response = await relayer.post('/relay', tamper(mine, { signature: theirs['signature']! }));
+    const response = await relayer.post(
+      '/relay',
+      tamper(mine, { signature: theirs['signature']! }),
+    );
 
     expect(response.status).toBe(401);
     expect(((await response.json()) as ErrorBody).error).toBe('SIGNER_MISMATCH');

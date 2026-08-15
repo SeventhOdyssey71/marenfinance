@@ -25,7 +25,12 @@ const PAY = RELAYABLE_FUNCTIONS.marenPay.find((f) => f.abi.name === 'pay')!;
 function payWithFee(relayFee: bigint) {
   return encodeFunctionData({
     abi: [PAY.abi],
-    args: [getAddress('0x5555555555555555555555555555555555555555'), parseEther('10'), 'lunch', relayFee],
+    args: [
+      getAddress('0x5555555555555555555555555555555555555555'),
+      parseEther('10'),
+      'lunch',
+      relayFee,
+    ],
   });
 }
 
@@ -97,7 +102,11 @@ describe('sponsorship policy', () => {
 
   it('closes the paid tier entirely when no fee is configured', async () => {
     const store = new MemoryStore();
-    const relayer = await buildTestRelayer(makeEnv({ RELAYER_FEE_MUSD: '' }), new FakeChain(), store);
+    const relayer = await buildTestRelayer(
+      makeEnv({ RELAYER_FEE_MUSD: '' }),
+      new FakeChain(),
+      store,
+    );
     await seed(store, keys.lifetime(USER.address), 25n);
 
     const response = await relayer.post(

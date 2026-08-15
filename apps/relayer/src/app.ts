@@ -80,19 +80,13 @@ export function buildApp(deps: AppDeps): Hono<{ Variables: Vars }> {
   app.onError((err, c) => {
     const requestId = c.get('requestId');
     if (isRelayError(err)) {
-      logger.warn(
-        { event: 'error', requestId, code: err.code, status: err.status },
-        err.message,
-      );
+      logger.warn({ event: 'error', requestId, code: err.code, status: err.status }, err.message);
       return c.json({ ...err.toJSON(), requestId }, err.status as 400);
     }
     // Unexpected failures never leak an internal message to the client — a stack
     // trace from a signing path is exactly the thing not to hand out.
     logger.error({ event: 'error.unhandled', requestId, err }, 'unhandled error');
-    return c.json(
-      { error: 'UPSTREAM_ERROR', detail: 'internal error', meta: {}, requestId },
-      500,
-    );
+    return c.json({ error: 'UPSTREAM_ERROR', detail: 'internal error', meta: {}, requestId }, 500);
   });
 
   // --- POST /relay ---------------------------------------------------------
@@ -147,9 +141,7 @@ export function buildApp(deps: AppDeps): Hono<{ Variables: Vars }> {
     return c.json(jsonSafe(health) as Record<string, unknown>, health.accepting ? 200 : 503);
   });
 
-  app.notFound((c) =>
-    c.json({ error: 'NOT_FOUND', detail: 'no such endpoint', meta: {} }, 404),
-  );
+  app.notFound((c) => c.json({ error: 'NOT_FOUND', detail: 'no such endpoint', meta: {} }, 404));
 
   return app;
 }
