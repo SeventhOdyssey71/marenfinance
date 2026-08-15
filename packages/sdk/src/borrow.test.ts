@@ -14,7 +14,7 @@ import {
 /** BTC at $63,071.83, the live price read from Mezo's oracle on 2026-08-15. */
 const PRICE = 63_071_830_000_000_000_000_000n;
 
-const DAY = 24n * 60n * 60n;
+const DAY = 24 * 60 * 60;
 
 /**
  * A direct trove that has been open long enough to accrue interest. The accrual is the
@@ -23,7 +23,7 @@ const DAY = 24n * 60n * 60n;
  */
 function directPosition(): BorrowPosition {
   const principalWei = 12_000n * WAD;
-  const interestWei = accruedInterest(principalWei, 100, 214n * DAY);
+  const interestWei = accruedInterest(principalWei, 100, 214 * DAY);
   // Composed exactly as the apps compose it: principal + origination fee + accrued
   // interest + the 200 MUSD gas compensation.
   const originationFeeWei = (principalWei * BORROWING_RATE) / WAD;
@@ -37,7 +37,7 @@ function directPosition(): BorrowPosition {
 }
 
 /** The accrued interest carried by `directPosition()` — the term every bug here drops. */
-const ACCRUED_INTEREST = accruedInterest(12_000n * WAD, 100, 214n * DAY);
+const ACCRUED_INTEREST = accruedInterest(12_000n * WAD, 100, 214 * DAY);
 
 describe('borrowCeiling', () => {
   it('never quotes a draw that lands below Maren’s 180% floor', () => {
