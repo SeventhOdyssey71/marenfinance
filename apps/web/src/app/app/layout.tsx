@@ -2,7 +2,7 @@ import type { Metadata } from 'next';
 import type { ReactNode } from 'react';
 
 import { AppNav } from '@/components/app/app-nav';
-import { ChainStatus } from '@/components/app/chain-status';
+import { ChainStatus, VaultProvenance } from '@/components/app/chain-status';
 import { NetworkGuard } from '@/components/app/wallet';
 import { AppProviders } from './providers';
 
@@ -25,13 +25,8 @@ export const metadata: Metadata = {
 export default function AppLayout({ children }: { children: ReactNode }) {
   return (
     <AppProviders>
-      <a
-        href="#app-content"
-        className="sr-only rounded-[var(--radius-pill)] bg-white px-5 py-3 text-sm font-medium text-[#08080A] focus:not-sr-only focus:absolute focus:left-4 focus:top-4 focus:z-50"
-      >
-        Skip to content
-      </a>
-
+      {/* Removed on the owner's direct instruction — see the note in `app/page.tsx`.
+          `#app-content` is still on <main> below, so restoring the link is one element. */}
       <AppNav />
 
       <main id="app-content" className="container-maren pb-24 pt-8">
@@ -51,14 +46,17 @@ export default function AppLayout({ children }: { children: ReactNode }) {
             Pre-audit — MarenVault and MarenPay hold user funds and have not been audited. Pooled
             collateral is segregated in accounting, not custody.
           </p>
-          <a
-            href="https://github.com/SeventhOdyssey71/marenfinance/tree/main/docs"
-            target="_blank"
-            rel="noreferrer noopener"
-            className="text-text-muted hover:text-text transition-colors duration-[120ms] ease-out"
-          >
-            Docs
-          </a>
+          <div className="flex flex-wrap items-center gap-5">
+            <VaultProvenance />
+            <a
+              href="https://github.com/SeventhOdyssey71/marenfinance/tree/main/docs"
+              target="_blank"
+              rel="noreferrer noopener"
+              className="text-text-muted hover:text-text transition-colors duration-[120ms] ease-out"
+            >
+              Docs
+            </a>
+          </div>
         </div>
       </footer>
     </AppProviders>
