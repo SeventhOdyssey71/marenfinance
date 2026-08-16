@@ -16,11 +16,11 @@ export function Surfaces() {
         <div className="mt-14 grid grid-cols-1 gap-4 md:mt-16 md:grid-cols-6 md:gap-5">
           {/* Vault — the differentiator, so it gets the wide tile */}
           <Reveal className="md:col-span-4">
+            {/* The violet blur that used to sit behind this tile is gone. It made the
+                differentiator card read a shade lighter than the three beside it, which
+                is the filled-panel look this pass exists to remove — at a larger scale
+                than the fill itself. */}
             <article className="card relative h-full overflow-hidden p-6 md:p-8">
-              <span
-                aria-hidden
-                className="pointer-events-none absolute -left-20 -top-28 size-72 rounded-full bg-violet-500/10 blur-3xl"
-              />
               <div className="relative flex h-full flex-col">
                 <div className="flex items-center gap-3.5">
                   <span className="grid size-10 shrink-0 place-items-center rounded-[var(--radius-pill)] border border-[var(--border-hairline)] text-violet-400">
@@ -59,8 +59,8 @@ export function Surfaces() {
                 <h3 className="t-h3">Pay</h3>
               </div>
               <p className="text-text-muted mt-6 text-[0.9375rem] leading-relaxed">
-                Send MUSD to an @handle, a link, a request or a split. Gasless, with an on-chain
-                memo.
+                Send MUSD to an @handle, a link, a request or a split, with a memo written
+                on-chain.
               </p>
               <ul className="mt-auto space-y-2.5 pt-8">
                 {[
@@ -92,12 +92,12 @@ export function Surfaces() {
                 <h3 className="t-h3">Earn</h3>
               </div>
               <p className="text-text-muted mt-6 text-[0.9375rem] leading-relaxed">
-                Idle MUSD into the MUSD Stability Pool through an ERC-4626 vault. BTC liquidation
-                gains are swept and compounded back into MUSD.
+                Put idle MUSD into the Stability Pool. You are paid in the Bitcoin seized when
+                somebody else is liquidated.
               </p>
               <p className="text-text-subtle mt-auto pt-10 text-xs leading-relaxed">
-                The Stability Pool has no token emissions. Yield is liquidation gains only — lumpy,
-                and shown as trailing realised return, never as a fixed APY.
+                So the return is lumpy and can be zero for months. Maren shows what was actually
+                realised and never quotes an APY.
               </p>
             </article>
           </Reveal>
@@ -111,12 +111,12 @@ export function Surfaces() {
                 <h3 className="t-h3">Portfolio</h3>
               </div>
               <p className="text-text-muted mt-6 text-[0.9375rem] leading-relaxed">
-                Position health, borrowing capacity, history and alerts. If the price feed is stale,
-                Maren says so and stops — it never renders a stale price as though it were live.
+                Your ratio, your borrowing capacity, and how far Bitcoin can fall before you are
+                liquidated. History read from the contracts, not from us.
               </p>
               <p className="text-text-subtle mt-auto pt-10 text-xs leading-relaxed">
-                Mezo&rsquo;s price feed reverts above 60 seconds of staleness. Both apps have an
-                explicit unavailable state.
+                When the price feed goes stale, Maren stops and says so. It never shows a stale
+                price as though it were live.
               </p>
             </article>
           </Reveal>
