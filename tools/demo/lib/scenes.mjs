@@ -276,10 +276,20 @@ async function sceneVault(ctx) {
 
   // Every reason the app might give for not letting someone borrow, in the order we would
   // rather film them. The first one present is the shot.
+  //
+  // These strings are not paraphrases. `describeRevert()` in lib/chain/errors.ts builds the
+  // disabled control's explanation from the very arguments the contract would have reverted
+  // with, so the sentence filmed here is character-for-character the sentence a user would
+  // have read after paying gas for the revert. Matching on the app's own words is therefore
+  // also an assertion that the app is still saying them.
   const reasons = [
-    page.getByText(/under the 180% floor/i).first(),
-    page.getByText(/Capped by Maren.s 180% floor/i).first(),
-    page.getByText(/New borrowing reverts/i).first(),
+    // The one that fires today: the pooled trove is under MIN_TROVE_CR.
+    page.getByText(/The shared trove is too thin to lend against/i).first(),
+    page.getByText(/the pool itself is fully drawn right now/i).first(),
+    // Your position, rather than the pool's — a different fix, so a different sentence.
+    page.getByText(/Not enough collateral behind this loan/i).first(),
+    // The wallet has no collateral at all. True screen, thinner demo.
+    page.getByText(/Nothing to borrow against/i).first(),
     page.getByText(/Deposit first/i).first(),
   ];
 
@@ -390,7 +400,7 @@ async function sceneEarn(ctx) {
   await settle(page, { log });
   await sleep(BEATS.read);
 
-  const trailing = page.getByText(/trailing|realised|realized|has paid/i).first();
+  const trailing = page.getByText(/Realised over the last|trailing|realised|realized/i).first();
   if ((await trailing.count()) > 0) {
     await centre(page, trailing, { duration: 1_100, bias: 0.4 });
     await pointer.moveToElement(trailing, { duration: 900, settle: 0 }).catch(() => {});
@@ -398,7 +408,11 @@ async function sceneEarn(ctx) {
     log(`  trailing yield: ${seen.trailing}`);
   }
 
-  const noForward = page.getByText(/forward|making it up|do not project|projected/i).first();
+  // The sentence that does the work on this screen: Maren says what the vault HAS paid and
+  // refuses to name a rate it might pay. The absence of an APY is the feature.
+  const noForward = page
+    .getByText(/not a forecast|does not display an APY|no reliable one|forward|projected/i)
+    .first();
   if ((await noForward.count()) > 0) {
     await centre(page, noForward, { duration: 1_000, bias: 0.42 });
     seen.noForward = await reveal(page, noForward, { hold: BEATS.dwell, log });
@@ -443,7 +457,7 @@ async function sceneActivity(ctx) {
   // The closing shot: the link out to the explorer, where every figure in this video can be
   // checked by hand.
   const explorer = page
-    .getByRole('link', { name: /explorer|blockscout|view on/i })
+    .getByRole('link', { name: /open on|explorer|blockscout|view on/i })
     .first();
   if ((await explorer.count()) > 0) {
     await centre(page, explorer, { duration: 1_100, bias: 0.45 }).catch(() => {});
