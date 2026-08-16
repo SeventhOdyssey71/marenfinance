@@ -1,64 +1,55 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { useQuery } from '@tanstack/react-query';
-import { useAccount, usePublicClient } from 'wagmi';
-import { getMarenAddresses, isDeployed, resolveNetwork, type MezoNetwork } from '@maren/sdk';
+import { useQuery, type UseQueryResult } from '@tanstack/react-query';
+import { useAccount, useChainId, usePublicClient } from 'wagmi';
+import { getChain, getMarenAddresses, isDeployed, resolveNetwork, type MezoNetwork } from '@maren/sdk';
 import type { Address } from 'viem';
 
+import { readActivity, type ActivityWindow } from '../chain/logs';
 import { classifyPrice, type PriceFeed } from '../chain/price';
-import { useDemoState } from './demo';
 import * as live from './live';
-import * as mock from './mock';
-import type {
-  ActivityItem,
-  Balances,
-  EarnPosition,
-  Handle,
-  PaymentLink,
-  PaymentRequest,
-  Position,
-  Sponsorship,
-} from './types';
+import type { Balances, EarnPosition, Handle, Position, ProtocolStats } from './types';
 
 /**
- * THE MOCK / LIVE SPLIT. This module is the only place that decision is made.
+ * THE ONLY DATA SOURCE. There is no second one.
  *
- * The switch is `isDeployed(marenVault)` for the configured network, and it has already
- * fired: matsnet addresses were written into `packages/sdk/src/addresses.ts` on
- * 15 August 2026, and `resolveNetwork()` defaults to testnet. **The default mode is now
- * `live`.** Mainnet is still all zeroes and still falls through to `./mock.ts`, where
- * every screen says so, loudly, in the header.
+ * This module used to hold a mock/live switch, and `./mock.ts` beside it held a cast of
+ * invented people — `@nadia`, `@okonkwo`, `@mira` — with invented amounts and invented
+ * transaction hashes that the Activity screen rendered as working explorer links under a
+ * header reading "Live from Mezo testnet". A reviewer who clicked one would have found
+ * nothing on chain and been right to disbelieve every other number in the product.
  *
- * What makes this honest rather than a demo dressed as a product:
+ * That file is deleted. So is the switch, so is the demo-control store, and so is the
+ * fallback that let a disconnected visitor see a populated dashboard. What replaced them:
  *
- *   1. The live implementations in `./live.ts` are real — real ABIs transcribed from the
- *      Solidity, real addresses from the SDK, real wagmi/viem reads. They are not
- *      stubs waiting to be written. They are also, as of this writing, not yet exercised
- *      end to end against the live deployment.
- *   2. The switch needed no other edit, which was the design goal — and is also the
- *      hazard: writing an address into a data file changed this app's runtime behaviour
- *      with nothing in the diff to say so. Deploying is a behavioural change; see
- *      CONTRIBUTING.md.
- *   3. Nothing downstream branches on the mode except the banner that discloses it, so
- *      there is no second, mock-shaped code path to unwind later.
+ *   1. EVERY hook below reads the chain, or reports that it cannot. There is no third
+ *      outcome and no seeded data to fall back to.
+ *   2. A disconnected visitor gets EMPTY STATES plus `useProtocolStats()` — the pooled
+ *      trove and the BTC/USD oracle, which are real, public, and readable without a
+ *      wallet. The app still has something true to show; it just is not pretending the
+ *      something belongs to the visitor.
+ *   3. Nothing is synthesised. Not a hash, not an address, not a handle, not an amount,
+ *      not a timestamp — not behind a flag, not for a screenshot.
  *
- * Documented in `apps/web/README.md` under "Mock vs live data".
+ * `isDeployed()` survives because mainnet genuinely is all zeroes. It no longer selects a
+ * mock; it selects an honest unavailable state.
  */
-
-export type DataMode = 'live' | 'mock';
 
 export const NETWORK: MezoNetwork = resolveNetwork(process.env.NEXT_PUBLIC_MEZO_NETWORK);
 
+const targetChain = getChain(NETWORK);
+
 export interface DataSource {
-  mode: DataMode;
   network: MezoNetwork;
-  /** Plain-language reason the app is in this mode. Shown to the user, not logged. */
-  reason: string;
-  /** The address whose position is on screen. The demo account when mocked. */
-  account: Address;
-  /** True when a real wallet is connected, regardless of data mode. */
+  /** The address whose position is on screen, or null when no wallet is connected. */
+  account: Address | null;
+  /** A wallet is connected. Says nothing about which chain it is on. */
   connected: boolean;
+  /** Connected AND on the chain Maren is deployed to. */
+  ready: boolean;
+  /** Maren's contracts exist on the configured network. False on mainnet. */
+  deployed: boolean;
 }
 
 /** True once Maren's contracts exist at the addresses in the SDK. */
@@ -66,85 +57,62 @@ export function contractsDeployed(network: MezoNetwork = NETWORK): boolean {
   return isDeployed(getMarenAddresses(network).marenVault);
 }
 
-/**
- * The gate. One expression, one place.
- *
- * Deployment is necessary but not sufficient: reading a position needs an address to
- * read it FOR. Before the deploy this only asked whether the contracts existed, and the
- * account fell back to a hardcoded demo address — so once matsnet went live the app
- * happily read the chain for a wallet that owns nothing and rendered every screen as a
- * column of dashes. That is the first thing a visitor sees, and it made a working
- * product look broken.
- *
- * So: live when the contracts are deployed AND a wallet is connected. Otherwise the app
- * previews itself with demo data and says so, which is the honest version of the same
- * screen and the only one worth showing someone who has not connected yet.
- */
-export function dataMode(network: MezoNetwork = NETWORK, connected = false): DataMode {
-  return contractsDeployed(network) && connected ? 'live' : 'mock';
-}
-
 export function useDataSource(): DataSource {
   const { address, isConnected } = useAccount();
+  const chainId = useChainId();
   const connected = isConnected && Boolean(address);
-  const mode = dataMode(NETWORK, connected);
+  const deployed = contractsDeployed(NETWORK);
 
   return {
-    mode,
     network: NETWORK,
-    /**
-     * Names the network, always.
-     *
-     * "Maren's contracts are not deployed yet" was true of every network when it was
-     * written and is now false of the one this app actually points at. An unqualified
-     * claim about deployment is exactly the sentence that goes stale the moment someone
-     * deploys, so this one is scoped: matsnet is live, mainnet is genuinely all zeroes,
-     * and the user is told which of those they are looking at.
-     */
-    reason: !contractsDeployed()
-      ? `Maren is not deployed on Mezo ${NETWORK} — those addresses are still zero — so every figure here is demo data.`
-      : mode === 'mock'
-        ? `Maren is live on Mezo ${NETWORK}. Connect a wallet to read your own position; until then every figure here is demo data.`
-        : `Live from Mezo ${NETWORK}.`,
-    account: mode === 'live' && address ? address : mock.MOCK_ADDRESS,
+    account: connected && address ? address : null,
     connected,
+    ready: connected && deployed && chainId === targetChain.id,
+    deployed,
   };
 }
 
 /**
- * Query keys carry the mode, the network, the account and the demo version, so switching
- * demo account or forcing a stale oracle refetches everything at once. A screen half in
- * one state and half in another is worse than either state.
+ * Query keys carry the network and the account, so disconnecting or switching wallets
+ * cannot leave one screen showing the previous account's figures.
  */
-function key(parts: readonly unknown[], source: DataSource, version: number) {
-  return ['maren', source.mode, source.network, source.account, version, ...parts];
+function key(parts: readonly unknown[], source: DataSource) {
+  return ['maren', source.network, source.account ?? 'anonymous', ...parts];
 }
 
-/** Everything a screen needs to know about where its numbers came from. */
-function useSource() {
+/** The context a live read needs. Null whenever a read would be meaningless. */
+function useLiveContext() {
   const source = useDataSource();
-  const { version } = useDemoState();
   const client = usePublicClient();
   const ctx =
-    source.mode === 'live' && client
+    source.ready && client && source.account
       ? { client, network: source.network, account: source.account }
       : null;
-  return { source, version, ctx };
+  return { source, client, ctx };
 }
 
 /**
  * The BTC/USD feed, classified against the wall clock every second.
  *
- * `classifyPrice` runs on every render rather than only on fetch, because a price that
- * was live when it arrived becomes stale 61 seconds later whether or not we refetch, and
- * a screen that keeps calling it live is exactly the failure the state exists to prevent.
+ * Needs no wallet: the oracle is a chain precompile and its answer is the same for
+ * everyone, so this is one of the few things a disconnected visitor can be shown that is
+ * both real and theirs to check.
+ *
+ * `classifyPrice` runs on every render rather than only on fetch, because a price that was
+ * live when it arrived becomes stale 61 seconds later whether or not we refetch, and a
+ * screen that keeps calling it live is exactly the failure the state exists to prevent.
  */
 export function usePrice(): PriceFeed {
-  const { source, version, ctx } = useSource();
+  const source = useDataSource();
+  const client = usePublicClient();
 
   const query = useQuery({
-    queryKey: key(['price'], source, version),
-    queryFn: async () => (ctx ? live.readPrice(ctx) : mock.readPrice()),
+    queryKey: key(['price'], source),
+    queryFn: async () => {
+      if (!client) throw new Error('No RPC transport for Mezo is available.');
+      return live.readPrice({ client, network: source.network, account: ZERO });
+    },
+    enabled: Boolean(client) && source.deployed,
     // Well inside the oracle's own 60s tolerance, so a healthy feed never drifts into
     // looking stale purely because we stopped asking.
     refetchInterval: 15_000,
@@ -152,102 +120,149 @@ export function usePrice(): PriceFeed {
     retry: 1,
   });
 
-  // The clock is a value, not a side effect of rendering: it lives in state and is
-  // advanced by an interval. That keeps this hook's output a function of its inputs, and
-  // it is what makes a price go stale on screen without waiting for the next fetch.
   const nowSeconds = useNowSeconds();
 
-  if (query.isPending || nowSeconds === null) return { state: 'loading' };
-  if (query.error) {
-    return {
-      state: 'unavailable',
-      reason: 'Mezo’s oracle did not answer.',
-    };
+  if (!source.deployed) {
+    return { state: 'unavailable', reason: `Maren is not deployed on Mezo ${source.network}.` };
   }
+  if (query.isPending || nowSeconds === null) return { state: 'loading' };
+  if (query.error) return { state: 'unavailable', reason: 'Mezo’s oracle did not answer.' };
   return classifyPrice(query.data ?? null, nowSeconds);
 }
 
-export function usePosition() {
-  const { source, version, ctx } = useSource();
+const ZERO = '0x0000000000000000000000000000000000000000' as Address;
+
+export function usePosition(): UseQueryResult<Position> {
+  const { source, ctx } = useLiveContext();
   return useQuery<Position>({
-    queryKey: key(['position'], source, version),
-    queryFn: async () => (ctx ? live.readPosition(ctx) : mock.readPosition()),
+    queryKey: key(['position'], source),
+    queryFn: async () => {
+      if (!ctx) throw new Error('No connected account to read a position for.');
+      return live.readPosition(ctx);
+    },
+    enabled: ctx !== null,
   });
 }
 
-export function useBalances() {
-  const { source, version, ctx } = useSource();
+export function useBalances(): UseQueryResult<Balances> {
+  const { source, ctx } = useLiveContext();
   return useQuery<Balances>({
-    queryKey: key(['balances'], source, version),
-    queryFn: async () => (ctx ? live.readBalances(ctx) : mock.readBalances()),
+    queryKey: key(['balances'], source),
+    queryFn: async () => {
+      if (!ctx) throw new Error('No connected account to read balances for.');
+      return live.readBalances(ctx);
+    },
+    enabled: ctx !== null,
   });
 }
 
-export function useEarn() {
-  const { source, version, ctx } = useSource();
+export function useEarn(): UseQueryResult<EarnPosition> {
+  const { source, ctx } = useLiveContext();
   return useQuery<EarnPosition>({
-    queryKey: key(['earn'], source, version),
-    queryFn: async () => (ctx ? live.readEarn(ctx) : mock.readEarn()),
+    queryKey: key(['earn'], source),
+    queryFn: async () => {
+      if (!ctx) throw new Error('No connected account to read Earn for.');
+      return live.readEarn(ctx);
+    },
+    enabled: ctx !== null,
   });
 }
 
-export function useActivity() {
-  const { source, version } = useSource();
-  return useQuery<ActivityItem[]>({
-    queryKey: key(['activity'], source, version),
-    // The live path needs the Goldsky index (ARCHITECTURE.md §4); until it exists there
-    // is no honest live answer, so activity is mock in both modes and labelled as such.
-    queryFn: () => mock.readActivity(),
+/**
+ * Activity, from `eth_getLogs`.
+ *
+ * Returns the whole `ActivityWindow`, not just the rows, because the SPAN is part of the
+ * answer. "Nothing here" means something different when the scan reached the deployment
+ * block than when it only reached three days back, and the screen renders a different
+ * empty state for each. Flattening this to `ActivityItem[]` would throw away the
+ * distinction and let the UI overclaim.
+ */
+export function useActivity(): UseQueryResult<ActivityWindow> {
+  const { source, ctx } = useLiveContext();
+  return useQuery<ActivityWindow>({
+    queryKey: key(['activity'], source),
+    queryFn: async () => {
+      if (!ctx) throw new Error('No connected account to read activity for.');
+      return readActivity(ctx.client, ctx.network, ctx.account);
+    },
+    enabled: ctx !== null,
+    // A log scan is many round trips. Nothing on this screen changes second to second,
+    // and re-running it on every window focus would be rude to a public RPC.
+    staleTime: 30_000,
+    refetchOnWindowFocus: false,
   });
 }
 
-export function useRequests() {
-  const { source, version } = useSource();
-  return useQuery<PaymentRequest[]>({
-    queryKey: key(['requests'], source, version),
-    queryFn: () => mock.readRequests(),
-  });
-}
-
-export function useLinks() {
-  const { source, version } = useSource();
-  return useQuery<PaymentLink[]>({
-    queryKey: key(['links'], source, version),
-    queryFn: () => mock.readLinks(),
-  });
-}
-
-export function useSponsorship() {
-  const { source, version } = useSource();
-  return useQuery<Sponsorship>({
-    queryKey: key(['sponsorship'], source, version),
-    queryFn: () => mock.readSponsorship(),
+/**
+ * The protocol's own figures — the pooled trove and the oracle.
+ *
+ * Deliberately independent of the connected account, because this is what an app with a
+ * real product behind it can honestly show someone who has not connected yet. Every field
+ * is a contract read anyone can repeat.
+ */
+export function useProtocolStats(): UseQueryResult<ProtocolStats> {
+  const source = useDataSource();
+  const client = usePublicClient();
+  return useQuery<ProtocolStats>({
+    queryKey: ['maren', source.network, 'protocol'],
+    queryFn: async () => {
+      if (!client) throw new Error('No RPC transport for Mezo is available.');
+      return live.readProtocolStats({ client, network: source.network, account: ZERO });
+    },
+    enabled: Boolean(client) && source.deployed,
+    refetchInterval: 30_000,
   });
 }
 
 /** The account's own `@handle`, from MarenRegistry's reverse resolution. */
-export function usePrimaryHandle() {
-  const { source, version, ctx } = useSource();
+export function usePrimaryHandle(): UseQueryResult<string | null> {
+  const { source, ctx } = useLiveContext();
   return useQuery<string | null>({
-    queryKey: key(['primary-handle'], source, version),
-    queryFn: async () =>
-      ctx ? live.reverseResolve(ctx, source.account) : mock.reverseResolve(source.account),
+    queryKey: key(['primary-handle'], source),
+    queryFn: async () => {
+      if (!ctx) return null;
+      return live.reverseResolve(ctx, ctx.account);
+    },
+    enabled: ctx !== null,
   });
 }
 
 /**
  * Handle resolution. The resolved address is displayed beside the handle before any
  * confirmation — a user always sees where money is actually going.
+ *
+ * Resolution needs an RPC but not a signer, so this works while disconnected: someone can
+ * check a handle before they commit to anything, which is the point of having handles.
  */
-export function useResolvedHandle(query: string) {
-  const { source, version, ctx } = useSource();
+export function useResolvedHandle(query: string): UseQueryResult<Handle | null> {
+  const source = useDataSource();
+  const client = usePublicClient();
   const trimmed = query.trim();
   const isHandle = trimmed.startsWith('@') && trimmed.length > 1;
 
   return useQuery<Handle | null>({
-    queryKey: key(['handle', trimmed], source, version),
-    queryFn: async () => (ctx ? live.resolveHandle(ctx, trimmed) : mock.resolveHandle(trimmed)),
-    enabled: isHandle,
+    queryKey: key(['handle', trimmed], source),
+    queryFn: async () => {
+      if (!client) throw new Error('No RPC transport for Mezo is available.');
+      return live.resolveHandle({ client, network: source.network, account: ZERO }, trimmed);
+    },
+    enabled: isHandle && Boolean(client) && source.deployed,
+  });
+}
+
+/** Is a handle free to register? `null` while unknown — never guessed. */
+export function useHandleAvailable(handle: string): UseQueryResult<boolean> {
+  const source = useDataSource();
+  const client = usePublicClient();
+  const cleaned = handle.trim().replace(/^@/, '').toLowerCase();
+
+  return useQuery<boolean>({
+    queryKey: key(['handle-available', cleaned], source),
+    queryFn: async () => {
+      if (!client) throw new Error('No RPC transport for Mezo is available.');
+      return live.handleAvailable({ client, network: source.network, account: ZERO }, cleaned);
+    },
+    enabled: cleaned.length >= 3 && Boolean(client) && source.deployed,
   });
 }
 

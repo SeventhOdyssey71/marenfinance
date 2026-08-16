@@ -96,6 +96,14 @@ export interface MarenWrites {
   approveMusd: (spender: Address, amountWei: bigint) => Promise<Hash>;
   payAddress: (to: Address, amountWei: bigint, memo: string) => Promise<Hash>;
   payHandle: (handle: string, amountWei: bigint, memo: string) => Promise<Hash>;
+  /** `payer` is the zero address when anyone may fulfil the request. */
+  createRequest: (payer: Address, amountWei: bigint, memo: string) => Promise<Hash>;
+  createLink: (
+    linkKey: Address,
+    amountWei: bigint,
+    expiryUnix: bigint,
+    memo: string,
+  ) => Promise<Hash>;
   earnDeposit: (assetsWei: bigint) => Promise<Hash>;
   earnWithdraw: (assetsWei: bigint) => Promise<Hash>;
   commitHandle: (commitment: Hex) => Promise<Hash>;
@@ -236,6 +244,30 @@ export function useMarenWrites(): MarenWrites {
           abi: marenPayAbi,
           functionName: 'payToHandle',
           args: [handle.replace(/^@/, ''), amountWei, memo],
+        } as const;
+        await publicClient.simulateContract({ ...params, account });
+        return writeContractAsync({ ...params, chainId: targetChain.id });
+      },
+
+      async createRequest(payer, amountWei, memo) {
+        const { account, publicClient } = requireSigner();
+        const params = {
+          address: maren.marenPay,
+          abi: marenPayAbi,
+          functionName: 'createRequest',
+          args: [payer, amountWei, memo],
+        } as const;
+        await publicClient.simulateContract({ ...params, account });
+        return writeContractAsync({ ...params, chainId: targetChain.id });
+      },
+
+      async createLink(linkKey, amountWei, expiryUnix, memo) {
+        const { account, publicClient } = requireSigner();
+        const params = {
+          address: maren.marenPay,
+          abi: marenPayAbi,
+          functionName: 'createLink',
+          args: [linkKey, amountWei, expiryUnix, memo],
         } as const;
         await publicClient.simulateContract({ ...params, account });
         return writeContractAsync({ ...params, chainId: targetChain.id });

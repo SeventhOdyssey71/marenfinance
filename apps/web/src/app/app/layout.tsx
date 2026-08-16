@@ -2,7 +2,7 @@ import type { Metadata } from 'next';
 import type { ReactNode } from 'react';
 
 import { AppNav } from '@/components/app/app-nav';
-import { DataModeBanner } from '@/components/app/data-mode';
+import { ChainStatus } from '@/components/app/chain-status';
 import { NetworkGuard } from '@/components/app/wallet';
 import { AppProviders } from './providers';
 
@@ -37,7 +37,7 @@ export default function AppLayout({ children }: { children: ReactNode }) {
       <main id="app-content" className="container-maren pb-24 pt-8">
         <div className="flex flex-col gap-6">
           <NetworkGuard />
-          <DataModeBanner />
+          <ChainStatus />
         </div>
         <div className="mt-8">{children}</div>
       </main>

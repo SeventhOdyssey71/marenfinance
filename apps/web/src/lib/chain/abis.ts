@@ -114,6 +114,15 @@ export const marenVaultAbi = [
     outputs: [{ type: 'uint256' }],
   },
   {
+    // Every user's collateral added together. Read for the protocol panel a disconnected
+    // visitor sees, which is real chain state rather than a seeded preview.
+    type: 'function',
+    name: 'totalCollateral',
+    stateMutability: 'view',
+    inputs: [],
+    outputs: [{ type: 'uint256' }],
+  },
+  {
     type: 'function',
     name: 'troveStatus',
     stateMutability: 'view',
@@ -429,6 +438,31 @@ export const marenRegistryAbi = [
       { name: 'secret', type: 'bytes32' },
     ],
     outputs: [{ type: 'bytes32' }],
+  },
+  {
+    // commitment => the block timestamp it was made at. Zero means "not committed".
+    // Read rather than trusted from the browser: this is the clock the contract's own
+    // 60-second check compares against, so a countdown derived from anything else can
+    // tell the user to reveal a second before the chain will accept it.
+    type: 'function',
+    name: 'commitments',
+    stateMutability: 'view',
+    inputs: [{ name: 'commitment', type: 'bytes32' }],
+    outputs: [{ name: 'committedAt', type: 'uint256' }],
+  },
+  {
+    type: 'function',
+    name: 'MIN_COMMITMENT_AGE',
+    stateMutability: 'view',
+    inputs: [],
+    outputs: [{ type: 'uint256' }],
+  },
+  {
+    type: 'function',
+    name: 'MAX_COMMITMENT_AGE',
+    stateMutability: 'view',
+    inputs: [],
+    outputs: [{ type: 'uint256' }],
   },
   {
     type: 'function',
