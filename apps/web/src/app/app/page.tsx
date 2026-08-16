@@ -321,8 +321,8 @@ function GasCard() {
       </p>
       <p className="text-text-muted mt-2 max-w-[68ch] text-sm leading-relaxed">
         <strong className="text-text font-medium">Your first deposit costs gas</strong> — and always
-        will, even once the relayer runs: it carries Bitcoin with the call, and the relay hub refuses
-        any request with value.
+        will, even once the relayer runs: it carries Bitcoin with the call, and the relay hub
+        refuses any request with value.
       </p>
       <Info summary="What sponsorship would change">
         The contracts already trust <span className="num">MarenRelayHub</span> under ERC-2771, so

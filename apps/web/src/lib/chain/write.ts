@@ -55,7 +55,10 @@ const musd = getMusdAddresses(NETWORK);
 export const RELAYER_AVAILABLE = false;
 
 /** Honest gas copy for an action that WOULD be sponsored if a relayer were running. */
-export function gasNote(sponsorable: boolean, detail: string): { sponsored: boolean; note: string } {
+export function gasNote(
+  sponsorable: boolean,
+  detail: string,
+): { sponsored: boolean; note: string } {
   if (sponsorable && !RELAYER_AVAILABLE) {
     return {
       sponsored: false,
@@ -124,7 +127,10 @@ export function useMarenWrites(): MarenWrites {
    * because a submit function that quietly resolves to nothing would be reported by the
    * transaction sheet as a success with a missing hash.
    */
-  const requireSigner = useCallback((): { account: Address; publicClient: NonNullable<typeof client> } => {
+  const requireSigner = useCallback((): {
+    account: Address;
+    publicClient: NonNullable<typeof client>;
+  } => {
     if (!isConnected || !address) throw new NotConnectedError();
     if (!onRightChain) throw new WrongNetworkError(chainId);
     if (!client) throw new Error('No RPC transport for Mezo is available right now.');

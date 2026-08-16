@@ -3,7 +3,13 @@
 import { useEffect, useState } from 'react';
 import { useQuery, type UseQueryResult } from '@tanstack/react-query';
 import { useAccount, useChainId, usePublicClient } from 'wagmi';
-import { getChain, getMarenAddresses, isDeployed, resolveNetwork, type MezoNetwork } from '@maren/sdk';
+import {
+  getChain,
+  getMarenAddresses,
+  isDeployed,
+  resolveNetwork,
+  type MezoNetwork,
+} from '@maren/sdk';
 import type { Address } from 'viem';
 
 import { readActivity, type ActivityWindow } from '../chain/logs';

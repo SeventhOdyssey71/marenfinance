@@ -249,7 +249,9 @@ export function HandleRegistration({ runner }: { runner: TxRunner }) {
           {validation ? (
             <span className="text-danger">{validation}</span>
           ) : handle.length < 3 ? (
-            <span className="text-text-subtle">3 to 32 lowercase letters, digits, underscores.</span>
+            <span className="text-text-subtle">
+              3 to 32 lowercase letters, digits, underscores.
+            </span>
           ) : checkingAvailable ? (
             <span className="text-text-subtle">Checking the registry…</span>
           ) : taken ? (

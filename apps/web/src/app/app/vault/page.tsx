@@ -103,10 +103,7 @@ export default function VaultPage() {
           </p>
         </div>
 
-        <ConnectPrompt
-          icon={<VaultIcon className="size-6" />}
-          title="Connect to open a position"
-        >
+        <ConnectPrompt icon={<VaultIcon className="size-6" />} title="Connect to open a position">
           Deposit Bitcoin as collateral and draw MUSD against it at {formatApr(INTEREST_RATE_BPS)},
           fixed. The minimum deposit is {formatBtc(MIN_DEPOSIT)}.
         </ConnectPrompt>

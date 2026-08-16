@@ -289,7 +289,9 @@ export function TxSheet({ runner }: { runner: TxRunner }) {
           </div>
         ) : null}
 
-        {phase.name === 'settled' ? <Settled outcome={phase.outcome} reason={phase.reason} /> : null}
+        {phase.name === 'settled' ? (
+          <Settled outcome={phase.outcome} reason={phase.reason} />
+        ) : null}
 
         {phase.name === 'error' ? (
           <div className="mt-5" role="alert">

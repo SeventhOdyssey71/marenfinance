@@ -62,16 +62,10 @@ export function newSecret(): Hex {
 
 export function saveCommitment(pending: PendingCommitment): void {
   if (typeof window === 'undefined') return;
-  window.localStorage.setItem(
-    storageKey(pending.network, pending.handle),
-    JSON.stringify(pending),
-  );
+  window.localStorage.setItem(storageKey(pending.network, pending.handle), JSON.stringify(pending));
 }
 
-export function loadCommitment(
-  network: MezoNetwork,
-  handle: string,
-): PendingCommitment | null {
+export function loadCommitment(network: MezoNetwork, handle: string): PendingCommitment | null {
   if (typeof window === 'undefined') return null;
   const raw = window.localStorage.getItem(storageKey(network, handle));
   if (!raw) return null;
