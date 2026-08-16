@@ -58,15 +58,16 @@ and the vault's MUSD reserve. Those are public, real, and repeatable by anyone w
 It is a quieter first screen than the demo portfolio it replaces, and it is the only one
 that survives being checked.
 
-| File                      | Role                                                                                                                  |
-| ------------------------- | --------------------------------------------------------------------------------------------------------------------- |
-| `src/lib/data/source.ts`  | The hooks and their query keys. Live-only; `isDeployed()` now selects an honest unavailable state rather than a mock. |
-| `src/lib/data/live.ts`    | Every contract read, against the verified addresses in `@maren/sdk`.                                                  |
-| `src/lib/chain/logs.ts`   | Activity, decoded from `eth_getLogs`.                                                                                 |
-| `src/lib/chain/write.ts`  | Every transaction the app can send. Chain-guarded, hinted off-chain, simulated before signing.                        |
-| `src/lib/chain/handle.ts` | Commit-reveal handle registration and the secret's storage.                                                           |
-| `src/lib/chain/errors.ts` | Custom errors decoded into English. `errors.test.ts` asserts none can render as hex.                                  |
-| `src/lib/chain/abis.ts`   | ABIs transcribed from `packages/contracts/src/*.sol`. Nothing invented.                                               |
+| File                         | Role                                                                                                                        |
+| ---------------------------- | --------------------------------------------------------------------------------------------------------------------------- |
+| `src/lib/data/source.ts`     | The hooks and their query keys. Live-only; `isDeployed()` now selects an honest unavailable state rather than a mock.       |
+| `src/lib/data/live.ts`       | Every contract read, against the verified addresses in `@maren/sdk`.                                                        |
+| `src/lib/chain/logs.ts`      | Activity, decoded from `eth_getLogs`.                                                                                       |
+| `src/lib/chain/write.ts`     | Every transaction the app can send. Chain-guarded, hinted off-chain, simulated before signing.                              |
+| `src/lib/chain/preflight.ts` | The contract's own preconditions, evaluated before a control is enabled. `preflight.test.ts` pins them to matsnet fixtures. |
+| `src/lib/chain/handle.ts`    | Commit-reveal handle registration and the secret's storage.                                                                 |
+| `src/lib/chain/errors.ts`    | Custom errors decoded into English. `errors.test.ts` asserts none can render as hex.                                        |
+| `src/lib/chain/abis.ts`      | ABIs transcribed from `packages/contracts/src/*.sol`. Nothing invented.                                                     |
 
 ### Activity, and the 10,000-block limit
 
@@ -126,6 +127,32 @@ Every action now either produces a real hash or fails with a decoded reason, and
 the app cannot perform is disabled at the button with that reason beside it — never
 offered and then faked.
 
+**A user never pays to discover a refusal we could have read for free.** This is the rule
+`src/lib/chain/preflight.ts` exists for, and it was written after a real transaction: the
+borrow slider offered a 0–35 MUSD range while the pooled trove sat at 151% against the
+vault's 180% `MIN_TROVE_CR`, so every value on it reverted. Someone dragged it to 17.95
+MUSD, pressed Borrow, and paid for the answer.
+
+Before any control is enabled, the preflight evaluates the conditions `MarenVault.sol`
+will evaluate, in its order, from chain state — pause flags, deposit cap, oracle
+staleness, the account's ratio, its borrow ceiling, its wallet balances, and the shared
+trove's ratio, which is the constraint no user-side arithmetic finds because it is not
+about the user. Three properties hold:
+
+- **The copy is the contract's.** Every refusal is built by `describeRevert()`, so the
+  sentence on a disabled button is literally the sentence the revert would have carried,
+  with the same live numbers. There is no second copy deck to go stale.
+- **The range is the truth.** `AmountSlider`'s `max` is `Preflight.maxWei`, so it cannot
+  travel anywhere that reverts. When nothing can succeed it is disabled at zero with the
+  explanation above it.
+- **It fails closed.** Unread balances, unread `ProtocolStats`, an unclassified price feed
+  — all of them block. "We do not know" and "you may proceed" are different answers.
+
+`simulateThenSign()` in `write.ts` is the second defence and is not redundant with the
+first: the preflight stops a doomed action being _offered_, from state read at render;
+the `eth_call` stops one being _signed_, from state as it is at the press. `prove-preflight.mjs`
+demonstrates the whole thing against the live chain with a signer that cannot sign.
+
 **A stale price is never rendered as live.** Mezo's oracle reverts above 60 seconds of
 staleness. `src/lib/chain/price.ts` models a price as a discriminated union where only the
 `live` case carries a number, so a screen cannot read a stale one by accident. Borrowing
@@ -162,29 +189,49 @@ or a number format.
 
 ## Verification
 
-All three scripts need a build running on port 3000 and use `playwright-core`:
+All the scripts need a build running on port 3000 and use `playwright-core`:
 
 ```bash
-CI=true pnpm --filter @maren/web test          # the revert decoder, offline
+CI=true pnpm --filter @maren/web test          # the revert decoder and the preflight, offline
 CI=true NEXT_PUBLIC_MEZO_NETWORK=testnet pnpm --filter @maren/web build
 CI=true NEXT_PUBLIC_MEZO_NETWORK=testnet pnpm --filter @maren/web start &
 
 export PLAYWRIGHT_CORE=/path/to/node_modules/playwright-core/index.js
-export MAREN_TEST_PRIVATE_KEY=0x...   # a throwaway matsnet key, needs only gas
 
-node scripts/verify-behaviour.mjs  # 69 checks: a11y, the rules above, 390px overflow
+node scripts/verify-behaviour.mjs  # 87 checks: a11y, the rules above, preflight, 390px overflow
 node scripts/verify-contrast.mjs   # worst-case contrast against what is actually painted
+node scripts/prove-preflight.mjs   # 36 checks: the disabled borrow, against the live chain
+node scripts/capture-tx-states.mjs # screenshots of every transaction-sheet state
 node scripts/prove-onchain.mjs     # drives a real handle registration, prints the hashes
 node scripts/prove-activity.mjs    # renders real history, then diffs it against eth_getLogs
 ```
 
-**`verify-behaviour.mjs` needs a key, and that is the point.** It runs twice: once
-disconnected, asserting the empty states and that no invented handle, hash or counterparty
-has come back; once with a real signer injected at `window.ethereum`
-(`scripts/injected-wallet.mjs`), asserting live registry resolution, the minimum-deposit
-refusal and the two-step handle flow. Signing happens in Node, so key material never
-enters the page. The account needs only gas — every connected assertion is about an
-account that owns nothing, which is the state most users arrive in.
+**`verify-behaviour.mjs` runs three passes.** Once disconnected, asserting the empty
+states and that no invented handle, hash or counterparty has come back. Once with a real
+signer injected at `window.ethereum` (`scripts/injected-wallet.mjs`), asserting live
+registry resolution, the minimum-deposit refusal and the two-step handle flow — signing
+happens in Node, so key material never enters the page. And once with a **read-only**
+signer at an account that has a real position, for the preflight checks.
+
+It no longer refuses to start without `MAREN_TEST_PRIVATE_KEY`: not one of its assertions
+submits a transaction, so it generates a throwaway key per run and says so. Set the
+variable to pin a specific account.
+
+**`prove-preflight.mjs` proves a negative, which needs a signer that cannot sign.**
+`installReadOnlyWallet` impersonates a real address against Mezo's own RPC — every read is
+that account's genuine state — and every signing method throws while recording the
+attempt. So "no signature was requested" is measured rather than asserted, and the
+account's nonce is read from the chain before and after the run to show that nothing was
+submitted.
+
+**`capture-tx-states.mjs` broadcasts nothing, and its two settled states are labelled.**
+Five of its seven states are reached exactly as a user reaches them. To render `delivered`
+and `failed on-chain` it answers `eth_sendTransaction` with the hash of a transaction that
+is _already mined_ on matsnet — the real 0.001 BTC deposit `0x3b34e664…95e8dd2`, and the
+real reverted borrow `0x9da5b3ed…86a0d47f`. Every receipt, block, gas figure and decoded
+revert reason on screen is read live and is true of those transactions; the only fiction
+is that this run's click produced them. Those images are for judging the sheet's design.
+`prove-preflight.mjs` is the script that proves things.
 
 The checks used to reach their interesting states by clicking a "Demo controls" panel that
 only existed in mock mode. There is no mock mode, so they reach them the way a user does.

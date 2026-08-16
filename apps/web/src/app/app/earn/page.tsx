@@ -120,9 +120,7 @@ export default function EarnPage() {
       {
         label: 'In Earn',
         before: <Musd wei={inEarn} />,
-        after: (
-          <Musd wei={mode === 'deposit' ? inEarn + wei : inEarn > wei ? inEarn - wei : 0n} />
-        ),
+        after: <Musd wei={mode === 'deposit' ? inEarn + wei : inEarn > wei ? inEarn - wei : 0n} />,
       },
       {
         label: 'Spendable MUSD',

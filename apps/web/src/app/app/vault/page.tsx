@@ -354,7 +354,8 @@ function BorrowPanel({
   const pre = range.rangeDead ? range : preflightBorrow(chain, value);
 
   const preview = useMemo(
-    () => (position && livePrice && !range.rangeDead ? previewBorrow(position, livePrice, value) : null),
+    () =>
+      position && livePrice && !range.rangeDead ? previewBorrow(position, livePrice, value) : null,
     [position, livePrice, value, range.rangeDead],
   );
 
@@ -553,7 +554,7 @@ function BorrowPanel({
           }
           endLabels={{
             start: '0 MUSD',
-            end: range.rangeDead ? '0' : formatMusd(ceiling?.amountWei ?? 0n, { unit: false }),
+            end: range.rangeDead ? '0 MUSD' : formatMusd(ceiling?.amountWei ?? 0n, { unit: false }),
           }}
         />
       </div>
@@ -747,9 +748,7 @@ function DepositPanel({ runner, chain }: { runner: TxRunner; chain: VaultState }
             ? [
                 {
                   label: 'Collateral value',
-                  before: (
-                    <Num>{formatUsd((position.collateralWei * livePrice) / 10n ** 18n)}</Num>
-                  ),
+                  before: <Num>{formatUsd((position.collateralWei * livePrice) / 10n ** 18n)}</Num>,
                   after: (
                     <Num>
                       {formatUsd(((position.collateralWei + wei) * livePrice) / 10n ** 18n)}
@@ -1002,7 +1001,17 @@ function RepayPanel({ runner, chain }: { runner: TxRunner; chain: VaultState }) 
 function WithdrawPanel({ runner, chain }: { runner: TxRunner; chain: VaultState }) {
   const { position } = chain;
   const writes = useMarenWrites({ onSimulated: runner.onSimulated });
-  const [input, setInput] = useState('0.01');
+  /**
+   * Empty, not `0.01`.
+   *
+   * A seeded default is a guess about how much of their own Bitcoin someone wants back,
+   * and this one guessed ten times the collateral the live test account holds — so the
+   * panel opened with a red "More than your collateral" error against an action that was
+   * perfectly available. A withdrawal is the one number on this screen nobody should be
+   * nudged toward; the "Available to withdraw" figure beside the field is one press away
+   * and is computed from the position rather than assumed.
+   */
+  const [input, setInput] = useState('');
   const wei = parseUnitsSafe(input);
 
   const pre = preflightWithdraw(chain, wei);

@@ -164,8 +164,7 @@ export function preflightDeposit(state: VaultState, amountWei: bigint): Prefligh
   if (!stats) return blocked(reading('the vault’s deposit cap and pause flags'));
   if (!balances) return blocked(reading('your wallet balance'));
 
-  const spendable =
-    balances.btcWei > GAS_HEADROOM_WEI ? balances.btcWei - GAS_HEADROOM_WEI : 0n;
+  const spendable = balances.btcWei > GAS_HEADROOM_WEI ? balances.btcWei - GAS_HEADROOM_WEI : 0n;
   const capHeadroom =
     stats.depositCapWei > stats.totalCollateralWei
       ? stats.depositCapWei - stats.totalCollateralWei
