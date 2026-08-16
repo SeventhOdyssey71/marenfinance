@@ -20,7 +20,9 @@ import { TxSheet, useTxRunner, type TxIntent } from '@/components/app/tx';
 import { ArrowRight } from '@/components/ui/icons';
 import { ConnectPrompt } from '@/components/app/connect-prompt';
 import { EarnIcon } from '@/components/ui/icons';
+import { BlockedNote } from '@/components/app/blocked';
 import { parseUnitsSafe, timeAgo } from '@/lib/copy';
+import { preflightEarnWithdraw, preflightMusdSpend } from '@/lib/chain/preflight';
 import { gasNote, SPENDERS, useMarenWrites, useMusdAllowance } from '@/lib/chain/write';
 import { useBalances, useDataSource, useEarn } from '@/lib/data/source';
 
@@ -41,16 +43,27 @@ export default function EarnPage() {
   const source = useDataSource();
   const { data: earn } = useEarn();
   const { data: balances } = useBalances();
-  const writes = useMarenWrites();
   const runner = useTxRunner();
+  const writes = useMarenWrites({ onSimulated: runner.onSimulated });
   const [mode, setMode] = useState<'deposit' | 'withdraw'>('deposit');
   const [amount, setAmount] = useState('500');
 
   const wei = parseUnitsSafe(amount);
   const spendable = balances?.musdWei ?? 0n;
   const inEarn = earn?.assetsWei ?? 0n;
-  const ceiling = mode === 'deposit' ? spendable : inEarn;
-  const overCeiling = wei > ceiling;
+
+  /**
+   * Both directions are preflighted, and today the deposit side is closed for everyone:
+   * Earn takes MUSD, MUSD comes from borrowing, and the pooled trove is under its floor so
+   * nobody can borrow. That is a chain of three facts a user has no way to assemble from a
+   * failed `transferFrom`, so the button is disabled and the first link in the chain is
+   * stated where the button is.
+   */
+  const pre =
+    mode === 'deposit'
+      ? preflightMusdSpend(balances, wei, { verb: 'deposit', noun: 'Deposit' })
+      : preflightEarnWithdraw(earn, wei);
+  const ceiling = pre.maxWei;
 
   /**
    * Depositing into an ERC-4626 pulls the asset with `transferFrom`, so MarenEarn needs an
@@ -58,13 +71,22 @@ export default function EarnPage() {
    * one press must not produce two signatures, only one of which anybody checks a receipt
    * for. Withdrawing burns the caller's own shares and needs no allowance.
    */
-  const { needed: needsApproval, refetch: refetchAllowance } = useMusdAllowance(
-    SPENDERS.earn,
-    mode === 'deposit' ? wei : 0n,
-  );
+  const {
+    allowanceWei,
+    needed: needsApproval,
+    refetch: refetchAllowance,
+  } = useMusdAllowance(SPENDERS.earn, mode === 'deposit' ? wei : 0n);
 
   const approvalIntent = (): TxIntent => ({
     title: `Approve ${formatMusd(wei)} for Earn`,
+    successTitle: `Approved ${formatMusd(wei)}`,
+    changes: [
+      {
+        label: 'Earn allowance',
+        before: <Musd wei={allowanceWei ?? 0n} />,
+        after: <Musd wei={wei} />,
+      },
+    ],
     details: [
       { label: 'Token', value: <span className="text-text-muted">MUSD</span> },
       { label: 'Amount', value: <Musd wei={wei} /> },
@@ -90,6 +112,26 @@ export default function EarnPage() {
   const intent = (): TxIntent => ({
     title:
       mode === 'deposit' ? `Deposit ${formatMusd(wei)} into Earn` : `Withdraw ${formatMusd(wei)}`,
+    successTitle:
+      mode === 'deposit'
+        ? `Deposited ${formatMusd(wei)} into Earn`
+        : `Withdrew ${formatMusd(wei)} from Earn`,
+    changes: [
+      {
+        label: 'In Earn',
+        before: <Musd wei={inEarn} />,
+        after: <Musd wei={mode === 'deposit' ? inEarn + wei : inEarn > wei ? inEarn - wei : 0n} />,
+      },
+      {
+        label: 'Spendable MUSD',
+        before: <Musd wei={spendable} />,
+        after: (
+          <Musd
+            wei={mode === 'deposit' ? (spendable > wei ? spendable - wei : 0n) : spendable + wei}
+          />
+        ),
+      },
+    ],
     details: [
       { label: 'Amount', value: <Musd wei={wei} /> },
       {
@@ -98,7 +140,7 @@ export default function EarnPage() {
       },
       {
         label: 'Return',
-        value: <span className="text-text-muted">liquidation gains only — no fixed rate</span>,
+        value: <span className="text-text-muted">liquidation gains only, no fixed rate</span>,
       },
     ],
     gas: gasNote(true, 'Moves MUSD between your wallet and the Stability Pool.'),
@@ -125,13 +167,15 @@ export default function EarnPage() {
               is still measured on this route. The connected screen has its own. */}
           <span data-contrast="earn-disclosure">
             Earn holds your MUSD in the MUSD Stability Pool through an ERC-4626 vault. Maren does
-            not display an APY for Earn because there is no reliable one to display — the yield is
+            not display an APY for Earn because there is no reliable one to display. The yield is
             liquidation gains, which can be zero for months.
           </span>
         </ConnectPrompt>
 
         <Note>
-          <p>Your MUSD absorbs liquidated debt — not principal-protected, and not guaranteed.</p>
+          <p>
+            Your MUSD absorbs liquidated debt. It is not principal-protected, and not guaranteed.
+          </p>
         </Note>
       </div>
     );
@@ -208,7 +252,7 @@ export default function EarnPage() {
             data-contrast="earn-disclosure"
             className="text-text-muted mt-5 max-w-[68ch] text-sm leading-relaxed"
           >
-            Realised in the past, not a forecast — Maren does not display an APY for Earn because
+            Realised in the past, not a forecast. Maren does not display an APY for Earn because
             there is no reliable one to display.
           </p>
           <Info summary="Why there is no rate">
@@ -268,20 +312,28 @@ export default function EarnPage() {
             maxLabel={mode === 'deposit' ? 'Spendable MUSD' : 'In Earn'}
             onMax={() => setAmount(formatMusd(ceiling, { unit: false }).replace(/,/g, ''))}
             error={
-              overCeiling
-                ? mode === 'deposit'
-                  ? 'More than your spendable MUSD.'
-                  : 'More than you have in Earn.'
+              pre.blocker && pre.blocker.scope !== 'loading' && !pre.rangeDead && wei > 0n
+                ? pre.blocker.title
                 : null
             }
           />
         </div>
 
         <p className="text-text-subtle mt-6 text-xs leading-relaxed">
-          Costs BTC gas — Maren’s relayer is not deployed, so your own wallet submits this.
+          Costs BTC gas. Maren’s relayer is not deployed, so your own wallet submits this.
         </p>
 
-        {needsApproval ? (
+        {pre.blocker && !(pre.blocker.scope === 'input' && wei === 0n) ? (
+          <div className="mt-6">
+            <BlockedNote
+              blocker={pre.blocker}
+              id="earn-blocked"
+              role={pre.rangeDead ? 'status' : 'alert'}
+            />
+          </div>
+        ) : null}
+
+        {pre.ok && needsApproval ? (
           <div className="mt-6">
             <Note>
               Earn has to be allowed to take {formatMusd(wei)} of your MUSD before it can be
@@ -295,7 +347,8 @@ export default function EarnPage() {
           {needsApproval ? (
             <ActionButton
               onClick={() => runner.request(approvalIntent())}
-              disabled={wei === 0n || overCeiling}
+              disabled={!pre.ok || !writes.ready}
+              aria-describedby="earn-blocked"
               icon={<ArrowRight className="size-4" />}
             >
               Approve {formatMusd(wei)}
@@ -304,7 +357,8 @@ export default function EarnPage() {
           <ActionButton
             variant={needsApproval ? 'secondary' : 'primary'}
             onClick={() => runner.request(intent())}
-            disabled={wei === 0n || overCeiling || needsApproval}
+            disabled={!pre.ok || needsApproval || !writes.ready}
+            aria-describedby="earn-blocked"
             icon={<ArrowRight className="size-4" />}
           >
             {mode === 'deposit' ? 'Deposit into Earn' : 'Withdraw from Earn'}
@@ -315,7 +369,7 @@ export default function EarnPage() {
       {/* The risk statement stays. It is the one thing a depositor cannot infer from the
           screen: this is not a savings account, and the principal is at risk. */}
       <Note>
-        <p>Your MUSD absorbs liquidated debt — not principal-protected, and not guaranteed.</p>
+        <p>Your MUSD absorbs liquidated debt. It is not principal-protected, and not guaranteed.</p>
         <Info summary="What that means in practice">
           Stability Pool deposits are spent closing other people’s positions, and you are paid in
           the Bitcoin seized doing it. Historically profitable, but not guaranteed. The vault also

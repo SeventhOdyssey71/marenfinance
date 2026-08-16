@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useMemo } from 'react';
+import { useCallback, useMemo, useRef } from 'react';
 import { useAccount, useChainId, usePublicClient, useReadContract, useWriteContract } from 'wagmi';
 import { erc20Abi, type Address, type Hash, type Hex } from 'viem';
 import { getChain, getMarenAddresses, getMusdAddresses } from '@maren/sdk';
@@ -64,7 +64,7 @@ export function gasNote(
       sponsored: false,
       note:
         `${detail} Maren's relayer would normally pay the Bitcoin gas for this, but no relayer ` +
-        `is running yet — so this transaction is submitted by your own wallet and you pay the ` +
+        `is running yet, so this transaction is submitted by your own wallet and you pay the ` +
         `gas. The contracts are ready for it; the service is not deployed.`,
     };
   }
@@ -113,7 +113,20 @@ export interface MarenWrites {
   registerHandle: (handle: string, secret: Hex) => Promise<Hash>;
 }
 
-export function useMarenWrites(): MarenWrites {
+export interface MarenWriteOptions {
+  /**
+   * Called the instant a simulation passes and BEFORE the wallet is asked for anything.
+   *
+   * The transaction sheet uses it to move from "Checking this will succeed" to "Waiting
+   * for your wallet", which is the difference between two states a user can tell apart:
+   * one where nothing has been asked of them and one where something has. It also makes
+   * the ordering observable — if a refusal arrives without this ever firing, no signature
+   * was requested, and the sheet says so in those words.
+   */
+  onSimulated?: () => void;
+}
+
+export function useMarenWrites(options: MarenWriteOptions = {}): MarenWrites {
   const { address, isConnected } = useAccount();
   const chainId = useChainId();
   const client = usePublicClient();
@@ -121,6 +134,11 @@ export function useMarenWrites(): MarenWrites {
 
   const onRightChain = chainId === targetChain.id;
   const ready = Boolean(isConnected && address && client) && onRightChain;
+
+  // Held in a ref so a fresh callback identity on every render of a screen cannot
+  // rebuild every write function underneath an in-flight transaction.
+  const onSimulated = useRef(options.onSimulated);
+  onSimulated.current = options.onSimulated;
 
   /**
    * The guard every write goes through. Throws a NAMED error rather than returning null,
@@ -148,6 +166,32 @@ export function useMarenWrites(): MarenWrites {
       return hintsForDelta(client, NETWORK, { collDelta, debtDelta });
     };
 
+    /**
+     * SIMULATE, THEN SIGN. NEVER THE OTHER WAY, NEVER ONLY ONE.
+     *
+     * Every write in this module goes through here, so the ordering is stated once and
+     * cannot be forgotten in the thirteenth one. `simulate` is an `eth_call` against
+     * current state: it reverts exactly as the real transaction would, for free, before
+     * the wallet ever opens. If it throws, `write` is never reached — no signature is
+     * requested, no gas is spent, and the thrown error still carries the contract's own
+     * revert data for `explainError` to decode.
+     *
+     * This is the second of two defences and it is not redundant with the first.
+     * `lib/chain/preflight.ts` stops a doomed action being OFFERED, from state that was
+     * read when the screen rendered. This stops a doomed action being SIGNED, from state
+     * as it is at the moment of the press — a price tick, somebody else's borrow, a
+     * guardian pausing the vault between the render and the click. The preflight cannot
+     * see those; this cannot explain itself in advance. Both, always.
+     */
+    const simulateThenSign = async (
+      simulate: () => Promise<unknown>,
+      write: () => Promise<Hash>,
+    ): Promise<Hash> => {
+      await simulate();
+      onSimulated.current?.();
+      return write();
+    };
+
     return {
       ready,
 
@@ -163,8 +207,10 @@ export function useMarenWrites(): MarenWrites {
           args: [upper, lower],
           value: amountWei,
         } as const;
-        await publicClient.simulateContract({ ...params, account });
-        return writeContractAsync({ ...params, chainId: targetChain.id });
+        return simulateThenSign(
+          () => publicClient.simulateContract({ ...params, account }),
+          () => writeContractAsync({ ...params, chainId: targetChain.id }),
+        );
       },
 
       async borrowMusd(amountWei) {
@@ -179,8 +225,10 @@ export function useMarenWrites(): MarenWrites {
           functionName: 'borrow',
           args: [amountWei, upper, lower],
         } as const;
-        await publicClient.simulateContract({ ...params, account });
-        return writeContractAsync({ ...params, chainId: targetChain.id });
+        return simulateThenSign(
+          () => publicClient.simulateContract({ ...params, account }),
+          () => writeContractAsync({ ...params, chainId: targetChain.id }),
+        );
       },
 
       async repayMusd(amountWei) {
@@ -192,8 +240,10 @@ export function useMarenWrites(): MarenWrites {
           functionName: 'repay',
           args: [amountWei, upper, lower],
         } as const;
-        await publicClient.simulateContract({ ...params, account });
-        return writeContractAsync({ ...params, chainId: targetChain.id });
+        return simulateThenSign(
+          () => publicClient.simulateContract({ ...params, account }),
+          () => writeContractAsync({ ...params, chainId: targetChain.id }),
+        );
       },
 
       async withdrawBtc(amountWei) {
@@ -205,8 +255,10 @@ export function useMarenWrites(): MarenWrites {
           functionName: 'withdraw',
           args: [amountWei, upper, lower],
         } as const;
-        await publicClient.simulateContract({ ...params, account });
-        return writeContractAsync({ ...params, chainId: targetChain.id });
+        return simulateThenSign(
+          () => publicClient.simulateContract({ ...params, account }),
+          () => writeContractAsync({ ...params, chainId: targetChain.id }),
+        );
       },
 
       // --- MUSD approval ------------------------------------------------------
@@ -226,8 +278,10 @@ export function useMarenWrites(): MarenWrites {
           functionName: 'approve',
           args: [spender, amountWei],
         } as const;
-        await publicClient.simulateContract({ ...params, account });
-        return writeContractAsync({ ...params, chainId: targetChain.id });
+        return simulateThenSign(
+          () => publicClient.simulateContract({ ...params, account }),
+          () => writeContractAsync({ ...params, chainId: targetChain.id }),
+        );
       },
 
       // --- pay ----------------------------------------------------------------
@@ -239,8 +293,10 @@ export function useMarenWrites(): MarenWrites {
           functionName: 'pay',
           args: [to, amountWei, memo],
         } as const;
-        await publicClient.simulateContract({ ...params, account });
-        return writeContractAsync({ ...params, chainId: targetChain.id });
+        return simulateThenSign(
+          () => publicClient.simulateContract({ ...params, account }),
+          () => writeContractAsync({ ...params, chainId: targetChain.id }),
+        );
       },
 
       async payHandle(handle, amountWei, memo) {
@@ -251,8 +307,10 @@ export function useMarenWrites(): MarenWrites {
           functionName: 'payToHandle',
           args: [handle.replace(/^@/, ''), amountWei, memo],
         } as const;
-        await publicClient.simulateContract({ ...params, account });
-        return writeContractAsync({ ...params, chainId: targetChain.id });
+        return simulateThenSign(
+          () => publicClient.simulateContract({ ...params, account }),
+          () => writeContractAsync({ ...params, chainId: targetChain.id }),
+        );
       },
 
       async createRequest(payer, amountWei, memo) {
@@ -263,8 +321,10 @@ export function useMarenWrites(): MarenWrites {
           functionName: 'createRequest',
           args: [payer, amountWei, memo],
         } as const;
-        await publicClient.simulateContract({ ...params, account });
-        return writeContractAsync({ ...params, chainId: targetChain.id });
+        return simulateThenSign(
+          () => publicClient.simulateContract({ ...params, account }),
+          () => writeContractAsync({ ...params, chainId: targetChain.id }),
+        );
       },
 
       async createLink(linkKey, amountWei, expiryUnix, memo) {
@@ -275,8 +335,10 @@ export function useMarenWrites(): MarenWrites {
           functionName: 'createLink',
           args: [linkKey, amountWei, expiryUnix, memo],
         } as const;
-        await publicClient.simulateContract({ ...params, account });
-        return writeContractAsync({ ...params, chainId: targetChain.id });
+        return simulateThenSign(
+          () => publicClient.simulateContract({ ...params, account }),
+          () => writeContractAsync({ ...params, chainId: targetChain.id }),
+        );
       },
 
       // --- earn ----------------------------------------------------------------
@@ -288,8 +350,10 @@ export function useMarenWrites(): MarenWrites {
           functionName: 'deposit',
           args: [assetsWei, account],
         } as const;
-        await publicClient.simulateContract({ ...params, account });
-        return writeContractAsync({ ...params, chainId: targetChain.id });
+        return simulateThenSign(
+          () => publicClient.simulateContract({ ...params, account }),
+          () => writeContractAsync({ ...params, chainId: targetChain.id }),
+        );
       },
 
       async earnWithdraw(assetsWei) {
@@ -300,8 +364,10 @@ export function useMarenWrites(): MarenWrites {
           functionName: 'withdraw',
           args: [assetsWei, account, account],
         } as const;
-        await publicClient.simulateContract({ ...params, account });
-        return writeContractAsync({ ...params, chainId: targetChain.id });
+        return simulateThenSign(
+          () => publicClient.simulateContract({ ...params, account }),
+          () => writeContractAsync({ ...params, chainId: targetChain.id }),
+        );
       },
 
       // --- registry -------------------------------------------------------------
@@ -313,8 +379,10 @@ export function useMarenWrites(): MarenWrites {
           functionName: 'commit',
           args: [commitment],
         } as const;
-        await publicClient.simulateContract({ ...params, account });
-        return writeContractAsync({ ...params, chainId: targetChain.id });
+        return simulateThenSign(
+          () => publicClient.simulateContract({ ...params, account }),
+          () => writeContractAsync({ ...params, chainId: targetChain.id }),
+        );
       },
 
       async registerHandle(handle, secret) {
@@ -325,8 +393,10 @@ export function useMarenWrites(): MarenWrites {
           functionName: 'register',
           args: [handle.replace(/^@/, ''), secret],
         } as const;
-        await publicClient.simulateContract({ ...params, account });
-        return writeContractAsync({ ...params, chainId: targetChain.id });
+        return simulateThenSign(
+          () => publicClient.simulateContract({ ...params, account }),
+          () => writeContractAsync({ ...params, chainId: targetChain.id }),
+        );
       },
     };
   }, [client, ready, requireSigner, writeContractAsync]);
