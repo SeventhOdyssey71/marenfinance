@@ -9,14 +9,7 @@ import { ConnectPrompt } from '@/components/app/connect-prompt';
 import { AmountField, Segmented } from '@/components/app/controls';
 import { HandleRegistration } from '@/components/app/handle-registration';
 import { Musd } from '@/components/app/money';
-import {
-  ActionButton,
-  AppCard,
-  CardTitle,
-  Info,
-  Label,
-  Note,
-} from '@/components/app/primitives';
+import { ActionButton, AppCard, CardTitle, Info, Label, Note } from '@/components/app/primitives';
 import { TxSheet, useTxRunner, type TxIntent, type TxRunner } from '@/components/app/tx';
 import { ArrowUpRight, LinkIcon, PayIcon } from '@/components/ui/icons';
 import { parseUnitsSafe, utf8Length } from '@/lib/copy';
@@ -196,10 +189,7 @@ function SendPanel({ runner }: { runner: TxRunner }) {
       },
       ...(memo ? [{ label: 'Memo', value: <span className="text-text-muted">{memo}</span> }] : []),
     ],
-    gas: gasNote(
-      true,
-      'The memo is written on-chain and is publicly readable by anyone, forever.',
-    ),
+    gas: gasNote(true, 'The memo is written on-chain and is publicly readable by anyone, forever.'),
     confirmLabel: 'Send',
     /**
      * A handle is paid through `payToHandle`, which re-resolves it INSIDE the transaction,
@@ -617,8 +607,8 @@ function LinkPanel({ runner }: { runner: TxRunner }) {
               {typeof window !== 'undefined' ? window.location.origin : ''}/claim#{created.secret}
             </p>
             <p className="mt-2 text-xs">
-              The claim key after the <span className="num">#</span> never leaves your browser and is
-              not stored anywhere. Once you navigate away it is gone.
+              The claim key after the <span className="num">#</span> never leaves your browser and
+              is not stored anywhere. Once you navigate away it is gone.
             </p>
             <div className="mt-4">
               <ActionButton

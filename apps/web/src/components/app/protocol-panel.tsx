@@ -95,11 +95,7 @@ export function ProtocolPanel() {
         <Metric
           label="Borrowing ceiling"
           value={
-            stats ? (
-              <Musd wei={stats.troveMaxBorrowingCapacityWei} size="lg" />
-            ) : (
-              <Dash size="lg" />
-            )
+            stats ? <Musd wei={stats.troveMaxBorrowingCapacityWei} size="lg" /> : <Dash size="lg" />
           }
           caption="fixed when the trove opened"
         />
@@ -116,18 +112,18 @@ export function ProtocolPanel() {
           collateral when it is not. */}
       <Info summary="Why the ceiling does not move">
         Mezo fixes a per-trove ceiling at the price the trove opened at, and reports it from{' '}
-        <span className="num">TroveManager.getTroveMaxBorrowingCapacity()</span> rather than deriving
-        it from the collateral ratio. Adding collateral does not raise it — only a refinance does,
-        which re-fixes the ceiling at today’s price for a fee and is blocked while the system is in
-        Recovery Mode.
+        <span className="num">TroveManager.getTroveMaxBorrowingCapacity()</span> rather than
+        deriving it from the collateral ratio. Adding collateral does not raise it — only a
+        refinance does, which re-fixes the ceiling at today’s price for a fee and is blocked while
+        the system is in Recovery Mode.
       </Info>
 
       {belowFloor ? (
         <div className="mt-5">
           <Note tone="warning" role="status">
-            The shared trove is at {stats ? formatCollateralRatio(stats.troveIcrWei) : ''}, under the{' '}
-            {policyRatio(MAREN_POLICY.minHealthyCr)} floor Maren keeps. New borrowing reverts until
-            someone deposits more Bitcoin or repays. Deposits, repayments and withdrawals are
+            The shared trove is at {stats ? formatCollateralRatio(stats.troveIcrWei) : ''}, under
+            the {policyRatio(MAREN_POLICY.minHealthyCr)} floor Maren keeps. New borrowing reverts
+            until someone deposits more Bitcoin or repays. Deposits, repayments and withdrawals are
             unaffected.
           </Note>
         </div>

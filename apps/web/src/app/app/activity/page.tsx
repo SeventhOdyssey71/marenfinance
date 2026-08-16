@@ -63,8 +63,7 @@ export default function ActivityPage() {
         <Label>Activity</Label>
         <h1 className="t-h2 mt-2">History</h1>
         <p className="text-text-muted mt-3 max-w-[68ch] text-sm leading-relaxed">
-          Your deposits, borrows and payments, read from Maren’s contract logs on{' '}
-          {explorer.name}.
+          Your deposits, borrows and payments, read from Maren’s contract logs on {explorer.name}.
         </p>
       </div>
 
@@ -172,9 +171,9 @@ function Body({
                 yet. It may still land; check here before retrying.
               </li>
               <li>
-                <span className="text-text">Failed — no funds moved</span> — mined, then reverted.
-                A reverted transaction emits no events, so it can only appear here if its receipt
-                says so.
+                <span className="text-text">Failed — no funds moved</span> — mined, then reverted. A
+                reverted transaction emits no events, so it can only appear here if its receipt says
+                so.
               </li>
               <li>
                 <span className="text-text">Gas</span> — what you actually paid in BTC, from the
