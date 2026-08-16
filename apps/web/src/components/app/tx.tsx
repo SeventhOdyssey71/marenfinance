@@ -3,30 +3,43 @@
 import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { usePublicClient } from 'wagmi';
+import { getChain } from '@maren/sdk';
 import type { Hash } from 'viem';
 
+import { explainError, type RevertReason } from '@/lib/chain/errors';
 import { confirmTransaction, describeOutcome, type TxOutcome } from '@/lib/chain/receipt';
 import { bumpDemoVersion } from '@/lib/data/demo';
-import { useDataSource } from '@/lib/data/source';
+import { NETWORK, useDataSource } from '@/lib/data/source';
 import { ActionButton } from './primitives';
 import { ArrowRight } from '@/components/ui/icons';
 
 /**
  * The transaction runner and its confirmation sheet.
  *
- * Two rules live here, and they are the reason this is one shared component rather than
+ * Three rules live here, and they are the reason this is one shared component rather than
  * a pattern each screen repeats:
  *
  *   1. NOTHING IS CONFIRMED WITHOUT A RECEIPT. The live path submits, then hands the
  *      hash to `confirmTransaction`, which is the only code in the app that decides what
  *      "delivered" means. A hash on its own renders as "submitted", never as success.
- *   2. A SIMULATION IS NEVER DRESSED AS A TRANSACTION. While the contracts are
- *      undeployed the app is in mock mode, and this sheet says "Simulated" — it does not
- *      borrow the language of a receipt it never fetched.
+ *   2. A SIMULATION IS NEVER DRESSED AS A TRANSACTION — and, just as importantly, a real
+ *      transaction is never described as a simulation. The sheet only reaches the
+ *      "Simulated" state when there was genuinely nothing to sign with, and it says which
+ *      of those reasons applied rather than repeating a stale claim about deployment.
+ *   3. A REFUSAL IS EXPLAINED. Every failure runs through `explainError`, which decodes
+ *      the contract's own custom errors into language. A user who is told
+ *      `0x7d1cc1b3…` has been told nothing.
  *
  * The confirmation step is not decoration either: it is where a payment's resolved
  * address is shown next to the handle it came from, before anything is signed.
  */
+
+const explorer = getChain(NETWORK).blockExplorers?.default.url ?? '';
+
+/** The explorer URL for a hash. Shown the moment one exists, receipt or no receipt. */
+export function explorerTxUrl(hash: Hash): string {
+  return `${explorer}/tx/${hash}`;
+}
 
 export interface TxDetail {
   label: string;
@@ -59,9 +72,9 @@ type Phase =
   | { name: 'confirm'; intent: TxIntent }
   | { name: 'submitting'; intent: TxIntent }
   | { name: 'pending'; intent: TxIntent; hash: Hash }
-  | { name: 'settled'; intent: TxIntent; outcome: TxOutcome }
-  | { name: 'simulated'; intent: TxIntent }
-  | { name: 'error'; intent: TxIntent; message: string };
+  | { name: 'settled'; intent: TxIntent; outcome: TxOutcome; reason: RevertReason | null }
+  | { name: 'simulated'; intent: TxIntent; reason: string }
+  | { name: 'error'; intent: TxIntent; reason: RevertReason };
 
 export interface TxRunner {
   phase: Phase;
@@ -86,6 +99,15 @@ export function useTxRunner(): TxRunner {
 
   const run = useCallback(
     async (intent: TxIntent) => {
+      /**
+       * The simulated path is now the EXCEPTION, not the default.
+       *
+       * It is reached only when there is genuinely nothing to sign with — no wallet, or a
+       * network where Maren is not deployed. `source.reason` states which, in words that
+       * are true of the network actually configured. The old copy here asserted that
+       * Maren's contracts were not deployed; on matsnet that has been false since
+       * 15 August 2026, and repeating it turned a working product into a demo.
+       */
       if (source.mode === 'mock' || !intent.submit) {
         setPhase({ name: 'submitting', intent });
         // A deliberate beat, so the simulated flow has the same shape as the real one
@@ -94,7 +116,7 @@ export function useTxRunner(): TxRunner {
         intent.simulate?.();
         bumpDemoVersion();
         await queryClient.invalidateQueries({ queryKey: ['maren'] });
-        setPhase({ name: 'simulated', intent });
+        setPhase({ name: 'simulated', intent, reason: source.reason });
         return;
       }
 
@@ -103,11 +125,9 @@ export function useTxRunner(): TxRunner {
       try {
         hash = await intent.submit();
       } catch (error) {
-        setPhase({
-          name: 'error',
-          intent,
-          message: error instanceof Error ? error.message : String(error),
-        });
+        // Includes the pre-flight simulation, so a doomed borrow lands here with its
+        // decoded reason and the user has neither signed nor spent gas.
+        setPhase({ name: 'error', intent, reason: explainError(error) });
         return;
       }
 
@@ -118,15 +138,28 @@ export function useTxRunner(): TxRunner {
           name: 'settled',
           intent,
           outcome: { kind: 'unreachable', hash, error: 'No RPC client available.' },
+          reason: null,
         });
         return;
       }
 
       const outcome = await confirmTransaction(client, hash, { sponsored: intent.gas.sponsored });
       await queryClient.invalidateQueries({ queryKey: ['maren'] });
-      setPhase({ name: 'settled', intent, outcome });
+
+      /**
+       * A transaction that passed simulation and then reverted anyway means state moved
+       * underneath it — a price tick, someone else's borrow. Replaying the call at the
+       * block it failed in recovers the actual revert data, so even this path names its
+       * reason instead of shrugging.
+       */
+      let reason: RevertReason | null = null;
+      if (outcome.kind === 'reverted') {
+        reason = await replayRevert(client, outcome.hash).catch(() => null);
+      }
+
+      setPhase({ name: 'settled', intent, outcome, reason });
     },
-    [client, queryClient, source.mode],
+    [client, queryClient, source.mode, source.reason],
   );
 
   return { phase, request, run, close };
@@ -241,28 +274,34 @@ export function TxSheet({ runner }: { runner: TxRunner }) {
               marked delivered until the chain returns one with
               <span className="num"> status success</span>.
             </p>
-            <p className="num text-text-subtle mt-3 break-all text-xs">{phase.hash}</p>
+            {/* The explorer link appears WITH THE HASH, not with the receipt. A user
+                watching a pending transaction should be able to go and look at it. */}
+            <HashLine hash={phase.hash} />
           </div>
         ) : null}
 
-        {phase.name === 'settled' ? <Settled outcome={phase.outcome} /> : null}
+        {phase.name === 'settled' ? <Settled outcome={phase.outcome} reason={phase.reason} /> : null}
 
         {phase.name === 'simulated' ? (
           <div className="mt-5" role="status">
             <p className="text-warning text-sm">Simulated — nothing was broadcast</p>
             <p className="text-text-muted mt-2 text-sm leading-relaxed">
-              Maren’s contracts are not deployed yet, so this action updated the demo figures only.
-              No transaction was signed, no receipt was fetched, and no funds moved.
+              {phase.reason} No transaction was signed, no receipt was fetched, and no funds moved.
             </p>
           </div>
         ) : null}
 
         {phase.name === 'error' ? (
           <div className="mt-5" role="alert">
-            <p className="text-danger text-sm">Not submitted</p>
+            <p className="text-danger text-sm">{phase.reason.title}</p>
             <p className="text-text-muted mt-2 break-words text-sm leading-relaxed">
-              {phase.message}
+              {phase.reason.detail}
             </p>
+            {phase.reason.name ? (
+              <p className="num text-text-subtle mt-3 text-xs">
+                Contract error: {phase.reason.name}
+              </p>
+            ) : null}
           </div>
         ) : null}
 
@@ -278,18 +317,68 @@ export function TxSheet({ runner }: { runner: TxRunner }) {
   );
 }
 
-function Settled({ outcome }: { outcome: TxOutcome }) {
+function Settled({ outcome, reason }: { outcome: TxOutcome; reason: RevertReason | null }) {
   const described = describeOutcome(outcome);
   const good = outcome.kind === 'delivered';
+  const hash = 'hash' in outcome ? outcome.hash : outcome.receipt.hash;
   return (
     <div className="mt-5" role="status">
       <p className={`text-sm ${good ? 'text-success' : 'text-danger'}`}>{described.title}</p>
       <p className="text-text-muted mt-2 text-sm leading-relaxed">{described.detail}</p>
-      {'hash' in outcome ? (
-        <p className="num text-text-subtle mt-3 break-all text-xs">{outcome.hash}</p>
-      ) : (
-        <p className="num text-text-subtle mt-3 break-all text-xs">{outcome.receipt.hash}</p>
-      )}
+      {/* When a mined transaction reverted, the decoded reason is the useful part —
+          "it reverted" alone tells a user nothing they can act on. */}
+      {reason ? (
+        <p className="text-text-muted mt-3 break-words text-sm leading-relaxed">
+          <span className="text-text">{reason.title}.</span> {reason.detail}
+        </p>
+      ) : null}
+      <HashLine hash={hash} />
     </div>
   );
+}
+
+/** A transaction hash and its explorer link. One component, so they never drift apart. */
+function HashLine({ hash }: { hash: Hash }) {
+  return (
+    <div className="mt-3">
+      <p className="num text-text-subtle break-all text-xs">{hash}</p>
+      <a
+        href={explorerTxUrl(hash)}
+        target="_blank"
+        rel="noreferrer noopener"
+        className="text-text-muted hover:text-text mt-2 inline-flex items-center gap-1.5 text-xs underline decoration-[var(--border-strong)] underline-offset-4 transition-colors duration-[120ms] ease-out"
+      >
+        View on the Mezo explorer
+        <span aria-hidden>↗</span>
+      </a>
+    </div>
+  );
+}
+
+/**
+ * Recover the revert reason for a transaction that already failed on-chain.
+ *
+ * Re-executes the exact call against the state of the block it was mined in — the same
+ * thing an explorer does. It cannot change the outcome; it only asks the node to fail the
+ * same way again, this time somewhere we can read the error data.
+ */
+async function replayRevert(
+  client: NonNullable<ReturnType<typeof usePublicClient>>,
+  hash: Hash,
+): Promise<RevertReason | null> {
+  const tx = await client.getTransaction({ hash });
+  try {
+    await client.call({
+      account: tx.from,
+      to: tx.to ?? undefined,
+      data: tx.input,
+      value: tx.value,
+      blockNumber: tx.blockNumber,
+    });
+    // It did not revert on replay, so state has moved on and there is nothing honest to
+    // report beyond the receipt itself.
+    return null;
+  } catch (error) {
+    return explainError(error);
+  }
 }
