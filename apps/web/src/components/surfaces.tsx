@@ -23,7 +23,7 @@ export function Surfaces() {
               />
               <div className="relative flex h-full flex-col">
                 <div className="flex items-center gap-3.5">
-                  <span className="bg-surface-raised grid size-10 shrink-0 place-items-center rounded-[var(--radius-pill)] border border-[var(--border-hairline)] text-violet-400">
+                  <span className="grid size-10 shrink-0 place-items-center rounded-[var(--radius-pill)] border border-[var(--border-hairline)] text-violet-400">
                     <VaultIcon className="size-5" />
                   </span>
                   <h3 className="t-h3">Vault</h3>
@@ -53,7 +53,7 @@ export function Surfaces() {
           <Reveal delay={80} className="md:col-span-2">
             <article className="card flex h-full flex-col p-6 md:p-8">
               <div className="flex items-center gap-3.5">
-                <span className="bg-surface-raised grid size-10 shrink-0 place-items-center rounded-[var(--radius-pill)] border border-[var(--border-hairline)] text-violet-400">
+                <span className="grid size-10 shrink-0 place-items-center rounded-[var(--radius-pill)] border border-[var(--border-hairline)] text-violet-400">
                   <PayIcon className="size-5" />
                 </span>
                 <h3 className="t-h3">Pay</h3>
@@ -86,7 +86,7 @@ export function Surfaces() {
           <Reveal delay={80} className="md:col-span-3">
             <article className="card flex h-full flex-col p-6 md:p-8">
               <div className="flex items-center gap-3.5">
-                <span className="bg-surface-raised grid size-10 shrink-0 place-items-center rounded-[var(--radius-pill)] border border-[var(--border-hairline)] text-violet-400">
+                <span className="grid size-10 shrink-0 place-items-center rounded-[var(--radius-pill)] border border-[var(--border-hairline)] text-violet-400">
                   <EarnIcon className="size-5" />
                 </span>
                 <h3 className="t-h3">Earn</h3>
@@ -105,7 +105,7 @@ export function Surfaces() {
           <Reveal delay={160} className="md:col-span-3">
             <article className="card flex h-full flex-col p-6 md:p-8">
               <div className="flex items-center gap-3.5">
-                <span className="bg-surface-raised grid size-10 shrink-0 place-items-center rounded-[var(--radius-pill)] border border-[var(--border-hairline)] text-violet-400">
+                <span className="grid size-10 shrink-0 place-items-center rounded-[var(--radius-pill)] border border-[var(--border-hairline)] text-violet-400">
                   <PortfolioIcon className="size-5" />
                 </span>
                 <h3 className="t-h3">Portfolio</h3>
