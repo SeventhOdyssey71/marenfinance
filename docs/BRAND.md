@@ -106,16 +106,57 @@ Headlines are tight and large. Body text never exceeds `68ch`.
 
 ## 4. Form
 
-- **Radius:** `8px` inputs · `16px` cards · `999px` buttons and pills. Nothing else.
+- **Radius:** `8px` inputs · `12px` cards · `999px` buttons and pills. Nothing else.
 - **Buttons are pills.** Primary = white fill, near-black text, with a circular violet
   icon badge on the right (see reference). Secondary = `surface-raised` fill, hairline
   border, white text. Both `44px` min height for touch.
-- **Cards:** `surface` fill, 1px `border` hairline, `16px` radius, `24px` padding.
-  Elevation comes from the hairline and a barely-there inner top highlight
-  (`inset 0 1px 0 rgba(255,255,255,0.04)`), never from a heavy drop shadow.
+- **Cards: a hairline on the page background. No fill.** 1px `border` hairline, `12px`
+  radius, `24px` padding, and nothing else — no `surface` fill, no inner top highlight,
+  no drop shadow. The border is the entire elevation.
+
+  _This is a change._ Cards were `surface` fill plus `inset 0 1px 0 rgba(255,255,255,0.04)`
+  at a `16px` radius. Against a near-black page a filled panel reads as a lighter box
+  floating over the page rather than as a region of it, and at `16px` the corners were soft
+  enough to read as consumer-app rather than instrument. The reference is a hairline and
+  nothing else.
+
+- **When a fill is allowed.** Only where a surface must genuinely separate from the page,
+  and each case is one of these three:
+  - **Modals** — `.card-modal`, `surface-raised` fill and a `border-strong` hairline. A
+    dialog sits over the page; transparent, it would show the page through itself.
+  - **Popovers** — `surface-raised`. Same reason: they float.
+  - **Inset wells** — `surface-inset` for inputs, tab tracks, sliders, disclosure notes and
+    code. `surface-inset` is _darker_ than the page, so it recesses rather than floats,
+    which is the opposite failure and is fine.
+
+  Controls (buttons, active tabs, active nav pills) may carry a fill because a control
+  needs a hit surface. A decorative disc inside a card may not — it is the same floating
+  lighter box at a smaller scale.
 - **Spacing scale:** 4 · 8 · 12 · 16 · 24 · 32 · 48 · 64 · 96 · 128. Nothing off-scale.
 - **Section rhythm:** `96px` vertical padding mobile, `128px` desktop.
 - **Grid:** 12-column, `1200px` max content width, `24px` gutters.
+
+### Iconography
+
+**HugeIcons** (`@hugeicons/react` + `@hugeicons/core-free-icons`), drawn through one
+wrapper module — `apps/web/src/components/ui/icons.tsx`. Nothing imports the icon package
+directly; call sites import named components from the wrapper, so weight, colour and
+sizing are decided once. The previous set was hand-rolled SVG: consistent at three icons,
+not at fourteen, and with no vocabulary left for a denser dApp.
+
+- **Stroke is 1.5 device pixels at every size**, enforced with
+  `vector-effect: non-scaling-stroke`. HugeIcons draws on a 24-unit grid at
+  `stroke-width: 1.5`, which thins to 0.75–1.25px at the 12–20px sizes this app actually
+  uses; taking the stroke out of the viewBox transform keeps the line work at the weight
+  the rest of the page is drawn at.
+- **Size comes from a Tailwind `size-*` class**, never from the `size` prop. CSS beats the
+  SVG width/height attributes, so alignment is unaffected by the icon set.
+- **An icon means what it labels.** A vault icon for the Vault (`BitcoinSafeIcon` — a safe
+  holding Bitcoin, which is what `MarenVault` is), money leaving for Pay, a rising line for
+  Earn. Not a generic square. Where the copy makes a promise the icon must not contradict
+  it: Earn is a rising line and never a piggy bank, because the screen's own disclosure
+  says it is not a savings account.
+- **Colour is `currentColor`.** No icon carries its own fill.
 
 ---
 
