@@ -74,8 +74,8 @@ const items: readonly Item[] = [
           The first <span className="num text-text">25</span> actions per address are free. After
           that a small fee is taken in MUSD inside the same transaction. New users are never blocked
           at the door. The relayer is allowlisted to Maren contracts and known function selectors
-          only, is rate limited per address and per IP, and never holds user funds. Compromising
-          its key costs us gas, not your Bitcoin.
+          only, is rate limited per address and per IP, and never holds user funds. Compromising its
+          key costs us gas, not your Bitcoin.
         </p>
         <p>
           <span className="text-text">Not running yet.</span> The relay hub is deployed on matsnet
@@ -109,8 +109,8 @@ const items: readonly Item[] = [
     a: (
       <>
         <p>
-          If you hold more than roughly 0.079 BTC, it partly is not, and Maren will tell you to
-          open a direct trove, because that avoids pooling risk entirely. What Maren adds there is
+          If you hold more than roughly 0.079 BTC, it partly is not, and Maren will tell you to open
+          a direct trove, because that avoids pooling risk entirely. What Maren adds there is
           gasless execution and a payments surface.
         </p>
         <p>
