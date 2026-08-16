@@ -108,7 +108,7 @@ function GasTruth() {
     <Note>
       <p className="text-text">You pay the Bitcoin gas for these transactions.</p>
       <p className="mt-1">
-        MarenPay is built to be sponsored — it trusts Maren’s relay hub under ERC-2771 — but no
+        MarenPay is built to be sponsored and trusts Maren’s relay hub under ERC-2771, but no
         relayer is deployed, so your own wallet submits and pays. This screen will not describe a
         payment as free until something is actually paying for it.
       </p>
@@ -354,7 +354,7 @@ function RequestPanel({ runner }: { runner: TxRunner }) {
     ],
     gas: gasNote(
       true,
-      'A request creates no obligation and moves no funds — it is an ask the other side fulfils in one action.',
+      'A request creates no obligation and moves no funds. It is an ask the other side fulfils in one action.',
     ),
     confirmLabel: 'Create request',
     submit: writes.ready ? () => writes.createRequest(payer, amountWei, memo) : undefined,
@@ -602,7 +602,7 @@ function LinkPanel({ runner }: { runner: TxRunner }) {
       {created ? (
         <div className="mt-6">
           <Note tone="warning">
-            <p className="text-text">Copy this now — it is shown once.</p>
+            <p className="text-text">Copy this now. It is shown once.</p>
             <p className="num text-text-muted mt-2 break-all text-xs">
               {typeof window !== 'undefined' ? window.location.origin : ''}/claim#{created.secret}
             </p>
@@ -633,8 +633,8 @@ function LinkPanel({ runner }: { runner: TxRunner }) {
           are visible in Activity, from MarenPay's LinkCreated events. */}
       <Info summary="Why past links cannot be shown again">
         The claim key exists only in the URL fragment you copy. Maren never receives it and never
-        writes it down, so a list of your old links could show that they exist and their amounts —
-        which Activity does, from the contract’s events — but never the keys needed to claim them.
+        writes it down, so a list of your old links could show that they exist and their amounts
+        (which Activity does, from the contract’s events), but never the keys needed to claim them.
         That is the cost of the secret being genuinely secret.
       </Info>
     </AppCard>

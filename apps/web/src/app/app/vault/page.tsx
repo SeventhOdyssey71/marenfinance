@@ -255,7 +255,7 @@ function RouteCard() {
           important thing a pooled user does not otherwise know, and shortening a
           disclosure is not the same as removing it. */}
       <p className="text-text-muted mt-4 max-w-[68ch] text-sm leading-relaxed">
-        Your deposit shares one trove with other users — segregated in{' '}
+        Your deposit shares one trove with other users, segregated in{' '}
         <em className="text-text not-italic">accounting, not custody</em>, so a drawdown faster than
         the keeper could socialise losses.
       </p>
@@ -264,7 +264,7 @@ function RouteCard() {
         {policyRatio(MAREN_POLICY.vaultLiquidationCr)}, far above the protocol’s 110%, and backs
         that with a 0.001 BTC floor, per-block keeper checks and an insurance buffer funded from
         vault fees. These are mitigations, not a guarantee. You are here because a trove of your own
-        needs about {threshold ? formatBtc(threshold) : '0.079 BTC'} — MUSD will not open one below{' '}
+        needs about {threshold ? formatBtc(threshold) : '0.079 BTC'}. MUSD will not open one below{' '}
         {formatMusd(MIN_NET_DEBT)} of net debt.
       </Info>
       {assessment?.eligible && assessment.route === 'direct' ? (
@@ -340,7 +340,7 @@ function BorrowPanel({
         value:
           position?.route === 'direct' ? (
             <span className="text-text-muted">
-              <Musd wei={LIQUIDATION_RESERVE} /> — refunded on close
+              <Musd wei={LIQUIDATION_RESERVE} />, refunded on close
             </span>
           ) : (
             <span className="text-text-muted">none</span>
@@ -451,7 +451,7 @@ function BorrowPanel({
       {ceiling && ceiling.amountWei > 0n ? (
         <p className="text-text-subtle mt-4 text-xs leading-relaxed">
           {ceiling.binding === 'ceiling'
-            ? `Capped by Mezo’s per-trove ceiling — ${formatMusd(ceiling.mezoHeadroomWei)} of it is unused. Your ratio would allow ${formatMusd(ceiling.ratioHeadroomWei)}.`
+            ? `Capped by Mezo’s per-trove ceiling, with ${formatMusd(ceiling.mezoHeadroomWei)} of it unused. Your ratio would allow ${formatMusd(ceiling.ratioHeadroomWei)}.`
             : `Capped by Maren’s ${policyRatio(MAREN_POLICY.minHealthyCr)} floor. Mezo’s ceiling would allow ${formatMusd(ceiling.mezoHeadroomWei)}.`}
         </p>
       ) : null}
@@ -535,7 +535,7 @@ function BorrowPanel({
       {/* The gas claim, kept true. Maren's relay hub is deployed but no relayer service
           is running, so "no gas" would be a promise the product cannot currently keep. */}
       <p className="text-text-subtle mt-6 text-xs leading-relaxed">
-        Costs BTC gas — Maren’s relayer is not running yet, so your own wallet submits this.
+        Costs BTC gas. Maren’s relayer is not running yet, so your own wallet submits this.
       </p>
 
       {gateReason ? (
@@ -649,7 +649,7 @@ function DepositPanel({
 
       {/* The one action Maren cannot sponsor, said before the user signs it. */}
       <p className="text-text-subtle mt-6 max-w-[68ch] text-xs leading-relaxed">
-        A deposit costs BTC gas — it carries value, and the relayer cannot sponsor that. Everything
+        A deposit costs BTC gas. It carries value, and the relayer cannot sponsor that. Everything
         after it is free.
       </p>
 
@@ -727,7 +727,7 @@ function RepayPanel({ runner }: { runner: ReturnType<typeof useTxRunner> }) {
     ],
     gas: gasNote(
       true,
-      'Repaying is never paused and never gated on the oracle — an exit must always be open.',
+      'Repaying is never paused and never gated on the oracle. An exit must always be open.',
     ),
     confirmLabel: `Repay ${formatMusd(wei)}`,
     submit: writes.ready ? () => writes.repayMusd(wei) : undefined,
