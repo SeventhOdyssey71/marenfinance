@@ -15,16 +15,6 @@
  */
 
 /**
- * The house rhythm.
- *
- * These are tuned against a measured take, not chosen by feel. The first full run at
- * react/glance/read/dwell = 700/1400/2600/4200 came out at 132 seconds, which overshoots the
- * 90-120s the narration is written to; the figures below land it inside the window while
- * keeping `dwell` long enough to be uncomfortable in the edit, which is the point. If you
- * change these, re-run and read the duration off the take rather than trusting the arithmetic
- * here — every scene also waits on real RPC, and matsnet is not a metronome.
- */
-/**
  * One dial for the whole video.
  *
  * The beats below are in proportion to each other, and that proportion is the editorial
@@ -34,9 +24,14 @@
  * ratios live in BEATS and the length lives here, and a take that comes in long is fixed by
  * changing one number rather than by re-balancing nine scenes against each other.
  *
- * Set DEMO_PACE=1.2 for a slower read, 0.8 for a tighter one.
+ * The default is tuned against measured takes rather than chosen by feel: at 1.0 the
+ * walkthrough ran 152 seconds against the 90-120 the narration is written to. Re-tune by
+ * running and reading the duration off the take, never by arithmetic here — every scene also
+ * waits on real RPC, and matsnet is not a metronome.
+ *
+ * Set DEMO_PACE=1.0 for a slower read, 0.5 for a tighter one.
  */
-const PACE = Number(process.env.DEMO_PACE ?? 0.82);
+const PACE = Number(process.env.DEMO_PACE ?? 0.6);
 
 const beat = (ms) => Math.round(ms * PACE);
 
@@ -132,19 +127,42 @@ export async function centre(page, locator, { duration = 1_200, bias = 0.38 } = 
  * read is a true thing about the product; the run continues and the caller's dwell still
  * applies. What we refuse to do is *not wait at all*.
  */
-export async function settle(page, { timeout = 12_000, log } = {}) {
-  const loading = page.getByText('Reading the price feed.');
+export async function settle(page, { timeout = 20_000, log } = {}) {
   const deadline = Date.now() + timeout;
+  let last = 'nothing';
+
   while (Date.now() < deadline) {
-    if ((await loading.count()) === 0) {
-      // One more frame after the text disappears, so the number that replaced it has
-      // actually painted before the caller starts its dwell.
+    const state = await page.evaluate(() => {
+      const body = document.querySelector('main')?.innerText ?? '';
+      return {
+        reading: /Reading the price feed\./.test(body),
+        // A failed oracle read, not a pending one. Every figure downstream of it renders as
+        // an em dash, so a screen in this state looks like a broken dashboard on camera. It
+        // usually clears on a retry, and it is emphatically not something to film.
+        deadOracle: /No usable oracle observation\./.test(body),
+        // wagmi mid-handshake. Filmed, this is the take where the whole app appears signed
+        // out; it is also what kills the reads above, so it has to gate the camera too.
+        connecting: /Connecting…|Connecting\.\.\./.test(
+          document.querySelector('header')?.innerText ?? '',
+        ),
+      };
+    });
+
+    if (!state.reading && !state.deadOracle && !state.connecting) {
+      // One more frame, so the number that replaced the placeholder has actually painted
+      // before the caller starts its dwell.
       await sleep(400);
       return true;
     }
-    await sleep(200);
+    last = state.connecting
+      ? 'the header still says Connecting'
+      : state.deadOracle
+        ? 'the oracle read came back empty'
+        : 'the price feed is still loading';
+    await sleep(250);
   }
-  log?.(`  ! still reading the price feed after ${timeout}ms — filming it as it is`);
+
+  log?.(`  ! ${last} after ${timeout}ms — filming it as it is`);
   return false;
 }
 
