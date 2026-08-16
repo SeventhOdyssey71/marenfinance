@@ -14,17 +14,43 @@
  * reading, so the camera only ever dwells on values that arrived.
  */
 
+/**
+ * The house rhythm.
+ *
+ * These are tuned against a measured take, not chosen by feel. The first full run at
+ * react/glance/read/dwell = 700/1400/2600/4200 came out at 132 seconds, which overshoots the
+ * 90-120s the narration is written to; the figures below land it inside the window while
+ * keeping `dwell` long enough to be uncomfortable in the edit, which is the point. If you
+ * change these, re-run and read the duration off the take rather than trusting the arithmetic
+ * here — every scene also waits on real RPC, and matsnet is not a metronome.
+ */
+/**
+ * One dial for the whole video.
+ *
+ * The beats below are in proportion to each other, and that proportion is the editorial
+ * decision: a dwell is three times a glance because the shots it marks are worth three
+ * times the attention. Total length is a separate question, and it moves for reasons that
+ * have nothing to do with editing — a slower RPC day adds seconds to every screen. So the
+ * ratios live in BEATS and the length lives here, and a take that comes in long is fixed by
+ * changing one number rather than by re-balancing nine scenes against each other.
+ *
+ * Set DEMO_PACE=1.2 for a slower read, 0.8 for a tighter one.
+ */
+const PACE = Number(process.env.DEMO_PACE ?? 0.82);
+
+const beat = (ms) => Math.round(ms * PACE);
+
 export const BEATS = {
   /** After a click, before anything else is asserted. Lets a transition finish. */
-  react: 700,
+  react: beat(700),
   /** Reading a label, a chip, a single number. */
-  glance: 1_400,
+  glance: beat(1_400),
   /** Reading a card: a heading plus two or three figures. */
-  read: 2_600,
+  read: beat(2_600),
   /** The shots the whole demo exists for. Hold longer than feels comfortable. */
-  dwell: 4_200,
+  dwell: beat(4_200),
   /** Between one screen and the next. */
-  transition: 1_100,
+  transition: beat(1_100),
 };
 
 export const sleep = (ms) => new Promise((r) => setTimeout(r, ms));

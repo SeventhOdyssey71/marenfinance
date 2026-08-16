@@ -97,25 +97,34 @@ async function sceneHero(ctx) {
  * trove count, the log shows the new one instead of silently disagreeing with the video.
  */
 async function sceneProblem(ctx) {
-  const { page, log } = ctx;
+  const { page, pointer, log } = ctx;
   const seen = {};
 
   await scrollToSelector(page, '#problem', { duration: 2_000 });
   await sleep(BEATS.read);
 
-  const stats = page.locator('#problem .num');
-  const count = await stats.count();
-  seen.stats = [];
-  for (let i = 0; i < Math.min(count, 4); i += 1) {
-    const text = (await stats.nth(i).innerText()).replace(/\s+/g, ' ').trim();
-    seen.stats.push(text);
-  }
+  // `.num` is the unit span ("MUSD", "troves", "BTC"), not the figure beside it, so reading
+  // it alone reports a list of units and no numbers. The whole section is pulled instead and
+  // the three figures recovered from it — which also means the log records the copy as
+  // written rather than a guess at which element holds it.
+  const section = (await page.locator('#problem').innerText()).replace(/\s+/g, ' ');
+  seen.stats = [
+    section.match(/([\d,]+)\s*MUSD/)?.[0],
+    section.match(/(\d+)\s*troves/)?.[0],
+    section.match(/([\d.]+)\s*BTC/)?.[0],
+  ].filter(Boolean);
   log(`  problem stats: ${seen.stats.join(' | ')}`);
 
-  // Walk down the section rather than jumping, so the three figures arrive in sequence
-  // instead of all at once.
-  await scrollTo(page, await page.evaluate(() => window.scrollY + 320), { duration: 1_500 });
-  await sleep(BEATS.dwell);
+  // Walk down the section rather than jumping, so the figures arrive in sequence instead of
+  // all at once. Two stops, not three: the third is the same argument as the scale bar in
+  // the next scene, and making it twice costs eight seconds to say one thing.
+  for (const stat of ['1,800', '26']) {
+    const target = page.locator('#problem').getByText(stat, { exact: false }).first();
+    if ((await target.count()) === 0) continue;
+    await centre(page, target, { duration: 1_000, bias: 0.42 }).catch(() => {});
+    await pointer.moveToElement(target, { duration: 700, settle: 0 }).catch(() => {});
+    await sleep(BEATS.read);
+  }
 
   return seen;
 }
@@ -167,12 +176,18 @@ async function sceneScaleBar(ctx) {
 /* ── 2. Launch and connect ──────────────────────────────────────────────────────────── */
 
 /**
- * Launch the app and connect the injected signer.
+ * Launch the app and connect the wallet.
  *
- * The wallet is a real EIP-1193 provider backed by a real private key (see
- * apps/web/scripts/injected-wallet.mjs) — reads go to Mezo, writes are signed in Node. The
- * connect menu is clicked with the visible pointer rather than Playwright's direct
- * `.click()`, so the viewer can see the choice being made.
+ * THE AUTO-RECONNECT PROBLEM. wagmi's injected connector discovers our EIP-6963 provider the
+ * moment the page loads and connects to it without being asked, exactly as a real unlocked
+ * wallet would on a return visit. Correct behaviour, and it means the app arrives at
+ * /app already connected and the connect flow never happens on camera.
+ *
+ * So the scene signs out first, through the app's own account menu, and connects again from
+ * there. Nothing is faked: it is the product's real Disconnect button followed by its real
+ * connect menu, and the disconnected screen in between is the one every first-time visitor
+ * actually sees. The alternative — asserting a connect step the viewer never watched — would
+ * be narrating over an event that did not occur.
  */
 async function sceneConnect(ctx) {
   const { page, pointer, log } = ctx;
@@ -184,10 +199,28 @@ async function sceneConnect(ctx) {
   await page.waitForURL('**/app', { timeout: 20_000 }).catch(() => {});
   await sleep(BEATS.transition);
 
+  // If the provider already connected itself, sign out so the connect can be filmed.
+  const accountPill = page.locator('header button').filter({ hasText: /0x/ }).first();
+  if ((await accountPill.count()) > 0) {
+    await pointer.click(accountPill, { after: BEATS.react });
+    const disconnect = page.getByRole('menuitem', { name: /Disconnect/i }).first();
+    if (await disconnect.isVisible().catch(() => false)) {
+      await sleep(BEATS.glance);
+      await pointer.click(disconnect, { after: BEATS.react });
+      log('  signed out first, so the connect flow happens on camera');
+      await sleep(BEATS.glance);
+    } else {
+      await page.keyboard.press('Escape').catch(() => {});
+    }
+  }
+
   const connect = page.getByRole('button', { name: /Connect wallet/i }).first();
   if ((await connect.count()) === 0) {
-    log('  wallet reconnected on its own — no connect button to click');
+    log('  ! no connect button appeared — filming whatever state the app settled in');
   } else {
+    // The disconnected screen is a real screen and worth a beat of its own: it is what a
+    // first-time visitor sees, and it deliberately shows no sample position.
+    await sleep(BEATS.read);
     await pointer.click(connect, { after: BEATS.react });
     const option = page.getByRole('menuitem').first();
     await option.waitFor({ state: 'visible', timeout: 8_000 }).catch(() => {});
@@ -198,20 +231,43 @@ async function sceneConnect(ctx) {
     }
   }
 
-  await sleep(2_400);
-  await settle(page, { log });
-
+  // Wait for the account pill to come back rather than sleeping a guess. wagmi has to
+  // re-run discovery, hand the account to the provider and re-render the header, and on a
+  // cold connect that is comfortably longer than the 2.4s this used to allow — which is how
+  // an earlier take filmed the whole app signed out while reporting success.
   const pill = page.locator('header .num').first();
-  seen.account = (await pill.count()) > 0 ? await pill.innerText() : null;
+  try {
+    await pill.waitFor({ state: 'visible', timeout: 20_000 });
+    seen.account = (await pill.innerText()).replace(/\s+/g, ' ').trim();
+  } catch {
+    seen.account = null;
+  }
+
+  await settle(page, { log });
+  // A beat on the connected header before the Portfolio scene starts reading cards.
+  await sleep(BEATS.glance);
+
   log(`  connected as: ${seen.account ?? 'NOT CONNECTED'}`);
-  if (!seen.account) log('  ! the walkthrough continues, but every app screen will be the anon state');
+  if (!seen.account) {
+    // Loud, because every screen after this one is worth less. The take still completes:
+    // the anon app is a real screen, and a run that stops has nothing to show at all.
+    log('  ! CONNECT FAILED — every app screen below is the signed-out state.');
+    log('  ! Do not ship this take. Re-run; if it repeats, the connect menu has changed.');
+  }
 
   return seen;
 }
 
 /* ── 3-7. The app ───────────────────────────────────────────────────────────────────── */
 
-/** Portfolio: position health, collateral ratio, borrow capacity. */
+/**
+ * Portfolio: position health, collateral ratio, borrow capacity.
+ *
+ * Three cards, filmed in the order a person reads them — who am I, how safe am I, what can I
+ * do. The collateral-ratio dial is the centrepiece: it renders the 180% floor and the 110%
+ * liquidation threshold on the same scale as the position, so the distance between "where I
+ * am" and "where I would be liquidated" is a length rather than a number to compute.
+ */
 async function scenePortfolio(ctx) {
   const { page, pointer, log } = ctx;
   const seen = {};
@@ -222,25 +278,43 @@ async function scenePortfolio(ctx) {
   const heading = page.locator('main h1').first();
   seen.heading = await reveal(page, heading, { hold: BEATS.glance, log });
 
-  // The health card is the one thing on this screen a viewer must actually look at, so the
-  // pointer goes to it and stays.
-  const health = page.getByText(/Position health|Collateral ratio/i).first();
+  // The oracle price, with its own age. Every other figure on the screen derives from it.
+  const price = page.getByText(/oracle updated/i).first();
+  if ((await price.count()) > 0) {
+    await pointer.moveToElement(price, { duration: 900, settle: 0 }).catch(() => {});
+    seen.price = (await price.locator('..').innerText()).replace(/\s+/g, ' ').trim();
+    log(`  price: ${seen.price}`);
+    await sleep(BEATS.glance);
+  }
+
+  // Position health and the collateral-ratio dial.
+  const health = page.getByText('Position health', { exact: false }).first();
   if ((await health.count()) > 0) {
-    await pointer.moveToElement(health, { duration: 1_000, settle: 0 });
+    await centre(page, health, { duration: 1_200, bias: 0.34 });
+    await pointer.moveToElement(health, { duration: 1_000, settle: 0 }).catch(() => {});
+    seen.health = (await health.locator('..').innerText()).replace(/\s+/g, ' ').trim().slice(0, 160);
+    log(`  health: ${seen.health}`);
     await sleep(BEATS.dwell);
   }
 
-  const metrics = page.locator('main .num');
-  const n = await metrics.count();
-  seen.metrics = [];
-  for (let i = 0; i < Math.min(n, 8); i += 1) {
-    const t = (await metrics.nth(i).innerText()).replace(/\s+/g, ' ').trim();
-    if (t) seen.metrics.push(t);
+  // Borrowing capacity — the number the 180% floor is currently holding down.
+  const capacity = page.getByText('Borrowing capacity', { exact: false }).first();
+  if ((await capacity.count()) > 0) {
+    await centre(page, capacity, { duration: 1_300, bias: 0.34 });
+    await pointer.moveToElement(capacity, { duration: 900, settle: 0 }).catch(() => {});
+    seen.capacity = (await capacity.locator('..').innerText()).replace(/\s+/g, ' ').trim().slice(0, 200);
+    log(`  capacity: ${seen.capacity}`);
+    await sleep(BEATS.dwell);
   }
-  log(`  portfolio: ${seen.heading} — ${seen.metrics.join(' | ')}`);
 
-  await scrollTo(page, 420, { duration: 1_400 });
-  await sleep(BEATS.read);
+  // The balances that back it.
+  const balances = page.getByText('Bitcoin collateral', { exact: false }).first();
+  if ((await balances.count()) > 0) {
+    await centre(page, balances, { duration: 1_200, bias: 0.38 });
+    seen.collateral = (await balances.locator('..').innerText()).replace(/\s+/g, ' ').trim();
+    log(`  collateral: ${seen.collateral}`);
+    await sleep(BEATS.read);
+  }
 
   return seen;
 }
@@ -334,63 +408,77 @@ async function scenePay(ctx) {
   await navigate(ctx, { linkName: /^Pay/i, path: '/app/pay', label: 'Pay' });
   await sleep(BEATS.read);
 
-  const handleTab = page.getByRole('tab', { name: /Handle/i }).first();
-  if ((await handleTab.count()) > 0) {
-    await pointer.click(handleTab, { after: BEATS.react });
-    await sleep(BEATS.glance);
+  // Stay on Send. `Pay` opens on it, and the other three tabs are different screens: Handle
+  // is where you claim a name of your own, not where you spend. An earlier cut of this
+  // walkthrough clicked Handle and filmed the registration form while the narration talked
+  // about sending money, which is the exact class of mistake this file exists to avoid.
+  const sendTab = page.getByRole('tab', { name: /^Send/i }).first();
+  if ((await sendTab.count()) > 0 && (await sendTab.getAttribute('aria-selected')) !== 'true') {
+    await pointer.click(sendTab, { after: BEATS.react });
   }
 
-  const field = page
-    .locator('input[placeholder*="@"], input[name="to"], input[type="text"]')
-    .first();
+  // `#pay-to` and `#pay-to-status` are the app's own ids, and the status region is wired to
+  // the input through aria-describedby — so pointing at it here films the same thing a
+  // screen reader would announce.
+  const field = page.locator('#pay-to');
   if ((await field.count()) > 0) {
+    await centre(page, field, { duration: 1_000, bias: 0.4 }).catch(() => {});
     await pointer.moveToElement(field, { duration: 900, settle: 220 });
     await page.mouse.down();
     await page.mouse.up();
     // Typed a character at a time. A field that fills instantly reads as a scripted stub;
     // watching the handle arrive letter by letter is what makes the resolution legible.
-    await field.pressSequentially(ctx.handle, { delay: 110 });
+    await field.pressSequentially(ctx.handle, { delay: 120 });
     seen.typed = ctx.handle;
     log(`  typed handle: ${ctx.handle}`);
-    // Resolution is an on-chain read; give it room and then hold on the answer.
-    await sleep(BEATS.dwell);
-    await settle(page, { log });
   } else {
-    log('  ! no recipient field found on Pay');
+    log('  ! no #pay-to field on Pay — the send form has been restructured');
   }
 
-  const resolved = page.getByText(/0x[a-fA-F0-9]{4}/).first();
-  if ((await resolved.count()) > 0) {
-    seen.resolved = await reveal(page, resolved, { hold: BEATS.read, log });
-    log(`  resolved to: ${seen.resolved}`);
-  } else {
-    const unresolved = page.getByText(/not registered|no such handle|couldn.t find/i).first();
-    if ((await unresolved.count()) > 0) {
-      seen.resolved = await reveal(page, unresolved, { hold: BEATS.read, log });
-      log(`  handle did not resolve: ${seen.resolved}`);
-    }
+  // Resolution is a real MarenRegistry lookup over RPC. Wait for the status line to stop
+  // saying it is working rather than guessing a duration.
+  const status = page.locator('#pay-to-status');
+  if ((await status.count()) > 0) {
+    await page
+      .waitForFunction(
+        () => {
+          const el = document.querySelector('#pay-to-status');
+          return el ? !/Resolving handle/i.test(el.textContent ?? '') : false;
+        },
+        undefined,
+        { timeout: 12_000 },
+      )
+      .catch(() => log('  ! the handle lookup did not settle in 12s — filming it as it is'));
+    seen.resolved = await reveal(page, status, { hold: BEATS.dwell, log });
+    log(`  resolution: ${seen.resolved}`);
   }
 
-  // The amount field, filled but never submitted. The walkthrough does not spend anything.
+  // The amount field, filled but never submitted. The walkthrough does not spend anything —
+  // and with the read-only provider it structurally cannot.
   const amount = page.locator('input[inputmode="decimal"]').first();
   if ((await amount.count()) > 0) {
     await pointer.moveToElement(amount, { duration: 800, settle: 200 });
     await page.mouse.down();
     await page.mouse.up();
-    await amount.pressSequentially('25', { delay: 180 });
-    await sleep(BEATS.dwell);
+    await amount.pressSequentially('25', { delay: 170 });
     seen.amount = '25';
+    await sleep(BEATS.read);
   }
 
   return seen;
 }
 
 /**
- * Earn: trailing yield, and the deliberate absence of a forward APY.
+ * Earn: what the pool has actually paid, and no rate anywhere.
  *
- * The empty space where a projected rate would sit is the interesting part of this screen.
- * Maren shows what the vault has actually paid and refuses to advertise what it might pay,
- * so the scene holds on that refusal rather than treating it as a gap to scroll past.
+ * There is no APY on this screen. Not a small one, not a range, not a "historical" one with
+ * an asterisk — the page does not contain the number, because Earn's yield is liquidation
+ * gains and those can be zero for months. What it says instead is that returns are
+ * irregular, and then it reports the realised figure, which for this account is nothing yet.
+ *
+ * So the honest shot is an empty result. `No return to report yet` is filmed and held for as
+ * long as a populated card would have been. A demo that skipped to a wallet with gains would
+ * be showing the same product with better luck, and this audience will check.
  */
 async function sceneEarn(ctx) {
   const { page, pointer, log } = ctx;
@@ -398,26 +486,35 @@ async function sceneEarn(ctx) {
 
   await navigate(ctx, { linkName: /^Earn/i, path: '/app/earn', label: 'Earn' });
   await settle(page, { log });
-  await sleep(BEATS.read);
+  await sleep(BEATS.glance);
 
-  const trailing = page.getByText(/Realised over the last|trailing|realised|realized/i).first();
-  if ((await trailing.count()) > 0) {
-    await centre(page, trailing, { duration: 1_100, bias: 0.4 });
-    await pointer.moveToElement(trailing, { duration: 900, settle: 0 }).catch(() => {});
-    seen.trailing = await reveal(page, trailing, { hold: BEATS.dwell, log });
-    log(`  trailing yield: ${seen.trailing}`);
+  // The framing sentence, which is the anti-APY in the app's own voice.
+  const framing = page.getByText(/Returns come from liquidations, which are irregular/i).first();
+  if ((await framing.count()) > 0) {
+    seen.framing = await reveal(page, framing, { hold: BEATS.read, log });
+    log(`  framing: ${seen.framing}`);
   }
 
-  // The sentence that does the work on this screen: Maren says what the vault HAS paid and
-  // refuses to name a rate it might pay. The absence of an APY is the feature.
-  const noForward = page
-    .getByText(/not a forecast|does not display an APY|no reliable one|forward|projected/i)
+  // Either the realised-yield card (an account with gains) or the empty state (this one).
+  // Both are true; whichever is present gets the same hold.
+  const result = page
+    .getByText(/Realised over the last|No return to report yet/i)
     .first();
-  if ((await noForward.count()) > 0) {
-    await centre(page, noForward, { duration: 1_000, bias: 0.42 });
-    seen.noForward = await reveal(page, noForward, { hold: BEATS.dwell, log });
-    log(`  no forward rate: ${seen.noForward}`);
+  if ((await result.count()) > 0) {
+    await centre(page, result, { duration: 1_100, bias: 0.4 });
+    await pointer.moveToElement(result, { duration: 900, settle: 0 }).catch(() => {});
+    seen.result = await reveal(page, result, { hold: BEATS.dwell, log });
+    log(`  earn result: ${seen.result}`);
+  } else {
+    log('  ! neither a realised figure nor the empty state is on Earn');
   }
+
+  // Belt and braces: assert to the run log that no percentage rate is being advertised.
+  // If a forward APY ever appears on this screen, the take should say so out loud.
+  const body = await page.locator('main').innerText();
+  const apy = body.match(/\b\d+(\.\d+)?\s*%\s*(APY|APR)/i);
+  seen.advertisedRate = apy ? apy[0] : null;
+  log(`  advertised rate on Earn: ${seen.advertisedRate ?? 'none — as designed'}`);
 
   return seen;
 }
@@ -430,21 +527,32 @@ async function sceneActivity(ctx) {
   await navigate(ctx, { linkName: /^Activity/i, path: '/app/activity', label: 'Activity' });
   // The activity feed scans logs in ranged chunks; this is genuinely several round trips to
   // Mezo and is the slowest read in the app.
-  await sleep(6_000);
+  // Wait for the scan to finish rather than sleeping a guessed amount: the footnote naming
+  // the block range is only rendered once the range has actually been read.
+  await page
+    .waitForSelector('text=/Read every block from|Read blocks/i', { timeout: 20_000 })
+    .catch(() => log('  ! the log scan did not report a block range in 20s'));
   await settle(page, { log });
-  await sleep(BEATS.read);
+  await sleep(BEATS.glance);
 
-  const rows = page.locator('main li, main tbody tr');
+  // A row is a transaction, and a transaction is the thing with a hash linking out to the
+  // explorer. The obvious `main li` is wrong here: the only <li>s on this screen are the
+  // bullets inside the collapsed "What these statuses mean" disclosure, so counting them
+  // reports four rows on a screen showing one and reads an empty string off a hidden node.
+  const rows = page.locator('main a[href*="/tx/"]');
   seen.rowCount = await rows.count();
   log(`  activity rows: ${seen.rowCount}`);
 
   if (seen.rowCount > 0) {
+    // The row proper is the card around the link, which is where the title, the timestamp
+    // and the amount live.
+    const firstRow = rows.first().locator('xpath=ancestor::div[2]');
     await pointer.moveToElement(rows.first(), { duration: 1_000, settle: 0 }).catch(() => {});
-    seen.firstRow = (await rows.first().innerText()).replace(/\s+/g, ' ').trim();
+    seen.firstRow = (await firstRow.innerText().catch(() => ''))
+      .replace(/\s+/g, ' ')
+      .trim();
     log(`  first row: ${seen.firstRow}`);
     await sleep(BEATS.dwell);
-    await scrollTo(page, 300, { duration: 1_300 });
-    await sleep(BEATS.read);
   } else {
     // An empty feed is a real screen and gets the same hold as a full one.
     const empty = page.getByText(/nothing here|no activity|no transactions/i).first();
