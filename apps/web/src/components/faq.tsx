@@ -77,6 +77,12 @@ const items: readonly Item[] = [
           only, is rate limited per address and per IP, and never holds user funds — compromising
           its key costs us gas, not your Bitcoin.
         </p>
+        <p>
+          <span className="text-text">Not running yet.</span> The relay hub is deployed on matsnet
+          and the contracts trust it, but the relayer service itself is not hosted anywhere — so
+          today every action in the app is submitted by your own wallet and you pay the gas. The app
+          says so on every screen rather than quoting this page back at you.
+        </p>
       </>
     ),
   },

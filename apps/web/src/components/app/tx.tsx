@@ -52,7 +52,7 @@ export interface TxDetail {
 }
 
 export interface TxIntent {
-  /** Imperative title, e.g. "Send 240.00 MUSD to @nadia". */
+  /** Imperative title, e.g. "Send 240.00 MUSD to @a-handle". */
   title: string;
   /** What the user is about to agree to, itemised. */
   details: TxDetail[];
