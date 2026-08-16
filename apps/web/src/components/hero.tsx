@@ -51,7 +51,7 @@ export function Hero() {
 
           <p className="text-text-muted mx-auto mt-6 max-w-[42rem] text-[1.0625rem] leading-relaxed">
             Deposit from <span className="num text-text">0.001 BTC</span>, draw MUSD against it, and
-            pay anyone — without selling a satoshi.
+            pay anyone without selling a satoshi.
           </p>
 
           <div className="mt-9 flex flex-col items-center gap-3 sm:flex-row sm:justify-center">

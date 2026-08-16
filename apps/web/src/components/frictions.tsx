@@ -24,7 +24,7 @@ const items: readonly Item[] = [
       'Per-user collateral, debt and ICR, computed off the same oracle',
       'Internal liquidation at 140% against the protocol’s 110%',
       'Exit any time: repay your share, withdraw your collateral',
-      'Above the protocol minimum you are steered to a direct trove instead — no pooling risk',
+      'Above the protocol minimum you are steered to a direct trove instead, with no pooling risk',
     ],
     visual: <CollateralFloor />,
   },
@@ -45,7 +45,7 @@ const items: readonly Item[] = [
     index: '03',
     friction: 'There is nowhere to spend it',
     answer: 'Payments that feel like messaging',
-    body: 'MUSD exists. A consumer-grade surface for it does not. Maren adds handles, links, requests and splits — the shapes people already use to move money.',
+    body: 'MUSD exists. A consumer-grade surface for it does not. Maren adds handles, links, requests and splits: the shapes people already use to move money.',
     points: [
       'Send to an @handle resolved on-chain by MarenRegistry',
       'Claimable links: the recipient needs no prior relationship and no BTC',

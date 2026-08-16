@@ -5,7 +5,7 @@ const steps = [
   {
     k: '01',
     title: 'Connect',
-    body: 'Any EVM wallet — injected or WalletConnect. Mezo is a standard EVM chain, so there is no special SDK and nothing to install.',
+    body: 'Any EVM wallet, injected or WalletConnect. Mezo is a standard EVM chain, so there is no special SDK and nothing to install.',
     meta: 'No BTC balance needed',
   },
   {
