@@ -5,7 +5,7 @@ import { useQueryClient } from '@tanstack/react-query';
 import { useAccount, usePublicClient } from 'wagmi';
 import type { Hex } from 'viem';
 
-import { ActionButton, AppCard, CardTitle, Info, Note } from '@/components/app/primitives';
+import { ActionButton, Info, Note, Panel } from '@/components/app/primitives';
 import { ArrowRight } from '@/components/ui/icons';
 import { useTxRunner, type TxRunner } from '@/components/app/tx';
 import {
@@ -216,22 +216,21 @@ export function HandleRegistration({ runner }: { runner: TxRunner }) {
   const taken = available === false;
 
   return (
-    <AppCard className="p-6 md:p-8">
-      <div className="flex flex-wrap items-center justify-between gap-4">
-        <CardTitle>Your handle</CardTitle>
-        {primary ? <span className="t-label text-text-subtle">{primary}</span> : null}
-      </div>
+    <Panel
+      title="Your handle"
+      meta={primary ? <span className="t-label text-text-subtle">{primary}</span> : null}
+    >
+      <div className="px-5 py-5">
+        {/* The two-transaction, 60-second shape of this flow is stated whether or not the
+            account already holds a handle. An earlier version dropped it for returning
+            users, which meant the people most likely to be claiming a SECOND handle were
+            the only ones not told why the second step makes them wait. */}
+        <p className="text-text-muted max-w-[68ch] text-sm leading-relaxed">
+          {primary ? `You hold ${primary}. ` : ''}Claiming a handle takes two transactions, 60
+          seconds apart.
+        </p>
 
-      {/* The two-transaction, 60-second shape of this flow is stated whether or not the
-          account already holds a handle. An earlier version dropped it for returning
-          users, which meant the people most likely to be claiming a SECOND handle were
-          the only ones not told why the second step makes them wait. */}
-      <p className="text-text-muted mt-3 max-w-[68ch] text-sm leading-relaxed">
-        {primary ? `You hold ${primary}. ` : ''}A handle is how people pay you without pasting an
-        address. Claiming one takes two transactions, 60 seconds apart.
-      </p>
-
-      <div className="mt-8 max-w-md">
+      <div className="mt-6 max-w-md">
         <label htmlFor="handle-input" className="t-label text-text-subtle block">
           Handle
         </label>
@@ -364,7 +363,8 @@ export function HandleRegistration({ runner }: { runner: TxRunner }) {
           </Note>
         </div>
       ) : null}
-    </AppCard>
+      </div>
+    </Panel>
   );
 }
 
