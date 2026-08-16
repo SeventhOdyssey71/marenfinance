@@ -34,6 +34,8 @@ import {
   Note,
   StatRow,
 } from '@/components/app/primitives';
+import { ConnectPrompt } from '@/components/app/connect-prompt';
+import { ProtocolPanel } from '@/components/app/protocol-panel';
 import { LivePulseFrame } from '@/components/shaders/live-pulse';
 import { ArrowRight, EarnIcon, PayIcon, VaultIcon } from '@/components/ui/icons';
 import { activityTitle, statusLabel, timeAgo } from '@/lib/copy';
@@ -74,6 +76,10 @@ export default function PortfolioPage() {
   const { data: handle } = usePrimaryHandle();
 
   const livePrice = price.state === 'live' ? price.priceWei : null;
+  const recent = activity?.items ?? [];
+
+  // Disconnected is a first-class state now, not a gap filled with demo data.
+  if (!source.connected) return <NotConnected />;
 
   /**
    * The empty account. `debtWei === 0n && collateralWei === 0n` rather than
@@ -90,7 +96,8 @@ export default function PortfolioPage() {
   const collateralUsd =
     position && livePrice ? collateralValue(position.collateralWei, livePrice) : null;
 
-  if (empty) return <NoPosition handle={handle ?? null} account={source.account} price={price} />;
+  if (empty)
+    return <NoPosition handle={handle ?? null} account={source.account ?? ''} price={price} />;
 
   return (
     <div className="flex flex-col gap-6">
@@ -98,7 +105,9 @@ export default function PortfolioPage() {
         <div>
           <Label>Account</Label>
           <h1 className="t-h2 mt-2">{handle ?? 'Your position'}</h1>
-          <p className="num text-text-subtle mt-2 text-sm">{shortAddress(source.account, 10, 8)}</p>
+          <p className="num text-text-subtle mt-2 text-sm">
+            {shortAddress(source.account ?? '', 10, 8)}
+          </p>
         </div>
         {price.state === 'live' ? <PriceBanner feed={price} /> : null}
       </div>
@@ -242,27 +251,7 @@ export default function PortfolioPage() {
       </div>
 
       {/* ------------------------------------------------------------ Gas truth */}
-      {/* The claim and its exception, in two lines. The exception is not optional: a
-          deposit carries BTC with the call and the relay hub refuses any request that
-          does, so copy promising unconditional gasless would be a lie the contracts
-          expose on the user's very first action. */}
-      <AppCard>
-        <CardTitle>Gas</CardTitle>
-        <p
-          data-contrast="gas-copy"
-          className="text-text-muted mt-4 max-w-[68ch] text-sm leading-relaxed"
-        >
-          Maren pays the Bitcoin gas for payments, Earn, and pooled borrow, repay and withdraw.
-        </p>
-        <p className="text-text-muted mt-2 max-w-[68ch] text-sm leading-relaxed">
-          <strong className="text-text font-medium">Your first deposit costs gas</strong> — it
-          carries Bitcoin with the call, and the relayer cannot sponsor that.
-        </p>
-        <Info summary="After the free tier">
-          Maren sponsors 25 actions per address per month. After that the fee is taken in MUSD
-          inside the same transaction and shown before you sign — you are never blocked at the door.
-        </Info>
-      </AppCard>
+      <GasCard />
 
       {/* ------------------------------------------------------------- Activity */}
       <AppCard>
@@ -276,7 +265,7 @@ export default function PortfolioPage() {
           </Link>
         </div>
         <div className="mt-2">
-          {(activity ?? []).slice(0, 4).map((item, index, list) => (
+          {recent.slice(0, 4).map((item, index, list) => (
             <StatRow
               key={item.id}
               label={activityTitle(item.kind, item.counterparty)}
@@ -293,12 +282,54 @@ export default function PortfolioPage() {
               last={index === Math.min(3, list.length - 1)}
             />
           ))}
-          {activity && activity.length === 0 ? (
-            <p className="text-text-subtle py-3 text-sm">Nothing yet.</p>
+          {activity && recent.length === 0 ? (
+            <p className="text-text-subtle py-3 text-sm">
+              {activity.complete
+                ? 'Nothing yet — this account has never transacted with Maren.'
+                : 'Nothing in the blocks we can scan. See Activity for the range.'}
+            </p>
           ) : null}
         </div>
       </AppCard>
     </div>
+  );
+}
+
+/**
+ * The gas card. Rewritten, because what it said stopped being true.
+ *
+ * It used to read "Maren pays the Bitcoin gas for payments, Earn, and pooled borrow,
+ * repay and withdraw", and offer a free tier of 25 sponsored actions a month. Both halves
+ * described a relayer that is not deployed anywhere — the hub exists on-chain, the service
+ * that would submit through it does not — so every user paid their own gas while the app
+ * told them otherwise.
+ *
+ * The exception outlives the relayer either way: `MarenVault.deposit()` is payable and
+ * `MarenRelayHub` reverts with `ValueNotRelayable()` on any request carrying value, so a
+ * deposit can never be sponsored no matter what is running.
+ */
+function GasCard() {
+  return (
+    <AppCard>
+      <CardTitle>Gas</CardTitle>
+      <p
+        data-contrast="gas-copy"
+        className="text-text-muted mt-4 max-w-[68ch] text-sm leading-relaxed"
+      >
+        You pay the Bitcoin gas for everything here. Maren’s relayer is not deployed yet, so every
+        action is submitted by your own wallet.
+      </p>
+      <p className="text-text-muted mt-2 max-w-[68ch] text-sm leading-relaxed">
+        <strong className="text-text font-medium">Your first deposit costs gas</strong> — and always
+        will, even once the relayer runs: it carries Bitcoin with the call, and the relay hub
+        refuses any request with value.
+      </p>
+      <Info summary="What sponsorship would change">
+        The contracts already trust <span className="num">MarenRelayHub</span> under ERC-2771, so
+        payments, Earn and pooled borrow/repay/withdraw are sponsorable by construction. Nothing is
+        running to sponsor them, and until something is, this app will not describe them as free.
+      </Info>
+    </AppCard>
   );
 }
 
@@ -469,21 +500,66 @@ function NoPosition({
       </div>
 
       {/* The gas disclosure belongs on this screen more than any other: the first
-          deposit is the one action Maren cannot sponsor, and this user is about to
+          deposit is the one action Maren can never sponsor, and this user is about to
           make it. `data-contrast` is the hook verify-contrast measures. */}
-      <AppCard>
-        <CardTitle>Gas</CardTitle>
-        <p
-          data-contrast="gas-copy"
-          className="text-text-muted mt-4 max-w-[68ch] text-sm leading-relaxed"
-        >
-          Maren pays the Bitcoin gas for payments, Earn, and pooled borrow, repay and withdraw.
+      <GasCard />
+    </div>
+  );
+}
+
+/**
+ * The screen with no wallet attached.
+ *
+ * Previously this state did not exist: `source.ts` fell back to a demo account, so an
+ * anonymous visitor saw a full portfolio belonging to nobody — a health ratio, a
+ * liquidation price, a history of payments to invented people. Removing that leaves a
+ * hole, and the hole is filled with things that are actually true and actually public:
+ * the oracle price and the pooled trove, straight from the contracts.
+ *
+ * It is a quieter first screen than the one it replaces. It is also the only one that
+ * does not fall apart when somebody checks it.
+ */
+function NotConnected() {
+  return (
+    <div className="flex flex-col gap-6">
+      <div>
+        <Label>Account</Label>
+        <h1 className="t-h2 mt-2">Your position</h1>
+        <p className="text-text-muted mt-3 max-w-[68ch] text-sm leading-relaxed">
+          Connect a wallet to read your collateral, debt and history from Mezo.
         </p>
-        <p className="text-text-muted mt-2 max-w-[68ch] text-sm leading-relaxed">
-          <strong className="text-text font-medium">Your first deposit costs gas</strong> — it
-          carries Bitcoin with the call, and the relayer cannot sponsor that.
-        </p>
-      </AppCard>
+      </div>
+
+      <ConnectPrompt icon={<VaultIcon className="size-6" />} title="No wallet connected">
+        Maren shows you your own position and nothing else — there is no sample account to look at.
+        Connect and every figure on this screen becomes a contract read you can check on the
+        explorer.
+      </ConnectPrompt>
+
+      <ProtocolPanel />
+
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+        <QuickLink
+          href="/app/vault"
+          label="Vault"
+          detail="Deposit, borrow, repay, withdraw"
+          icon={<VaultIcon className="size-5" />}
+        />
+        <QuickLink
+          href="/app/pay"
+          label="Pay"
+          detail="Send, request, or share a link"
+          icon={<PayIcon className="size-5" />}
+        />
+        <QuickLink
+          href="/app/earn"
+          label="Earn"
+          detail="Put idle MUSD to work"
+          icon={<EarnIcon className="size-5" />}
+        />
+      </div>
+
+      <GasCard />
     </div>
   );
 }

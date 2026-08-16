@@ -1,14 +1,31 @@
+/**
+ * Placeholders that could not be mistaken for accounts.
+ *
+ * These used to read `@sele`, `@mira` and `@kofi` — plausible people with plausible
+ * invoices. Two problems with that, and the second is the serious one.
+ *
+ * The small problem: the app has just deleted a seeded Activity screen built from exactly
+ * that kind of cast, and reintroducing the same names on the landing page invites the
+ * reader to wonder which other figures are furniture.
+ *
+ * The real problem: `@sele` IS REGISTERED on matsnet, to the account that deployed these
+ * contracts. This illustration was therefore attributing invented payments — an amount, a
+ * memo, a direction — to a real on-chain identity that never made them. That is a smaller
+ * version of the same fabrication, aimed at someone who cannot correct the record.
+ *
+ * So the roles are generic and the amounts are round. Nothing here resolves to anything.
+ */
 const rows = [
-  { handle: '@sele', memo: 'Dinner, split three ways', amount: '24.00', out: true },
-  { handle: '@mira', memo: 'Invoice 0114', amount: '480.00', out: false },
-  { handle: '@kofi', memo: 'Rent, August', amount: '650.00', out: true },
+  { handle: '@your-handle', memo: 'Dinner, split three ways', amount: '24.00', out: true },
+  { handle: '@a-client', memo: 'Invoice 0114', amount: '480.00', out: false },
+  { handle: '@your-landlord', memo: 'Rent, August', amount: '650.00', out: true },
 ] as const;
 
-/** F3 visual — what a payment surface for MUSD actually looks like. */
+/** F3 visual — the shape of a payment surface for MUSD. Illustrative, and labelled so. */
 export function PayThread() {
   return (
     <div className="card overflow-hidden p-6 md:p-8">
-      <p className="t-label text-text-subtle">Pay · example thread</p>
+      <p className="t-label text-text-subtle">Pay · illustration, not live data</p>
 
       <ul className="mt-7 space-y-2.5">
         {rows.map((r) => (

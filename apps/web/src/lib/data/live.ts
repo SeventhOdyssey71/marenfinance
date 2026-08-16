@@ -17,20 +17,21 @@ import {
   troveManagerAbi,
 } from '../chain/abis';
 import type { PriceObservation } from '../chain/price';
-import type { Balances, EarnPosition, Handle, Position } from './types';
+import type { Balances, EarnPosition, Handle, Position, ProtocolStats } from './types';
 
 /**
- * The live reads.
+ * The live reads. THE ONLY READS.
  *
  * Every function here is written against the real ABIs and the verified addresses in
- * `@maren/sdk`. None of it runs today, because `getMarenAddresses()` still returns zero
- * addresses and `source.ts` therefore selects the mock — but it compiles, it is typed
- * against the same contracts CI builds, and turning it on is a deployment, not a
- * rewrite. That is the point: the mock exists to make the UI demoable, not to become
- * the thing the UI is built around.
+ * `@maren/sdk`, and every one of them runs on every page load — Maren has been live on
+ * matsnet since 15 August 2026, and the mock module that used to sit beside this file is
+ * deleted. There is no longer a second implementation for any of these, which is the
+ * point: a function that can only read the chain cannot quietly start inventing.
  *
- * `packages/contracts/script/Deploy.s.sol` writes the deployed addresses back into the
- * SDK; the moment it does, `isDeployed()` flips and these functions answer instead.
+ * The header of this file previously said none of it ran and that `getMarenAddresses()`
+ * still returned zeroes. That stopped being true the day the addresses landed, and a
+ * comment asserting a product is not deployed while it is deployed is precisely the kind
+ * of stale claim this pass exists to remove.
  */
 
 export interface LiveContext {
@@ -217,6 +218,80 @@ export async function resolveHandle(ctx: LiveContext, query: string): Promise<Ha
 
   if (address === '0x0000000000000000000000000000000000000000') return null;
   return { handle: `@${handle}`, address };
+}
+
+/** MarenRegistry.available — false once a handle is taken. */
+export async function handleAvailable(ctx: LiveContext, handle: string): Promise<boolean> {
+  const maren = getMarenAddresses(ctx.network);
+  return ctx.client.readContract({
+    address: maren.marenRegistry,
+    abi: marenRegistryAbi,
+    functionName: 'available',
+    args: [handle],
+  });
+}
+
+/**
+ * The protocol's own state — no wallet required.
+ *
+ * Read straight from MUSD's TroveManager rather than from the vault's convenience view,
+ * for the same reason `hints.ts` does: `troveStatus()` reports NET debt, and the ratio a
+ * user should be shown for the shared trove is the one the protocol itself ranks and
+ * liquidates on. Reading both and quoting the vault's would understate how drawn the pool
+ * is — which, right now, is the single most decision-relevant fact on the screen, because
+ * the trove sits under Maren's own borrow floor and every borrow therefore reverts.
+ */
+export async function readProtocolStats(ctx: LiveContext): Promise<ProtocolStats> {
+  const maren = getMarenAddresses(ctx.network);
+  const musd = getMusdAddresses(ctx.network);
+
+  const [totalCollateral, status, capacity, reserve, depositsPaused, borrowingPaused] =
+    await Promise.all([
+      ctx.client.readContract({
+        address: maren.marenVault,
+        abi: marenVaultAbi,
+        functionName: 'totalCollateral',
+      }),
+      ctx.client.readContract({
+        address: maren.marenVault,
+        abi: marenVaultAbi,
+        functionName: 'troveStatus',
+      }),
+      ctx.client.readContract({
+        address: maren.marenVault,
+        abi: marenVaultAbi,
+        functionName: 'troveMaxBorrowingCapacity',
+      }),
+      ctx.client.readContract({
+        address: musd.musd,
+        abi: erc20Abi,
+        functionName: 'balanceOf',
+        args: [maren.marenVault],
+      }),
+      ctx.client.readContract({
+        address: maren.marenVault,
+        abi: marenVaultAbi,
+        functionName: 'depositsPaused',
+      }),
+      ctx.client.readContract({
+        address: maren.marenVault,
+        abi: marenVaultAbi,
+        functionName: 'borrowingPaused',
+      }),
+    ]);
+
+  const [coll, netDebt, icr] = status;
+
+  return {
+    totalCollateralWei: totalCollateral,
+    troveCollateralWei: coll,
+    troveNetDebtWei: netDebt,
+    troveIcrWei: icr,
+    reserveMusdWei: reserve,
+    troveMaxBorrowingCapacityWei: capacity,
+    depositsPaused,
+    borrowingPaused,
+  };
 }
 
 export async function reverseResolve(ctx: LiveContext, address: Address): Promise<string | null> {

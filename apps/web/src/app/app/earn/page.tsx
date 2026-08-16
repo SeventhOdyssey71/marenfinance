@@ -18,9 +18,11 @@ import {
 } from '@/components/app/primitives';
 import { TxSheet, useTxRunner, type TxIntent } from '@/components/app/tx';
 import { ArrowRight } from '@/components/ui/icons';
+import { ConnectPrompt } from '@/components/app/connect-prompt';
+import { EarnIcon } from '@/components/ui/icons';
 import { parseUnitsSafe, timeAgo } from '@/lib/copy';
-import { mutate } from '@/lib/data/mock';
-import { useBalances, useEarn } from '@/lib/data/source';
+import { gasNote, SPENDERS, useMarenWrites, useMusdAllowance } from '@/lib/chain/write';
+import { useBalances, useDataSource, useEarn } from '@/lib/data/source';
 
 /**
  * Earn — idle MUSD into the MUSD Stability Pool via MarenEarn, an ERC-4626 vault.
@@ -36,8 +38,10 @@ import { useBalances, useEarn } from '@/lib/data/source';
  * deposits — and attract capital that leaves for the next number.
  */
 export default function EarnPage() {
+  const source = useDataSource();
   const { data: earn } = useEarn();
   const { data: balances } = useBalances();
+  const writes = useMarenWrites();
   const runner = useTxRunner();
   const [mode, setMode] = useState<'deposit' | 'withdraw'>('deposit');
   const [amount, setAmount] = useState('500');
@@ -47,6 +51,41 @@ export default function EarnPage() {
   const inEarn = earn?.assetsWei ?? 0n;
   const ceiling = mode === 'deposit' ? spendable : inEarn;
   const overCeiling = wei > ceiling;
+
+  /**
+   * Depositing into an ERC-4626 pulls the asset with `transferFrom`, so MarenEarn needs an
+   * MUSD allowance first. Surfaced as its own step for the same reason the Vault does it:
+   * one press must not produce two signatures, only one of which anybody checks a receipt
+   * for. Withdrawing burns the caller's own shares and needs no allowance.
+   */
+  const { needed: needsApproval, refetch: refetchAllowance } = useMusdAllowance(
+    SPENDERS.earn,
+    mode === 'deposit' ? wei : 0n,
+  );
+
+  const approvalIntent = (): TxIntent => ({
+    title: `Approve ${formatMusd(wei)} for Earn`,
+    details: [
+      { label: 'Token', value: <span className="text-text-muted">MUSD</span> },
+      { label: 'Amount', value: <Musd wei={wei} /> },
+      {
+        label: 'Spender',
+        value: <span className="num text-text-subtle break-all text-xs">{SPENDERS.earn}</span>,
+      },
+    ],
+    gas: {
+      sponsored: false,
+      note: 'An ERC-20 approval is a transaction on MUSD itself, not on Maren, so it could never be relayed through Maren’s hub. It approves exactly this amount, not an unlimited allowance.',
+    },
+    confirmLabel: 'Approve',
+    submit: writes.ready
+      ? async () => {
+          const hash = await writes.approveMusd(SPENDERS.earn, wei);
+          refetchAllowance();
+          return hash;
+        }
+      : undefined,
+  });
 
   const intent = (): TxIntent => ({
     title:
@@ -62,13 +101,41 @@ export default function EarnPage() {
         value: <span className="text-text-muted">liquidation gains only — no fixed rate</span>,
       },
     ],
-    gas: {
-      sponsored: true,
-      note: 'No gas. Maren’s relayer pays the Bitcoin network fee for Earn deposits and withdrawals.',
-    },
+    gas: gasNote(true, 'Moves MUSD between your wallet and the Stability Pool.'),
     confirmLabel: mode === 'deposit' ? 'Deposit' : 'Withdraw',
-    simulate: () => (mode === 'deposit' ? mutate.earnDeposit(wei) : mutate.earnWithdraw(wei)),
+    submit: writes.ready
+      ? () => (mode === 'deposit' ? writes.earnDeposit(wei) : writes.earnWithdraw(wei))
+      : undefined,
   });
+
+  if (!source.connected) {
+    return (
+      <div className="flex flex-col gap-6">
+        <div>
+          <Label>Earn</Label>
+          <h1 className="t-h2 mt-2">Idle MUSD</h1>
+          <p className="text-text-muted mt-3 max-w-[68ch] text-sm leading-relaxed">
+            MUSD you are not spending goes into the Stability Pool. Returns come from liquidations,
+            which are irregular.
+          </p>
+        </div>
+
+        <ConnectPrompt icon={<EarnIcon className="size-6" />} title="Connect to use Earn">
+          {/* Carries the contrast hook while disconnected, so the muted-on-card worst case
+              is still measured on this route. The connected screen has its own. */}
+          <span data-contrast="earn-disclosure">
+            Earn holds your MUSD in the MUSD Stability Pool through an ERC-4626 vault. Maren does
+            not display an APY for Earn because there is no reliable one to display — the yield is
+            liquidation gains, which can be zero for months.
+          </span>
+        </ConnectPrompt>
+
+        <Note>
+          <p>Your MUSD absorbs liquidated debt — not principal-protected, and not guaranteed.</p>
+        </Note>
+      </div>
+    );
+  }
 
   return (
     <div className="flex flex-col gap-6">
@@ -211,13 +278,33 @@ export default function EarnPage() {
         </div>
 
         <p className="text-text-subtle mt-6 text-xs leading-relaxed">
-          No gas — Maren’s relayer pays it.
+          Costs BTC gas — Maren’s relayer is not deployed, so your own wallet submits this.
         </p>
 
-        <div className="mt-7">
+        {needsApproval ? (
+          <div className="mt-6">
+            <Note>
+              Earn has to be allowed to take {formatMusd(wei)} of your MUSD before it can be
+              deposited. That is one approval transaction, and it is shown to you rather than
+              slipped in behind the deposit.
+            </Note>
+          </div>
+        ) : null}
+
+        <div className="mt-7 flex flex-wrap gap-3">
+          {needsApproval ? (
+            <ActionButton
+              onClick={() => runner.request(approvalIntent())}
+              disabled={wei === 0n || overCeiling}
+              icon={<ArrowRight className="size-4" />}
+            >
+              Approve {formatMusd(wei)}
+            </ActionButton>
+          ) : null}
           <ActionButton
+            variant={needsApproval ? 'secondary' : 'primary'}
             onClick={() => runner.request(intent())}
-            disabled={wei === 0n || overCeiling}
+            disabled={wei === 0n || overCeiling || needsApproval}
             icon={<ArrowRight className="size-4" />}
           >
             {mode === 'deposit' ? 'Deposit into Earn' : 'Withdraw from Earn'}

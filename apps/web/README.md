@@ -33,55 +33,80 @@ answer it, which looks exactly like a network hang.
 
 ---
 
-## Mock vs live data
+## Where the data comes from
 
-**This flipped when the contracts were deployed, and the flip is the whole design.**
-Since 15 August 2026 `getMarenAddresses('testnet')` returns real matsnet addresses, so
-`isDeployed()` is true and — because `resolveNetwork()` defaults to `testnet` — **the
-app reads live from chain by default.** On `mainnet`, where the addresses are still
-zero, it runs on mock data with a disclosure banner on every screen.
+**There is one data source: the chain.** `src/lib/data/live.ts` holds every read, and
+`src/lib/data/source.ts` is the only place they are wired to React. There is no second
+implementation to fall back to.
 
-That means the demo controls (the pooled/direct account switch, the oracle-stall button)
-are no longer reachable on the default network, and the live read path in `./live.ts` is
-now the one users hit. It has **not** been exercised end to end against the deployment.
-Set `NEXT_PUBLIC_MEZO_NETWORK=mainnet` to get the mock behaviour back.
+There used to be. `src/lib/data/mock.ts` held a seeded world — a cast of handles
+(`@nadia`, `@okonkwo`, `@mira`), amounts, timestamps and **invented transaction hashes
+that Activity rendered as working links to `explorer.test.mezo.org`**, under a header
+reading "Live from Mezo testnet". A `mock`/`live` switch chose between it and the real
+reads, and it selected the mock whenever no wallet was connected — which is every first
+visit. That file, the switch, and the demo-control store beside it are deleted.
 
-The decision is made in **one place**, `src/lib/data/source.ts`:
+**Nothing in this app synthesises a hash, an address, a handle, an amount or a
+timestamp.** Not for a demo, not for a screenshot, not behind a flag. When a figure is
+unknown it renders an em dash; when a list is empty it says so; when a read fails it says
+that instead, because "empty" and "we could not look" are different claims.
 
-```ts
-export function dataMode(network = NETWORK): DataMode {
-  return isDeployed(getMarenAddresses(network).marenVault) ? 'live' : 'mock';
-}
-```
+### What a visitor without a wallet sees
 
-Everything downstream calls the same hooks — `usePosition()`, `usePrice()`,
-`useBalances()`, `useEarn()`, `useActivity()` — and those hooks pick a side. No screen
-branches on the mode; the only component that knows about it is the banner that discloses
-it.
+Empty states, and `ProtocolPanel` — the BTC/USD oracle precompile, `MarenVault.troveStatus()`
+and the vault's MUSD reserve. Those are public, real, and repeatable by anyone with an RPC.
+It is a quieter first screen than the demo portfolio it replaces, and it is the only one
+that survives being checked.
 
-| File                     | Role                                                                                                                                    |
-| ------------------------ | --------------------------------------------------------------------------------------------------------------------------------------- |
-| `src/lib/data/source.ts` | **The gate.** Hooks, query keys, and the `isDeployed()` check.                                                                          |
-| `src/lib/data/live.ts`   | Real viem reads against real ABIs and the SDK's verified addresses. Compiled and typechecked today; selected the moment addresses land. |
-| `src/lib/data/mock.ts`   | Demo state. Two accounts (direct trove, pooled), a drifting BTC price, seeded activity, requests and links.                             |
-| `src/lib/data/demo.ts`   | The demo controls — switch account, stall the oracle. Mock mode only.                                                                   |
-| `src/lib/chain/abis.ts`  | ABIs transcribed from `packages/contracts/src/*.sol`. Nothing invented.                                                                 |
+| File                      | Role                                                                                                                  |
+| ------------------------- | --------------------------------------------------------------------------------------------------------------------- |
+| `src/lib/data/source.ts`  | The hooks and their query keys. Live-only; `isDeployed()` now selects an honest unavailable state rather than a mock. |
+| `src/lib/data/live.ts`    | Every contract read, against the verified addresses in `@maren/sdk`.                                                  |
+| `src/lib/chain/logs.ts`   | Activity, decoded from `eth_getLogs`.                                                                                 |
+| `src/lib/chain/write.ts`  | Every transaction the app can send. Chain-guarded, hinted off-chain, simulated before signing.                        |
+| `src/lib/chain/handle.ts` | Commit-reveal handle registration and the secret's storage.                                                           |
+| `src/lib/chain/errors.ts` | Custom errors decoded into English. `errors.test.ts` asserts none can render as hex.                                  |
+| `src/lib/chain/abis.ts`   | ABIs transcribed from `packages/contracts/src/*.sol`. Nothing invented.                                               |
 
-### Turning it live
+### Activity, and the 10,000-block limit
 
-1. Deploy with `packages/contracts/script/Deploy.s.sol`.
-2. Write the addresses into `MAREN_ADDRESSES` in `packages/sdk/src/addresses.ts`.
-3. Nothing else. `isDeployed()` flips, `source.ts` selects `live.ts`, the banner
-   disappears, and the same screens read from chain.
+Activity reads `MarenVault`, `MarenPay` and `MarenEarn` logs directly. **Mezo's public RPC
+refuses any `eth_getLogs` spanning more than 10,000 blocks** — a wider range returns
+`{"code":-32000,"message":"maximum [from, to] blocks distance: 10000"}`. At matsnet's
+~4.7-second blocks that is roughly thirteen hours per request.
 
-Two reads stay mocked past that point and say so in the code:
+So the reader walks backwards in 10,000-block windows from the head, up to
+`MAX_WINDOWS` (6, about 3.3 days) or until it reaches `MAREN_DEPLOYMENT_BLOCK` — whichever
+comes first. That constant is in `packages/sdk/src/addresses.ts`, derived by bisecting
+`eth_getCode` rather than copied from a deploy log.
 
-- **Activity** needs the Goldsky index described in `docs/ARCHITECTURE.md` §4. There is no
-  public Mezo subgraph to read instead.
-- **Earn's trailing yield** is the sum of share-price movement across a window, which
-  needs `Harvested` event history. The live path reports a zero-length window rather than
-  inventing a figure — a fabricated trailing return is the same dishonesty as a forward
-  APY, only backdated.
+Reaching the deployment block matters more than the span: **if the scan reached it, an
+empty result means "this account has never transacted", which is a fact.** If it did not,
+an empty result only means "nothing in the last few days", and the screen says that
+instead. `ActivityWindow.complete` carries the distinction and the UI renders a different
+empty state for each. The coverage line under the list always states the exact block range
+that was read.
+
+**This is the honest ceiling, not a finished answer.** Today the contracts are young
+enough that one window covers their entire history, so `complete` is true and the whole
+ledger is on screen. As the chain moves on, older history will fall outside the window and
+the app will say so rather than quietly truncating. The fix is an indexer
+(`docs/ARCHITECTURE.md` §4), not a larger number here — a page load that fans out to
+hundreds of RPC calls is its own kind of dishonesty about what the app can do.
+
+**Earn's trailing yield** has the same shape of limit: it needs `Harvested` event history
+to be meaningful, so the live path reports a zero-length window and the screen renders
+"No return to report yet" rather than inventing a figure. A fabricated trailing return is
+the same dishonesty as a forward APY, only backdated.
+
+### What is deliberately not wired
+
+**No relayer is deployed.** `MarenRelayHub` exists on matsnet and the contracts trust it
+under ERC-2771, but `apps/relayer` runs on no host, so there is nothing to submit through
+it. `RELAYER_AVAILABLE` in `src/lib/chain/write.ts` is the single place that fact lives,
+and `gasNote()` reads from it, so every gas claim in the product says the user pays —
+because the user does. Nothing is routed through the hub and no action is simulated to
+paper over its absence.
 
 ---
 
@@ -93,8 +118,13 @@ These are product commitments, not implementation details. Each has a check in
 **A transaction hash is not a success.** `src/lib/chain/receipt.ts` is the only place that
 decides what "delivered" means, and it means a receipt with `status === 'success'`. The
 `Delivered` type carries a unique symbol, so it cannot be constructed without going
-through that check. In mock mode the sheet says _Simulated — nothing was broadcast_; it
-never borrows the language of a receipt it did not fetch.
+through that check. The sheet shows the explorer link the moment a hash exists and still
+says _Submitted. Waiting for a receipt_ until one comes back.
+
+**There is no simulated path.** The transaction runner used to have one, for mock mode.
+Every action now either produces a real hash or fails with a decoded reason, and an action
+the app cannot perform is disabled at the button with that reason beside it — never
+offered and then faked.
 
 **A stale price is never rendered as live.** Mezo's oracle reverts above 60 seconds of
 staleness. `src/lib/chain/price.ts` models a price as a discriminated union where only the
@@ -102,10 +132,12 @@ staleness. `src/lib/chain/price.ts` models a price as a discriminated union wher
 is blocked; repay stays open; withdrawal stays open whenever the contract allows it
 (`vaultActionGate()` reads its rules off `MarenVault.sol`'s own per-entrypoint notes).
 
-**Gasless copy is per-action.** `MarenVault.deposit()` is payable and `MarenRelayHub`
-reverts on any request carrying value, so a first deposit costs the user BTC gas and
-everything after it is sponsored. Nowhere in this app does it say "no gas, ever" — there
-is a check that fails the build if it ever does.
+**Gas copy describes what is actually running.** No relayer is deployed, so the app says
+the user pays — everywhere. Separately and permanently, `MarenVault.deposit()` is payable
+and `MarenRelayHub` reverts on any request carrying value, so a deposit can never be
+sponsored even once a relayer exists. `verify-behaviour.mjs` asserts all three: that the
+copy never says "no gas, ever", that it states the first-deposit exception, and that it
+does not claim Maren pays while `RELAYER_AVAILABLE` is false.
 
 **Borrowing capacity is the contract's ceiling.** `TroveManager.getTroveMaxBorrowingCapacity()`,
 never an ICR-derived estimate. Mezo fixes that ceiling at the price the trove opened at and
@@ -113,6 +145,12 @@ adding collateral does not raise it, so both limits are shown and the binding on
 
 **No forward APY on Earn.** The Stability Pool has no emissions. Trailing realised MUSD
 only, labelled backward-looking, with the liquidation-event count kept visible.
+
+**Every custom error decodes into English.** `src/lib/chain/errors.ts` maps all ~50 of
+them, and `errors.test.ts` walks the whole table asserting that none renders as a
+selector and none reaches the "no plain-language mapping yet" fallback. Its fixture for
+`InsufficientCollateralRatio` is the literal revert data matsnet returned for a real
+reverted borrow, not a hand-written blob.
 
 **All position maths comes from `@maren/sdk`.** It is not composed locally any more:
 what used to be `src/lib/vault.ts` now lives in `packages/sdk/src/borrow.ts`, because a
@@ -127,14 +165,29 @@ or a number format.
 All three scripts need a build running on port 3000 and use `playwright-core`:
 
 ```bash
+CI=true pnpm --filter @maren/web test          # the revert decoder, offline
 CI=true NEXT_PUBLIC_MEZO_NETWORK=testnet pnpm --filter @maren/web build
 CI=true NEXT_PUBLIC_MEZO_NETWORK=testnet pnpm --filter @maren/web start &
 
 export PLAYWRIGHT_CORE=/path/to/node_modules/playwright-core/index.js
-node scripts/screenshot.mjs        # .screenshots/ — every route at 1440 and 390
-node scripts/verify-behaviour.mjs  # a11y, the rules above, 390px overflow
+export MAREN_TEST_PRIVATE_KEY=0x...   # a throwaway matsnet key, needs only gas
+
+node scripts/verify-behaviour.mjs  # 69 checks: a11y, the rules above, 390px overflow
 node scripts/verify-contrast.mjs   # worst-case contrast against what is actually painted
+node scripts/prove-onchain.mjs     # drives a real handle registration, prints the hashes
+node scripts/prove-activity.mjs    # renders real history, then diffs it against eth_getLogs
 ```
+
+**`verify-behaviour.mjs` needs a key, and that is the point.** It runs twice: once
+disconnected, asserting the empty states and that no invented handle, hash or counterparty
+has come back; once with a real signer injected at `window.ethereum`
+(`scripts/injected-wallet.mjs`), asserting live registry resolution, the minimum-deposit
+refusal and the two-step handle flow. Signing happens in Node, so key material never
+enters the page. The account needs only gas — every connected assertion is about an
+account that owns nothing, which is the state most users arrive in.
+
+The checks used to reach their interesting states by clicking a "Demo controls" panel that
+only existed in mock mode. There is no mock mode, so they reach them the way a user does.
 
 **Screenshot with WebGL enabled.** The scripts pass `--use-gl=angle`. Running Chrome with
 `--disable-gpu` renders no shader at all, which makes a working page look broken — the
