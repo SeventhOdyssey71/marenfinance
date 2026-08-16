@@ -65,8 +65,8 @@ export function PriceBanner({ feed, className = '' }: { feed: PriceFeed; classNa
           Last known price{' '}
           <span className="num decoration-text-subtle line-through">
             {formatUsd(feed.lastKnownWei)}
-          </span>{' '}
-          — nothing is computed from it.
+          </span>
+          . Nothing is computed from it.
         </p>
       ) : null}
     </div>

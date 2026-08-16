@@ -434,7 +434,7 @@ function Confirming({
       ) : null}
       {signing ? (
         <p className="text-text-muted mt-3 max-w-[52ch] text-sm leading-relaxed">
-          It would succeed against the chain as it is right now. Approve it in your wallet — this is
+          It would succeed against the chain as it is right now. Approve it in your wallet. This is
           the only signature this action needs.
         </p>
       ) : null}
@@ -489,7 +489,7 @@ function Pending({ intent, hash }: { intent: TxIntent; hash: Hash }) {
         {intent.title}
       </h2>
       <p className="text-text-muted mt-3 max-w-[52ch] text-sm leading-relaxed">
-        Waiting for a receipt. A transaction hash is not a result — nothing is marked delivered
+        Waiting for a receipt. A transaction hash is not a result, so nothing is marked delivered
         until the chain returns one with <span className="num">status success</span>.
       </p>
       {/* The explorer link appears WITH THE HASH, not with the receipt. A user watching a

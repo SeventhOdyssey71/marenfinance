@@ -26,7 +26,7 @@ const HASH = '0xaaaabbbbccccddddeeeeffff0000111122223333444455556666777788889999
 
 // ── R12: no bare custom URL scheme ───────────────────────────────────────────
 
-describe('R12 — auth redirect must be a verified universal link', () => {
+describe('R12: auth redirect must be a verified universal link', () => {
   it('rejects the exact failure mode Talise shipped: a custom scheme', () => {
     // Talise M1: the bearer token arrived over `talise://`, claimable by any other app.
     expect(() => assertVerifiableRedirect('maren://auth/callback')).toThrow(InsecureRedirectError);
@@ -55,7 +55,7 @@ describe('R12 — auth redirect must be a verified universal link', () => {
   });
 });
 
-describe('R12 — CSRF state is compared in constant time', () => {
+describe('R12: CSRF state is compared in constant time', () => {
   it('matches only identical strings', () => {
     expect(timingSafeEqualString('abc123', 'abc123')).toBe(true);
     expect(timingSafeEqualString('abc123', 'abc124')).toBe(false);
@@ -73,7 +73,7 @@ describe('R12 — CSRF state is compared in constant time', () => {
   });
 });
 
-describe('R12 — callback validation', () => {
+describe('R12: callback validation', () => {
   const state = 'f'.repeat(64);
 
   it('returns the code when origin and state both check out', () => {
@@ -108,7 +108,7 @@ function clientReturning(receipt: Partial<TransactionReceipt>) {
   };
 }
 
-describe('R15 — only a receipt with status success is a delivery', () => {
+describe('R15: only a receipt with status success is a delivery', () => {
   it('treats status "success" as delivered', async () => {
     const outcome = await confirmTransaction(
       clientReturning({

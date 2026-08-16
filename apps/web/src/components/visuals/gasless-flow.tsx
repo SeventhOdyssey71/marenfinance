@@ -4,7 +4,7 @@ const steps = [
   {
     k: '01',
     title: 'You sign',
-    body: 'An EIP-712 ForwardRequest. A signature, not a transaction — so it costs no gas.',
+    body: 'An EIP-712 ForwardRequest. A signature, not a transaction, so it costs no gas.',
   },
   {
     k: '02',
@@ -52,7 +52,7 @@ export function GaslessFlow() {
         <span className="num text-2xl font-medium text-violet-400">25</span>
         <span className="text-text-muted text-sm">
           free actions per address. After that, a small fee is taken in MUSD inside the same
-          transaction — never in BTC.
+          transaction, never in BTC.
         </span>
       </div>
 

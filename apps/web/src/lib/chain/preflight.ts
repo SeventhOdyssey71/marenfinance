@@ -301,7 +301,7 @@ export function preflightBorrow(state: VaultState, amountWei: bigint): Preflight
         'position',
         'Nothing to borrow against',
         `Borrowing needs collateral. Deposit at least ${formatBtc(MAREN_VAULT.minDeposit)} of ` +
-          `Bitcoin first — it stays yours, and you can withdraw it.`,
+          `Bitcoin first. It stays yours, and you can withdraw it.`,
       ),
       { rangeDead: true },
     );

@@ -37,7 +37,7 @@ export default function WalletSetup() {
 
       <Txt variant="body" tone="muted" style={styles.intro}>
         Maren is non-custodial. The key that signs your transactions is generated on this device and
-        never leaves it — we cannot see it, move your funds, or recover it for you.
+        never leaves it. We cannot see it, move your funds, or recover it for you.
       </Txt>
 
       {/* Key protection, stated before the choice rather than after it. */}
@@ -61,7 +61,7 @@ export default function WalletSetup() {
           {cap === null
             ? 'Reading the Secure Enclave capabilities.'
             : protectedByBiometrics
-              ? `Your key is written to the iOS Keychain with requireAuthentication, so ${biometricName(cap)} is required every time it is read — which is every time you sign.`
+              ? `Your key is written to the iOS Keychain with requireAuthentication, so ${biometricName(cap)} is required every time it is read, which is every time you sign.`
               : cap.available
                 ? 'No Face ID or Touch ID is enrolled. Rather than write an unprotected key to disk, Maren will keep it in memory for this session only and will not persist it. Enrol biometrics in iOS Settings to store it properly.'
                 : `${cap.reason} Rather than write an unprotected key to disk, Maren will keep it in memory for this session only.`}

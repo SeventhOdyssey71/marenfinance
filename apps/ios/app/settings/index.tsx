@@ -203,7 +203,7 @@ export default function Settings() {
           />
           <StatRow
             label="App Attest"
-            hint="not implemented in this build — we do not claim it"
+            hint="not implemented in this build, and we do not claim it"
             value={
               <Txt variant="small" tone="muted">
                 Not used
@@ -224,8 +224,8 @@ export default function Settings() {
         <Txt variant="small" tone="muted" style={styles.authBody}>
           The auth callback arrives only on {AUTH_REDIRECT_URI}, a universal link Apple verifies
           against this app’s entitlement, with a 256-bit CSRF token compared in constant time. A
-          custom scheme is claimable by any other app on the device, so Maren refuses to accept one
-          — the check is in code, not in a policy document.
+          custom scheme is claimable by any other app on the device, so Maren refuses to accept one.
+          The check is in code, not in a policy document.
         </Txt>
       </Card>
 
@@ -272,8 +272,8 @@ export default function Settings() {
       />
 
       <Txt variant="small" tone="muted" style={styles.signOutNote}>
-        Signing out deletes the key from the Keychain. Maren holds no copy — without your own backup
-        the funds it controls are unrecoverable.
+        Signing out deletes the key from the Keychain. Maren holds no copy, so without your own
+        backup the funds it controls are unrecoverable.
       </Txt>
     </Screen>
   );

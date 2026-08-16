@@ -555,8 +555,8 @@ const check = (name, pass, detail = '') => {
   const handlePanel = await page.locator('main').innerText();
   check(
     'handle: registration is presented as two steps with the 60s wait explained',
-    /step 1 — commit/i.test(handlePanel) &&
-      /step 2 — claim/i.test(handlePanel) &&
+    /step 1: commit/i.test(handlePanel) &&
+      /step 2: claim/i.test(handlePanel) &&
       /60 seconds/i.test(handlePanel),
   );
   check(
