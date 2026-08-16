@@ -60,28 +60,24 @@ const items: readonly Item[] = [
     a: (
       <>
         <p>
-          It means Maren pays the BTC gas, not that gas stopped existing. You sign an EIP-712
-          request; our relayer verifies it, simulates it, submits it, and settles the BTC out of its
-          own hot key.
+          <strong className="text-text font-medium">
+            Today it means nothing: you pay your own gas.
+          </strong>{' '}
+          Maren is built so that it will not stay that way, but the service that would pay for you
+          is not running anywhere, and the app says so on every screen rather than quoting this page
+          back at you.
         </p>
         <p>
-          One exception, and it is the first thing you will do: depositing BTC sends BTC, and a
-          transaction carrying value cannot be relayed by anyone. So your{' '}
-          <span className="text-text">first deposit costs gas</span>. Everything after it — borrow,
-          repay, withdraw, and every payment — is sponsored.
+          When it does run, it means Maren pays the Bitcoin fee rather than that the fee stopped
+          existing. You sign; Maren checks what you signed, tries the call, and pays. Whatever
+          submits for you can only ever touch Maren&rsquo;s own contracts, and can never move your
+          Bitcoin.
         </p>
         <p>
-          The first <span className="num text-text">25</span> actions per address are free. After
-          that a small fee is taken in MUSD inside the same transaction. New users are never blocked
-          at the door. The relayer is allowlisted to Maren contracts and known function selectors
-          only, is rate limited per address and per IP, and never holds user funds — compromising
-          its key costs us gas, not your Bitcoin.
-        </p>
-        <p>
-          <span className="text-text">Not running yet.</span> The relay hub is deployed on matsnet
-          and the contracts trust it, but the relayer service itself is not hosted anywhere — so
-          today every action in the app is submitted by your own wallet and you pay the gas. The app
-          says so on every screen rather than quoting this page back at you.
+          One thing is exempt permanently, and it is the first thing you will do: depositing Bitcoin{' '}
+          <em className="text-text not-italic">sends</em> Bitcoin, and nobody can submit a
+          transaction carrying value on your behalf. Your{' '}
+          <span className="text-text">first deposit costs gas</span> and always will.
         </p>
       </>
     ),
