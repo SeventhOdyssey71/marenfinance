@@ -40,7 +40,7 @@ export function HandleRegistration({ runner }: { runner: TxRunner }) {
   const source = useDataSource();
   const { address } = useAccount();
   const client = usePublicClient();
-  const writes = useMarenWrites();
+  const writes = useMarenWrites({ onSimulated: runner.onSimulated });
   const queryClient = useQueryClient();
   const { data: primary } = usePrimaryHandle();
 
@@ -132,6 +132,14 @@ export function HandleRegistration({ runner }: { runner: TxRunner }) {
 
       runner.request({
         title: `Commit to @${handle}`,
+        successTitle: `Committed to @${handle}`,
+        changes: [
+          {
+            label: 'Registration',
+            before: <span className="text-text-subtle">not started</span>,
+            after: <span className="text-text">step 1 of 2 done</span>,
+          },
+        ],
         details: [
           { label: 'Handle', value: <span className="text-text">@{handle}</span> },
           {
@@ -170,6 +178,14 @@ export function HandleRegistration({ runner }: { runner: TxRunner }) {
     if (!pending) return;
     runner.request({
       title: `Claim @${pending.handle}`,
+      successTitle: `Registered @${pending.handle}`,
+      changes: [
+        {
+          label: 'Your handle',
+          before: <span className="text-text-subtle">{primary ?? 'none'}</span>,
+          after: <span className="text-text">@{pending.handle}</span>,
+        },
+      ],
       details: [
         { label: 'Handle', value: <span className="text-text">@{pending.handle}</span> },
         {
@@ -194,7 +210,7 @@ export function HandleRegistration({ runner }: { runner: TxRunner }) {
           }
         : undefined,
     });
-  }, [committedAt, pending, runner, writes]);
+  }, [committedAt, pending, primary, runner, writes]);
 
   /**
    * Once the handle resolves to this account the secret is worthless, so it is deleted.
@@ -278,7 +294,7 @@ export function HandleRegistration({ runner }: { runner: TxRunner }) {
       {/* --- the two steps ---------------------------------------------------- */}
       <ol className="mt-8 flex flex-col gap-6">
         <li>
-          <p className="t-label text-text-subtle">Step 1 — commit</p>
+          <p className="t-label text-text-subtle">Step 1: commit</p>
           <p className="text-text-muted mt-2 max-w-[68ch] text-sm leading-relaxed">
             Publishes a hash of the handle, your address and a random secret. The name itself stays
             private until step two.
@@ -302,7 +318,7 @@ export function HandleRegistration({ runner }: { runner: TxRunner }) {
         </li>
 
         <li>
-          <p className="t-label text-text-subtle">Step 2 — claim</p>
+          <p className="t-label text-text-subtle">Step 2: claim</p>
           <p className="text-text-muted mt-2 max-w-[68ch] text-sm leading-relaxed">
             {!pending ? (
               'Available once a commitment for this handle exists in this browser.'
@@ -313,7 +329,7 @@ export function HandleRegistration({ runner }: { runner: TxRunner }) {
             ) : secondsRemaining > 0 ? (
               <>
                 <span className="num text-text">{secondsRemaining}s</span> to go. MarenRegistry
-                refuses a reveal younger than 60 seconds — that delay is what makes copying your
+                refuses a reveal younger than 60 seconds. That delay is what makes copying your
                 commitment from the mempool useless.
               </>
             ) : (

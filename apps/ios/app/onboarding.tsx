@@ -141,7 +141,7 @@ export default function Onboarding() {
                     #0C0C0F falls under 4.5:1. Risk copy is never the dimmest text. */}
                 <Txt variant="small" tone="muted">
                   Small positions share one trove. Your collateral is segregated in accounting, not
-                  in custody — a drawdown faster than the keeper can respond could socialise losses.
+                  in custody. A drawdown faster than the keeper can respond could socialise losses.
                   Above 0.079 BTC, Maren opens you a direct trove instead, which carries no pooling
                   risk.
                 </Txt>

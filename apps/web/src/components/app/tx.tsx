@@ -3,28 +3,26 @@
 import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { usePublicClient } from 'wagmi';
-import { getChain } from '@maren/sdk';
+import { getChain, shortHash } from '@maren/sdk';
 import type { Hash } from 'viem';
 
 import { explainError, type RevertReason } from '@/lib/chain/errors';
 import { confirmTransaction, describeOutcome, type TxOutcome } from '@/lib/chain/receipt';
 import { NETWORK } from '@/lib/data/source';
-import { ActionButton } from './primitives';
-import { ArrowRight } from '@/components/ui/icons';
+import { PillAction } from '@/components/ui/pill-button';
+import { ArrowRight, ArrowUpRight, Check, CopyIcon } from '@/components/ui/icons';
 
 /**
- * The transaction runner and its confirmation sheet.
+ * The transaction runner and its sheet.
  *
  * THERE IS NO SIMULATED PATH ANY MORE. This component used to have one: when the app was
  * in mock mode it slept 420ms, mutated a local store, and told the user "Simulated —
- * nothing was broadcast". That was honest as far as it went, but it meant every button in
- * the product had a branch that could satisfy a user without touching the chain. Every
- * action now either produces a real transaction hash or fails with a reason, and an action
- * the app cannot perform is DISABLED AT THE BUTTON with that reason next to it — never
- * offered and then faked.
+ * nothing was broadcast". Every action now either produces a real transaction hash or
+ * fails with a reason, and an action the app cannot perform is DISABLED AT THE BUTTON with
+ * that reason next to it — see `lib/chain/preflight.ts` — never offered and then faked.
  *
- * Three rules survive, and they are why this is one shared component rather than a pattern
- * each screen repeats:
+ * FOUR RULES, and they are why this is one shared component rather than a pattern each
+ * screen repeats:
  *
  *   1. NOTHING IS CONFIRMED WITHOUT A RECEIPT. `submit` returns a hash; `confirmTransaction`
  *      is the only code in the app that decides what "delivered" means. A hash on its own
@@ -33,10 +31,18 @@ import { ArrowRight } from '@/components/ui/icons';
  *      pending transaction should be able to go and look at it.
  *   3. A REFUSAL IS EXPLAINED. Every failure runs through `explainError`, which decodes the
  *      contract's own custom errors into language. A user told `0x7d1cc1b3…` has been told
- *      nothing.
+ *      nothing. The decoded sentence leads; the Solidity name is secondary.
+ *   4. THE SHEET LEADS WITH THE OUTCOME, NOT THE HASH. A live screenshot of a successful
+ *      deposit showed a 66-character hash wrapping across two lines of low-contrast mono,
+ *      dominating a sheet that never once said what had changed. The hash is now truncated
+ *      behind a copy button and the headline is "Deposited 0.001 BTC" with the collateral
+ *      before and after it. The full value belongs behind Copy; nobody reads 66 characters.
  *
- * The confirmation step is not decoration either: it is where a payment's resolved address
- * is shown next to the handle it came from, before anything is signed.
+ * THE PHASES ARE THE POINT OF THE MIDDLE OF THIS FILE. `checking` and `signing` are
+ * separate states because they are separate facts: during `checking` nothing has been
+ * asked of the user and an `eth_call` is deciding whether this can succeed at all; during
+ * `signing` their wallet is open. A failure that arrives without `signing` ever being
+ * reached is a failure that cost nothing, and the sheet says so in those words.
  */
 
 const explorer = getChain(NETWORK).blockExplorers?.default.url ?? '';
@@ -51,11 +57,33 @@ export interface TxDetail {
   value: ReactNode;
 }
 
+/**
+ * One figure this transaction moves, before and after.
+ *
+ * The sheet's whole job on success is to answer "what changed", and a deposit that
+ * confirms without naming the resulting collateral has answered nothing. Computed by the
+ * screen, which is the only place that knows what the figure means.
+ */
+export interface TxChange {
+  label: string;
+  before: ReactNode;
+  after: ReactNode;
+}
+
 export interface TxIntent {
   /** Imperative title, e.g. "Send 240.00 MUSD to @a-handle". */
   title: string;
-  /** What the user is about to agree to, itemised. */
+  /**
+   * Past-tense headline for the delivered state, e.g. "Deposited 0.001 BTC".
+   *
+   * Falls back to `title`, which is imperative and reads oddly under a green tick, so
+   * every screen should set it.
+   */
+  successTitle?: string;
+  /** What the user is about to agree to, itemised. Shown while confirming. */
   details: TxDetail[];
+  /** What this transaction moved. Shown once it has been delivered. */
+  changes?: TxChange[];
   /**
    * Gas truth for THIS action. Never a blanket claim: MarenVault.deposit() is payable,
    * the relay hub refuses any request carrying value, so a deposit costs BTC gas while
@@ -67,9 +95,12 @@ export interface TxIntent {
   /**
    * Submits the real transaction and returns its hash, or throws.
    *
+   * Simulates first — see `simulateThenSign` in `lib/chain/write.ts`. A throw from the
+   * simulation lands in the `error` phase with the contract's decoded reason and nothing
+   * signed.
+   *
    * Optional only because a screen may build an intent before a signer exists. Reaching
-   * the sheet without it is a bug, and it is reported as one rather than smoothed over —
-   * see `run`.
+   * the sheet without it is a bug, and it is reported as one rather than smoothed over.
    */
   submit?: () => Promise<Hash>;
   /** Label for the confirm button. */
@@ -79,10 +110,18 @@ export interface TxIntent {
 type Phase =
   | { name: 'idle' }
   | { name: 'confirm'; intent: TxIntent }
-  | { name: 'submitting'; intent: TxIntent }
+  /** An `eth_call` is running. Nothing has been asked of the user. */
+  | { name: 'checking'; intent: TxIntent }
+  /** Simulation passed; the wallet is open. */
+  | { name: 'signing'; intent: TxIntent }
   | { name: 'pending'; intent: TxIntent; hash: Hash }
   | { name: 'settled'; intent: TxIntent; outcome: TxOutcome; reason: RevertReason | null }
-  | { name: 'error'; intent: TxIntent; reason: RevertReason };
+  /**
+   * Never reached the chain. `signed` records whether the wallet was ever opened, which
+   * is the difference between "we refused this for you, at no cost" and "your wallet
+   * returned an error".
+   */
+  | { name: 'error'; intent: TxIntent; reason: RevertReason; signed: boolean };
 
 export interface TxRunner {
   phase: Phase;
@@ -90,6 +129,11 @@ export interface TxRunner {
   request: (intent: TxIntent) => void;
   /** Carries out a confirmed intent. Called by the sheet, not by screens. */
   run: (intent: TxIntent) => Promise<void>;
+  /**
+   * Pass to `useMarenWrites({ onSimulated })`. Moves the sheet from "checking" to
+   * "waiting for your wallet" at the exact moment the simulation passes.
+   */
+  onSimulated: () => void;
   close: () => void;
 }
 
@@ -98,10 +142,25 @@ export function useTxRunner(): TxRunner {
   const client = usePublicClient();
   const queryClient = useQueryClient();
 
+  /**
+   * Whether the wallet has been opened for the transaction currently in flight.
+   *
+   * A ref rather than state because the value is read inside `run`'s catch, and a state
+   * update queued from `onSimulated` would not be visible there in the same tick.
+   */
+  const signedRef = useRef(false);
+
   const request = useCallback((intent: TxIntent) => setPhase({ name: 'confirm', intent }), []);
 
   const close = useCallback(() => {
     setPhase({ name: 'idle' });
+  }, []);
+
+  const onSimulated = useCallback(() => {
+    signedRef.current = true;
+    setPhase((current) =>
+      current.name === 'checking' ? { name: 'signing', intent: current.intent } : current,
+    );
   }, []);
 
   const run = useCallback(
@@ -118,6 +177,7 @@ export function useTxRunner(): TxRunner {
         setPhase({
           name: 'error',
           intent,
+          signed: false,
           reason: {
             name: null,
             title: 'Nothing to sign with',
@@ -129,14 +189,17 @@ export function useTxRunner(): TxRunner {
         return;
       }
 
-      setPhase({ name: 'submitting', intent });
+      signedRef.current = false;
+      setPhase({ name: 'checking', intent });
+
       let hash: Hash;
       try {
         hash = await intent.submit();
       } catch (error) {
         // Includes the pre-flight simulation, so a doomed borrow lands here with its
-        // decoded reason and the user has neither signed nor spent gas.
-        setPhase({ name: 'error', intent, reason: explainError(error) });
+        // decoded reason and the user has neither signed nor spent gas. `signed` is what
+        // lets the sheet make that promise out loud rather than leaving it implied.
+        setPhase({ name: 'error', intent, reason: explainError(error), signed: signedRef.current });
         return;
       }
 
@@ -171,15 +234,33 @@ export function useTxRunner(): TxRunner {
     [client, queryClient],
   );
 
-  return { phase, request, run, close };
+  return { phase, request, run, onSimulated, close };
 }
+
+// ── the sheet ────────────────────────────────────────────────────────────────
+
+type Tone = 'neutral' | 'success' | 'danger' | 'warning';
+
+const toneText: Record<Tone, string> = {
+  neutral: 'text-text-muted',
+  success: 'text-success',
+  danger: 'text-danger',
+  warning: 'text-warning',
+};
+
+const toneDot: Record<Tone, string> = {
+  neutral: 'bg-text-subtle',
+  success: 'bg-success',
+  danger: 'bg-danger',
+  warning: 'bg-warning',
+};
 
 export function TxSheet({ runner }: { runner: TxRunner }) {
   const { phase, run } = runner;
   const dialogRef = useRef<HTMLDivElement | null>(null);
   const restoreRef = useRef<HTMLElement | null>(null);
   const open = phase.name !== 'idle';
-  const busy = phase.name === 'submitting' || phase.name === 'pending';
+  const busy = phase.name === 'checking' || phase.name === 'signing' || phase.name === 'pending';
 
   useEffect(() => {
     if (!open) return;
@@ -187,6 +268,9 @@ export function TxSheet({ runner }: { runner: TxRunner }) {
     // Focus the dialog itself, so a screen reader announces the title before the
     // buttons and Tab lands inside rather than behind.
     dialogRef.current?.focus();
+    // Returning focus to the control that opened the sheet is not a nicety here: with the
+    // preflight work, the trigger is often a button that is about to become disabled, and
+    // a keyboard user left focused on `<body>` has lost their place on the page entirely.
     return () => restoreRef.current?.focus?.();
   }, [open]);
 
@@ -220,138 +304,397 @@ export function TxSheet({ runner }: { runner: TxRunner }) {
 
   return (
     <div className="fixed inset-0 z-50 flex items-end justify-center sm:items-center">
+      {/* A proper scrim: the app's own background at 78% with a real blur behind it, so
+          the surface underneath reads as depth rather than as a hole cut in the page.
+          The old backdrop was near-black at 80% with a 4px blur, which on a dark app is
+          indistinguishable from switching the lights off. */}
       <button
         type="button"
         aria-label="Close"
         tabIndex={-1}
         onClick={() => !busy && runner.close()}
-        className="absolute inset-0 cursor-default bg-[#08080A]/80 backdrop-blur-sm"
+        className="bg-[#08080A]/78 absolute inset-0 cursor-default backdrop-blur-lg"
       />
+
       <div
         ref={dialogRef}
         role="dialog"
         aria-modal="true"
         aria-labelledby="tx-sheet-title"
         tabIndex={-1}
-        className="card relative m-4 w-full max-w-lg p-6"
+        data-tx-phase={phase.name}
+        className="bg-surface-raised relative m-0 w-full max-w-[30rem] rounded-t-[var(--radius-card)] border border-[var(--border-hairline)] p-6 shadow-[inset_0_1px_0_rgba(255,255,255,0.05)] sm:m-4 sm:rounded-[var(--radius-card)] sm:p-7"
       >
-        <h2 id="tx-sheet-title" className="t-h3 pr-8">
-          {intent.title}
-        </h2>
-
-        {phase.name === 'confirm' || phase.name === 'submitting' ? (
-          <>
-            <dl className="mt-5">
-              {intent.details.map((detail) => (
-                <div
-                  key={detail.label}
-                  className="flex items-start justify-between gap-6 border-b border-[var(--border-hairline)] py-3 last:border-b-0"
-                >
-                  <dt className="text-text-muted text-sm">{detail.label}</dt>
-                  <dd className="text-right text-sm">{detail.value}</dd>
-                </div>
-              ))}
-            </dl>
-
-            <p className="text-text-subtle mt-4 text-xs leading-relaxed">{intent.gas.note}</p>
-
-            {intent.caution ? (
-              <p className="text-warning mt-4 text-sm leading-relaxed" role="alert">
-                {intent.caution}
-              </p>
-            ) : null}
-
-            <div className="mt-6 flex flex-wrap items-center gap-3">
-              <ActionButton
-                onClick={() => void run(intent)}
-                disabled={phase.name === 'submitting'}
-                icon={<ArrowRight className="size-4" />}
-              >
-                {phase.name === 'submitting' ? 'Working…' : intent.confirmLabel}
-              </ActionButton>
-              <ActionButton variant="quiet" onClick={runner.close} disabled={busy}>
-                Cancel
-              </ActionButton>
-            </div>
-          </>
+        {phase.name === 'confirm' || phase.name === 'checking' || phase.name === 'signing' ? (
+          <Confirming
+            phase={phase}
+            intent={intent}
+            onConfirm={() => void run(intent)}
+            runner={runner}
+          />
         ) : null}
 
-        {phase.name === 'pending' ? (
-          <div className="mt-5" role="status">
-            <p className="text-text-muted text-sm leading-relaxed">
-              Submitted. Waiting for a receipt — a transaction hash is not a result, so nothing is
-              marked delivered until the chain returns one with
-              <span className="num"> status success</span>.
-            </p>
-            {/* The explorer link appears WITH THE HASH, not with the receipt. A user
-                watching a pending transaction should be able to go and look at it. */}
-            <HashLine hash={phase.hash} />
-          </div>
-        ) : null}
+        {phase.name === 'pending' ? <Pending intent={intent} hash={phase.hash} /> : null}
 
         {phase.name === 'settled' ? (
-          <Settled outcome={phase.outcome} reason={phase.reason} />
+          <Settled
+            intent={intent}
+            outcome={phase.outcome}
+            reason={phase.reason}
+            onClose={runner.close}
+          />
         ) : null}
 
         {phase.name === 'error' ? (
-          <div className="mt-5" role="alert">
-            <p className="text-danger text-sm">{phase.reason.title}</p>
-            <p className="text-text-muted mt-2 break-words text-sm leading-relaxed">
-              {phase.reason.detail}
-            </p>
-            {phase.reason.name ? (
-              <p className="num text-text-subtle mt-3 text-xs">
-                Contract error: {phase.reason.name}
-              </p>
-            ) : null}
-          </div>
-        ) : null}
-
-        {phase.name === 'settled' || phase.name === 'error' ? (
-          <div className="mt-6">
-            <ActionButton variant="secondary" onClick={runner.close}>
-              Close
-            </ActionButton>
-          </div>
+          <Failed
+            intent={intent}
+            reason={phase.reason}
+            signed={phase.signed}
+            onClose={runner.close}
+          />
         ) : null}
       </div>
     </div>
   );
 }
 
-function Settled({ outcome, reason }: { outcome: TxOutcome; reason: RevertReason | null }) {
-  const described = describeOutcome(outcome);
-  const good = outcome.kind === 'delivered';
-  const hash = 'hash' in outcome ? outcome.hash : outcome.receipt.hash;
+/** The eyebrow: one word for where this is, with a dot carrying the tone. */
+function StatusLine({
+  tone,
+  children,
+  spinning = false,
+}: {
+  tone: Tone;
+  children: ReactNode;
+  spinning?: boolean;
+}) {
   return (
-    <div className="mt-5" role="status">
-      <p className={`text-sm ${good ? 'text-success' : 'text-danger'}`}>{described.title}</p>
-      <p className="text-text-muted mt-2 text-sm leading-relaxed">{described.detail}</p>
-      {/* When a mined transaction reverted, the decoded reason is the useful part —
-          "it reverted" alone tells a user nothing they can act on. */}
-      {reason ? (
-        <p className="text-text-muted mt-3 break-words text-sm leading-relaxed">
-          <span className="text-text">{reason.title}.</span> {reason.detail}
+    <p className={`t-label flex items-center gap-2 ${toneText[tone]}`}>
+      {spinning ? (
+        <Spinner />
+      ) : (
+        <span aria-hidden className={`size-1.5 rounded-[var(--radius-pill)] ${toneDot[tone]}`} />
+      )}
+      {children}
+    </p>
+  );
+}
+
+/**
+ * A spinner that obeys `prefers-reduced-motion`.
+ *
+ * BRAND.md §6: all motion is disabled under reduce. The global stylesheet already clamps
+ * animation duration, which would leave a rotating ring frozen at whatever angle it
+ * happened to reach — a broken-looking artefact rather than an absence of motion. So the
+ * ring is hidden outright under reduce and a static dot takes its place.
+ */
+function Spinner() {
+  return (
+    <>
+      <span
+        aria-hidden
+        className="size-3 shrink-0 animate-spin rounded-[var(--radius-pill)] border-2 border-current border-t-transparent motion-reduce:hidden"
+      />
+      <span
+        aria-hidden
+        className="hidden size-1.5 shrink-0 rounded-[var(--radius-pill)] bg-current motion-reduce:block"
+      />
+    </>
+  );
+}
+
+function Confirming({
+  phase,
+  intent,
+  onConfirm,
+  runner,
+}: {
+  phase: Phase;
+  intent: TxIntent;
+  onConfirm: () => void;
+  runner: TxRunner;
+}) {
+  const checking = phase.name === 'checking';
+  const signing = phase.name === 'signing';
+
+  return (
+    <>
+      <StatusLine tone="neutral" spinning={checking || signing}>
+        {checking ? 'Checking' : signing ? 'Waiting for your wallet' : 'Confirm'}
+      </StatusLine>
+      <h2 id="tx-sheet-title" className="t-h3 mt-3 pr-6">
+        {intent.title}
+      </h2>
+
+      {checking ? (
+        <p className="text-text-muted mt-3 max-w-[52ch] text-sm leading-relaxed">
+          Running this against Mezo as a read-only call first. If it would revert, you will see why
+          here and your wallet will never open.
         </p>
       ) : null}
+      {signing ? (
+        <p className="text-text-muted mt-3 max-w-[52ch] text-sm leading-relaxed">
+          It would succeed against the chain as it is right now. Approve it in your wallet. This is
+          the only signature this action needs.
+        </p>
+      ) : null}
+
+      {phase.name === 'confirm' ? (
+        <>
+          <dl className="mt-5">
+            {intent.details.map((detail) => (
+              <div
+                key={detail.label}
+                className="flex items-start justify-between gap-6 border-b border-[var(--border-hairline)] py-3 last:border-b-0"
+              >
+                <dt className="text-text-muted text-sm">{detail.label}</dt>
+                <dd className="text-right text-sm">{detail.value}</dd>
+              </div>
+            ))}
+          </dl>
+
+          <p className="text-text-subtle mt-4 text-xs leading-relaxed">{intent.gas.note}</p>
+
+          {intent.caution ? (
+            <p className="text-warning mt-4 text-sm leading-relaxed" role="alert">
+              {intent.caution}
+            </p>
+          ) : null}
+        </>
+      ) : null}
+
+      <div className="mt-6 flex flex-wrap items-center gap-3">
+        <PillAction
+          onClick={onConfirm}
+          disabled={checking || signing}
+          icon={<ArrowRight className="size-4" />}
+        >
+          {checking ? 'Checking…' : signing ? 'In your wallet…' : intent.confirmLabel}
+        </PillAction>
+        <PillAction variant="ghost" onClick={runner.close} disabled={checking || signing}>
+          Cancel
+        </PillAction>
+      </div>
+    </>
+  );
+}
+
+function Pending({ intent, hash }: { intent: TxIntent; hash: Hash }) {
+  return (
+    <div role="status">
+      <StatusLine tone="neutral" spinning>
+        Submitted
+      </StatusLine>
+      <h2 id="tx-sheet-title" className="t-h3 mt-3 pr-6">
+        {intent.title}
+      </h2>
+      <p className="text-text-muted mt-3 max-w-[52ch] text-sm leading-relaxed">
+        Waiting for a receipt. A transaction hash is not a result, so nothing is marked delivered
+        until the chain returns one with <span className="num">status success</span>.
+      </p>
+      {/* The explorer link appears WITH THE HASH, not with the receipt. A user watching a
+          pending transaction should be able to go and look at it. */}
       <HashLine hash={hash} />
     </div>
   );
 }
 
-/** A transaction hash and its explorer link. One component, so they never drift apart. */
-function HashLine({ hash }: { hash: Hash }) {
+function Settled({
+  intent,
+  outcome,
+  reason,
+  onClose,
+}: {
+  intent: TxIntent;
+  outcome: TxOutcome;
+  reason: RevertReason | null;
+  onClose: () => void;
+}) {
+  const described = describeOutcome(outcome);
+  const delivered = outcome.kind === 'delivered';
+  const hash = 'hash' in outcome ? outcome.hash : outcome.receipt.hash;
+  const tone: Tone = delivered ? 'success' : outcome.kind === 'reverted' ? 'danger' : 'warning';
+
+  /**
+   * THE DECODED REASON IS THE HEADLINE, not "Failed on-chain".
+   *
+   * A transaction that mined and reverted has two things to say and only one of them is
+   * useful. "Failed on-chain" belongs in the eyebrow, where the state is; the headline
+   * belongs to "Not enough collateral behind this loan", which is what the user can act
+   * on. When the replay could not recover a reason we fall back to the outcome's own
+   * title — better a duplicated line than a headline that says nothing.
+   */
+  const headline = delivered
+    ? (intent.successTitle ?? intent.title)
+    : (reason?.title ?? described.title);
+
   return (
-    <div className="mt-3">
-      <p className="num text-text-subtle break-all text-xs">{hash}</p>
+    <div role="status">
+      <StatusLine tone={tone}>{delivered ? 'Confirmed on Mezo' : described.title}</StatusLine>
+
+      {/* THE OUTCOME LEADS. Not the hash, not the word "Delivered" — what happened, in
+          past tense, at headline size. */}
+      <h2 id="tx-sheet-title" className="t-h2 mt-3 pr-6">
+        {headline}
+      </h2>
+
+      {delivered ? null : (
+        <p className="text-text-muted mt-3 max-w-[52ch] text-sm leading-relaxed">
+          {reason?.detail ?? described.detail}
+        </p>
+      )}
+
+      {/* The mechanical facts, secondary: what the receipt said, and the Solidity name for
+          anyone who wants to grep the source. */}
+      {delivered ? null : (
+        <div className="bg-surface-inset mt-5 rounded-[var(--radius-input)] border border-[var(--border-hairline)] p-4">
+          <p className="text-text-muted text-sm leading-relaxed">{described.detail}</p>
+          {reason?.name ? (
+            <p className="num text-text-subtle mt-2.5 text-xs">Contract error: {reason.name}</p>
+          ) : null}
+          <p className="text-text-subtle mt-2.5 text-xs">
+            Attempted: <span className="text-text-muted">{intent.title}</span>
+          </p>
+        </div>
+      )}
+
+      {delivered && intent.changes && intent.changes.length > 0 ? (
+        <Changes changes={intent.changes} />
+      ) : null}
+
+      <HashLine hash={hash} />
+
+      <div className="mt-6">
+        <PillAction
+          onClick={onClose}
+          icon={delivered ? <Check className="size-4" /> : <ArrowRight className="size-4" />}
+        >
+          {delivered ? 'Done' : 'Close'}
+        </PillAction>
+      </div>
+    </div>
+  );
+}
+
+function Failed({
+  intent,
+  reason,
+  signed,
+  onClose,
+}: {
+  intent: TxIntent;
+  reason: RevertReason;
+  signed: boolean;
+  onClose: () => void;
+}) {
+  return (
+    <div role="alert">
+      <StatusLine tone="danger">Not submitted</StatusLine>
+
+      {/* The decoded human reason IS the headline. The raw contract error is secondary and
+          sits at the bottom in mono, for anyone who wants to grep the Solidity. */}
+      <h2 id="tx-sheet-title" className="t-h2 mt-3 pr-6">
+        {reason.title}
+      </h2>
+      <p className="text-text-muted mt-3 max-w-[52ch] text-sm leading-relaxed">{reason.detail}</p>
+
+      <div className="bg-surface-inset mt-5 rounded-[var(--radius-input)] border border-[var(--border-hairline)] p-4">
+        <p className="text-text-muted text-sm leading-relaxed">
+          {signed
+            ? 'Your wallet was asked to sign this and it did not go through. Nothing reached the chain.'
+            : 'Maren checked this against Mezo before opening your wallet, so no signature was ' +
+              'requested and no gas was spent.'}
+        </p>
+        {reason.name ? (
+          <p className="num text-text-subtle mt-2.5 text-xs">Contract error: {reason.name}</p>
+        ) : null}
+        <p className="text-text-subtle mt-2.5 text-xs">
+          Attempted: <span className="text-text-muted">{intent.title}</span>
+        </p>
+      </div>
+
+      <div className="mt-6">
+        <PillAction onClick={onClose} icon={<ArrowRight className="size-4" />}>
+          Close
+        </PillAction>
+      </div>
+    </div>
+  );
+}
+
+/** What moved: each figure before, and after. */
+function Changes({ changes }: { changes: TxChange[] }) {
+  return (
+    <dl className="bg-surface-inset mt-5 rounded-[var(--radius-input)] border border-[var(--border-hairline)] px-4">
+      {changes.map((change) => (
+        <div
+          key={change.label}
+          className="flex flex-wrap items-center justify-between gap-x-4 gap-y-1 border-b border-[var(--border-hairline)] py-3.5 last:border-b-0"
+        >
+          <dt className="text-text-muted text-sm">{change.label}</dt>
+          <dd className="flex items-center gap-2.5 text-sm">
+            {/* Subtle, not struck through. A strike-through across tabular numerals is
+                hard to read and says "cancelled" rather than "was". The arrow already
+                carries the direction. */}
+            <span className="text-text-subtle">{change.before}</span>
+            {/* Spoken, not just drawn: a screen reader reading "0.001 BTC 0.002 BTC" with
+                a decorative arrow between them has been told two numbers and no relation. */}
+            <span className="sr-only">changed to</span>
+            <ArrowRight aria-hidden className="text-text-subtle size-3.5 shrink-0" />
+            <span className="text-text">{change.after}</span>
+          </dd>
+        </div>
+      ))}
+    </dl>
+  );
+}
+
+/**
+ * A transaction hash, truncated, with a copy affordance and the explorer link.
+ *
+ * The full 66 characters used to be printed in low-contrast mono and wrapped onto two
+ * lines, which is the single largest thing on a sheet that ought to be about the money.
+ * Nobody reads a hash; they copy it or they click through to it. `shortHash` comes from
+ * `@maren/sdk` so web and iOS truncate identically, and the untruncated value stays
+ * reachable through Copy and through the `title`.
+ */
+function HashLine({ hash }: { hash: Hash }) {
+  const [copied, setCopied] = useState(false);
+
+  useEffect(() => {
+    if (!copied) return;
+    const id = setTimeout(() => setCopied(false), 1_800);
+    return () => clearTimeout(id);
+  }, [copied]);
+
+  return (
+    <div className="mt-5 flex flex-wrap items-center gap-x-4 gap-y-2 border-t border-[var(--border-hairline)] pt-4">
+      <span className="t-label text-text-subtle">Transaction</span>
+      <button
+        type="button"
+        title={hash}
+        onClick={() => {
+          void navigator.clipboard?.writeText(hash);
+          setCopied(true);
+        }}
+        className="num text-text-muted hover:text-text inline-flex items-center gap-2 rounded-[var(--radius-pill)] text-xs transition-colors duration-[120ms] ease-out"
+      >
+        <span data-tx-hash>{shortHash(hash)}</span>
+        {copied ? (
+          <Check aria-hidden className="text-success size-3.5" />
+        ) : (
+          <CopyIcon aria-hidden className="size-3.5" />
+        )}
+        <span className="sr-only">{copied ? 'Copied' : 'Copy the full transaction hash'}</span>
+      </button>
       <a
         href={explorerTxUrl(hash)}
         target="_blank"
         rel="noreferrer noopener"
-        className="text-text-muted hover:text-text mt-2 inline-flex items-center gap-1.5 text-xs underline decoration-[var(--border-strong)] underline-offset-4 transition-colors duration-[120ms] ease-out"
+        className="text-text-muted hover:text-text ml-auto inline-flex items-center gap-1.5 text-xs transition-colors duration-[120ms] ease-out"
       >
-        View on the Mezo explorer
-        <span aria-hidden>↗</span>
+        Explorer
+        <ArrowUpRight aria-hidden className="size-3.5" />
       </a>
     </div>
   );

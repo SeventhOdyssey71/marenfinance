@@ -19,7 +19,8 @@ const browser = await chromium.launch({
   args: ['--use-gl=angle'],
 });
 
-import { connectWallet, installWallet } from './injected-wallet.mjs';
+import { connectWallet, installReadOnlyWallet, installWallet } from './injected-wallet.mjs';
+import { generatePrivateKey } from 'viem/accounts';
 
 /**
  * Mezo matsnet, stated here rather than imported.
@@ -37,24 +38,35 @@ const mezoTestnet = {
 };
 
 /**
- * A throwaway key, supplied by the environment. Never a literal in this file — a private
- * key committed to a repository is a private key that has been published, even on a
- * testnet where it holds four hundredths of a cent.
+ * A throwaway key. Never a literal in this file — a private key committed to a repository
+ * is a private key that has been published, even on a testnet where it holds four
+ * hundredths of a cent.
  *
- * The account needs only gas. Every connected assertion below is about an account that
- * owns nothing, which is the state that matters most and the one the old mock data made
- * impossible to see.
+ * IT NO LONGER HAS TO BE FUNDED, AND THE SUITE NO LONGER REFUSES TO RUN WITHOUT ONE.
+ * Section 4b exercises an account that owns nothing — which is the state most users arrive
+ * in and the one the old mock data made impossible to see — and not one of its assertions
+ * submits a transaction: every sheet it opens is closed with Escape, and every write
+ * button it reaches is disabled. A key generated fresh on each run satisfies all of it,
+ * and makes the checks runnable by anyone who clones the repository. Set
+ * MAREN_TEST_PRIVATE_KEY to pin a specific account instead.
  */
-const TEST_PRIVATE_KEY = process.env.MAREN_TEST_PRIVATE_KEY;
+const TEST_PRIVATE_KEY = process.env.MAREN_TEST_PRIVATE_KEY ?? generatePrivateKey();
 const RPC_URL = process.env.MEZO_RPC_URL ?? 'https://rpc.test.mezo.org';
 
-if (!TEST_PRIVATE_KEY) {
-  console.error(
-    'MAREN_TEST_PRIVATE_KEY is not set. The connected checks sign real transactions on\n' +
-      'Mezo matsnet, so they need a funded throwaway key. Export one and re-run.',
+if (!process.env.MAREN_TEST_PRIVATE_KEY) {
+  console.log(
+    'MAREN_TEST_PRIVATE_KEY unset — generated a fresh key for this run.\n' +
+      'The connected checks are about an account that owns nothing, and none of them submit.\n',
   );
-  process.exit(1);
 }
+
+/**
+ * An account with a REAL position: 0.001 BTC of collateral in MarenVault, no debt, no
+ * MUSD. Section 4c drives it through a signer that cannot sign, which is how the preflight
+ * checks below prove a negative — that no signature is ever requested for a borrow the
+ * pooled trove cannot serve.
+ */
+const VIEW_ACCOUNT = process.env.MAREN_VIEW_ADDRESS ?? '0x457e46E52bE1b4A05e3f49d07e58d845ec15CE31';
 
 const results = [];
 const check = (name, pass, detail = '') => {
@@ -543,8 +555,8 @@ const check = (name, pass, detail = '') => {
   const handlePanel = await page.locator('main').innerText();
   check(
     'handle: registration is presented as two steps with the 60s wait explained',
-    /step 1 — commit/i.test(handlePanel) &&
-      /step 2 — claim/i.test(handlePanel) &&
+    /step 1: commit/i.test(handlePanel) &&
+      /step 2: claim/i.test(handlePanel) &&
       /60 seconds/i.test(handlePanel),
   );
   check(
@@ -569,6 +581,175 @@ const check = (name, pass, detail = '') => {
       .getByRole('button', { name: /^Commit/ })
       .last()
       .isDisabled(),
+  );
+
+  await ctx.close();
+}
+
+// ---- 4c. THE PREFLIGHT: nothing that cannot succeed is ever offered --------
+//
+// The reason this section exists, in one sentence: the owner dragged the borrow slider to
+// 17.95 MUSD, pressed Borrow, paid the gas, and got a revert that the app could have
+// predicted for free from a contract it had already called.
+//
+// The signer here is READ-ONLY and structurally incapable of signing — see
+// `installReadOnlyWallet`. That is what turns "no signature was requested" from a claim
+// into a measurement: every attempt is recorded, and the assertion is that the record is
+// empty. `prove-preflight.mjs` runs the same idea end to end and additionally checks the
+// account's nonce on chain before and after.
+{
+  const ctx = await browser.newContext({ viewport: { width: 1440, height: 1100 } });
+  const wallet = await installReadOnlyWallet(ctx, {
+    address: VIEW_ACCOUNT,
+    chain: mezoTestnet,
+    rpcUrl: RPC_URL,
+  });
+  const page = await ctx.newPage();
+
+  await page.goto(BASE + '/app/vault', { waitUntil: 'networkidle' });
+  await page.waitForTimeout(1200);
+  await connectWallet(page);
+  await page.waitForTimeout(4000);
+  await page.getByRole('tab', { name: 'Borrow' }).click();
+  await page.waitForTimeout(2500);
+
+  const borrowPanel = await page.locator('main').innerText();
+  const troveUnderFloor = /the pool itself is fully drawn right now/.test(borrowPanel);
+
+  check(
+    'preflight: the borrow refusal is on the panel BEFORE anything is attempted',
+    troveUnderFloor,
+    'the shared trove is under MIN_TROVE_CR, so no borrow can succeed at any amount',
+  );
+  check(
+    'preflight: the reason is the contract’s own words, not a second copy deck',
+    /This is not about your position/.test(borrowPanel) &&
+      /Your collateral is untouched and you can withdraw it/.test(borrowPanel),
+    'built by describeRevert(), same string the revert carries',
+  );
+  check(
+    'preflight: the refusal names the contract check, so the claim is falsifiable',
+    /TroveCollateralRatioTooLow/.test(borrowPanel),
+  );
+  check(
+    'preflight: the Borrow button is disabled rather than offered',
+    await page
+      .getByRole('button', { name: /^Borrow/ })
+      .last()
+      .isDisabled(),
+  );
+
+  const slider = page.locator('input[type=range]');
+  check('preflight: the borrow slider is disabled', await slider.isDisabled());
+  check(
+    'preflight: the slider cannot travel into the reverting range',
+    (await slider.getAttribute('aria-valuetext'))?.includes('Borrowing is unavailable') === true,
+    'the control that was dragged to 17.95 MUSD now has no reachable value',
+  );
+  check(
+    'preflight: the disabled slider points at the sentence explaining it',
+    (await slider.getAttribute('aria-describedby')) === 'borrow-blocked',
+  );
+
+  // Forcing the click must change nothing at all.
+  await page
+    .getByRole('button', { name: /^Borrow/ })
+    .last()
+    .click({ force: true })
+    .catch(() => {});
+  await page.waitForTimeout(900);
+  check(
+    'preflight: forcing a click on the disabled control opens no confirmation sheet',
+    (await page.locator('[role=dialog]').count()) === 0,
+  );
+  check(
+    'preflight: NO SIGNATURE WAS REQUESTED, at any point',
+    wallet.signatureRequests.length === 0,
+    `${wallet.signatureRequests.length} requests recorded`,
+  );
+
+  // Exits stay open while entries are shut. This is the product's own promise and the
+  // preflight has to keep it rather than disabling everything it is unsure about.
+  await page.getByRole('tab', { name: 'Withdraw' }).click();
+  await page.waitForTimeout(1200);
+  await page.getByRole('button', { name: /BTC$/ }).first().click();
+  await page.waitForTimeout(600);
+  check(
+    'preflight: withdrawal stays OPEN while borrowing is shut',
+    !(await page
+      .getByRole('button', { name: /^Withdraw/ })
+      .last()
+      .isDisabled()),
+    'entries close before exits, never the other way round',
+  );
+
+  await page.getByRole('tab', { name: 'Repay' }).click();
+  await page.waitForTimeout(1000);
+  const repayPanel = await page.locator('main').innerText();
+  check(
+    'preflight: repay is disabled WITH A REASON on an account holding no debt',
+    /Nothing to repay/.test(repayPanel) &&
+      (await page
+        .getByRole('button', { name: /^Repay/ })
+        .last()
+        .isDisabled()),
+  );
+
+  // The confirmation sheet, reached through the one vault action that IS available.
+  await page.getByRole('tab', { name: 'Deposit' }).click();
+  await page.waitForTimeout(1000);
+  await page.locator('input[inputmode=decimal]').first().fill('0.001');
+  await page.waitForTimeout(500);
+  await page
+    .locator('main')
+    .getByRole('button', { name: /^Deposit/ })
+    .last()
+    .click();
+  const sheet = page.locator('[role=dialog]');
+  await sheet.waitFor({ state: 'visible', timeout: 15_000 });
+  await page.waitForTimeout(600);
+  check(
+    'sheet: an available action opens a confirmation, and it is a labelled modal dialog',
+    (await sheet.getAttribute('aria-modal')) === 'true' &&
+      (await sheet.getAttribute('data-tx-phase')) === 'confirm',
+  );
+  check(
+    'sheet: the confirm state states who pays the gas, and does not claim it is free',
+    /you pay the/i.test(await sheet.innerText()) && !/no gas/i.test(await sheet.innerText()),
+  );
+  await page.keyboard.press('Escape');
+  await page.waitForTimeout(400);
+  check('sheet: Escape closes it', (await page.locator('[role=dialog]').count()) === 0);
+  check(
+    'preflight: still no signature requested after opening and closing a sheet',
+    wallet.signatureRequests.length === 0,
+    JSON.stringify(wallet.signatureRequests),
+  );
+
+  // --- Pay and Earn: anything needing MUSD, on an account that holds none ---
+  await page.goto(BASE + '/app/pay', { waitUntil: 'networkidle' });
+  await page.waitForTimeout(3000);
+  const payLive = await page.locator('main').innerText();
+  check(
+    'preflight: Send is disabled with a plain reason when the wallet holds no MUSD',
+    /No MUSD to send/.test(payLive) &&
+      (await page.getByRole('button', { name: /^Send/ }).last().isDisabled()),
+  );
+  check(
+    'preflight: that reason explains where MUSD comes from rather than stopping at "no"',
+    /borrowing against Bitcoin in the Vault/.test(payLive),
+  );
+
+  await page.goto(BASE + '/app/earn', { waitUntil: 'networkidle' });
+  await page.waitForTimeout(3000);
+  const earnLive = await page.locator('main').innerText();
+  check(
+    'preflight: Earn deposits are disabled with a plain reason on an empty wallet',
+    /No MUSD to deposit/.test(earnLive) &&
+      (await page
+        .getByRole('button', { name: /^Deposit into Earn/ })
+        .last()
+        .isDisabled()),
   );
 
   await ctx.close();
