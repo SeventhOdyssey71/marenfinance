@@ -179,7 +179,9 @@ function splitList(raw: string | undefined): string[] {
  *
  * If both are empty the allowlist is empty and the relayer refuses everything.
  * Falling back to "allow all Maren contracts" would not be a fallback, it would
- * be a hole, because `MAREN_ADDRESSES` is all zeroes until deployment day.
+ * be a hole: `MAREN_ADDRESSES` now holds real matsnet addresses, so "all Maren
+ * contracts" is a live, non-empty set that an unconfigured relayer would happily
+ * sign for.
  *
  * `RELAYER_ALLOWED_FUNCTIONS` can only NARROW the code-level registry. There is
  * no syntax for adding a selector that is not already in registry.ts.

@@ -5,7 +5,7 @@ import { formatBtc, formatMusd, getChain, shortAddress, shortHash } from '@maren
 
 import { ConnectPrompt } from '@/components/app/connect-prompt';
 import { Segmented } from '@/components/app/controls';
-import { Num } from '@/components/app/money';
+import { Btc, Num } from '@/components/app/money';
 import { AppCard, EmptyState, Info, Label, Note } from '@/components/app/primitives';
 import { ArrowUpRight } from '@/components/ui/icons';
 import { activityDirection, activityTitle, statusLabel, timeAgo } from '@/lib/copy';
@@ -291,7 +291,12 @@ function Row({ item, last }: { item: ActivityItem; last: boolean }) {
             'Gas paid by a relayer'
           ) : (
             <>
-              Gas <span className="num">{formatBtc(item.gasPaidWei)}</span>
+              {/* `Btc` rather than a bare `formatBtc`, because Mezo's gas price is a few
+                  hundred wei and a real fee of 0.000000029 BTC rounds to "0 BTC" at the
+                  display precision. Rendering zero for a fee that was genuinely paid is a
+                  small lie of the same family as the ones this pass removed, so the exact
+                  figure stays reachable in the hover title — BRAND.md §8. */}
+              Gas <Btc wei={item.gasPaidWei} size="sm" tone="subtle" />
             </>
           )}
         </p>

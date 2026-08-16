@@ -461,6 +461,166 @@ function describe(name: string, args: readonly unknown[]): RevertReason {
         detail: 'The claim secret in this link is not the one the contract is holding.',
       };
 
+    // --- vault, the rarer refusals ------------------------------------------------
+    //
+    // Everything from here down used to fall through to the default and render as
+    // `SomeError(0, 0)`. That is a selector with punctuation, not an explanation, and a
+    // user who hits one of these is having an unusual day already. `errors.test.ts`
+    // asserts that no error in the table can reach the default any more.
+    case 'TroveAlreadyOpen':
+      return {
+        name,
+        title: 'The pooled trove is already open',
+        detail: 'Maren’s shared trove only needs seeding once, and it has been. Nothing to do.',
+      };
+    case 'SeedDebtBelowProtocolMinimum':
+      return {
+        name,
+        title: 'Seed debt below MUSD’s minimum',
+        detail: `Opening a trove needs at least ${formatMusd(n(1))} of net debt; this asked for ${formatMusd(n(0))}.`,
+      };
+    case 'PositionHealthy':
+      return {
+        name,
+        title: 'That position is healthy',
+        detail:
+          `It sits at ${percent(n(0))}, above the ${percent(n(1))} at which Maren liquidates. ` +
+          'There is nothing to liquidate, which is the outcome everyone wants.',
+      };
+    case 'NothingToLiquidate':
+      return {
+        name,
+        title: 'Nothing to liquidate',
+        detail: 'That account holds no collateral and owes nothing in this vault.',
+      };
+    case 'OutstandingUserDebt':
+      return {
+        name,
+        title: 'Debt is still outstanding',
+        detail:
+          'This cannot be closed while MUSD is still owed against it. Repay in full first — ' +
+          'repayment is never paused.',
+      };
+    case 'CollateralTransferFailed':
+      return {
+        name,
+        title: 'The Bitcoin transfer failed',
+        detail:
+          'The vault could not send collateral to the destination address, so the whole ' +
+          'transaction was reverted and your position is untouched. A contract that rejects ' +
+          'plain transfers is the usual cause.',
+      };
+    case 'NothingToSkim':
+      return {
+        name,
+        title: 'Nothing to skim',
+        detail: 'The vault holds no surplus beyond what is credited to users.',
+      };
+    case 'ZeroAddress':
+      return {
+        name,
+        title: 'That address is empty',
+        detail: 'A zero address was passed where a real one is required.',
+      };
+
+    // --- pay, the rarer refusals ---------------------------------------------------
+    case 'Permit2NotConfigured':
+      return {
+        name,
+        title: 'Permit2 is not configured',
+        detail:
+          'This deployment has no Permit2 address set, so the signature-based payment path is ' +
+          'unavailable. An ordinary approval and payment still work.',
+      };
+    case 'InvalidPermitToken':
+      return {
+        name,
+        title: 'That permit is for the wrong token',
+        detail: 'MarenPay only accepts permits for MUSD. Nothing was moved.',
+      };
+    case 'RequestNotOpen':
+      return {
+        name,
+        title: 'That request is no longer open',
+        detail: 'It has already been fulfilled or cancelled, so it cannot be paid again.',
+      };
+    case 'NotRequestPayer':
+      return {
+        name,
+        title: 'That request is addressed to someone else',
+        detail:
+          'It names a specific payer, and it is not this account. Ask for an unaddressed ' +
+          'request, which anyone may fulfil.',
+      };
+    case 'NotRequester':
+      return {
+        name,
+        title: 'Not your request',
+        detail: 'Only the account that created a request can cancel it.',
+      };
+    case 'LinkNotExpired':
+      return {
+        name,
+        title: 'Too early to reclaim',
+        detail:
+          'A link can only be reclaimed after it expires — until then the escrow belongs to ' +
+          'whoever holds the link.',
+      };
+    case 'NotLinkCreator':
+      return {
+        name,
+        title: 'Not your link',
+        detail: 'Only the account that created a link can reclaim it.',
+      };
+    case 'InvalidExpiry':
+      return {
+        name,
+        title: 'That expiry will not work',
+        detail: 'A link has to expire in the future, and within the contract’s maximum window.',
+      };
+    case 'ArrayLengthMismatch':
+      return {
+        name,
+        title: 'Recipients and amounts do not line up',
+        detail: `${n(0)} recipients against ${n(1)} amounts. Every recipient needs exactly one amount.`,
+      };
+    case 'TooManyRecipients':
+      return {
+        name,
+        title: 'Too many recipients in one split',
+        detail: `A split takes at most ${n(1)} recipients; this had ${n(0)}. Send it as more than one.`,
+      };
+    case 'EmptySplit':
+      return {
+        name,
+        title: 'That split has no recipients',
+        detail: 'Add at least one recipient and amount.',
+      };
+
+    // --- earn ----------------------------------------------------------------------
+    case 'FeeTooHigh':
+      return {
+        name,
+        title: 'That performance fee is too high',
+        detail: `The vault caps it at ${Number(n(1)) / 100}%, and this asked for ${Number(n(0)) / 100}%.`,
+      };
+    case 'SwapReturnedTooLittle':
+      return {
+        name,
+        title: 'The swap came back short',
+        detail:
+          `It returned ${formatMusd(n(0))} against a ${formatMusd(n(1))} minimum, so the harvest ` +
+          'was reverted rather than accepting a bad price. The Bitcoin is still held by the vault.',
+      };
+    case 'NoRouterConfigured':
+      return {
+        name,
+        title: 'No swap route is configured',
+        detail:
+          'Earn cannot convert seized Bitcoin into MUSD until a router Maren has reviewed exists ' +
+          'on Mezo. The Bitcoin is held, not lost, and shows in the vault’s asset breakdown.',
+      };
+
     // --- relay ------------------------------------------------------------------
     case 'ValueNotRelayable':
       return {
@@ -469,6 +629,34 @@ function describe(name: string, args: readonly unknown[]): RevertReason {
         detail:
           'It carries Bitcoin with it, and Maren’s relay hub refuses any request with value. ' +
           'Deposits are always paid for by the user in BTC gas.',
+      };
+    case 'CallNotAllowed':
+      return {
+        name,
+        title: 'That call is not on the relay allowlist',
+        detail:
+          'Maren’s relay hub will only sponsor a fixed set of functions. Anything else has to be ' +
+          'submitted by your own wallet.',
+      };
+    case 'TargetDoesNotTrustHub':
+      return {
+        name,
+        title: 'That contract does not trust the relay hub',
+        detail:
+          'It is not configured to accept forwarded calls, so a sponsored transaction to it ' +
+          'would be attributed to the hub rather than to you.',
+      };
+    case 'RelayExpired':
+      return {
+        name,
+        title: 'That sponsored request expired',
+        detail: 'Its deadline has passed. Build a fresh one and sign again.',
+      };
+    case 'BatchExecutionDisabled':
+      return {
+        name,
+        title: 'Batched relaying is switched off',
+        detail: 'The hub is accepting one request at a time.',
       };
 
     default:
