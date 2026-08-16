@@ -80,3 +80,6 @@ Thumbs.db
 /r*.json
 /chains.json
 /pim.html
+
+# Private grant package — context, pitch, and correspondence. Never committed.
+_grant/
