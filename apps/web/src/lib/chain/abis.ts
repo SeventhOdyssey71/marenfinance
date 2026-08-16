@@ -148,6 +148,35 @@ export const marenVaultAbi = [
     outputs: [{ type: 'bool' }],
   },
   {
+    // Whether the pooled trove exists at all. `borrow` reverts with TroveNotOpen() when it
+    // does not, and `troveStatus()` reports (0, 0, type(uint256).max) — a ratio of
+    // infinity, which reads as "extremely healthy" if taken at face value. Read as its own
+    // boolean so the preflight can tell "no trove" from "a very safe trove".
+    type: 'function',
+    name: 'troveOpen',
+    stateMutability: 'view',
+    inputs: [],
+    outputs: [{ type: 'bool' }],
+  },
+  {
+    // The vault's collateral ceiling. `deposit` reverts with DepositCapExceeded() when
+    // totalCollateral + msg.value would pass it, so the deposit form has to know it.
+    type: 'function',
+    name: 'depositCap',
+    stateMutability: 'view',
+    inputs: [],
+    outputs: [{ type: 'uint256' }],
+  },
+  {
+    // BTC credited to users but not yet pushed into the trove. A withdrawal larger than
+    // this has to pull from the trove, which needs a live price even for a debt-free user.
+    type: 'function',
+    name: 'idleCollateral',
+    stateMutability: 'view',
+    inputs: [],
+    outputs: [{ type: 'uint256' }],
+  },
+  {
     type: 'function',
     name: 'MIN_DEPOSIT',
     stateMutability: 'view',

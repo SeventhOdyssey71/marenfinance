@@ -211,6 +211,21 @@
     opacity: 0.5;
   }
 
+  /* A disabled slider must not keep the violet ring on its thumb.
+     Violet is the one saturated colour on a default screen (BRAND.md §2) and it means
+     "this is the action". On a borrow control that has been disabled because the pooled
+     trove is under its floor, a violet thumb sitting on a dead track is an invitation to
+     drag something that cannot move. Greyed, it reads as inert at a glance. */
+  .range-maren:disabled::-webkit-slider-thumb {
+    background: var(--color-text-subtle);
+    border-color: rgba(255, 255, 255, 0.14);
+  }
+
+  .range-maren:disabled::-moz-range-thumb {
+    background: var(--color-text-subtle);
+    border-color: rgba(255, 255, 255, 0.14);
+  }
+
   .range-maren::-webkit-slider-runnable-track {
     height: 6px;
     border-radius: var(--radius-pill);

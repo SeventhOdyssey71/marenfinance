@@ -81,7 +81,18 @@ describe('the borrow refusal a user actually hits', () => {
 
     expect(reason.name).toBe('TroveCollateralRatioTooLow');
     expect(reason.title).toBe('The shared trove is too thin to lend against');
-    expect(reason.detail).toContain('151.2%');
+
+    /**
+     * 151.1%, NOT 151.2%.
+     *
+     * 1.511985…e18 is 151.1985%, and this assertion used to expect the rounded-to-nearest
+     * "151.2%" that `toFixed(1)` produced. That is a health figure rounded UP, which
+     * BRAND.md §8 forbids in as many words, and it disagreed with the same ratio rendered
+     * through the SDK elsewhere in the app — the Portfolio said 151.1% while a revert said
+     * 151.2%. `describe()` now formats through `formatCollateralRatio`, which truncates.
+     */
+    expect(reason.detail).toContain('151.1%');
+    expect(reason.detail).not.toContain('151.2%');
     expect(reason.detail).toContain('180.0%');
 
     // The part that stops a user doing something that cannot help: this is not about

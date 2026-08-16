@@ -1,4 +1,4 @@
-import { formatBtc, formatMusd } from '@maren/sdk';
+import { formatBtc, formatCollateralRatio, formatMusd } from '@maren/sdk';
 import { BaseError, ContractFunctionRevertedError, decodeErrorResult, type Hex } from 'viem';
 
 /**
@@ -284,12 +284,35 @@ export interface RevertReason {
   name: string | null;
 }
 
-const percent = (wad: bigint): string => `${(Number(wad) / 1e16).toFixed(1)}%`;
+/**
+ * A collateral ratio in these messages, rounded the safe way.
+ *
+ * This was `(Number(wad) / 1e16).toFixed(1)`, which ROUNDS TO NEAREST — so the pooled
+ * trove's live 1.510537…e18 was reported to users as "151.1%" while the Portfolio, which
+ * goes through the SDK, called the same number "151.0%". Two figures for one ratio is bad;
+ * the direction is worse. BRAND.md §8: never round a number up in a way that flatters a
+ * position's safety. `formatCollateralRatio` truncates, always, for exactly this reason,
+ * and it is now the only thing in the app that turns a ratio into a string.
+ */
+const percent = (wad: bigint): string => formatCollateralRatio(wad);
 
 /**
  * Copy for each error. Written per-error rather than templated, because "what to do
  * instead" is different every time and a generic "the transaction failed" helps nobody.
+ *
+ * EXPORTED, and that is the point of this pass.
+ *
+ * This table used to be reachable only by failing. `lib/chain/preflight.ts` now calls it
+ * directly with the arguments the contract WOULD have reverted with, so the sentence a
+ * user reads on a disabled Borrow button is the identical sentence they would have read
+ * after paying for the revert — same words, same live numbers, one source. Writing a
+ * second, softer version of "the pool itself is fully drawn right now" for the disabled
+ * state is exactly how the two would drift apart, with the cheap one going stale.
  */
+export function describeRevert(name: string, args: readonly unknown[] = []): RevertReason {
+  return describe(name, args);
+}
+
 function describe(name: string, args: readonly unknown[]): RevertReason {
   const n = (i: number) => (typeof args[i] === 'bigint' ? (args[i] as bigint) : 0n);
   const s = (i: number) => String(args[i] ?? '');
