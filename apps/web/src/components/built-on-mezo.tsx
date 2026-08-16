@@ -16,7 +16,7 @@ const facts = [
   {
     label: 'Networks',
     value: '31612 / 31611',
-    body: 'Mezo mainnet and matsnet. Standard EVM — viem and wagmi, no bespoke SDK, no proprietary wallet requirement.',
+    body: 'Mezo mainnet and matsnet. Standard EVM: viem and wagmi, no bespoke SDK, no proprietary wallet requirement.',
   },
 ] as const;
 

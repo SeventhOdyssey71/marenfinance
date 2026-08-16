@@ -30,7 +30,7 @@ export function Surfaces() {
                 </div>
                 <p className="text-text-muted mt-6 max-w-lg text-[0.9375rem] leading-relaxed">
                   Deposit BTC, draw MUSD. A direct trove for positions above the protocol minimum; a
-                  pooled trove — from 0.001 BTC — for everyone the minimum currently excludes.
+                  pooled trove (from 0.001 BTC) for everyone the minimum currently excludes.
                 </p>
                 <dl className="mt-auto grid grid-cols-2 gap-4 pt-10 sm:grid-cols-3">
                   <div>
@@ -96,7 +96,7 @@ export function Surfaces() {
                 gains are swept and compounded back into MUSD.
               </p>
               <p className="text-text-subtle mt-auto pt-10 text-xs leading-relaxed">
-                The Stability Pool has no token emissions. Yield is liquidation gains only — lumpy,
+                The Stability Pool has no token emissions. Yield is liquidation gains only: lumpy,
                 and shown as trailing realised return, never as a fixed APY.
               </p>
             </article>
@@ -112,7 +112,7 @@ export function Surfaces() {
               </div>
               <p className="text-text-muted mt-6 text-[0.9375rem] leading-relaxed">
                 Position health, borrowing capacity, history and alerts. If the price feed is stale,
-                Maren says so and stops — it never renders a stale price as though it were live.
+                Maren says so and stops. It never renders a stale price as though it were live.
               </p>
               <p className="text-text-subtle mt-auto pt-10 text-xs leading-relaxed">
                 Mezo&rsquo;s price feed reverts above 60 seconds of staleness. Both apps have an

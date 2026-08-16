@@ -59,7 +59,7 @@ export function Nav() {
           <Link
             href="/"
             className="-m-2 shrink-0 rounded-[var(--radius-pill)] p-2"
-            aria-label="Maren Finance — home"
+            aria-label="Maren Finance home"
           >
             <Wordmark className="h-[18px] w-auto" />
           </Link>
