@@ -74,6 +74,16 @@ const log = (msg) => console.log(`[${stamp()}] ${msg}`);
 
 /* ── the recording ──────────────────────────────────────────────────────────────────── */
 
+/**
+ * The account the walkthrough films.
+ *
+ * It holds 0.001 BTC of collateral in MarenVault and no debt — a real position, opened by a
+ * real transaction, which is why the Vault screen has something to show. The same address is
+ * the `VIEW_ACCOUNT` in apps/web/scripts/verify-behaviour.mjs, so the video and the
+ * behaviour checks are looking at exactly the same on-chain state.
+ */
+const VIEW_ACCOUNT = '0x457e46E52bE1b4A05e3f49d07e58d845ec15CE31';
+
 const MEZO_MATSNET = {
   id: 31611,
   name: 'Mezo Matsnet',
@@ -118,22 +128,46 @@ try {
 
   await installCursor(context);
 
+  // Reused rather than reimplemented: the same providers the behaviour checks and the
+  // on-chain proof script connect through, so the video cannot diverge from what the tests
+  // already exercise.
+  const { installWallet, installReadOnlyWallet } = await import(
+    join(webDir, 'scripts', 'injected-wallet.mjs'),
+  );
+
   let account = null;
+  let wallet = null;
+
   if (process.env.MAREN_TEST_PRIVATE_KEY) {
-    // Reused rather than reimplemented: the same provider the behaviour checks and the
-    // on-chain proof script connect through, so the video cannot diverge from what the
-    // tests exercise. Key material stays in Node; the page only ever sees the interface.
-    const { installWallet } = await import(join(webDir, 'scripts', 'injected-wallet.mjs'));
-    const wallet = await installWallet(context, {
+    // A wallet that can genuinely sign. Nothing in the walkthrough asks it to, but the
+    // option exists for a take that intends to submit something. Key material stays in
+    // Node; the page only ever sees the EIP-1193 interface.
+    wallet = await installWallet(context, {
       privateKey: process.env.MAREN_TEST_PRIVATE_KEY,
       chain: MEZO_MATSNET,
       rpcUrl: MEZO_MATSNET.rpcUrls.default.http[0],
     });
     account = wallet.address;
-    log(`signer injected: ${account}`);
+    log(`signer injected (can sign): ${account}`);
   } else {
-    log('! MAREN_TEST_PRIVATE_KEY unset — filming the disconnected app.');
-    log('  Every app screen will be the anon state. That is a real screen, but a thin demo.');
+    // THE DEFAULT, AND THE MORE INTERESTING CASE.
+    //
+    // The walkthrough films an account that holds a real position: 0.001 BTC of collateral
+    // in MarenVault, no debt. Its private key is not in this repository and is not on the
+    // machine, which turns out not to matter — the recording submits nothing, so a provider
+    // that reads from Mezo and is structurally incapable of signing is not a compromise. It
+    // is a guarantee. A take can be re-run any number of times and cannot spend, cannot
+    // disturb the position it is filming, and cannot leave a transaction behind.
+    //
+    // Every read is still live: eth_call, eth_getLogs and the oracle all go to matsnet. The
+    // only capability missing is one the script never exercises.
+    account = process.env.MAREN_DEMO_ADDRESS ?? VIEW_ACCOUNT;
+    wallet = await installReadOnlyWallet(context, {
+      address: account,
+      chain: MEZO_MATSNET,
+      rpcUrl: MEZO_MATSNET.rpcUrls.default.http[0],
+    });
+    log(`view account injected (cannot sign): ${account}`);
   }
 
   const page = await context.newPage();
@@ -189,6 +223,15 @@ try {
   console.log(`webm        ${result.webm}`);
   console.log(`mp4         ${result.mp4 ?? 'not produced (no ffmpeg)'}`);
   console.log(`signer      ${account ?? 'none — disconnected take'}`);
+  // The walkthrough is supposed to fill forms and submit nothing. With the read-only
+  // provider this is measured rather than asserted: the page's every request to sign is
+  // recorded, and an empty record is the proof that the take cost nothing and moved nothing.
+  if (wallet?.signatureRequests) {
+    const n = wallet.signatureRequests.length;
+    console.log(
+      `signatures  ${n} requested${n === 0 ? ' — the take submitted nothing' : ` (${wallet.signatureRequests.map((r) => r.method).join(', ')})`}`,
+    );
+  }
   console.log('\nwhat the camera saw:');
   for (const [id, seen] of Object.entries(observed)) {
     const { at, ...rest } = seen;
