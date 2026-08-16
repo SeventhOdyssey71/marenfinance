@@ -93,7 +93,7 @@ guarantees, and our documents say exactly that."
 Do not oversell this. A room of Bitcoin people will trust you more for naming it.
 
 If asked why anyone would use the pooled trove rather than a direct one: they would not,
-if they qualify. The interface routes anyone above the threshold to a *direct* trove,
+if they qualify. The interface routes anyone above the threshold to a _direct_ trove,
 because that carries no pooling risk, even though pooled volume is better for us. Say
 that. It is a costly signal and it is true.
 
@@ -274,6 +274,31 @@ trapped. There is a dedicated test for it.
 
 **"You built this on Sui first. Why should we believe the Mezo version?"**
 Because it is the second attempt and it is informed by a specific list of what went
+wrong. The first one has a published audit that found 7 Critical and 13 High. That is a
+credibility asset, not a liability: we know exactly what to avoid, and the security
+lessons from it are written down as rules the new codebase is checked against.
+
+**"What went wrong in this build?"**
+Answer it fully; the list is short and it is a strength. Fabricated activity rows with
+invented tx hashes rendered as explorer links, since deleted. "Zero gas" copy we had
+explicitly forbidden. A lint gate cited as a quality signal for hours while no ESLint
+config existed. A contracts test command that ran zero tests and reported success. Two
+money bugs from duplicated borrow arithmetic, found by an independent audit and fixed in
+one shared module. **The pattern worth naming: every one was caught by verification, not
+by review of intent.**
+
+**"How long to mainnet?"**
+Gated on the audit, not on engineering. Which is why the introduction is the ask.
+
+---
+
+## Before you walk on
+
+- Re-read slide 2's two numbers against the chain that morning. They move.
+- Have the explorer open on a second screen with the vault address already pasted.
+- Know the deposit tx hash, or have it one keystroke away.
+- Do not use the word "revolutionary". Do not use the word "just".
+ a specific list of what went
 wrong. The first one has a published audit that found 7 Critical and 13 High. That is a
 credibility asset, not a liability: we know exactly what to avoid, and the security
 lessons from it are written down as rules the new codebase is checked against.

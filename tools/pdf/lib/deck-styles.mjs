@@ -290,7 +290,7 @@ code, .num, .mono {
 
 /* Three or more figures on one slide cannot each be 148px. */
 .stats.trio .figure { font-size: 92px; }
-.stats.trio .label { font-size: 19px; max-width: 15ch; }
+.stats.trio .label { font-size: 19px; max-width: 18ch; }
 .stats.trio { gap: 64px; }
 
 /* A slide holding exactly one figure is that figure, and its label is the sentence

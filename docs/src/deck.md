@@ -77,13 +77,12 @@ Spend Bitcoin. Never sell it. Built on Mezo.
 157.6% | Collateral ratio
 ```
 
-<!-- slide: stat | kicker: What we found in the chain | tag: Findings | foot: The RPCs do not implement debug_traceCall, so no compliant bundler can run against Mezo. -->
+<!-- slide: stat | kicker: What we found in the chain | tag: Findings | foot: Zero per the Mezo explorer index. No Mezo RPC implements debug_traceCall, so no compliant bundler can run. Mainnet does accept EIP-7702 type-4 transactions. -->
 
 # We read the chain, not the documentation.
 
 ```stat
-0 | UserOperations ever processed by the deployed EntryPoint
-9,275,000 | Mainnet block where EIP-7702 went live
+0 | UserOperations ever processed by the deployed ERC-4337 EntryPoint
 $0.0092 | What 100,000 gas costs
 ```
 
