@@ -6,7 +6,7 @@ import { HeroMesh } from './shaders/hero-mesh';
 const heroFacts = [
   { value: '0.001 BTC', label: 'Minimum deposit' },
   { value: '140%', label: 'Maren liquidation CR' },
-  { value: '25', label: 'Free actions, no gas' },
+  { value: '25', label: 'Free actions, once relayed' },
 ] as const;
 
 export function Hero() {
