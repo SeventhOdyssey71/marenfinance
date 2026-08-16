@@ -65,7 +65,7 @@ export function Footer() {
                     target="_blank"
                     rel="noreferrer noopener"
                     aria-label={label}
-                    className="bg-surface text-text-muted hover:text-text grid size-11 place-items-center rounded-[var(--radius-pill)] border border-[var(--border-hairline)] transition-colors duration-[120ms] ease-out hover:border-[var(--border-strong)]"
+                    className="text-text-muted hover:text-text grid size-11 place-items-center rounded-[var(--radius-pill)] border border-[var(--border-hairline)] transition-colors duration-[120ms] ease-out hover:border-[var(--border-strong)]"
                   >
                     <Icon className="size-4" />
                   </a>
