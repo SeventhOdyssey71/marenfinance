@@ -9,7 +9,7 @@ import { ConnectPrompt } from '@/components/app/connect-prompt';
 import { AmountField, Segmented } from '@/components/app/controls';
 import { HandleRegistration } from '@/components/app/handle-registration';
 import { Musd } from '@/components/app/money';
-import { ActionButton, AppCard, CardTitle, Info, Label, Note } from '@/components/app/primitives';
+import { ActionButton, Info, Label, Note, Panel } from '@/components/app/primitives';
 import { TxSheet, useTxRunner, type TxIntent, type TxRunner } from '@/components/app/tx';
 import { ArrowUpRight, LinkIcon, PayIcon } from '@/components/ui/icons';
 import { parseUnitsSafe, utf8Length } from '@/lib/copy';
@@ -55,7 +55,7 @@ export default function PayPage() {
 
   if (!source.connected) {
     return (
-      <div className="flex flex-col gap-6">
+      <div className="flex flex-col gap-4">
         <Header />
         <ConnectPrompt icon={<PayIcon className="size-6" />} title="Connect to send MUSD">
           Send MUSD to an @handle or a plain address, with an optional memo written on-chain.
@@ -66,7 +66,7 @@ export default function PayPage() {
   }
 
   return (
-    <div className="flex flex-col gap-6">
+    <div className="flex flex-col gap-4">
       <Header />
 
       <Segmented options={TABS} value={tab} onChange={setTab} label="Payment type" />
@@ -85,10 +85,7 @@ function Header() {
   return (
     <div>
       <Label>Pay</Label>
-      <h1 className="t-h2 mt-2">Move dollars</h1>
-      <p className="text-text-muted mt-3 max-w-[68ch] text-sm leading-relaxed">
-        Send MUSD to a handle or an address.
-      </p>
+      <h1 className="t-h3 mt-1.5">Move dollars</h1>
     </div>
   );
 }
@@ -201,8 +198,8 @@ function SendPanel({ runner }: { runner: TxRunner }) {
   });
 
   return (
-    <AppCard className="p-6 md:p-8">
-      <CardTitle>Send</CardTitle>
+    <Panel title="Send">
+      <div className="px-5 py-5">
 
       <div className="mt-6 max-w-xl">
         <label htmlFor="pay-to" className="t-label text-text-subtle block">
@@ -313,7 +310,8 @@ function SendPanel({ runner }: { runner: TxRunner }) {
           {amountWei > 0n ? `Send ${formatMusd(amountWei)}` : 'Send'}
         </ActionButton>
       </div>
-    </AppCard>
+      </div>
+    </Panel>
   );
 }
 
@@ -358,11 +356,15 @@ function RequestPanel({ runner }: { runner: TxRunner }) {
   });
 
   return (
-    <AppCard className="p-6 md:p-8">
-      <CardTitle>Request payment</CardTitle>
-      <p className="text-text-muted mt-3 max-w-[68ch] text-sm leading-relaxed">
-        An ask, not an obligation. Nothing moves until the other side pays it.
-      </p>
+    <Panel
+      title="Request payment"
+      meta={
+        <span className="text-text-muted text-xs">
+          An ask, not an obligation. Nothing moves until the other side pays it.
+        </span>
+      }
+    >
+      <div className="px-5 py-5">
 
       <div className="mt-8 max-w-xl">
         <AmountField value={amount} onChange={setAmount} unit="MUSD" label="Amount" />
@@ -428,7 +430,8 @@ function RequestPanel({ runner }: { runner: TxRunner }) {
       <p className="text-text-subtle mt-8 text-xs leading-relaxed">
         Requests you create appear in Activity.
       </p>
-    </AppCard>
+      </div>
+    </Panel>
   );
 }
 
@@ -518,11 +521,15 @@ function LinkPanel({ runner }: { runner: TxRunner }) {
   };
 
   return (
-    <AppCard className="p-6 md:p-8">
-      <CardTitle>Payment link</CardTitle>
-      <p className="text-text-muted mt-3 max-w-[68ch] text-sm leading-relaxed">
-        Escrows MUSD against a one-time key. Anyone with the link can claim it.
-      </p>
+    <Panel
+      title="Payment link"
+      meta={
+        <span className="text-text-muted text-xs">
+          Escrows MUSD against a one-time key. Anyone with the link can claim it.
+        </span>
+      }
+    >
+      <div className="px-5 py-5">
 
       <div className="mt-8 grid max-w-2xl grid-cols-1 gap-8 sm:grid-cols-2">
         <AmountField
@@ -639,6 +646,7 @@ function LinkPanel({ runner }: { runner: TxRunner }) {
         which Activity does, from the contract’s events — but never the keys needed to claim them.
         That is the cost of the secret being genuinely secret.
       </Info>
-    </AppCard>
+      </div>
+    </Panel>
   );
 }

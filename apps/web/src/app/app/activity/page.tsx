@@ -6,7 +6,7 @@ import { formatBtc, formatMusd, getChain, shortAddress, shortHash } from '@maren
 import { ConnectPrompt } from '@/components/app/connect-prompt';
 import { Segmented } from '@/components/app/controls';
 import { Btc, Num } from '@/components/app/money';
-import { AppCard, EmptyState, Info, Label, Note } from '@/components/app/primitives';
+import { EmptyState, Info, Label, Note, Panel } from '@/components/app/primitives';
 import { ArrowUpRight } from '@/components/ui/icons';
 import { activityDirection, activityTitle, statusLabel, timeAgo } from '@/lib/copy';
 import { NETWORK, useActivity } from '@/lib/data/source';
@@ -58,13 +58,10 @@ export default function ActivityPage() {
   const rows = items.filter((item) => filter === 'all' || GROUPS[filter].includes(item.kind));
 
   return (
-    <div className="flex flex-col gap-6">
+    <div className="flex flex-col gap-4">
       <div>
         <Label>Activity</Label>
-        <h1 className="t-h2 mt-2">History</h1>
-        <p className="text-text-muted mt-3 max-w-[68ch] text-sm leading-relaxed">
-          Your deposits, borrows and payments, read from Maren’s contract logs on {explorer.name}.
-        </p>
+        <h1 className="t-h3 mt-1.5">History</h1>
       </div>
 
       <Body
@@ -127,8 +124,8 @@ function Body({
     <>
       <Segmented options={FILTERS} value={filter} onChange={setFilter} label="Activity filter" />
 
-      <AppCard className="p-0">
-        <div className="px-6">
+      <Panel title={`${rows.length} ${rows.length === 1 ? 'entry' : 'entries'}`}>
+        <div className="px-5">
           {rows.map((item, index) => (
             <Row key={item.id} item={item} last={index === rows.length - 1} />
           ))}
@@ -154,7 +151,7 @@ function Body({
             </div>
           ) : null}
         </div>
-      </AppCard>
+      </Panel>
 
       {window ? <Coverage window={window} /> : null}
 
@@ -254,29 +251,35 @@ function Row({ item, last }: { item: ActivityItem; last: boolean }) {
 
   return (
     <div
-      className={`flex flex-wrap items-start justify-between gap-x-6 gap-y-3 py-5 ${
+      className={`flex flex-wrap items-baseline justify-between gap-x-6 gap-y-1.5 py-3 ${
         last ? '' : 'border-b border-[var(--border-hairline)]'
       }`}
     >
       <div className="min-w-0">
-        <p className="text-text text-[0.9375rem]">{activityTitle(item.kind, counterparty)}</p>
-        <p className="text-text-subtle mt-1.5 text-xs">
-          {item.at > 0 ? timeAgo(item.at) : 'time unknown'} ·{' '}
+        <p className="text-text truncate text-sm">{activityTitle(item.kind, counterparty)}</p>
+        <p className="text-text-subtle mt-1 flex flex-wrap items-center gap-x-2 text-xs">
+          <span>{item.at > 0 ? timeAgo(item.at) : 'time unknown'}</span>
+          <span aria-hidden>·</span>
           <span className={statusClass}>{statusLabel(item.status)}</span>
-          {item.memo ? ` · ${item.memo}` : ''}
+          {item.memo ? (
+            <>
+              <span aria-hidden>·</span>
+              <span className="truncate">{item.memo}</span>
+            </>
+          ) : null}
+          {item.hash ? (
+            <a
+              href={`${explorer.url}/tx/${item.hash}`}
+              target="_blank"
+              rel="noreferrer noopener"
+              className="num text-text-subtle hover:text-text inline-flex items-center gap-1 rounded-[var(--radius-pill)] transition-colors duration-[120ms] ease-out"
+            >
+              {shortHash(item.hash)}
+              <ArrowUpRight className="size-3" />
+              <span className="sr-only">open on {explorer.name}</span>
+            </a>
+          ) : null}
         </p>
-        {item.hash ? (
-          <a
-            href={`${explorer.url}/tx/${item.hash}`}
-            target="_blank"
-            rel="noreferrer noopener"
-            className="num text-text-muted hover:text-text mt-2 inline-flex items-center gap-1.5 rounded-[var(--radius-pill)] text-xs transition-colors duration-[120ms] ease-out"
-          >
-            {shortHash(item.hash)}
-            <ArrowUpRight className="size-3" />
-            <span className="sr-only">— open on {explorer.name}</span>
-          </a>
-        ) : null}
       </div>
 
       <div className="shrink-0 text-right">
@@ -286,7 +289,7 @@ function Row({ item, last }: { item: ActivityItem; last: boolean }) {
             {amount}
           </Num>
         ) : null}
-        <p className="text-text-subtle mt-1.5 text-xs">
+        <p className="text-text-subtle mt-1 text-xs">
           {item.sponsored ? (
             'Gas paid by a relayer'
           ) : (
