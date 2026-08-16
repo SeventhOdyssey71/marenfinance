@@ -158,11 +158,31 @@ const check = (name, pass, detail = '') => {
     JSON.stringify(ring),
   );
 
-  // skip link is the first tab stop — reload so focus starts at document top
+  /**
+   * The skip link is GONE, on the owner's direct instruction, so this no longer asserts
+   * that it is the first tab stop — it asserts what replaced it.
+   *
+   * The check is kept rather than deleted because tab order is still load-bearing: the
+   * first thing a keyboard user reaches must be a real, labelled control in the header,
+   * not a stray focusable div or something buried below the fold. If the skip link is
+   * ever restored, this flips back to expecting "Skip to content".
+   */
   await page.reload({ waitUntil: 'networkidle' });
   await page.keyboard.press('Tab');
-  const firstStop = await page.evaluate(() => document.activeElement?.textContent?.trim());
-  check('skip link is first tab stop', firstStop === 'Skip to content', `got="${firstStop}"`);
+  const firstStop = await page.evaluate(() => {
+    const el = document.activeElement;
+    return {
+      label: el?.getAttribute('aria-label') ?? el?.textContent?.trim() ?? '',
+      inHeader: Boolean(el?.closest('header')),
+      skipLink: el?.textContent?.trim() === 'Skip to content',
+    };
+  });
+  check('skip link is not present as a tab stop', !firstStop.skipLink, `got="${firstStop.label}"`);
+  check(
+    'first tab stop is a labelled control in the header',
+    firstStop.inHeader && firstStop.label.length > 0,
+    JSON.stringify(firstStop),
+  );
 
   check('no 4xx/5xx responses', bad.length === 0, bad.join(', '));
   await ctx.close();
@@ -232,12 +252,22 @@ const check = (name, pass, detail = '') => {
     JSON.stringify(landmarks),
   );
 
+  // Same change as the landing page: the skip link was removed on the owner's
+  // instruction, so tab order is asserted on what is actually first now.
   await page.keyboard.press('Tab');
-  const firstStop = await page.evaluate(() => document.activeElement?.textContent?.trim());
+  const appFirstStop = await page.evaluate(() => {
+    const el = document.activeElement;
+    return {
+      label: el?.getAttribute('aria-label') ?? el?.textContent?.trim() ?? '',
+      inHeader: Boolean(el?.closest('header')),
+      skipLink: el?.textContent?.trim() === 'Skip to content',
+    };
+  });
+  check('app: skip link is not present as a tab stop', !appFirstStop.skipLink, appFirstStop.label);
   check(
-    'app: skip link is the first tab stop',
-    firstStop === 'Skip to content',
-    `got="${firstStop}"`,
+    'app: first tab stop is a labelled control in the header',
+    appFirstStop.inHeader && appFirstStop.label.length > 0,
+    JSON.stringify(appFirstStop),
   );
 
   // The borrowing ceiling must be the contract's real one, not an ICR estimate, and the
