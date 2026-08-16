@@ -214,34 +214,63 @@ async function sceneConnect(ctx) {
     }
   }
 
-  const connect = page.getByRole('button', { name: /Connect wallet/i }).first();
-  if ((await connect.count()) === 0) {
-    log('  ! no connect button appeared — filming whatever state the app settled in');
-  } else {
-    // The disconnected screen is a real screen and worth a beat of its own: it is what a
-    // first-time visitor sees, and it deliberately shows no sample position.
-    await sleep(BEATS.read);
+  // The account pill is the app's own evidence that wagmi has an account. Everything below
+  // waits on it rather than on a duration.
+  const pill = page.locator('header .num').first();
+
+  /**
+   * One attempt at the connect menu.
+   *
+   * The connector is picked by name. `.first()` was not good enough: the menu is rebuilt on
+   * every render and, mid-disconnect, the account menu's own Disconnect item can still be
+   * the first `menuitem` in the tree — clicking it signs out again, which is precisely the
+   * failure that produced a take of the entire app in its signed-out state.
+   */
+  const attemptConnect = async () => {
+    const connect = page.getByRole('button', { name: /Connect wallet/i }).first();
+    if ((await connect.count()) === 0) return false;
+
     await pointer.click(connect, { after: BEATS.react });
-    const option = page.getByRole('menuitem').first();
-    await option.waitFor({ state: 'visible', timeout: 8_000 }).catch(() => {});
-    if (await option.isVisible().catch(() => false)) {
-      // Long enough for the menu to be read before it is dismissed by the choice.
+
+    const option = page
+      .getByRole('menuitem')
+      .filter({ hasNotText: /Disconnect/i })
+      .first();
+    if (!(await option.waitFor({ state: 'visible', timeout: 8_000 }).then(
+      () => true,
+      () => false,
+    ))) {
+      await page.keyboard.press('Escape').catch(() => {});
+      return false;
+    }
+
+    // Long enough for the menu to be read before it is dismissed by the choice.
+    await sleep(BEATS.glance);
+    await pointer.click(option);
+
+    return pill.waitFor({ state: 'visible', timeout: 12_000 }).then(
+      () => true,
+      () => false,
+    );
+  };
+
+  // The disconnected screen is a real screen and worth a beat of its own: it is what a
+  // first-time visitor sees, and it deliberately shows no sample position.
+  await sleep(BEATS.read);
+
+  // wagmi's reconnect is genuinely racy right after a disconnect — one take in three lost
+  // it — and a lost connect invalidates every scene after this one. Retrying costs a few
+  // seconds on a bad day and saves the whole run.
+  let connected = false;
+  for (let attempt = 1; attempt <= 3 && !connected; attempt += 1) {
+    connected = await attemptConnect();
+    if (!connected && attempt < 3) {
+      log(`  connect attempt ${attempt} did not take — trying again`);
       await sleep(BEATS.glance);
-      await pointer.click(option);
     }
   }
 
-  // Wait for the account pill to come back rather than sleeping a guess. wagmi has to
-  // re-run discovery, hand the account to the provider and re-render the header, and on a
-  // cold connect that is comfortably longer than the 2.4s this used to allow — which is how
-  // an earlier take filmed the whole app signed out while reporting success.
-  const pill = page.locator('header .num').first();
-  try {
-    await pill.waitFor({ state: 'visible', timeout: 20_000 });
-    seen.account = (await pill.innerText()).replace(/\s+/g, ' ').trim();
-  } catch {
-    seen.account = null;
-  }
+  seen.account = connected ? (await pill.innerText()).replace(/\s+/g, ' ').trim() : null;
 
   await settle(page, { log });
   // A beat on the connected header before the Portfolio scene starts reading cards.
@@ -307,13 +336,13 @@ async function scenePortfolio(ctx) {
     await sleep(BEATS.dwell);
   }
 
-  // The balances that back it.
+  // The balances that back it are read into the log but not given a stop of their own: the
+  // Vault scene is thirty seconds away and opens on the same 0.001 BTC, and a walkthrough
+  // that shows the identical figure twice spends its two scarcest seconds saying nothing new.
   const balances = page.getByText('Bitcoin collateral', { exact: false }).first();
   if ((await balances.count()) > 0) {
-    await centre(page, balances, { duration: 1_200, bias: 0.38 });
     seen.collateral = (await balances.locator('..').innerText()).replace(/\s+/g, ' ').trim();
     log(`  collateral: ${seen.collateral}`);
-    await sleep(BEATS.read);
   }
 
   return seen;
@@ -428,7 +457,7 @@ async function scenePay(ctx) {
     await page.mouse.up();
     // Typed a character at a time. A field that fills instantly reads as a scripted stub;
     // watching the handle arrive letter by letter is what makes the resolution legible.
-    await field.pressSequentially(ctx.handle, { delay: 120 });
+    await field.pressSequentially(ctx.handle, { delay: 95 });
     seen.typed = ctx.handle;
     log(`  typed handle: ${ctx.handle}`);
   } else {
@@ -460,7 +489,7 @@ async function scenePay(ctx) {
     await pointer.moveToElement(amount, { duration: 800, settle: 200 });
     await page.mouse.down();
     await page.mouse.up();
-    await amount.pressSequentially('25', { delay: 170 });
+    await amount.pressSequentially('25', { delay: 130 });
     seen.amount = '25';
     await sleep(BEATS.read);
   }

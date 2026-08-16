@@ -247,6 +247,18 @@ try {
     for (const e of [...new Set(consoleErrors)].slice(0, 8)) console.log(`  ${e.slice(0, 200)}`);
   }
 
+  // A take that never connected is not a shorter demo, it is nine screens of the signed-out
+  // app with a narration track describing a position that is not on any of them. It has
+  // happened, and it is not obvious from skimming the log, so it fails the run.
+  if (running.some((s) => s.id === 'connect') && !observed.connect?.account) {
+    process.exitCode = 1;
+    console.log(
+      '\n! THE WALLET NEVER CONNECTED. Every app screen in this file is the signed-out\n' +
+        '  state. The video is written but must not be shipped — re-run it. If it fails\n' +
+        '  again, the connect menu in components/app/wallet.tsx has changed shape.',
+    );
+  }
+
   if (result.seconds && (result.seconds < 80 || result.seconds > 130)) {
     console.log(
       `\n! ${result.seconds.toFixed(0)}s is outside the 90-120s the narration in ` +
