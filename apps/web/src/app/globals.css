@@ -34,9 +34,9 @@
   --font-sans: var(--font-satoshi), ui-sans-serif, system-ui, -apple-system, 'Segoe UI', sans-serif;
   --font-mono: var(--font-geist-mono), ui-monospace, 'SFMono-Regular', monospace;
 
-  /* Form — BRAND.md §4: 8 / 16 / 999 and nothing else */
+  /* Form — BRAND.md §4: 8 / 12 / 999 and nothing else */
   --radius-input: 8px;
-  --radius-card: 16px;
+  --radius-card: 12px;
   --radius-pill: 999px;
 
   /* Motion — BRAND.md §6 */
@@ -131,12 +131,21 @@
     padding-inline: var(--container-pad);
   }
 
-  /* Card — surface fill, hairline, inner top highlight. No drop shadows. */
+  /* Card — a hairline on the page background. Nothing else.
+     No fill and no inset highlight: against a near-black page a filled panel reads
+     as a lighter box floating on the page, which is the opposite of the reference.
+     The border alone is the whole elevation. */
   .card {
-    background-color: var(--color-surface);
     border: 1px solid var(--border-hairline);
     border-radius: var(--radius-card);
-    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.04);
+  }
+
+  /* The one surface that still needs a fill: a modal sits over the page, and a
+     transparent dialog would show the page it is interrupting straight through it. */
+  .card-modal {
+    background-color: var(--color-surface-raised);
+    border: 1px solid var(--border-strong);
+    border-radius: var(--radius-card);
   }
 
   .hairline-t {

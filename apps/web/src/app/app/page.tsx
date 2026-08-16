@@ -578,9 +578,9 @@ function QuickLink({
   return (
     <Link
       href={href}
-      className="card hover:bg-surface-raised group flex items-center gap-4 p-5 transition-colors duration-[120ms] ease-out"
+      className="card group flex items-center gap-4 p-5 transition-colors duration-[120ms] ease-out hover:border-[var(--border-strong)]"
     >
-      <span className="bg-surface-raised grid size-10 shrink-0 place-items-center rounded-[var(--radius-pill)] border border-[var(--border-hairline)] text-violet-400">
+      <span className="grid size-10 shrink-0 place-items-center rounded-[var(--radius-pill)] border border-[var(--border-hairline)] text-violet-400">
         {icon}
       </span>
       <span className="min-w-0">

@@ -227,13 +227,15 @@ export function TxSheet({ runner }: { runner: TxRunner }) {
         onClick={() => !busy && runner.close()}
         className="absolute inset-0 cursor-default bg-[#08080A]/80 backdrop-blur-sm"
       />
+      {/* `card-modal`, not `card`: cards are border-only now, and a transparent dialog
+          would show the screen it is interrupting straight through itself. */}
       <div
         ref={dialogRef}
         role="dialog"
         aria-modal="true"
         aria-labelledby="tx-sheet-title"
         tabIndex={-1}
-        className="card relative m-4 w-full max-w-lg p-6"
+        className="card-modal relative m-4 w-full max-w-lg p-6"
       >
         <h2 id="tx-sheet-title" className="t-h3 pr-8">
           {intent.title}
