@@ -278,7 +278,7 @@ export function HandleRegistration({ runner }: { runner: TxRunner }) {
       {/* --- the two steps ---------------------------------------------------- */}
       <ol className="mt-8 flex flex-col gap-6">
         <li>
-          <p className="t-label text-text-subtle">Step 1 — commit</p>
+          <p className="t-label text-text-subtle">Step 1: commit</p>
           <p className="text-text-muted mt-2 max-w-[68ch] text-sm leading-relaxed">
             Publishes a hash of the handle, your address and a random secret. The name itself stays
             private until step two.
@@ -302,7 +302,7 @@ export function HandleRegistration({ runner }: { runner: TxRunner }) {
         </li>
 
         <li>
-          <p className="t-label text-text-subtle">Step 2 — claim</p>
+          <p className="t-label text-text-subtle">Step 2: claim</p>
           <p className="text-text-muted mt-2 max-w-[68ch] text-sm leading-relaxed">
             {!pending ? (
               'Available once a commitment for this handle exists in this browser.'
@@ -313,7 +313,7 @@ export function HandleRegistration({ runner }: { runner: TxRunner }) {
             ) : secondsRemaining > 0 ? (
               <>
                 <span className="num text-text">{secondsRemaining}s</span> to go. MarenRegistry
-                refuses a reveal younger than 60 seconds — that delay is what makes copying your
+                refuses a reveal younger than 60 seconds. That delay is what makes copying your
                 commitment from the mempool useless.
               </>
             ) : (

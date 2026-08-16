@@ -279,7 +279,7 @@ export function TxSheet({ runner }: { runner: TxRunner }) {
         {phase.name === 'pending' ? (
           <div className="mt-5" role="status">
             <p className="text-text-muted text-sm leading-relaxed">
-              Submitted. Waiting for a receipt — a transaction hash is not a result, so nothing is
+              Submitted. Waiting for a receipt. A transaction hash is not a result, so nothing is
               marked delivered until the chain returns one with
               <span className="num"> status success</span>.
             </p>
