@@ -285,7 +285,7 @@ export default function PortfolioPage() {
           {activity && recent.length === 0 ? (
             <p className="text-text-subtle py-3 text-sm">
               {activity.complete
-                ? 'Nothing yet — this account has never transacted with Maren.'
+                ? 'Nothing yet. This account has never transacted with Maren.'
                 : 'Nothing in the blocks we can scan. See Activity for the range.'}
             </p>
           ) : null}
@@ -320,8 +320,8 @@ function GasCard() {
         action is submitted by your own wallet.
       </p>
       <p className="text-text-muted mt-2 max-w-[68ch] text-sm leading-relaxed">
-        <strong className="text-text font-medium">Your first deposit costs gas</strong> — and always
-        will, even once the relayer runs: it carries Bitcoin with the call, and the relay hub
+        <strong className="text-text font-medium">Your first deposit costs gas</strong>, and always
+        will, even once the relayer runs. It carries Bitcoin with the call, and the relay hub
         refuses any request with value.
       </p>
       <Info summary="What sponsorship would change">
@@ -409,13 +409,13 @@ function BorrowingCapacity() {
         {position.route === 'pooled' ? (
           <>
             This ceiling belongs to the pooled trove and is shared by everyone inside it. Your own
-            limit is Maren’s 180% floor on your share — whichever binds first stops the transaction.
+            limit is Maren’s 180% floor on your share. Whichever binds first stops the transaction.
           </>
         ) : (
           <>
             Mezo fixes a per-trove ceiling at the price the trove opened at, and reports it from{' '}
             <span className="num">TroveManager.getTroveMaxBorrowingCapacity()</span> rather than
-            deriving it from your collateral ratio. Adding collateral does not raise it — only a
+            deriving it from your collateral ratio. Adding collateral does not raise it. Only a
             refinance does, which re-fixes the ceiling at today’s price for a fee and is blocked
             while the system is in Recovery Mode.
           </>
@@ -531,7 +531,7 @@ function NotConnected() {
       </div>
 
       <ConnectPrompt icon={<VaultIcon className="size-6" />} title="No wallet connected">
-        Maren shows you your own position and nothing else — there is no sample account to look at.
+        Maren shows you your own position and nothing else. There is no sample account to look at.
         Connect and every figure on this screen becomes a contract read you can check on the
         explorer.
       </ConnectPrompt>

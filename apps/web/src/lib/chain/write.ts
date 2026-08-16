@@ -64,7 +64,7 @@ export function gasNote(
       sponsored: false,
       note:
         `${detail} Maren's relayer would normally pay the Bitcoin gas for this, but no relayer ` +
-        `is running yet — so this transaction is submitted by your own wallet and you pay the ` +
+        `is running yet, so this transaction is submitted by your own wallet and you pay the ` +
         `gas. The contracts are ready for it; the service is not deployed.`,
     };
   }

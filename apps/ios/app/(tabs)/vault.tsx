@@ -154,7 +154,7 @@ export default function Vault() {
           key="deposit"
           unit="BTC"
           title="Deposit Bitcoin"
-          body="Adds collateral to your trove and raises your collateral ratio immediately. Note that adding collateral does not raise your Mezo borrow limit — only a refinance does."
+          body="Adds collateral to your trove and raises your collateral ratio immediately. Note that adding collateral does not raise your Mezo borrow limit. Only a refinance does."
           presets={[
             { label: '0.01 BTC', wei: 10n ** 16n },
             { label: '0.05 BTC', wei: 5n * 10n ** 16n },
@@ -284,7 +284,7 @@ function BorrowPanel({
       <Txt variant="h3">Borrow MUSD</Txt>
       <Txt variant="small" tone="muted" style={styles.panelBody}>
         1.00% APR, simple interest, fixed for the life of this loan. The slider stops at Maren’s
-        180% floor — it will not let you past it.
+        180% floor and will not let you past it.
       </Txt>
 
       {/* Amount */}
@@ -381,7 +381,7 @@ function BorrowPanel({
       <View style={styles.gasRow}>
         <Icon name="shield" size={14} color={brand.violet400} />
         <Txt variant="small" tone="muted" style={styles.gasText}>
-          Depositing sends Bitcoin, so it is the one action a relayer cannot carry for you — you pay
+          Depositing sends Bitcoin, so it is the one action a relayer cannot carry for you. You pay
           gas on that first transaction. Borrow, repay and withdraw are relayed and cost you
           nothing.
         </Txt>
