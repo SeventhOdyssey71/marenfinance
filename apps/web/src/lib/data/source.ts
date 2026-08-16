@@ -92,10 +92,19 @@ export function useDataSource(): DataSource {
   return {
     mode,
     network: NETWORK,
+    /**
+     * Names the network, always.
+     *
+     * "Maren's contracts are not deployed yet" was true of every network when it was
+     * written and is now false of the one this app actually points at. An unqualified
+     * claim about deployment is exactly the sentence that goes stale the moment someone
+     * deploys, so this one is scoped: matsnet is live, mainnet is genuinely all zeroes,
+     * and the user is told which of those they are looking at.
+     */
     reason: !contractsDeployed()
-      ? 'Maren’s contracts are not deployed yet, so every figure here is demo data.'
+      ? `Maren is not deployed on Mezo ${NETWORK} — those addresses are still zero — so every figure here is demo data.`
       : mode === 'mock'
-        ? 'Connect a wallet to read your own position. Until then every figure here is demo data.'
+        ? `Maren is live on Mezo ${NETWORK}. Connect a wallet to read your own position; until then every figure here is demo data.`
         : `Live from Mezo ${NETWORK}.`,
     account: mode === 'live' && address ? address : mock.MOCK_ADDRESS,
     connected,
