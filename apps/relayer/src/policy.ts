@@ -4,7 +4,9 @@ import { paymentRequired, rateLimited, type RelayError } from './errors.js';
  * The sponsorship policy. ONE module, not constants scattered across handlers.
  *
  * Mezo's base fee is 1,300,000 wei, so a 100,000-gas transaction costs about
- * $0.0092 at $63k BTC. Sponsorship is cheap. Abuse control is the actual problem,
+ * $0.0092 at $63k BTC and the 1,462,500 wei gas price a sponsor actually pays (the base
+ * fee is lower, $0.0082, and is NOT what this budget is spent at). Sponsorship is cheap.
+ * Abuse control is the actual problem,
  * so every number below is a *cap*, and a cap that cannot be read from config is
  * treated as zero, not as infinity (R8 — gates fail closed).
  */
