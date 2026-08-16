@@ -30,6 +30,25 @@ export function ArrowRight(props: IconProps) {
   );
 }
 
+/** Confirmation. Used once, on the delivered transaction sheet. */
+export function Check(props: IconProps) {
+  return (
+    <svg viewBox="0 0 16 16" {...base} {...props}>
+      <path d="M3.5 8.5 6.5 11.5 12.5 4.5" />
+    </svg>
+  );
+}
+
+/** Copy-to-clipboard. The affordance that lets a transaction hash be truncated. */
+export function CopyIcon(props: IconProps) {
+  return (
+    <svg viewBox="0 0 16 16" {...base} {...props}>
+      <rect x="5.75" y="5.75" width="7.5" height="7.5" rx="1.75" />
+      <path d="M10.25 3.75a1.5 1.5 0 0 0-1.5-1.5h-4.5a2.5 2.5 0 0 0-2.5 2.5v4.5a1.5 1.5 0 0 0 1.5 1.5" />
+    </svg>
+  );
+}
+
 export function ArrowDown(props: IconProps) {
   return (
     <svg viewBox="0 0 16 16" {...base} {...props}>

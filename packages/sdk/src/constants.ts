@@ -80,6 +80,36 @@ export const MAREN_POLICY = {
 } as const;
 
 /**
+ * MarenVault's own on-chain constants, mirrored from `packages/contracts/src/MarenVault.sol`.
+ *
+ * These are not policy — they are the literal `constant`s the deployed contract checks
+ * before it reverts, transcribed so the interface can evaluate the same conditions BEFORE
+ * a user signs rather than after they have paid for the answer. `MAREN_POLICY` above is
+ * what Maren recommends; this is what the contract enforces. They currently agree at 180%,
+ * and the duplication is deliberate: if governance ever moved one, silently reusing the
+ * other would put a slider's hard stop on the wrong side of a revert.
+ *
+ * Verified against matsnet on 2026-08-16 by reading the public getters:
+ *   MIN_DEPOSIT 1e15 · MIN_BORROW_CR 1.8e18 · MIN_TROVE_CR 1.8e18 · LIQUIDATION_CR 1.4e18
+ */
+export const MAREN_VAULT = {
+  /** `MIN_DEPOSIT` — 0.001 BTC. Below it `deposit` reverts with DepositBelowMinimum. */
+  minDeposit: 10n ** 15n,
+  /** `MIN_BORROW_CR` — the floor YOUR position must clear. InsufficientCollateralRatio. */
+  minBorrowCr: 1_800_000_000_000_000_000n,
+  /**
+   * `MIN_TROVE_CR` — the floor the SHARED trove must clear after any borrow.
+   *
+   * This is the constraint that closes borrowing for everyone at once, and it is checked
+   * unconditionally: even a borrow served entirely from `reserveMUSD`, which adds no trove
+   * debt at all, is refused while the pooled trove sits under it.
+   */
+  minTroveCr: 1_800_000_000_000_000_000n,
+  /** `LIQUIDATION_CR` — where Maren's own keeper liquidates a pooled position. */
+  liquidationCr: 1_400_000_000_000_000_000n,
+} as const;
+
+/**
  * Ways MUSD differs from Liquity v1. Ignoring any of these produces silent failures
  * or reverts that are very hard to debug. Kept in code because it is integration-critical.
  */
