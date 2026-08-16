@@ -5,6 +5,7 @@ import { generatePrivateKey, privateKeyToAccount } from 'viem/accounts';
 import { formatMusd } from '@maren/sdk';
 import type { Address } from 'viem';
 
+import { BlockedNote } from '@/components/app/blocked';
 import { ConnectPrompt } from '@/components/app/connect-prompt';
 import { AmountField, Segmented } from '@/components/app/controls';
 import { HandleRegistration } from '@/components/app/handle-registration';
@@ -13,6 +14,7 @@ import { ActionButton, AppCard, CardTitle, Info, Label, Note } from '@/component
 import { TxSheet, useTxRunner, type TxIntent, type TxRunner } from '@/components/app/tx';
 import { ArrowUpRight, LinkIcon, PayIcon } from '@/components/ui/icons';
 import { parseUnitsSafe, utf8Length } from '@/lib/copy';
+import { preflightMusdSpend } from '@/lib/chain/preflight';
 import { gasNote, SPENDERS, useMarenWrites, useMusdAllowance } from '@/lib/chain/write';
 import { useBalances, useDataSource, useResolvedHandle } from '@/lib/data/source';
 
@@ -120,7 +122,7 @@ const ADDRESS_RE = /^0x[0-9a-fA-F]{40}$/;
 
 function SendPanel({ runner }: { runner: TxRunner }) {
   const { data: balances } = useBalances();
-  const writes = useMarenWrites();
+  const writes = useMarenWrites({ onSimulated: runner.onSimulated });
   const [to, setTo] = useState('');
   const [amount, setAmount] = useState('');
   const [memo, setMemo] = useState('');
@@ -132,20 +134,35 @@ function SendPanel({ runner }: { runner: TxRunner }) {
 
   const amountWei = parseUnitsSafe(amount);
   const balance = balances?.musdWei ?? 0n;
-  const overBalance = amountWei > balance;
   const recipient = isAddress ? (trimmed as Address) : (resolved?.address ?? null);
   const memoBytes = utf8Length(memo);
 
-  const { needed: needsApproval, refetch: refetchAllowance } = useMusdAllowance(
-    SPENDERS.pay,
-    amountWei,
-  );
+  const {
+    allowanceWei,
+    needed: needsApproval,
+    refetch: refetchAllowance,
+  } = useMusdAllowance(SPENDERS.pay, amountWei);
 
-  const canSend =
-    recipient !== null && amountWei > 0n && !overBalance && memoBytes <= 80 && writes.ready;
+  /**
+   * A payment moves MUSD out of this wallet, so it has the same precondition Earn and the
+   * Link escrow do, and it is failing for everybody right now for a reason that has
+   * nothing to do with them: the pooled trove is under its floor, so nobody can borrow the
+   * MUSD in the first place. Stated at the button rather than discovered inside MUSD's own
+   * `ERC20InsufficientBalance`, which names no product and suggests no next step.
+   */
+  const funds = preflightMusdSpend(balances, amountWei, { verb: 'send', noun: 'Send' });
+  const canSend = funds.ok && recipient !== null && memoBytes <= 80 && writes.ready;
 
   const approvalIntent = (): TxIntent => ({
     title: `Approve ${formatMusd(amountWei)} for MarenPay`,
+    successTitle: `Approved ${formatMusd(amountWei)}`,
+    changes: [
+      {
+        label: 'MarenPay allowance',
+        before: <Musd wei={allowanceWei ?? 0n} />,
+        after: <Musd wei={amountWei} />,
+      },
+    ],
     details: [
       { label: 'Token', value: <span className="text-text-muted">MUSD</span> },
       { label: 'Amount', value: <Musd wei={amountWei} /> },
@@ -170,6 +187,14 @@ function SendPanel({ runner }: { runner: TxRunner }) {
 
   const intent = (): TxIntent => ({
     title: `Send ${formatMusd(amountWei)}`,
+    successTitle: `Sent ${formatMusd(amountWei)}`,
+    changes: [
+      {
+        label: 'MUSD in your wallet',
+        before: <Musd wei={balance} />,
+        after: <Musd wei={balance > amountWei ? balance - amountWei : 0n} />,
+      },
+    ],
     details: [
       { label: 'Amount', value: <Musd wei={amountWei} /> },
       {
@@ -256,7 +281,11 @@ function SendPanel({ runner }: { runner: TxRunner }) {
           max={<Musd wei={balance} size="sm" />}
           maxLabel="Available"
           onMax={() => setAmount(formatMusd(balance, { unit: false }).replace(/,/g, ''))}
-          error={overBalance ? 'More than your MUSD balance.' : null}
+          error={
+            funds.blocker && funds.blocker.scope === 'wallet' && amountWei > 0n
+              ? funds.blocker.title
+              : null
+          }
         />
       </div>
 
@@ -278,16 +307,13 @@ function SendPanel({ runner }: { runner: TxRunner }) {
         </p>
       </div>
 
-      {balance === 0n ? (
+      {funds.rangeDead && funds.blocker ? (
         <div className="mt-8">
-          <Note>
-            You hold no MUSD, so there is nothing to send yet. Deposit Bitcoin in the Vault and
-            borrow against it, or receive a payment from someone else.
-          </Note>
+          <BlockedNote blocker={funds.blocker} id="send-blocked" />
         </div>
       ) : null}
 
-      {needsApproval && amountWei > 0n ? (
+      {funds.ok && needsApproval && amountWei > 0n ? (
         <div className="mt-6">
           <Note>
             MarenPay has to be allowed to take {formatMusd(amountWei)} of your MUSD before it can be
@@ -301,7 +327,8 @@ function SendPanel({ runner }: { runner: TxRunner }) {
         {needsApproval && amountWei > 0n ? (
           <ActionButton
             onClick={() => runner.request(approvalIntent())}
-            disabled={!writes.ready || overBalance || amountWei === 0n}
+            disabled={!writes.ready || !funds.ok}
+            aria-describedby="send-blocked"
             icon={<ArrowUpRight className="size-4" />}
           >
             Approve {formatMusd(amountWei)}
@@ -311,6 +338,7 @@ function SendPanel({ runner }: { runner: TxRunner }) {
           variant={needsApproval && amountWei > 0n ? 'secondary' : 'primary'}
           onClick={() => runner.request(intent())}
           disabled={!canSend || (needsApproval && amountWei > 0n)}
+          aria-describedby="send-blocked"
           icon={<ArrowUpRight className="size-4" />}
         >
           {amountWei > 0n ? `Send ${formatMusd(amountWei)}` : 'Send'}
@@ -320,8 +348,13 @@ function SendPanel({ runner }: { runner: TxRunner }) {
   );
 }
 
+/**
+ * A request is the one thing on this screen that works with an empty wallet, and that is
+ * worth keeping true: it moves no funds, so it has no balance precondition to preflight.
+ * Its only requirement is that a named payer, if given, actually resolves.
+ */
 function RequestPanel({ runner }: { runner: TxRunner }) {
-  const writes = useMarenWrites();
+  const writes = useMarenWrites({ onSimulated: runner.onSimulated });
   const [amount, setAmount] = useState('');
   const [from, setFrom] = useState('');
   const [memo, setMemo] = useState('');
@@ -337,6 +370,7 @@ function RequestPanel({ runner }: { runner: TxRunner }) {
 
   const intent = (): TxIntent => ({
     title: `Request ${formatMusd(amountWei)}`,
+    successTitle: `Requested ${formatMusd(amountWei)}`,
     details: [
       { label: 'Amount', value: <Musd wei={amountWei} /> },
       {
@@ -441,7 +475,7 @@ function RequestPanel({ runner }: { runner: TxRunner }) {
  */
 function LinkPanel({ runner }: { runner: TxRunner }) {
   const { data: balances } = useBalances();
-  const writes = useMarenWrites();
+  const writes = useMarenWrites({ onSimulated: runner.onSimulated });
   const [amount, setAmount] = useState('');
   const [days, setDays] = useState('7');
   const [memo, setMemo] = useState('');
@@ -451,15 +485,26 @@ function LinkPanel({ runner }: { runner: TxRunner }) {
   const amountWei = parseUnitsSafe(amount);
   const expiryDays = Number.parseInt(days, 10) || 0;
   const balance = balances?.musdWei ?? 0n;
-  const overBalance = amountWei > balance;
 
-  const { needed: needsApproval, refetch: refetchAllowance } = useMusdAllowance(
-    SPENDERS.pay,
-    amountWei,
-  );
+  // A link escrows real MUSD, so it has the same precondition Send does.
+  const funds = preflightMusdSpend(balances, amountWei, { verb: 'escrow', noun: 'Escrow' });
+
+  const {
+    allowanceWei,
+    needed: needsApproval,
+    refetch: refetchAllowance,
+  } = useMusdAllowance(SPENDERS.pay, amountWei);
 
   const approvalIntent = (): TxIntent => ({
     title: `Approve ${formatMusd(amountWei)} for MarenPay`,
+    successTitle: `Approved ${formatMusd(amountWei)}`,
+    changes: [
+      {
+        label: 'MarenPay allowance',
+        before: <Musd wei={allowanceWei ?? 0n} />,
+        after: <Musd wei={amountWei} />,
+      },
+    ],
     details: [
       { label: 'Token', value: <span className="text-text-muted">MUSD</span> },
       { label: 'Amount', value: <Musd wei={amountWei} /> },
@@ -492,6 +537,14 @@ function LinkPanel({ runner }: { runner: TxRunner }) {
 
     return {
       title: `Create a link for ${formatMusd(amountWei)}`,
+      successTitle: `Escrowed ${formatMusd(amountWei)}`,
+      changes: [
+        {
+          label: 'MUSD in your wallet',
+          before: <Musd wei={balance} />,
+          after: <Musd wei={balance > amountWei ? balance - amountWei : 0n} />,
+        },
+      ],
       details: [
         { label: 'Amount escrowed', value: <Musd wei={amountWei} /> },
         { label: 'Expires', value: <span className="text-text-muted">in {expiryDays} days</span> },
@@ -531,7 +584,11 @@ function LinkPanel({ runner }: { runner: TxRunner }) {
           label="Amount"
           max={<Musd wei={balance} size="sm" />}
           maxLabel="Available"
-          error={overBalance ? 'More than your MUSD balance.' : null}
+          error={
+            funds.blocker && funds.blocker.scope === 'wallet' && amountWei > 0n
+              ? funds.blocker.title
+              : null
+          }
         />
         <div>
           <label htmlFor="link-expiry" className="t-label text-text-subtle block">
@@ -564,7 +621,13 @@ function LinkPanel({ runner }: { runner: TxRunner }) {
         />
       </div>
 
-      {needsApproval && amountWei > 0n ? (
+      {funds.rangeDead && funds.blocker ? (
+        <div className="mt-6">
+          <BlockedNote blocker={funds.blocker} id="link-blocked" />
+        </div>
+      ) : null}
+
+      {funds.ok && needsApproval && amountWei > 0n ? (
         <div className="mt-6">
           <Note>
             MarenPay has to be allowed to take {formatMusd(amountWei)} of your MUSD before it can be
@@ -577,7 +640,8 @@ function LinkPanel({ runner }: { runner: TxRunner }) {
         {needsApproval && amountWei > 0n ? (
           <ActionButton
             onClick={() => runner.request(approvalIntent())}
-            disabled={!writes.ready || overBalance || amountWei === 0n}
+            disabled={!writes.ready || !funds.ok}
+            aria-describedby="link-blocked"
             icon={<LinkIcon className="size-4" />}
           >
             Approve {formatMusd(amountWei)}
@@ -587,12 +651,9 @@ function LinkPanel({ runner }: { runner: TxRunner }) {
           variant={needsApproval && amountWei > 0n ? 'secondary' : 'primary'}
           onClick={() => runner.request(intent())}
           disabled={
-            amountWei === 0n ||
-            overBalance ||
-            expiryDays <= 0 ||
-            !writes.ready ||
-            (needsApproval && amountWei > 0n)
+            !funds.ok || expiryDays <= 0 || !writes.ready || (needsApproval && amountWei > 0n)
           }
+          aria-describedby="link-blocked"
           icon={<LinkIcon className="size-4" />}
         >
           Create link

@@ -40,7 +40,7 @@ export function HandleRegistration({ runner }: { runner: TxRunner }) {
   const source = useDataSource();
   const { address } = useAccount();
   const client = usePublicClient();
-  const writes = useMarenWrites();
+  const writes = useMarenWrites({ onSimulated: runner.onSimulated });
   const queryClient = useQueryClient();
   const { data: primary } = usePrimaryHandle();
 
@@ -132,6 +132,14 @@ export function HandleRegistration({ runner }: { runner: TxRunner }) {
 
       runner.request({
         title: `Commit to @${handle}`,
+        successTitle: `Committed to @${handle}`,
+        changes: [
+          {
+            label: 'Registration',
+            before: <span className="text-text-subtle">not started</span>,
+            after: <span className="text-text">step 1 of 2 done</span>,
+          },
+        ],
         details: [
           { label: 'Handle', value: <span className="text-text">@{handle}</span> },
           {
@@ -170,6 +178,14 @@ export function HandleRegistration({ runner }: { runner: TxRunner }) {
     if (!pending) return;
     runner.request({
       title: `Claim @${pending.handle}`,
+      successTitle: `Registered @${pending.handle}`,
+      changes: [
+        {
+          label: 'Your handle',
+          before: <span className="text-text-subtle">{primary ?? 'none'}</span>,
+          after: <span className="text-text">@{pending.handle}</span>,
+        },
+      ],
       details: [
         { label: 'Handle', value: <span className="text-text">@{pending.handle}</span> },
         {
@@ -194,7 +210,7 @@ export function HandleRegistration({ runner }: { runner: TxRunner }) {
           }
         : undefined,
     });
-  }, [committedAt, pending, runner, writes]);
+  }, [committedAt, pending, primary, runner, writes]);
 
   /**
    * Once the handle resolves to this account the secret is worthless, so it is deleted.
