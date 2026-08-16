@@ -354,8 +354,11 @@ curl -s localhost:8787/health | jq
 ```
 
 A fresh checkout will report `accepting: false` with a populated `problems` array,
-because `MAREN_ADDRESSES` is still all zeroes and no key is configured. **That is the
-correct default state**, and `problems` tells you exactly what to set.
+because no signing key is configured. **That is the correct default state**, and
+`problems` tells you exactly what to set. Note that the allowlist is no longer part of
+what keeps it refusing: `MAREN_ADDRESSES` has held real matsnet addresses since
+15 August 2026, so `buildTargets` resolves a live allowlist from `@maren/sdk` alone.
+The missing key is what stops it, and it is the only thing that stops it.
 
 ### Tests
 

@@ -188,99 +188,55 @@ for (const shot of closeups) {
 }
 
 /**
- * States that only exist after an interaction, and that are the whole point of the
- * screens they live on: the Vault with Mezo's oracle stalled, and the confirmation sheet
- * where a payment's resolved address is shown before anything is signed. A design review
- * that never sees these has not seen the product.
+ * States that only exist after an interaction.
+ *
+ * These used to be reached by clicking a "Demo controls" panel and selecting a seeded
+ * account. There is no such panel and no seeded account: the empty states below are what
+ * the app genuinely renders for a visitor with no wallet, which is also the state it is
+ * most often seen in and the one that used to hide a 60-digit liquidation price.
+ *
+ * The connected states need a signer, so they are skipped unless MAREN_TEST_PRIVATE_KEY
+ * is set — a screenshot run should degrade to fewer images, never to invented ones.
  */
-const openDemo = async (page, account) => {
-  await page.getByRole('button', { name: 'Demo controls' }).click();
-  await page.getByRole('button', { name: account }).first().click();
-  await page.getByRole('button', { name: 'Hide demo controls' }).click();
-  await page.waitForTimeout(900);
-};
-
 const states = [
-  /**
-   * The empty account, at both widths, on both screens that derive figures from a
-   * position. This is the default state for anyone arriving without a wallet, and it is
-   * the state that used to render a 60-digit liquidation price, so a review that never
-   * looks at it has not looked at the thing most likely to be broken.
-   */
+  { name: 'state-anon-portfolio-1440', path: '/app', width: 1440, height: 1200 },
+  { name: 'state-anon-portfolio-390', path: '/app', width: 390, height: 844 },
+  { name: 'state-anon-vault-1440', path: '/app/vault', width: 1440, height: 1200 },
+  { name: 'state-anon-vault-390', path: '/app/vault', width: 390, height: 844 },
+  { name: 'state-anon-earn-1440', path: '/app/earn', width: 1440, height: 1000 },
+  { name: 'state-anon-activity-1440', path: '/app/activity', width: 1440, height: 900 },
+  { name: 'state-anon-pay-1440', path: '/app/pay', width: 1440, height: 1000 },
+];
+
+const connectedStates = [
+  { name: 'state-live-portfolio-1440', path: '/app', width: 1440, height: 1100 },
+  { name: 'state-live-vault-1440', path: '/app/vault', width: 1440, height: 1200 },
+  { name: 'state-live-activity-1440', path: '/app/activity', width: 1440, height: 1000 },
   {
-    name: 'state-empty-portfolio-1440',
-    path: '/app',
-    width: 1440,
-    height: 1000,
-    act: (page) => openDemo(page, /New wallet/),
-  },
-  {
-    name: 'state-empty-portfolio-390',
-    path: '/app',
-    width: 390,
-    height: 844,
-    act: (page) => openDemo(page, /New wallet/),
-  },
-  {
-    name: 'state-empty-vault-1440',
-    path: '/app/vault',
-    width: 1440,
-    height: 1100,
-    act: (page) => openDemo(page, /New wallet/),
-  },
-  {
-    name: 'state-empty-vault-390',
-    path: '/app/vault',
-    width: 390,
-    height: 844,
-    act: (page) => openDemo(page, /New wallet/),
-  },
-  {
-    name: 'state-empty-earn-1440',
-    path: '/app/earn',
-    width: 1440,
-    height: 1000,
-    act: (page) => openDemo(page, /New wallet/),
-  },
-  {
-    name: 'state-empty-activity-1440',
-    path: '/app/activity',
-    width: 1440,
-    height: 900,
-    act: (page) => openDemo(page, /New wallet/),
-  },
-  {
-    name: 'state-vault-stale-1440',
-    path: '/app/vault',
-    width: 1440,
-    height: 1100,
-    async act(page) {
-      await page.getByRole('button', { name: 'Demo controls' }).click();
-      await page.getByRole('button', { name: /Stall the oracle/ }).click();
-      await page.waitForTimeout(900);
-    },
-  },
-  {
-    // The pooled route is the differentiator, and its copy and figures differ from the
-    // direct route's in ways a review has to actually look at.
-    name: 'state-vault-pooled-1440',
-    path: '/app/vault',
+    name: 'state-live-handle-1440',
+    path: '/app/pay',
     width: 1440,
     height: 1400,
     async act(page) {
-      await page.getByRole('button', { name: 'Demo controls' }).click();
-      await page.getByRole('button', { name: /^Pooled/ }).click();
-      await page.waitForTimeout(900);
+      await page.getByRole('tab', { name: 'Handle' }).click();
+      await page.waitForTimeout(1200);
     },
   },
   {
-    name: 'state-tx-confirm-1440',
+    name: 'state-live-tx-confirm-1440',
     path: '/app/pay',
     width: 1440,
     height: 900,
     async act(page) {
-      await page.getByRole('button', { name: /^Send / }).click();
-      await page.waitForTimeout(500);
+      await page.getByRole('tab', { name: 'Request' }).click();
+      await page.waitForTimeout(600);
+      await page.locator('input[inputmode=decimal]').first().fill('10');
+      await page.waitForTimeout(400);
+      await page
+        .getByRole('button', { name: /^Request / })
+        .last()
+        .click();
+      await page.waitForTimeout(700);
     },
   },
 ];
@@ -293,12 +249,51 @@ for (const shot of states) {
   });
   const page = await context.newPage();
   await page.goto(`${BASE}${shot.path}`, { waitUntil: 'networkidle' });
-  await page.waitForTimeout(700);
-  await shot.act(page);
+  await page.waitForTimeout(1500);
+  if (shot.act) await shot.act(page);
   await page.screenshot({ path: join(outDir, `${shot.name}.png`) });
   console.log(`${shot.name.padEnd(24)} ${shot.width}px @2x`);
   await context.close();
 }
 
+let connectedTaken = 0;
+if (process.env.MAREN_TEST_PRIVATE_KEY) {
+  const { connectWallet, installWallet } = await import('./injected-wallet.mjs');
+  const mezoTestnet = {
+    id: 31611,
+    name: 'Mezo Matsnet',
+    nativeCurrency: { name: 'Bitcoin', symbol: 'BTC', decimals: 18 },
+    rpcUrls: { default: { http: ['https://rpc.test.mezo.org'] } },
+  };
+
+  for (const shot of connectedStates) {
+    const context = await browser.newContext({
+      viewport: { width: shot.width, height: shot.height },
+      deviceScaleFactor: 2,
+      colorScheme: 'dark',
+    });
+    await installWallet(context, {
+      privateKey: process.env.MAREN_TEST_PRIVATE_KEY,
+      chain: mezoTestnet,
+      rpcUrl: process.env.MEZO_RPC_URL ?? 'https://rpc.test.mezo.org',
+    });
+    const page = await context.newPage();
+    await page.goto(`${BASE}${shot.path}`, { waitUntil: 'networkidle' });
+    await page.waitForTimeout(1200);
+    await connectWallet(page);
+    // Long enough for the log scan on /app/activity, which is several round trips.
+    await page.waitForTimeout(shot.path.endsWith('activity') ? 9000 : 4000);
+    if (shot.act) await shot.act(page);
+    await page.screenshot({ path: join(outDir, `${shot.name}.png`) });
+    console.log(`${shot.name.padEnd(24)} ${shot.width}px @2x`);
+    connectedTaken += 1;
+    await context.close();
+  }
+} else {
+  console.log('\nMAREN_TEST_PRIVATE_KEY unset — skipping the connected states.');
+}
+
 await browser.close();
-console.log(`\nWrote ${shots.length + closeups.length + states.length} screenshots to ${outDir}`);
+console.log(
+  `\nWrote ${shots.length + closeups.length + states.length + connectedTaken} screenshots to ${outDir}`,
+);
