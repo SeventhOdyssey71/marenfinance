@@ -66,16 +66,59 @@ export async function startWebServer({ webDir, log }) {
     return { baseUrl: external.replace(/\/$/, ''), close: async () => {} };
   }
 
-  if (!existsSync(join(webDir, '.next', 'BUILD_ID'))) {
-    throw new Error(
-      `apps/web has no production build. Run:\n` +
-        `  CI=true pnpm --filter @maren/web build\n` +
-        `(looked for ${join(webDir, '.next', 'BUILD_ID')})`,
-    );
-  }
-
+  const hasBuild = existsSync(join(webDir, '.next', 'BUILD_ID'));
   const port = await freePort();
   const baseUrl = `http://127.0.0.1:${port}`;
+
+  if (!hasBuild) {
+    log(`no production build found, falling back to next dev on ${port}`);
+    const child = spawn(
+      process.execPath,
+      [join(webDir, 'node_modules', 'next', 'dist', 'bin', 'next'), 'dev', '--port', String(port)],
+      {
+        cwd: webDir,
+        stdio: ['ignore', 'pipe', 'pipe'],
+        env: { ...process.env, NODE_ENV: 'development', PORT: String(port) },
+      },
+    );
+
+    const output = [];
+    child.stdout.on('data', (d) => output.push(String(d)));
+    child.stderr.on('data', (d) => output.push(String(d)));
+
+    let exited = null;
+    child.on('exit', (code, signal) => {
+      exited = `next dev exited early (code=${code} signal=${signal})\n${output.join('')}`;
+    });
+
+    try {
+      await waitForHttp(baseUrl, { log, timeoutMs: 120_000 });
+    } catch (err) {
+      child.kill('SIGKILL');
+      throw new Error(exited ?? `${err.message}\n${output.join('')}`);
+    }
+
+    log(`dev server ready at ${baseUrl}`);
+
+    return {
+      baseUrl,
+      async close() {
+        if (child.exitCode !== null) return;
+        child.kill('SIGTERM');
+        await new Promise((resolve) => {
+          const timer = setTimeout(() => {
+            child.kill('SIGKILL');
+            resolve();
+          }, 4_000);
+          child.on('exit', () => {
+            clearTimeout(timer);
+            resolve();
+          });
+        });
+      },
+    };
+  }
+
   log(`booting next start on ${port}`);
 
   const child = spawn(
