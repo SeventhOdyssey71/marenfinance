@@ -14,67 +14,62 @@ export function Hero() {
     <section className="relative isolate overflow-hidden" aria-labelledby="hero-title">
       <HeroMesh />
 
-      {/* Legibility floor: the mesh never sits under body copy at a contrast
-          that drops below 4.5:1. Two scrims guarantee it — a vertical one that
-          carries the whole viewport on mobile, and a horizontal one from md up
-          that darkens the text column while leaving the violet bleed visible in
-          the empty right half. */}
+      {/* Legibility floor: the shader never sits under copy below 4.5:1.
+          The copy is centred, so the scrim is centre-weighted rather than
+          side-weighted — a dark ellipse behind the text that falls away at the
+          edges, letting the silk read at full strength down both margins the way
+          the reference does. A left-to-right ramp would have been wrong here: it
+          darkens one edge the text no longer occupies and washes the other. */}
       <div
         aria-hidden
-        className="pointer-events-none absolute inset-0 -z-10 bg-[linear-gradient(180deg,rgba(8,8,10,0.84)_0%,rgba(8,8,10,0.76)_32%,rgba(8,8,10,0.82)_62%,rgba(8,8,10,0.94)_88%,#08080A_100%)] md:bg-[linear-gradient(180deg,rgba(8,8,10,0.44)_0%,rgba(8,8,10,0.22)_34%,rgba(8,8,10,0.38)_70%,rgba(8,8,10,0.86)_90%,#08080A_100%)]"
+        className="pointer-events-none absolute inset-0 -z-10 bg-[radial-gradient(130%_62%_at_50%_44%,rgba(8,8,10,0.95)_0%,rgba(8,8,10,0.92)_46%,rgba(8,8,10,0.72)_74%,rgba(8,8,10,0.35)_92%,rgba(8,8,10,0.12)_100%)] md:bg-[radial-gradient(72%_58%_at_50%_44%,rgba(8,8,10,0.92)_0%,rgba(8,8,10,0.86)_42%,rgba(8,8,10,0.52)_70%,rgba(8,8,10,0.12)_88%,rgba(8,8,10,0)_100%)]"
       />
-      {/* From md up the copy sits in the left column, so the horizontal scrim can
-          hold the text side dark and then clear completely — letting the shader
-          run at full strength across the right half, which is where the reference
-          gets its presence. On mobile there is no left/right split, so the
-          vertical scrim above carries the whole legibility budget alone. */}
+      {/* Seats the section into the page: fully opaque at the very bottom so the
+          shader does not collide with the section that follows. */}
       <div
         aria-hidden
-        className="pointer-events-none absolute inset-0 -z-10 hidden md:block md:bg-[linear-gradient(90deg,rgba(8,8,10,0.93)_0%,rgba(8,8,10,0.90)_42%,rgba(8,8,10,0.58)_63%,rgba(8,8,10,0.12)_80%,rgba(8,8,10,0)_100%)]"
+        className="pointer-events-none absolute inset-0 -z-10 bg-[linear-gradient(180deg,rgba(8,8,10,0.55)_0%,rgba(8,8,10,0)_28%,rgba(8,8,10,0)_68%,rgba(8,8,10,0.72)_90%,#08080A_100%)]"
       />
 
       <div className="container-maren relative">
         {/* Capped so the hero stays a hero on a 27" display instead of turning
             into a page of its own. */}
-        <div className="flex min-h-[min(92svh,1000px)] flex-col justify-center pb-24 pt-[136px] md:min-h-[min(94svh,1120px)] md:pb-32 md:pt-40">
-          <div className="max-w-[62rem]">
-            <EyebrowPill>Built on Mezo</EyebrowPill>
+        {/* Centred, and vertically centred in the viewport. The copy block is
+            capped at 46rem so the headline breaks where it is written to break
+            rather than running the full container width. */}
+        <div className="flex min-h-[min(92svh,940px)] flex-col items-center justify-center pb-24 pt-[136px] text-center md:min-h-[min(92svh,1040px)] md:pb-28 md:pt-40">
+          <EyebrowPill>Built on Mezo</EyebrowPill>
 
-            <h1 id="hero-title" className="t-display text-text mt-8 text-balance md:mt-10">
-              Spend Bitcoin.
-              <br />
-              <span className="text-text-muted">Never sell it.</span>
-            </h1>
+          <h1
+            id="hero-title"
+            className="t-display text-text mx-auto mt-7 max-w-[46rem] text-balance"
+          >
+            Spend Bitcoin.
+            <br />
+            <span className="text-text-muted">Never sell it.</span>
+          </h1>
 
-            <p className="prose-measure text-text-muted mt-7 text-[1.0625rem] leading-relaxed md:mt-8 md:text-lg">
-              Maren turns Bitcoin into spendable liquidity on Mezo. Deposit from{' '}
-              <span className="num text-text">0.001 BTC</span>, draw MUSD against it, and pay anyone
-              — without keeping a gas balance, and without selling a satoshi.
-            </p>
+          <p className="text-text-muted mx-auto mt-6 max-w-[42rem] text-[1.0625rem] leading-relaxed">
+            Deposit from <span className="num text-text">0.001 BTC</span>, draw MUSD against it, and
+            pay anyone — without selling a satoshi.
+          </p>
 
-            <div className="mt-10 flex flex-col gap-3 sm:flex-row sm:items-center md:mt-12">
-              <PillButton href="/app" size="lg">
-                Launch App
-              </PillButton>
-              <PillButton
-                href="#problem"
-                variant="secondary"
-                size="lg"
-                icon={<ArrowDown className="size-4" />}
-              >
-                Read the thesis
-              </PillButton>
-            </div>
+          <div className="mt-9 flex flex-col items-center gap-3 sm:flex-row sm:justify-center">
+            <PillButton href="/app">Launch App</PillButton>
+            <PillButton href="#problem" variant="secondary" icon={<ArrowDown className="size-4" />}>
+              Read the thesis
+            </PillButton>
           </div>
 
-          {/* Hard numbers, stated exactly. Nothing here is an estimate. */}
-          <dl className="mt-20 grid max-w-3xl grid-cols-1 gap-px overflow-hidden rounded-[var(--radius-card)] border border-[var(--border-hairline)] bg-[var(--border-hairline)] sm:grid-cols-3 md:mt-24">
+          {/* Hard numbers, stated exactly. Nothing here is an estimate. Kept, but
+              demoted to a quiet centred strip — the reference hero carries no
+              stat block at all, and these earn their place on facts rather than
+              on visual weight. */}
+          <dl className="mt-16 flex flex-col items-center justify-center gap-x-12 gap-y-6 sm:flex-row md:mt-20">
             {heroFacts.map((f) => (
-              <div key={f.label} className="bg-[#0A0A0D]/80 px-6 py-5 backdrop-blur-sm">
-                <dt className="t-label text-text-subtle">{f.label}</dt>
-                <dd className="num text-text mt-2 text-2xl font-medium tracking-tight">
-                  {f.value}
-                </dd>
+              <div key={f.label} className="text-center">
+                <dd className="num text-text text-lg font-medium tracking-tight">{f.value}</dd>
+                <dt className="t-label text-text-subtle mt-1.5">{f.label}</dt>
               </div>
             ))}
           </dl>
