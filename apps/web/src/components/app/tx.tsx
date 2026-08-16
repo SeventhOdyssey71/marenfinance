@@ -315,7 +315,8 @@ export function TxSheet({ runner }: { runner: TxRunner }) {
         onClick={() => !busy && runner.close()}
         className="bg-[#08080A]/78 absolute inset-0 cursor-default backdrop-blur-lg"
       />
-
+      {/* `card-modal`, not `card`: cards are border-only now, and a transparent dialog
+          would show the screen it is interrupting straight through itself. */}
       <div
         ref={dialogRef}
         role="dialog"
