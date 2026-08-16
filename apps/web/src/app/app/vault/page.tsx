@@ -764,7 +764,7 @@ function DepositPanel({ runner, chain }: { runner: TxRunner; chain: VaultState }
       // the accident of the relayer being down. It carries BTC with the call and
       // MarenRelayHub reverts with ValueNotRelayable() on any request with value.
       sponsored: false,
-      note: 'A deposit carries Bitcoin with the call, which the relay hub refuses by design. You pay the BTC gas for this one.',
+      note: 'A deposit carries Bitcoin with the call, so it can never be sponsored. You pay the Bitcoin gas for this one, today and always.',
     },
     confirmLabel: `Deposit ${formatBtc(wei)}`,
     submit: writes.ready ? () => writes.depositBtc(wei) : undefined,
@@ -879,7 +879,7 @@ function RepayPanel({ runner, chain }: { runner: TxRunner; chain: VaultState }) 
     ],
     gas: {
       sponsored: false,
-      note: 'An ERC-20 approval is a transaction on MUSD itself, not on Maren, so it cannot be relayed through Maren’s hub. It approves exactly this amount, not an unlimited allowance.',
+      note: 'Approves exactly this amount, not an unlimited allowance. You pay the Bitcoin gas.',
     },
     confirmLabel: 'Approve',
     submit: writes.ready
