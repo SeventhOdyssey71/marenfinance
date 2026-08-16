@@ -181,3 +181,43 @@ export function getMarenAddresses(network: MezoNetwork): MarenAddresses {
 export function isDeployed(address: Address): boolean {
   return address !== ZERO;
 }
+
+/**
+ * The block Maren's contracts first existed at, per network.
+ *
+ * This is the floor for any `eth_getLogs` scan: there is provably no Maren history
+ * before it, so a reader that starts here and finds nothing has read ALL of the
+ * history, not merely a recent slice. That distinction is the whole reason this
+ * constant exists — Activity has to be able to say "you have done nothing yet"
+ * without ever implying "we only looked at the last few hours".
+ *
+ * PROVENANCE — derived on 2026-08-16 by bisecting `eth_getCode` against
+ * https://rpc.test.mezo.org, not copied from a deploy log:
+ *
+ *   MarenRegistry 14,911,471 · MarenPay 14,911,472
+ *   MarenVault    14,911,473 · MarenEarn 14,911,474
+ *
+ * The value below is the earliest of those, so one floor covers every contract.
+ *
+ * Mainnet is `null` because Maren is not deployed there — the addresses above are
+ * genuinely all zeroes. `null` means "there is no history to read", which callers must
+ * handle as an unavailable state rather than as an empty one.
+ */
+export const MAREN_DEPLOYMENT_BLOCK: Record<MezoNetwork, bigint | null> = {
+  mainnet: null,
+  testnet: 14_911_471n,
+};
+
+export function getDeploymentBlock(network: MezoNetwork): bigint | null {
+  return MAREN_DEPLOYMENT_BLOCK[network];
+}
+
+/**
+ * The widest `[fromBlock, toBlock]` span Mezo's public RPC will answer in one call.
+ *
+ * Measured, not assumed: a wider range returns
+ * `{"code":-32000,"message":"maximum [from, to] blocks distance: 10000"}`.
+ * At matsnet's ~4.7s blocks that is roughly 13 hours per request, which is what forces
+ * a log reader to walk backwards in windows rather than asking for everything at once.
+ */
+export const MEZO_MAX_LOG_RANGE = 10_000n;

@@ -1,11 +1,12 @@
 'use client';
 
 import { useState } from 'react';
-import { formatBtc, formatMusd, getChain, shortHash } from '@maren/sdk';
+import { formatBtc, formatMusd, getChain, shortAddress, shortHash } from '@maren/sdk';
 
+import { ConnectPrompt } from '@/components/app/connect-prompt';
 import { Segmented } from '@/components/app/controls';
-import { Num } from '@/components/app/money';
-import { AppCard, EmptyState, Info, Label } from '@/components/app/primitives';
+import { Btc, Num } from '@/components/app/money';
+import { AppCard, EmptyState, Info, Label, Note } from '@/components/app/primitives';
 import { ArrowUpRight } from '@/components/ui/icons';
 import { activityDirection, activityTitle, statusLabel, timeAgo } from '@/lib/copy';
 import { NETWORK, useActivity } from '@/lib/data/source';
@@ -29,23 +30,32 @@ const GROUPS: Record<Exclude<Filter, 'all'>, readonly ActivityKind[]> = {
 const explorer = getChain(NETWORK).blockExplorers.default;
 
 /**
- * Activity — the ledger.
+ * Activity — the ledger, and the screen this whole pass was called in over.
  *
- * Status is the point of this screen. Every row says which of the three states it is in,
- * and 'Failed — no funds moved' says so in as many words rather than hiding behind
- * "unsuccessful". A row is only ever 'Confirmed' because a receipt came back with
- * `status === 'success'`; a hash on its own leaves it 'Awaiting receipt'.
+ * WHAT WAS HERE BEFORE. A seeded list: payments to `@nadia`, `@okonkwo` and `@mira`, with
+ * invented amounts, invented timestamps and invented transaction hashes rendered as
+ * working links to `explorer.test.mezo.org`, under a header that said "Live from Mezo
+ * testnet". None of those transactions existed. A reviewer following one of those links
+ * would have learned that this app makes up chain history, and been right to distrust
+ * every other figure in it.
  *
- * Every row with a hash links to Mezo's explorer, so nothing here has to be taken on
- * Maren's word.
+ * WHAT IS HERE NOW. `eth_getLogs` against `MarenVault`, `MarenPay` and `MarenEarn`,
+ * decoded in `lib/chain/logs.ts`. Every row is an event the node returned; every hash is a
+ * hash the node gave us; every amount is an event parameter; every timestamp is the
+ * timestamp of the block the event was in. When there is nothing, the screen says nothing
+ * — it does not seed itself so the page looks busier.
+ *
+ * THE RANGE IS PART OF THE ANSWER. Mezo's RPC caps a log query at 10,000 blocks, so this
+ * reads a bounded window rather than all of history, and the empty state distinguishes
+ * "we read everything since deployment and you have done nothing" from "we read the last
+ * few days". Those are different claims and only one of them is a fact about the user.
  */
 export default function ActivityPage() {
-  const { data: activity } = useActivity();
+  const { data: window, isPending, error } = useActivity();
   const [filter, setFilter] = useState<Filter>('all');
 
-  const rows = (activity ?? []).filter(
-    (item) => filter === 'all' || GROUPS[filter].includes(item.kind),
-  );
+  const items = window?.items ?? [];
+  const rows = items.filter((item) => filter === 'all' || GROUPS[filter].includes(item.kind));
 
   return (
     <div className="flex flex-col gap-6">
@@ -53,10 +63,68 @@ export default function ActivityPage() {
         <Label>Activity</Label>
         <h1 className="t-h2 mt-2">History</h1>
         <p className="text-text-muted mt-3 max-w-[68ch] text-sm leading-relaxed">
-          Every action, its gas, and a receipt on {explorer.name}.
+          Your deposits, borrows and payments, read from Maren’s contract logs on {explorer.name}.
         </p>
       </div>
 
+      <Body
+        filter={filter}
+        setFilter={setFilter}
+        rows={rows}
+        items={items}
+        window={window}
+        isPending={isPending}
+        error={error}
+      />
+    </div>
+  );
+}
+
+function Body({
+  filter,
+  setFilter,
+  rows,
+  items,
+  window,
+  isPending,
+  error,
+}: {
+  filter: Filter;
+  setFilter: (f: Filter) => void;
+  rows: ActivityItem[];
+  items: ActivityItem[];
+  window: ReturnType<typeof useActivity>['data'];
+  isPending: boolean;
+  error: unknown;
+}) {
+  // Not connected: `useActivity` is disabled, so it sits pending forever. Say why rather
+  // than spinning.
+  if (!window && !error && isPending) {
+    return <ActivityUnread />;
+  }
+
+  /**
+   * A failed scan is NOT an empty history.
+   *
+   * This is the distinction the old screen could not make, because it never read anything
+   * that could fail. Rendering "nothing yet" after a transport error would tell someone
+   * their transactions had vanished.
+   */
+  if (error) {
+    return (
+      <Note tone="warning" role="alert">
+        <p className="text-warning">Could not read your history</p>
+        <p className="mt-1">
+          Mezo’s RPC did not answer the log query, so this list is unknown rather than empty. Your
+          transactions are unaffected — nothing here reads or writes your position.{' '}
+          {error instanceof Error ? error.message : ''}
+        </p>
+      </Note>
+    );
+  }
+
+  return (
+    <>
       <Segmented options={FILTERS} value={filter} onChange={setFilter} label="Activity filter" />
 
       <AppCard className="p-0">
@@ -66,21 +134,30 @@ export default function ActivityPage() {
           ))}
           {rows.length === 0 ? (
             <div className="py-6">
-              <EmptyState title="Nothing here yet">
-                {filter === 'all'
-                  ? 'Your deposits, borrows and payments will appear here.'
-                  : 'Nothing in this filter.'}
-              </EmptyState>
+              {items.length > 0 ? (
+                <EmptyState title="Nothing in this filter">
+                  You have history, just none of this kind. Switch back to All.
+                </EmptyState>
+              ) : window?.complete ? (
+                <EmptyState title="Nothing here yet">
+                  This account has never transacted with Maren — we read every block since the
+                  contracts were deployed, so that is the whole story rather than a recent slice.
+                  Deposit Bitcoin in the Vault and the first row appears here.
+                </EmptyState>
+              ) : (
+                <EmptyState title="Nothing in the blocks we could read">
+                  Mezo’s RPC answers 10,000 blocks at a time, so this scan covered the most recent
+                  stretch rather than all of history. Anything older than that is not shown and is
+                  not claimed to be absent.
+                </EmptyState>
+              )}
             </div>
           ) : null}
         </div>
       </AppCard>
 
-      {/* The status vocabulary is load-bearing — a user deciding whether to retry a
-          payment needs to know that a hash is not a result — but it is reference
-          material, not something to read on every visit. */}
-      {/* No card around it: a whole panel holding one collapsed link is exactly the kind
-          of container-for-its-own-sake this pass removes. */}
+      {window ? <Coverage window={window} /> : null}
+
       {rows.length > 0 ? (
         <div>
           <Info summary="What these statuses mean">
@@ -94,17 +171,59 @@ export default function ActivityPage() {
                 yet. It may still land; check here before retrying.
               </li>
               <li>
-                <span className="text-text">Failed</span> — mined, then reverted. No funds moved.
+                <span className="text-text">Failed — no funds moved</span> — mined, then reverted. A
+                reverted transaction emits no events, so it can only appear here if its receipt says
+                so.
               </li>
               <li>
-                <span className="text-text">Gas</span> — what you paid in BTC. Sponsored rows are
-                zero because Maren’s relayer paid instead. A deposit is never sponsored.
+                <span className="text-text">Gas</span> — what you actually paid in BTC, from the
+                receipt. No relayer is deployed, so no row is sponsored today.
               </li>
             </ul>
           </Info>
         </div>
       ) : null}
-    </div>
+    </>
+  );
+}
+
+/** The state before a wallet exists. History is per-account; there is no general feed. */
+function ActivityUnread() {
+  return (
+    <ConnectPrompt title="Connect to see your history">
+      Activity is read from Maren’s contract logs for your address specifically. There is no sample
+      history to show you — the app does not keep one.
+    </ConnectPrompt>
+  );
+}
+
+/**
+ * How far back this list actually looked.
+ *
+ * Stated in blocks because blocks are exact and a converted date would not be: the only
+ * honest way to turn a block number into a wall-clock time is to fetch that block, and
+ * quoting "about 3 days" from an assumed block time is the kind of small invention this
+ * screen exists to be free of.
+ */
+function Coverage({ window }: { window: NonNullable<ReturnType<typeof useActivity>['data']> }) {
+  const span = (window.toBlock - window.fromBlock + 1n).toString();
+  return (
+    <p className="text-text-subtle text-xs leading-relaxed">
+      {window.complete ? (
+        <>
+          Read every block from <span className="num">{window.fromBlock.toString()}</span>, where
+          Maren was deployed, to <span className="num">{window.toBlock.toString()}</span> — the
+          complete history.
+        </>
+      ) : (
+        <>
+          Read blocks <span className="num">{window.fromBlock.toString()}</span> to{' '}
+          <span className="num">{window.toBlock.toString()}</span> ({span} blocks). Mezo’s public
+          RPC caps a log query at 10,000 blocks, so older history needs an indexer — see{' '}
+          <span className="num">apps/web/README.md</span>.
+        </>
+      )}
+    </p>
   );
 }
 
@@ -124,6 +243,15 @@ function Row({ item, last }: { item: ActivityItem; last: boolean }) {
         ? 'text-warning'
         : 'text-text-subtle';
 
+  // A counterparty is either a handle the payer actually typed on-chain or a raw address.
+  // Addresses are shortened for the row; nothing is looked up to make them prettier,
+  // because a name the chain did not record is a name we would be inventing.
+  const counterparty = item.counterparty
+    ? item.counterparty.startsWith('@')
+      ? item.counterparty
+      : shortAddress(item.counterparty)
+    : undefined;
+
   return (
     <div
       className={`flex flex-wrap items-start justify-between gap-x-6 gap-y-3 py-5 ${
@@ -131,9 +259,10 @@ function Row({ item, last }: { item: ActivityItem; last: boolean }) {
       }`}
     >
       <div className="min-w-0">
-        <p className="text-text text-[0.9375rem]">{activityTitle(item.kind, item.counterparty)}</p>
+        <p className="text-text text-[0.9375rem]">{activityTitle(item.kind, counterparty)}</p>
         <p className="text-text-subtle mt-1.5 text-xs">
-          {timeAgo(item.at)} · <span className={statusClass}>{statusLabel(item.status)}</span>
+          {item.at > 0 ? timeAgo(item.at) : 'time unknown'} ·{' '}
+          <span className={statusClass}>{statusLabel(item.status)}</span>
           {item.memo ? ` · ${item.memo}` : ''}
         </p>
         {item.hash ? (
@@ -159,10 +288,15 @@ function Row({ item, last }: { item: ActivityItem; last: boolean }) {
         ) : null}
         <p className="text-text-subtle mt-1.5 text-xs">
           {item.sponsored ? (
-            'Gas paid by Maren'
+            'Gas paid by a relayer'
           ) : (
             <>
-              Gas <span className="num">{formatBtc(item.gasPaidWei)}</span>
+              {/* `Btc` rather than a bare `formatBtc`, because Mezo's gas price is a few
+                  hundred wei and a real fee of 0.000000029 BTC rounds to "0 BTC" at the
+                  display precision. Rendering zero for a fee that was genuinely paid is a
+                  small lie of the same family as the ones this pass removed, so the exact
+                  figure stays reachable in the hover title — BRAND.md §8. */}
+              Gas <Btc wei={item.gasPaidWei} size="sm" tone="subtle" />
             </>
           )}
         </p>

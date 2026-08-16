@@ -64,7 +64,9 @@ export function Surfaces() {
               </p>
               <ul className="mt-auto space-y-2.5 pt-8">
                 {[
-                  ['Handle', '@sele'],
+                  // A shape, not an account. `@sele` is a real registration on matsnet
+                  // and does not belong in a feature list as decoration.
+                  ['Handle', '@handle'],
                   ['Link', 'claimable'],
                   ['Request', 'invoice'],
                   ['Split', 'one signature'],

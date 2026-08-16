@@ -59,13 +59,17 @@ CI=true pnpm --filter @maren/web build
 CI=true pnpm --filter @maren/web typecheck
 ```
 
-Path alias `@/*` → `./src/*`. Components are **kebab-case**. There is **no test suite**
-— the largest TypeScript surface in the repo has no automated coverage, and `pnpm test`
-will not tell you so. Weigh that when reviewing a change here.
+Path alias `@/*` → `./src/*`. Components are **kebab-case**. Unit coverage is thin —
+`src/lib/chain/errors.test.ts` is the only suite, and it covers the revert decoder. The
+behavioural surface is covered instead by `scripts/verify-behaviour.mjs`, which drives a
+real build against matsnet; it is not wired into `pnpm test` and will not run unless you
+run it. Weigh that when reviewing a change here.
 
-`src/lib/data/source.ts` is the only place the mock/live decision is made. It flips on
-`isDeployed(marenVault)` for the configured network, so **matsnet now runs live by
-default** and mainnet still runs on mock data.
+`src/lib/data/source.ts` is the only place chain reads are wired to React, and **it reads
+the chain or reports that it cannot — there is no mock**. `src/lib/data/mock.ts` and its
+demo-control store were deleted: they seeded handles, amounts and transaction hashes that
+Activity rendered as working explorer links. Do not reintroduce a fixture that a screen
+can render as though it came from the chain.
 
 ### `apps/ios` — Expo
 
@@ -182,9 +186,12 @@ forge script script/Deploy.s.sol:Deploy \
 Then, in order:
 
 1. Record addresses, tx hashes, and runtime byte sizes in [`docs/DEPLOYMENTS.md`](docs/DEPLOYMENTS.md).
-2. Write the addresses into `packages/sdk/src/addresses.ts`. **This is a behavioural
-   change, not bookkeeping** — `apps/web` switches from mock data to live reads the
-   moment `isDeployed()` turns true for a network. Say so in the PR.
+2. Write the addresses into `packages/sdk/src/addresses.ts`, and the deployment block
+   into `MAREN_DEPLOYMENT_BLOCK` beside them — derive it by bisecting `eth_getCode`
+   rather than copying it out of a deploy log. **This is a behavioural change, not
+   bookkeeping**: `apps/web` starts reading that network, and Activity uses the
+   deployment block to decide whether an empty history is a fact or only a recent
+   slice. Say so in the PR.
 3. Verify each address with `cast` before committing it. Read a constant back off the
    deployed bytecode and check it against the source, rather than trusting the receipt.
 4. Commit the `broadcast/` artifacts. They carry the tx hashes and contain no key

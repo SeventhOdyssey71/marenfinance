@@ -44,9 +44,11 @@ import {
 } from '@/components/app/primitives';
 import { TxSheet, useTxRunner, type TxIntent } from '@/components/app/tx';
 import { ArrowRight, VaultIcon } from '@/components/ui/icons';
+import { ConnectPrompt } from '@/components/app/connect-prompt';
+import { ProtocolPanel } from '@/components/app/protocol-panel';
 import { vaultActionGate } from '@/lib/chain/price';
-import { mutate } from '@/lib/data/mock';
-import { useBalances, usePosition, usePrice } from '@/lib/data/source';
+import { gasNote, SPENDERS, useMarenWrites, useMusdAllowance } from '@/lib/chain/write';
+import { useBalances, useDataSource, usePosition, usePrice } from '@/lib/data/source';
 import { parseUnitsSafe } from '@/lib/copy';
 import { healthLabel, healthTone, policyRatio, toneClasses } from '@/lib/health';
 
@@ -75,11 +77,47 @@ const MIN_DEPOSIT = 10n ** 15n;
  */
 export default function VaultPage() {
   const [chosen, setChosen] = useState<Mode | null>(null);
+  const source = useDataSource();
   const price = usePrice();
   const { data: position } = usePosition();
   const runner = useTxRunner();
 
   const livePrice = price.state === 'live' ? price.priceWei : null;
+
+  /**
+   * No wallet, no vault screen.
+   *
+   * Everything below — the position card, the borrow slider, the withdrawal ceiling — is a
+   * function of an account. There used to be a demo account standing in for one, which
+   * meant a visitor could drag a borrow slider that was attached to nothing. What they get
+   * instead is the reason to connect, and the shared trove's real numbers underneath it.
+   */
+  if (!source.connected) {
+    return (
+      <div className="flex flex-col gap-6">
+        <div>
+          <Label>Vault</Label>
+          <h1 className="t-h2 mt-2">Bitcoin credit</h1>
+          <p className="text-text-muted mt-3 max-w-[68ch] text-sm leading-relaxed">
+            Borrow MUSD against Bitcoin without selling it.
+          </p>
+        </div>
+
+        <ConnectPrompt icon={<VaultIcon className="size-6" />} title="Connect to open a position">
+          {/* `data-contrast` is verify-contrast's hook for muted body copy on a card
+              surface, which is this token's worst case. It lives on whichever copy is
+              actually on screen — here while disconnected, and on the borrow panel once
+              a position exists — so the measurement never silently stops happening. */}
+          <span data-contrast="route-body">
+            Deposit Bitcoin as collateral and draw MUSD against it at {formatApr(INTEREST_RATE_BPS)}
+            , fixed. The minimum deposit is {formatBtc(MIN_DEPOSIT)}.
+          </span>
+        </ConnectPrompt>
+
+        <ProtocolPanel />
+      </div>
+    );
+  }
 
   const empty = position !== undefined && position.collateralWei === 0n && position.debtWei === 0n;
 
@@ -250,6 +288,7 @@ function BorrowPanel({
   onDeposit: () => void;
 }) {
   const { data: position } = usePosition();
+  const writes = useMarenWrites();
 
   const ceiling = useMemo(
     () => (position && price ? borrowCeiling(position, price) : null),
@@ -331,10 +370,7 @@ function BorrowPanel({
     ],
     gas:
       position?.route === 'pooled'
-        ? {
-            sponsored: true,
-            note: 'Maren’s relayer submits this and pays the Bitcoin gas.',
-          }
+        ? gasNote(true, 'Draws MUSD against Maren’s pooled trove.')
         : {
             sponsored: false,
             note: 'Costs BTC gas. Maren does not sponsor direct-trove operations.',
@@ -343,7 +379,7 @@ function BorrowPanel({
       ? `Bitcoin would only need to fall ${dropPercent}% to liquidate this position.`
       : undefined,
     confirmLabel: `Borrow ${formatMusd(value)}`,
-    simulate: () => mutate.borrow(value),
+    submit: writes.ready ? () => writes.borrowMusd(value) : undefined,
   });
 
   // Nothing to borrow against. The slider, the preview and the fee breakdown are all
@@ -496,10 +532,10 @@ function BorrowPanel({
         </div>
       ) : null}
 
+      {/* The gas claim, kept true. Maren's relay hub is deployed but no relayer service
+          is running, so "no gas" would be a promise the product cannot currently keep. */}
       <p className="text-text-subtle mt-6 text-xs leading-relaxed">
-        {position?.route === 'pooled'
-          ? 'No gas — Maren’s relayer pays it.'
-          : 'Costs BTC gas. Maren does not sponsor direct-trove operations.'}
+        Costs BTC gas — Maren’s relayer is not running yet, so your own wallet submits this.
       </p>
 
       {gateReason ? (
@@ -531,6 +567,7 @@ function DepositPanel({
   price: bigint | null;
 }) {
   const { data: position } = usePosition();
+  const writes = useMarenWrites();
   const [input, setInput] = useState('0.05');
   const wei = parseUnitsSafe(input);
 
@@ -566,11 +603,14 @@ function DepositPanel({
       },
     ],
     gas: {
+      // Not routed through `gasNote`: a deposit is unsponsorable by construction, not by
+      // the accident of the relayer being down. It carries BTC with the call and
+      // MarenRelayHub reverts with ValueNotRelayable() on any request with value.
       sponsored: false,
-      note: 'A deposit carries Bitcoin with the call, which the relayer cannot sponsor. Everything after it is free.',
+      note: 'A deposit carries Bitcoin with the call, which the relay hub refuses by design. You pay the BTC gas for this one.',
     },
     confirmLabel: `Deposit ${formatBtc(wei)}`,
-    simulate: () => mutate.depositBtc(wei),
+    submit: writes.ready ? () => writes.depositBtc(wei) : undefined,
   });
 
   return (
@@ -629,11 +669,48 @@ function DepositPanel({
 function RepayPanel({ runner }: { runner: ReturnType<typeof useTxRunner> }) {
   const { data: position } = usePosition();
   const { data: balances } = useBalances();
+  const writes = useMarenWrites();
   const [input, setInput] = useState('500');
   const wei = parseUnitsSafe(input);
 
   const balance = balances?.musdWei ?? 0n;
   const overBalance = wei > balance;
+
+  /**
+   * Repaying pulls MUSD with `transferFrom`, so the vault needs an allowance first.
+   *
+   * That approval is its own transaction and is shown as its own step. Folding it into
+   * the repay would mean one press produced two wallet prompts, and the second one would
+   * be the only one anybody checked a receipt for.
+   */
+  const { needed: needsApproval, refetch: refetchAllowance } = useMusdAllowance(
+    SPENDERS.vault,
+    wei,
+  );
+
+  const approvalIntent = (): TxIntent => ({
+    title: `Approve ${formatMusd(wei)} for the vault`,
+    details: [
+      { label: 'Token', value: <span className="text-text-muted">MUSD</span> },
+      { label: 'Amount', value: <Musd wei={wei} /> },
+      {
+        label: 'Spender',
+        value: <span className="num text-text-subtle break-all text-xs">{SPENDERS.vault}</span>,
+      },
+    ],
+    gas: {
+      sponsored: false,
+      note: 'An ERC-20 approval is a transaction on MUSD itself, not on Maren, so it cannot be relayed through Maren’s hub. It approves exactly this amount, not an unlimited allowance.',
+    },
+    confirmLabel: 'Approve',
+    submit: writes.ready
+      ? async () => {
+          const hash = await writes.approveMusd(SPENDERS.vault, wei);
+          refetchAllowance();
+          return hash;
+        }
+      : undefined,
+  });
 
   const intent = (): TxIntent => ({
     title: `Repay ${formatMusd(wei)}`,
@@ -648,12 +725,12 @@ function RepayPanel({ runner }: { runner: ReturnType<typeof useTxRunner> }) {
         ),
       },
     ],
-    gas: {
-      sponsored: true,
-      note: 'Gasless on the pooled route. Repaying is never paused and never gated on the oracle — an exit must always be open.',
-    },
+    gas: gasNote(
+      true,
+      'Repaying is never paused and never gated on the oracle — an exit must always be open.',
+    ),
     confirmLabel: `Repay ${formatMusd(wei)}`,
-    simulate: () => mutate.repay(wei),
+    submit: writes.ready ? () => writes.repayMusd(wei) : undefined,
   });
 
   return (
@@ -684,10 +761,30 @@ function RepayPanel({ runner }: { runner: ReturnType<typeof useTxRunner> }) {
         Repay needs no price, so it stays open when the oracle is stale.
       </p>
 
-      <div className="mt-7">
+      {needsApproval ? (
+        <div className="mt-6">
+          <Note>
+            The vault has to be allowed to take {formatMusd(wei)} of your MUSD before it can be
+            repaid. That is one approval transaction, and it is shown to you rather than slipped in
+            behind the repay.
+          </Note>
+        </div>
+      ) : null}
+
+      <div className="mt-7 flex flex-wrap gap-3">
+        {needsApproval ? (
+          <ActionButton
+            onClick={() => runner.request(approvalIntent())}
+            disabled={wei === 0n || overBalance}
+            icon={<ArrowRight className="size-4" />}
+          >
+            Approve {formatMusd(wei)}
+          </ActionButton>
+        ) : null}
         <ActionButton
+          variant={needsApproval ? 'secondary' : 'primary'}
           onClick={() => runner.request(intent())}
-          disabled={wei === 0n || overBalance}
+          disabled={wei === 0n || overBalance || needsApproval}
           icon={<ArrowRight className="size-4" />}
         >
           Repay {wei > 0n ? formatMusd(wei) : ''}
@@ -707,6 +804,7 @@ function WithdrawPanel({
   gateReason: string | null;
 }) {
   const { data: position } = usePosition();
+  const writes = useMarenWrites();
   const [input, setInput] = useState('0.01');
   const wei = parseUnitsSafe(input);
 
@@ -726,12 +824,12 @@ function WithdrawPanel({
         ),
       },
     ],
-    gas: {
-      sponsored: true,
-      note: 'Gasless on the pooled route. Withdrawal is never paused: if Maren halts the vault, entries close and exits stay open.',
-    },
+    gas: gasNote(
+      true,
+      'Withdrawal is never paused: if Maren halts the vault, entries close and exits stay open.',
+    ),
     confirmLabel: `Withdraw ${formatBtc(wei)}`,
-    simulate: () => mutate.withdrawBtc(wei),
+    submit: writes.ready ? () => writes.withdrawBtc(wei) : undefined,
   });
 
   return (
