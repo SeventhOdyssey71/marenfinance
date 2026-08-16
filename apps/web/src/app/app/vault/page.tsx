@@ -104,8 +104,14 @@ export default function VaultPage() {
         </div>
 
         <ConnectPrompt icon={<VaultIcon className="size-6" />} title="Connect to open a position">
-          Deposit Bitcoin as collateral and draw MUSD against it at {formatApr(INTEREST_RATE_BPS)},
-          fixed. The minimum deposit is {formatBtc(MIN_DEPOSIT)}.
+          {/* `data-contrast` is verify-contrast's hook for muted body copy on a card
+              surface, which is this token's worst case. It lives on whichever copy is
+              actually on screen — here while disconnected, and on the borrow panel once
+              a position exists — so the measurement never silently stops happening. */}
+          <span data-contrast="route-body">
+            Deposit Bitcoin as collateral and draw MUSD against it at {formatApr(INTEREST_RATE_BPS)}
+            , fixed. The minimum deposit is {formatBtc(MIN_DEPOSIT)}.
+          </span>
         </ConnectPrompt>
 
         <ProtocolPanel />

@@ -121,9 +121,13 @@ export default function EarnPage() {
         </div>
 
         <ConnectPrompt icon={<EarnIcon className="size-6" />} title="Connect to use Earn">
-          Earn holds your MUSD in the MUSD Stability Pool through an ERC-4626 vault. There is no
-          advertised rate here and there never will be — the yield is liquidation gains, which can
-          be zero for months.
+          {/* Carries the contrast hook while disconnected, so the muted-on-card worst case
+              is still measured on this route. The connected screen has its own. */}
+          <span data-contrast="earn-disclosure">
+            Earn holds your MUSD in the MUSD Stability Pool through an ERC-4626 vault. Maren does
+            not display an APY for Earn because there is no reliable one to display — the yield is
+            liquidation gains, which can be zero for months.
+          </span>
         </ConnectPrompt>
 
         <Note>
