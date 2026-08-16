@@ -245,8 +245,17 @@ export async function readProtocolStats(ctx: LiveContext): Promise<ProtocolStats
   const maren = getMarenAddresses(ctx.network);
   const musd = getMusdAddresses(ctx.network);
 
-  const [totalCollateral, status, capacity, reserve, depositsPaused, borrowingPaused] =
-    await Promise.all([
+  const [
+    totalCollateral,
+    status,
+    capacity,
+    reserve,
+    depositsPaused,
+    borrowingPaused,
+    troveOpen,
+    depositCap,
+    idleCollateral,
+  ] = await Promise.all([
       ctx.client.readContract({
         address: maren.marenVault,
         abi: marenVaultAbi,
@@ -278,6 +287,21 @@ export async function readProtocolStats(ctx: LiveContext): Promise<ProtocolStats
         abi: marenVaultAbi,
         functionName: 'borrowingPaused',
       }),
+      ctx.client.readContract({
+        address: maren.marenVault,
+        abi: marenVaultAbi,
+        functionName: 'troveOpen',
+      }),
+      ctx.client.readContract({
+        address: maren.marenVault,
+        abi: marenVaultAbi,
+        functionName: 'depositCap',
+      }),
+      ctx.client.readContract({
+        address: maren.marenVault,
+        abi: marenVaultAbi,
+        functionName: 'idleCollateral',
+      }),
     ]);
 
   const [coll, netDebt, icr] = status;
@@ -289,6 +313,9 @@ export async function readProtocolStats(ctx: LiveContext): Promise<ProtocolStats
     troveIcrWei: icr,
     reserveMusdWei: reserve,
     troveMaxBorrowingCapacityWei: capacity,
+    troveOpen,
+    depositCapWei: depositCap,
+    idleCollateralWei: idleCollateral,
     depositsPaused,
     borrowingPaused,
   };
