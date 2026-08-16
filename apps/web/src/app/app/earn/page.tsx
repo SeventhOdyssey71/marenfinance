@@ -131,7 +131,9 @@ export default function EarnPage() {
         </ConnectPrompt>
 
         <Note>
-          <p>Your MUSD absorbs liquidated debt. It is not principal-protected, and not guaranteed.</p>
+          <p>
+            Your MUSD absorbs liquidated debt. It is not principal-protected, and not guaranteed.
+          </p>
         </Note>
       </div>
     );
