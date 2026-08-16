@@ -145,7 +145,10 @@
 
   /* Display type — BRAND.md §3 */
   .t-display {
-    font-size: clamp(2.75rem, 6vw, 5rem);
+    /* Reduced from clamp(2.75rem, 6vw, 5rem). At 5rem the two-line headline
+       dominated the viewport and pushed everything else below the fold; the
+       reference sets its hero headline around 3.75rem and reads calmer for it. */
+    font-size: clamp(2.25rem, 4.4vw, 3.75rem);
     line-height: 1.02;
     font-weight: 700;
     letter-spacing: -0.03em;
