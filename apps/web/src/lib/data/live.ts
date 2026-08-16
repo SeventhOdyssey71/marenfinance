@@ -256,53 +256,53 @@ export async function readProtocolStats(ctx: LiveContext): Promise<ProtocolStats
     depositCap,
     idleCollateral,
   ] = await Promise.all([
-      ctx.client.readContract({
-        address: maren.marenVault,
-        abi: marenVaultAbi,
-        functionName: 'totalCollateral',
-      }),
-      ctx.client.readContract({
-        address: maren.marenVault,
-        abi: marenVaultAbi,
-        functionName: 'troveStatus',
-      }),
-      ctx.client.readContract({
-        address: maren.marenVault,
-        abi: marenVaultAbi,
-        functionName: 'troveMaxBorrowingCapacity',
-      }),
-      ctx.client.readContract({
-        address: musd.musd,
-        abi: erc20Abi,
-        functionName: 'balanceOf',
-        args: [maren.marenVault],
-      }),
-      ctx.client.readContract({
-        address: maren.marenVault,
-        abi: marenVaultAbi,
-        functionName: 'depositsPaused',
-      }),
-      ctx.client.readContract({
-        address: maren.marenVault,
-        abi: marenVaultAbi,
-        functionName: 'borrowingPaused',
-      }),
-      ctx.client.readContract({
-        address: maren.marenVault,
-        abi: marenVaultAbi,
-        functionName: 'troveOpen',
-      }),
-      ctx.client.readContract({
-        address: maren.marenVault,
-        abi: marenVaultAbi,
-        functionName: 'depositCap',
-      }),
-      ctx.client.readContract({
-        address: maren.marenVault,
-        abi: marenVaultAbi,
-        functionName: 'idleCollateral',
-      }),
-    ]);
+    ctx.client.readContract({
+      address: maren.marenVault,
+      abi: marenVaultAbi,
+      functionName: 'totalCollateral',
+    }),
+    ctx.client.readContract({
+      address: maren.marenVault,
+      abi: marenVaultAbi,
+      functionName: 'troveStatus',
+    }),
+    ctx.client.readContract({
+      address: maren.marenVault,
+      abi: marenVaultAbi,
+      functionName: 'troveMaxBorrowingCapacity',
+    }),
+    ctx.client.readContract({
+      address: musd.musd,
+      abi: erc20Abi,
+      functionName: 'balanceOf',
+      args: [maren.marenVault],
+    }),
+    ctx.client.readContract({
+      address: maren.marenVault,
+      abi: marenVaultAbi,
+      functionName: 'depositsPaused',
+    }),
+    ctx.client.readContract({
+      address: maren.marenVault,
+      abi: marenVaultAbi,
+      functionName: 'borrowingPaused',
+    }),
+    ctx.client.readContract({
+      address: maren.marenVault,
+      abi: marenVaultAbi,
+      functionName: 'troveOpen',
+    }),
+    ctx.client.readContract({
+      address: maren.marenVault,
+      abi: marenVaultAbi,
+      functionName: 'depositCap',
+    }),
+    ctx.client.readContract({
+      address: maren.marenVault,
+      abi: marenVaultAbi,
+      functionName: 'idleCollateral',
+    }),
+  ]);
 
   const [coll, netDebt, icr] = status;
 

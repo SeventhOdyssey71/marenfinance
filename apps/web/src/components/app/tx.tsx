@@ -313,7 +313,7 @@ export function TxSheet({ runner }: { runner: TxRunner }) {
         aria-label="Close"
         tabIndex={-1}
         onClick={() => !busy && runner.close()}
-        className="absolute inset-0 cursor-default bg-[#08080A]/78 backdrop-blur-lg"
+        className="bg-[#08080A]/78 absolute inset-0 cursor-default backdrop-blur-lg"
       />
 
       <div
@@ -326,7 +326,12 @@ export function TxSheet({ runner }: { runner: TxRunner }) {
         className="bg-surface-raised relative m-0 w-full max-w-[30rem] rounded-t-[var(--radius-card)] border border-[var(--border-hairline)] p-6 shadow-[inset_0_1px_0_rgba(255,255,255,0.05)] sm:m-4 sm:rounded-[var(--radius-card)] sm:p-7"
       >
         {phase.name === 'confirm' || phase.name === 'checking' || phase.name === 'signing' ? (
-          <Confirming phase={phase} intent={intent} onConfirm={() => void run(intent)} runner={runner} />
+          <Confirming
+            phase={phase}
+            intent={intent}
+            onConfirm={() => void run(intent)}
+            runner={runner}
+          />
         ) : null}
 
         {phase.name === 'pending' ? <Pending intent={intent} hash={phase.hash} /> : null}
@@ -365,7 +370,11 @@ function StatusLine({
 }) {
   return (
     <p className={`t-label flex items-center gap-2 ${toneText[tone]}`}>
-      {spinning ? <Spinner /> : <span aria-hidden className={`size-1.5 rounded-[var(--radius-pill)] ${toneDot[tone]}`} />}
+      {spinning ? (
+        <Spinner />
+      ) : (
+        <span aria-hidden className={`size-1.5 rounded-[var(--radius-pill)] ${toneDot[tone]}`} />
+      )}
       {children}
     </p>
   );
@@ -388,7 +397,7 @@ function Spinner() {
       />
       <span
         aria-hidden
-        className="bg-current hidden size-1.5 shrink-0 rounded-[var(--radius-pill)] motion-reduce:block"
+        className="hidden size-1.5 shrink-0 rounded-[var(--radius-pill)] bg-current motion-reduce:block"
       />
     </>
   );
@@ -506,6 +515,19 @@ function Settled({
   const hash = 'hash' in outcome ? outcome.hash : outcome.receipt.hash;
   const tone: Tone = delivered ? 'success' : outcome.kind === 'reverted' ? 'danger' : 'warning';
 
+  /**
+   * THE DECODED REASON IS THE HEADLINE, not "Failed on-chain".
+   *
+   * A transaction that mined and reverted has two things to say and only one of them is
+   * useful. "Failed on-chain" belongs in the eyebrow, where the state is; the headline
+   * belongs to "Not enough collateral behind this loan", which is what the user can act
+   * on. When the replay could not recover a reason we fall back to the outcome's own
+   * title — better a duplicated line than a headline that says nothing.
+   */
+  const headline = delivered
+    ? (intent.successTitle ?? intent.title)
+    : (reason?.title ?? described.title);
+
   return (
     <div role="status">
       <StatusLine tone={tone}>{delivered ? 'Confirmed on Mezo' : described.title}</StatusLine>
@@ -513,29 +535,28 @@ function Settled({
       {/* THE OUTCOME LEADS. Not the hash, not the word "Delivered" — what happened, in
           past tense, at headline size. */}
       <h2 id="tx-sheet-title" className="t-h2 mt-3 pr-6">
-        {delivered ? (intent.successTitle ?? intent.title) : described.title}
+        {headline}
       </h2>
 
       {delivered ? null : (
         <p className="text-text-muted mt-3 max-w-[52ch] text-sm leading-relaxed">
-          {described.detail}
+          {reason?.detail ?? described.detail}
         </p>
       )}
 
-      {/* When a mined transaction reverted, the decoded reason is the useful part — "it
-          reverted" alone tells a user nothing they can act on. Human sentence first, the
-          Solidity name underneath and small. */}
-      {reason ? (
-        <div className="bg-surface-inset mt-4 rounded-[var(--radius-input)] border border-[var(--border-hairline)] p-4">
-          <p className="text-text text-sm font-medium">{reason.title}</p>
-          <p className="text-text-muted mt-1.5 max-w-[52ch] text-sm leading-relaxed">
-            {reason.detail}
-          </p>
-          {reason.name ? (
+      {/* The mechanical facts, secondary: what the receipt said, and the Solidity name for
+          anyone who wants to grep the source. */}
+      {delivered ? null : (
+        <div className="bg-surface-inset mt-5 rounded-[var(--radius-input)] border border-[var(--border-hairline)] p-4">
+          <p className="text-text-muted text-sm leading-relaxed">{described.detail}</p>
+          {reason?.name ? (
             <p className="num text-text-subtle mt-2.5 text-xs">Contract error: {reason.name}</p>
           ) : null}
+          <p className="text-text-subtle mt-2.5 text-xs">
+            Attempted: <span className="text-text-muted">{intent.title}</span>
+          </p>
         </div>
-      ) : null}
+      )}
 
       {delivered && intent.changes && intent.changes.length > 0 ? (
         <Changes changes={intent.changes} />
@@ -544,8 +565,11 @@ function Settled({
       <HashLine hash={hash} />
 
       <div className="mt-6">
-        <PillAction onClick={onClose} icon={<Check className="size-4" />}>
-          Done
+        <PillAction
+          onClick={onClose}
+          icon={delivered ? <Check className="size-4" /> : <ArrowRight className="size-4" />}
+        >
+          {delivered ? 'Done' : 'Close'}
         </PillAction>
       </div>
     </div>
@@ -609,9 +633,10 @@ function Changes({ changes }: { changes: TxChange[] }) {
         >
           <dt className="text-text-muted text-sm">{change.label}</dt>
           <dd className="flex items-center gap-2.5 text-sm">
-            <span className="text-text-subtle line-through decoration-[var(--border-strong)]">
-              {change.before}
-            </span>
+            {/* Subtle, not struck through. A strike-through across tabular numerals is
+                hard to read and says "cancelled" rather than "was". The arrow already
+                carries the direction. */}
+            <span className="text-text-subtle">{change.before}</span>
             {/* Spoken, not just drawn: a screen reader reading "0.001 BTC 0.002 BTC" with
                 a decorative arrow between them has been told two numbers and no relation. */}
             <span className="sr-only">changed to</span>

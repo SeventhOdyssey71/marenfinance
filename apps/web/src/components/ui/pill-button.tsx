@@ -146,10 +146,13 @@ export function PillAction({
       {...rest}
     >
       <span className="whitespace-nowrap">{children}</span>
+      {/* The badge greys out with the button. A violet badge is the loudest thing on a
+          Maren screen; leaving it at full strength on a disabled control points at the one
+          thing the user cannot do. */}
       {icon ? (
         <span
           aria-hidden
-          className={`grid shrink-0 place-items-center rounded-[var(--radius-pill)] transition-transform duration-[120ms] ease-out group-enabled:group-hover:translate-x-0.5 ${badgeSizing[size]} ${badgeVariants[variant]}`}
+          className={`group-disabled:text-text-subtle grid shrink-0 place-items-center rounded-[var(--radius-pill)] transition-transform duration-[120ms] ease-out group-enabled:group-hover:translate-x-0.5 group-disabled:bg-white/[0.06] ${badgeSizing[size]} ${badgeVariants[variant]}`}
         >
           {icon}
         </span>
