@@ -8,30 +8,35 @@ import type { Hash } from 'viem';
 
 import { explainError, type RevertReason } from '@/lib/chain/errors';
 import { confirmTransaction, describeOutcome, type TxOutcome } from '@/lib/chain/receipt';
-import { bumpDemoVersion } from '@/lib/data/demo';
-import { NETWORK, useDataSource } from '@/lib/data/source';
+import { NETWORK } from '@/lib/data/source';
 import { ActionButton } from './primitives';
 import { ArrowRight } from '@/components/ui/icons';
 
 /**
  * The transaction runner and its confirmation sheet.
  *
- * Three rules live here, and they are the reason this is one shared component rather than
- * a pattern each screen repeats:
+ * THERE IS NO SIMULATED PATH ANY MORE. This component used to have one: when the app was
+ * in mock mode it slept 420ms, mutated a local store, and told the user "Simulated —
+ * nothing was broadcast". That was honest as far as it went, but it meant every button in
+ * the product had a branch that could satisfy a user without touching the chain. Every
+ * action now either produces a real transaction hash or fails with a reason, and an action
+ * the app cannot perform is DISABLED AT THE BUTTON with that reason next to it — never
+ * offered and then faked.
  *
- *   1. NOTHING IS CONFIRMED WITHOUT A RECEIPT. The live path submits, then hands the
- *      hash to `confirmTransaction`, which is the only code in the app that decides what
- *      "delivered" means. A hash on its own renders as "submitted", never as success.
- *   2. A SIMULATION IS NEVER DRESSED AS A TRANSACTION — and, just as importantly, a real
- *      transaction is never described as a simulation. The sheet only reaches the
- *      "Simulated" state when there was genuinely nothing to sign with, and it says which
- *      of those reasons applied rather than repeating a stale claim about deployment.
- *   3. A REFUSAL IS EXPLAINED. Every failure runs through `explainError`, which decodes
- *      the contract's own custom errors into language. A user who is told
- *      `0x7d1cc1b3…` has been told nothing.
+ * Three rules survive, and they are why this is one shared component rather than a pattern
+ * each screen repeats:
  *
- * The confirmation step is not decoration either: it is where a payment's resolved
- * address is shown next to the handle it came from, before anything is signed.
+ *   1. NOTHING IS CONFIRMED WITHOUT A RECEIPT. `submit` returns a hash; `confirmTransaction`
+ *      is the only code in the app that decides what "delivered" means. A hash on its own
+ *      renders as "submitted", never as success.
+ *   2. THE EXPLORER LINK APPEARS WITH THE HASH, not with the receipt. Someone watching a
+ *      pending transaction should be able to go and look at it.
+ *   3. A REFUSAL IS EXPLAINED. Every failure runs through `explainError`, which decodes the
+ *      contract's own custom errors into language. A user told `0x7d1cc1b3…` has been told
+ *      nothing.
+ *
+ * The confirmation step is not decoration either: it is where a payment's resolved address
+ * is shown next to the handle it came from, before anything is signed.
  */
 
 const explorer = getChain(NETWORK).blockExplorers?.default.url ?? '';
@@ -59,9 +64,13 @@ export interface TxIntent {
   gas: { sponsored: boolean; note: string };
   /** Extra warning shown above the confirm button, e.g. a ratio below the recommendation. */
   caution?: string;
-  /** Applies the local mock mutation. Mock mode only. */
-  simulate?: () => void;
-  /** Submits the real transaction and returns its hash. Live mode only. */
+  /**
+   * Submits the real transaction and returns its hash, or throws.
+   *
+   * Optional only because a screen may build an intent before a signer exists. Reaching
+   * the sheet without it is a bug, and it is reported as one rather than smoothed over —
+   * see `run`.
+   */
   submit?: () => Promise<Hash>;
   /** Label for the confirm button. */
   confirmLabel: string;
@@ -73,7 +82,6 @@ type Phase =
   | { name: 'submitting'; intent: TxIntent }
   | { name: 'pending'; intent: TxIntent; hash: Hash }
   | { name: 'settled'; intent: TxIntent; outcome: TxOutcome; reason: RevertReason | null }
-  | { name: 'simulated'; intent: TxIntent; reason: string }
   | { name: 'error'; intent: TxIntent; reason: RevertReason };
 
 export interface TxRunner {
@@ -87,7 +95,6 @@ export interface TxRunner {
 
 export function useTxRunner(): TxRunner {
   const [phase, setPhase] = useState<Phase>({ name: 'idle' });
-  const source = useDataSource();
   const client = usePublicClient();
   const queryClient = useQueryClient();
 
@@ -100,23 +107,25 @@ export function useTxRunner(): TxRunner {
   const run = useCallback(
     async (intent: TxIntent) => {
       /**
-       * The simulated path is now the EXCEPTION, not the default.
+       * No signer, no transaction, no pretending.
        *
-       * It is reached only when there is genuinely nothing to sign with — no wallet, or a
-       * network where Maren is not deployed. `source.reason` states which, in words that
-       * are true of the network actually configured. The old copy here asserted that
-       * Maren's contracts were not deployed; on matsnet that has been false since
-       * 15 August 2026, and repeating it turned a working product into a demo.
+       * Every screen disables its button before this can happen, so reaching it means a
+       * guard is wrong. It surfaces as a plain refusal rather than a fabricated success,
+       * because the failure mode this whole module exists to prevent is a user being told
+       * their money moved when nothing was ever broadcast.
        */
-      if (source.mode === 'mock' || !intent.submit) {
-        setPhase({ name: 'submitting', intent });
-        // A deliberate beat, so the simulated flow has the same shape as the real one
-        // and the button cannot be double-fired.
-        await new Promise((resolve) => setTimeout(resolve, 420));
-        intent.simulate?.();
-        bumpDemoVersion();
-        await queryClient.invalidateQueries({ queryKey: ['maren'] });
-        setPhase({ name: 'simulated', intent, reason: source.reason });
+      if (!intent.submit) {
+        setPhase({
+          name: 'error',
+          intent,
+          reason: {
+            name: null,
+            title: 'Nothing to sign with',
+            detail:
+              'This action has no connected signer on Mezo, so there is no transaction to send. ' +
+              'Connect a wallet on the right network and try again.',
+          },
+        });
         return;
       }
 
@@ -159,7 +168,7 @@ export function useTxRunner(): TxRunner {
 
       setPhase({ name: 'settled', intent, outcome, reason });
     },
-    [client, queryClient, source.mode, source.reason],
+    [client, queryClient],
   );
 
   return { phase, request, run, close };
@@ -282,15 +291,6 @@ export function TxSheet({ runner }: { runner: TxRunner }) {
 
         {phase.name === 'settled' ? <Settled outcome={phase.outcome} reason={phase.reason} /> : null}
 
-        {phase.name === 'simulated' ? (
-          <div className="mt-5" role="status">
-            <p className="text-warning text-sm">Simulated — nothing was broadcast</p>
-            <p className="text-text-muted mt-2 text-sm leading-relaxed">
-              {phase.reason} No transaction was signed, no receipt was fetched, and no funds moved.
-            </p>
-          </div>
-        ) : null}
-
         {phase.name === 'error' ? (
           <div className="mt-5" role="alert">
             <p className="text-danger text-sm">{phase.reason.title}</p>
@@ -305,7 +305,7 @@ export function TxSheet({ runner }: { runner: TxRunner }) {
           </div>
         ) : null}
 
-        {phase.name === 'settled' || phase.name === 'simulated' || phase.name === 'error' ? (
+        {phase.name === 'settled' || phase.name === 'error' ? (
           <div className="mt-6">
             <ActionButton variant="secondary" onClick={runner.close}>
               Close

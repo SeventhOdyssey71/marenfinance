@@ -159,10 +159,29 @@ export interface PaymentLink {
   status: 'unclaimed' | 'claimed' | 'reclaimed' | 'expired';
 }
 
-/** Relayer sponsorship budget — the number that makes the gasless claim checkable. */
-export interface Sponsorship {
-  freeActionsRemaining: number;
-  freeActionsPerMonth: number;
-  /** MUSD fee charged inside the transaction once the free tier is exhausted. */
-  feeAfterFreeTierWei: bigint;
+/**
+ * The protocol's own state, readable by anyone with an RPC and no wallet at all.
+ *
+ * This exists so a disconnected visitor is shown something TRUE rather than something
+ * seeded. Every field is a single contract read: the pooled trove as MUSD's TroveManager
+ * reports it, and the vault's MUSD reserve. None of it is about the visitor, and the
+ * screen that renders it says so.
+ */
+export interface ProtocolStats {
+  /** Total BTC collateral credited across every user of the pooled vault. */
+  totalCollateralWei: bigint;
+  /** The pooled trove's collateral as the sorted list sees it. */
+  troveCollateralWei: bigint;
+  /** The pooled trove's net debt. */
+  troveNetDebtWei: bigint;
+  /** The pooled trove's individual collateral ratio, 1e18. */
+  troveIcrWei: bigint;
+  /** MUSD sitting in the vault's reserve, available to serve borrows without new debt. */
+  reserveMusdWei: bigint;
+  /** The trove's Mezo-fixed borrowing ceiling. */
+  troveMaxBorrowingCapacityWei: bigint;
+  /** True when the vault has paused new deposits. */
+  depositsPaused: boolean;
+  /** True when the vault has paused new borrowing. */
+  borrowingPaused: boolean;
 }

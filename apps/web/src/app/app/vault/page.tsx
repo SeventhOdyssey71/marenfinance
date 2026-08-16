@@ -44,10 +44,11 @@ import {
 } from '@/components/app/primitives';
 import { TxSheet, useTxRunner, type TxIntent } from '@/components/app/tx';
 import { ArrowRight, VaultIcon } from '@/components/ui/icons';
+import { ConnectPrompt } from '@/components/app/connect-prompt';
+import { ProtocolPanel } from '@/components/app/protocol-panel';
 import { vaultActionGate } from '@/lib/chain/price';
 import { gasNote, SPENDERS, useMarenWrites, useMusdAllowance } from '@/lib/chain/write';
-import { mutate } from '@/lib/data/mock';
-import { useBalances, usePosition, usePrice } from '@/lib/data/source';
+import { useBalances, useDataSource, usePosition, usePrice } from '@/lib/data/source';
 import { parseUnitsSafe } from '@/lib/copy';
 import { healthLabel, healthTone, policyRatio, toneClasses } from '@/lib/health';
 
@@ -76,11 +77,44 @@ const MIN_DEPOSIT = 10n ** 15n;
  */
 export default function VaultPage() {
   const [chosen, setChosen] = useState<Mode | null>(null);
+  const source = useDataSource();
   const price = usePrice();
   const { data: position } = usePosition();
   const runner = useTxRunner();
 
   const livePrice = price.state === 'live' ? price.priceWei : null;
+
+  /**
+   * No wallet, no vault screen.
+   *
+   * Everything below — the position card, the borrow slider, the withdrawal ceiling — is a
+   * function of an account. There used to be a demo account standing in for one, which
+   * meant a visitor could drag a borrow slider that was attached to nothing. What they get
+   * instead is the reason to connect, and the shared trove's real numbers underneath it.
+   */
+  if (!source.connected) {
+    return (
+      <div className="flex flex-col gap-6">
+        <div>
+          <Label>Vault</Label>
+          <h1 className="t-h2 mt-2">Bitcoin credit</h1>
+          <p className="text-text-muted mt-3 max-w-[68ch] text-sm leading-relaxed">
+            Borrow MUSD against Bitcoin without selling it.
+          </p>
+        </div>
+
+        <ConnectPrompt
+          icon={<VaultIcon className="size-6" />}
+          title="Connect to open a position"
+        >
+          Deposit Bitcoin as collateral and draw MUSD against it at {formatApr(INTEREST_RATE_BPS)},
+          fixed. The minimum deposit is {formatBtc(MIN_DEPOSIT)}.
+        </ConnectPrompt>
+
+        <ProtocolPanel />
+      </div>
+    );
+  }
 
   const empty = position !== undefined && position.collateralWei === 0n && position.debtWei === 0n;
 
@@ -342,7 +376,6 @@ function BorrowPanel({
       ? `Bitcoin would only need to fall ${dropPercent}% to liquidate this position.`
       : undefined,
     confirmLabel: `Borrow ${formatMusd(value)}`,
-    simulate: () => mutate.borrow(value),
     submit: writes.ready ? () => writes.borrowMusd(value) : undefined,
   });
 
@@ -574,7 +607,6 @@ function DepositPanel({
       note: 'A deposit carries Bitcoin with the call, which the relay hub refuses by design. You pay the BTC gas for this one.',
     },
     confirmLabel: `Deposit ${formatBtc(wei)}`,
-    simulate: () => mutate.depositBtc(wei),
     submit: writes.ready ? () => writes.depositBtc(wei) : undefined,
   });
 
@@ -695,7 +727,6 @@ function RepayPanel({ runner }: { runner: ReturnType<typeof useTxRunner> }) {
       'Repaying is never paused and never gated on the oracle — an exit must always be open.',
     ),
     confirmLabel: `Repay ${formatMusd(wei)}`,
-    simulate: () => mutate.repay(wei),
     submit: writes.ready ? () => writes.repayMusd(wei) : undefined,
   });
 
@@ -795,7 +826,6 @@ function WithdrawPanel({
       'Withdrawal is never paused: if Maren halts the vault, entries close and exits stay open.',
     ),
     confirmLabel: `Withdraw ${formatBtc(wei)}`,
-    simulate: () => mutate.withdrawBtc(wei),
     submit: writes.ready ? () => writes.withdrawBtc(wei) : undefined,
   });
 
