@@ -34,7 +34,7 @@ export function CtaBackdrop() {
       {!reduced && mounted && (
         <>
           <div className="absolute inset-0 animate-[maren-reveal_800ms_ease-out_forwards] opacity-0">
-            <RibbonCanvas running={visible} speed={0.2} />
+            <RibbonCanvas running={visible} speed={0.6} />
           </div>
           {/* Texture pass — deliberately faint. */}
           <div className="absolute inset-0 opacity-[0.14] mix-blend-soft-light">

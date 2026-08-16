@@ -126,7 +126,7 @@ Restraint is the point — the reference design is 95% black with a few gradient
 
 1. **`Warp`** — the hero background and the closing CTA band. A striped base pattern
    folded by noise and swirl, rotated ~38° so the bands run bottom-left to top-right.
-   Palette `#08080A → #241268 → #6C4BFF → #B9A6FF`. Hero `speed 0.3`, CTA band `0.2`, hard-capped at `0.45`.
+   Palette `#08080A → #241268 → #6C4BFF → #B9A6FF`. Hero `speed 0.9`, CTA band `0.6`, hard-capped at `1.2`.
 
    _Not `MeshGradient`._ Mesh blends colour blobs, and on a dark palette it averages
    into a soft haze with no structure — the hero read as a flat dark rectangle however
@@ -154,7 +154,7 @@ Verify the exact export names against the installed package before use; do not g
 
 ## 6. Motion
 
-- Shader speed is capped at `0.45`, not `0.2` as originally written — at `0.14` the silk was
+- Shader speed is capped at `1.2`, not `0.2` as originally written — at `0.14` the silk was
   visually static and read as a still image rather than a moving surface.
 - Durations: `120ms` micro (hover, press) · `240ms` standard (panel, tab) · `480ms`
   entrance. Easing `cubic-bezier(0.22, 1, 0.36, 1)` for entrances, `ease-out` otherwise.

@@ -81,12 +81,12 @@ export function Nav() {
           <div className="flex items-center gap-2">
             <Link
               href="/app"
-              className="group hidden h-11 items-center gap-3 rounded-[var(--radius-pill)] bg-white pl-5 pr-2 text-sm font-medium text-[#08080A] transition-colors duration-[120ms] ease-out hover:bg-white/90 sm:inline-flex"
+              className="group hidden h-11 items-center gap-2.5 rounded-[var(--radius-pill)] bg-white pl-5 pr-2 text-sm font-medium text-violet-600 transition-colors duration-[120ms] ease-out hover:bg-white/90 sm:inline-flex"
             >
               Launch App
               <span
                 aria-hidden
-                className="grid size-8 shrink-0 place-items-center rounded-[var(--radius-pill)] bg-violet-500 text-white transition-transform duration-[120ms] ease-out group-hover:translate-x-0.5"
+                className="grid size-7 shrink-0 place-items-center rounded-[var(--radius-pill)] border border-violet-500/70 text-violet-600 transition-transform duration-[120ms] ease-out group-hover:translate-x-0.5"
               >
                 <ArrowUpRight className="size-4" />
               </span>
@@ -148,12 +148,12 @@ export function Nav() {
             <Link
               href="/app"
               onClick={() => setOpen(false)}
-              className="flex h-12 w-full items-center justify-between rounded-[var(--radius-pill)] bg-white pl-6 pr-2 font-medium text-[#08080A]"
+              className="flex h-12 w-full items-center justify-between rounded-[var(--radius-pill)] bg-white pl-6 pr-2 font-medium text-violet-600"
             >
               Launch App
               <span
                 aria-hidden
-                className="grid size-9 place-items-center rounded-[var(--radius-pill)] bg-violet-500 text-white"
+                className="grid size-8 place-items-center rounded-[var(--radius-pill)] border border-violet-500/70 text-violet-600"
               >
                 <ArrowUpRight className="size-4" />
               </span>

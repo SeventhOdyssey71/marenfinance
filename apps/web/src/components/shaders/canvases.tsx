@@ -34,7 +34,7 @@ const RIBBON_COLORS = ['#08080A', '#241268', '#6C4BFF', '#B9A6FF'] as const;
 export function RibbonCanvas({
   running,
   className = '',
-  speed = 0.3,
+  speed = 0.9,
 }: {
   running: boolean;
   className?: string;
@@ -57,7 +57,7 @@ export function RibbonCanvas({
       swirlIterations={9}
       // Diagonal, matching the reference's bottom-left to top-right run.
       rotation={38}
-      speed={running ? Math.min(speed, 0.45) : 0}
+      speed={running ? Math.min(speed, 1.2) : 0}
       scale={1.1}
       offsetX={0.1}
       offsetY={-0.05}
