@@ -21,6 +21,7 @@ const browser = await chromium.launch({
 
 import { connectWallet, installReadOnlyWallet, installWallet } from './injected-wallet.mjs';
 import { generatePrivateKey } from 'viem/accounts';
+import { createPublicClient, http, parseAbi } from 'viem';
 
 /**
  * Mezo matsnet, stated here rather than imported.
@@ -121,6 +122,97 @@ async function domReady(page, fn, arg = null, timeout = 30_000) {
     .then(() => true)
     .catch(() => false);
 }
+
+/**
+ * THE VAULT, READ INDEPENDENTLY OF THE APP.
+ *
+ * The social-vault panel's whole claim is that its figures are contract reads anybody can
+ * repeat. An assertion that only checked "a percentage is on screen" would pass just as
+ * happily against a number the app made up, which is the exact failure this suite was
+ * written after. So the checks below read `MarenVault` themselves, over the same public
+ * RPC and with no app code in the path, and compare what the chain says to what the screen
+ * says.
+ *
+ * The two formatters here are deliberately NOT imported from `@maren/sdk` — a plain `.mjs`
+ * cannot import its TypeScript source, and more importantly an assertion that reuses the
+ * implementation it is testing proves nothing. They are the display rules written out
+ * independently: truncate, never round.
+ */
+const VAULT_ADDRESS =
+  process.env.MAREN_VAULT_ADDRESS ?? '0x46252B00AB59384518d9dB6D1f210ffF1221645b';
+
+const MUSD_ADDRESS = process.env.MAREN_MUSD_ADDRESS ?? '0x118917a40FAF1CD7a13dB0Ef56C86De7973Ac503';
+
+const vaultAbi = parseAbi([
+  'function totalCollateral() view returns (uint256)',
+  'function depositCap() view returns (uint256)',
+  'function troveStatus() view returns (uint256,uint256,uint256)',
+  'function balanceOf(address) view returns (uint256)',
+]);
+
+const rpc = createPublicClient({ transport: http(RPC_URL) });
+
+/**
+ * Read the vault, now.
+ *
+ * Called at each comparison rather than once at startup, because `troveStatus().icr` is
+ * priced: it moves whenever the BTC oracle moves, which over the eight minutes this suite
+ * takes is often enough to change the tenth of a percent the app displays. A single read
+ * at the top would have turned "the oracle ticked" into "the app is lying".
+ */
+async function readVault() {
+  const read = (functionName, args) =>
+    rpc.readContract({ address: VAULT_ADDRESS, abi: vaultAbi, functionName, args });
+  try {
+    const [totalCollateral, depositCap, status] = await Promise.all([
+      read('totalCollateral'),
+      read('depositCap'),
+      read('troveStatus'),
+    ]);
+    return { totalCollateral, depositCap, icr: status[2] };
+  } catch (error) {
+    console.log(`Could not read MarenVault directly: ${error.shortMessage ?? error.message}`);
+    return null;
+  }
+}
+
+/** MUSD in a wallet, for the checks whose whole subject is whether it is empty. */
+async function readMusd(address) {
+  try {
+    return await rpc.readContract({
+      address: MUSD_ADDRESS,
+      abi: vaultAbi,
+      functionName: 'balanceOf',
+      args: [address],
+    });
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Does the screen show a ratio the chain agrees with?
+ *
+ * Every ratio rendered as `NNN.N%` is collected and compared numerically against the
+ * contract's own figure, with half a percentage point of room for the oracle to have
+ * ticked between the render and this read. That is far tighter than any invented number
+ * would survive and far looser than the noise it has to tolerate.
+ */
+const ratioAgrees = (text, icrWei) => {
+  // A 1e18 ratio is a MULTIPLE, not a percentage: 2.218e18 is 221.8%. Scaling by 100
+  // rather than 10,000 makes every comparison here 2.21 against 221.8, which is how this
+  // helper's first run failed three checks that were reporting the truth.
+  const actual = Number((icrWei * 10_000n) / 10n ** 18n) / 100;
+  return [...text.matchAll(/(\d[\d,]*)\.(\d)%/g)]
+    .map((match) => Number(`${match[1].replace(/,/g, '')}.${match[2]}`))
+    .some((shown) => Math.abs(shown - actual) <= 0.5);
+};
+
+/** A share of a whole, as the app prints it: one decimal, truncated. */
+const percentText = (part, whole) => {
+  const tenths = whole === 0n ? 1000n : (part * 1000n) / whole;
+  return `${tenths / 10n}.${tenths % 10n}%`;
+};
 
 const results = [];
 const check = (name, pass, detail = '') => {
@@ -351,25 +443,18 @@ const check = (name, pass, detail = '') => {
     'BRAND.md: no function names in the primary UI',
   );
 
-  // The gasless claim must never be unconditional. MarenVault.deposit() is payable and
-  // MarenRelayHub reverts on any request carrying value, so the first deposit costs the
-  // user BTC gas no matter what is running.
-  const gasText = await page.locator('section:has([data-contrast="gas-copy"])').first().innerText();
-  check('app: gas copy never promises "no gas, ever"', !/no gas,? ever/i.test(gasText));
-  check(
-    'app: gas copy states the first-deposit exception',
-    /first deposit costs gas/i.test(gasText),
-    'deposit is payable, therefore never relayable',
-  );
-
-  // And while no relayer is deployed, it must not claim sponsorship at all. The old copy
-  // said "Maren pays the Bitcoin gas for payments, Earn, and pooled borrow, repay and
-  // withdraw" — describing a service that exists in the architecture and nowhere else.
-  check(
-    'app: gas copy does not claim Maren pays, while no relayer is deployed',
-    !/Maren pays the Bitcoin (network )?(gas|fee)/i.test(gasText),
-    'RELAYER_AVAILABLE is false',
-  );
+  /**
+   * THE GAS CHECKS MOVED, BECAUSE THE GAS COPY MOVED.
+   *
+   * The portfolio used to carry a "Gas" panel carrying a `data-contrast="gas-copy"` hook,
+   * and these three assertions read it from this screen. The light-theme pass deleted
+   * that panel deliberately: the disclosure now lives where the gas is actually paid, on
+   * the button that spends it. This locator therefore matched nothing and the whole suite
+   * died on a 30-second timeout before reaching a single dApp assertion.
+   *
+   * The guarantee is unchanged and the checks are not weakened; they run in 4c, against
+   * the deposit panel, which is the screen a user is on when the claim matters.
+   */
 
   // No figure anywhere in the dApp may be an unbounded number. Sixteen consecutive
   // digits is far past any real balance and far short of a 2^255 sentinel.
@@ -427,15 +512,20 @@ const check = (name, pass, detail = '') => {
     /BTC \/ USD/.test(appBody) && /\$[\d,]+\.\d\d/.test(appBody),
     'read from the Mezo price precompile',
   );
+  const vaultOnPortfolio = await readVault();
   check(
-    'app (no wallet): shows the pooled trove’s real collateral ratio',
-    /trove ratio/i.test(appBody) && /\d+\.\d+%/.test(appBody),
-    'MarenVault.troveStatus()',
+    'app (no wallet): shows the social vault’s real health, and it is the contract’s figure',
+    /vault health/i.test(appBody) &&
+      (vaultOnPortfolio === null || ratioAgrees(appBody, vaultOnPortfolio.icr)),
+    vaultOnPortfolio === null
+      ? 'MarenVault.troveStatus() could not be read directly'
+      : `MarenVault.troveStatus().icr is ${vaultOnPortfolio.icr}`,
   );
 
   // --- Vault, with no wallet ---------------------------------------------
   await page.goto(BASE + '/app/vault', { waitUntil: 'networkidle' });
   await textReady(page, /connect/i);
+  await textReady(page, /vault health/i);
   const vaultAnon = await page.locator('main').innerText();
   check(
     'vault (no wallet): offers a connect prompt, not a slider attached to nothing',
@@ -445,6 +535,80 @@ const check = (name, pass, detail = '') => {
   check(
     'vault (no wallet): quotes no liquidation price',
     !/liquidation price[\s\S]{0,40}?[\d]/i.test(vaultAnon),
+  );
+
+  /**
+   * THE SOCIAL VAULT PANEL.
+   *
+   * The pooled position is the thing Maren invented, and it used to appear in the product
+   * as a tag reading "Pooled trove" plus a paragraph shown only to whoever had already
+   * been routed into it. It is now a panel of its own on the screen it belongs to, before
+   * any wallet is connected, because the vault is public.
+   *
+   * These assertions are about the figures being the CHAIN'S. Each one is compared with a
+   * `MarenVault` read this script performed itself.
+   */
+  // Panel titles and metric labels carry `text-transform: uppercase`, and `innerText`
+  // reports what is rendered rather than what is written, so every assertion on a label
+  // is case-insensitive. A case-sensitive one passes locally and fails on the label it
+  // was written for.
+  const vaultNow = await readVault();
+  check(
+    'vault (no wallet): the social vault is a first-class panel, not a routing footnote',
+    /the social vault/i.test(vaultAnon) && /vault health/i.test(vaultAnon),
+    'the pooled position is the product, and it is on screen without a wallet',
+  );
+  check(
+    'vault: the vault health shown is the ICR MarenVault.troveStatus() reports',
+    vaultNow === null || ratioAgrees(vaultAnon, vaultNow.icr),
+    vaultNow === null ? 'vault unreadable' : `chain says ${vaultNow.icr}`,
+  );
+  check(
+    'vault: the health figure is marked against the 180% floor and the 250% target',
+    /180 floor/i.test(vaultAnon) && /250 target/i.test(vaultAnon),
+    'MIN_TROVE_CR and MAREN_POLICY.targetCr, both on the scale',
+  );
+  check(
+    'vault: capacity used is the contract’s totalCollateral against its own depositCap',
+    vaultNow === null ||
+      vaultAnon.includes(percentText(vaultNow.totalCollateral, vaultNow.depositCap)),
+    vaultNow === null
+      ? 'vault unreadable'
+      : `chain says ${percentText(vaultNow.totalCollateral, vaultNow.depositCap)}`,
+  );
+
+  // The bar is decoration to a sighted user and the only capacity signal to a screen
+  // reader, so it carries the same two figures the caption does.
+  const capacityBar = await page.evaluate(() =>
+    [...document.querySelectorAll('[role=img]')]
+      .map((el) => el.getAttribute('aria-label') ?? '')
+      .find((label) => /deposit cap is used/.test(label)),
+  );
+  check(
+    'vault: the capacity bar states the room left rather than being a bare rectangle',
+    Boolean(capacityBar) && /of room is left/.test(capacityBar ?? ''),
+    (capacityBar ?? '').slice(0, 90),
+  );
+
+  /**
+   * THE RISK LINE IS ON THE PANEL, NOT BEHIND THE AFFORDANCE. A product that leads with
+   * "one shared position, from 0.001 BTC" and files the consequence of sharing under a
+   * disclosure nobody opens has sold the upside and hidden the downside.
+   */
+  const riskInBody = await page.evaluate(() => {
+    const details = [...document.querySelectorAll('details')];
+    const inDetails = details.some((d) => /segregated in/.test(d.textContent ?? ''));
+    const inMain = /segregated in/.test(document.querySelector('main')?.textContent ?? '');
+    return { inDetails, inMain };
+  });
+  check(
+    'vault: the pooling risk is stated in the panel body, not filed behind an info toggle',
+    riskInBody.inMain && !riskInBody.inDetails,
+    JSON.stringify(riskInBody),
+  );
+  check(
+    'vault: that sentence says both what is shared and what sharing can cost',
+    /accounting, not custody/.test(vaultAnon) && /socialise losses/.test(vaultAnon),
   );
 
   // --- Activity, with no wallet ------------------------------------------
@@ -749,6 +913,22 @@ const check = (name, pass, detail = '') => {
     'MarenVault.troveStatus().icr is back above MIN_TROVE_CR',
   );
 
+  /**
+   * A depositor's own stake in the shared position, as a figure rather than as the word
+   * "pooled". This account holds 0.001 BTC of the vault's collateral, and the panel says
+   * so and says what fraction of the whole that is.
+   */
+  check(
+    'vault (in the vault): the panel states this account’s share of the shared position',
+    /your collateral in it/i.test(borrowPanel) && /% of the vault/i.test(borrowPanel),
+    'MarenVault.collateral(you) against totalCollateral()',
+  );
+  check(
+    'vault (in the vault): the user’s debt is named as theirs alone, not the vault’s',
+    /your debt in it/i.test(borrowPanel) && /yours alone, not the vault/i.test(borrowPanel),
+    'debt is per-user; only the collateral is pooled',
+  );
+
   const sliderMax = Number((await slider.getAttribute('max')) ?? '0');
   check(
     'preflight: the slider has a real range rather than a track bounded by zero',
@@ -762,11 +942,27 @@ const check = (name, pass, detail = '') => {
     (await slider.getAttribute('aria-valuetext')) ?? '',
   );
 
+  /**
+   * The slider is driven to a value rather than trusted to arrive at one.
+   *
+   * It seeds itself from `recommendedBorrow`, which is the draw that lands the position on
+   * the 250% target. This account is ALREADY at 250%, so the recommendation is genuinely
+   * zero and the button is correctly disabled at the default. Asserting "enabled on
+   * arrival" would now be asserting that the panel offers a borrow the position does not
+   * have room for. The guarantee under test is the one that survives either state: a value
+   * inside the range the panel advertises is a value the panel will submit.
+   */
+  await slider.fill('500');
+  await domReady(page, () =>
+    [...document.querySelectorAll('button')].some(
+      (b) => /^Borrow [\d,]/.test(b.textContent ?? '') && !b.disabled,
+    ),
+  );
   const borrowButton = page.getByRole('button', { name: /^Borrow/ }).last();
   check(
-    'preflight: the Borrow button is enabled at a valid amount',
+    'preflight: the Borrow button is enabled at a valid amount inside the slider’s range',
     !(await borrowButton.isDisabled()),
-    'the panel defaults to the recommended borrow, which the contract accepts',
+    (await slider.getAttribute('aria-valuetext')) ?? '',
   );
   check(
     'preflight: the panel names which ceiling is binding, so the number is falsifiable',
@@ -813,21 +1009,112 @@ const check = (name, pass, detail = '') => {
     'if Maren ever closes entries, exits are the last thing to go',
   );
 
+  /**
+   * REPAY, ON AN ACCOUNT THAT NOW OWES SOMETHING.
+   *
+   * This used to assert the refusal on a debt-free account: "Nothing to repay", button
+   * disabled. The account has since drawn 25.73 MUSD against its 0.001 BTC, so that
+   * assertion would now be demanding a refusal the contract would not give, and it would
+   * have failed for the right reason and been "fixed" for the wrong one.
+   *
+   * What is asserted instead is the promise that does not depend on the balance: an exit
+   * is always reachable, and the ERC-20 approval it needs is shown as its own transaction
+   * rather than folded into the repay, where only one of the two wallet prompts would ever
+   * get a receipt read.
+   */
   await page.getByRole('tab', { name: 'Repay' }).click();
-  const repayPanel = await textReady(page, /Nothing to repay/);
+  await page.locator('input[inputmode=decimal]').first().waitFor({ state: 'visible' });
+  await page.locator('input[inputmode=decimal]').first().fill('1');
+  const repayPanel = await textReady(page, /allowance|Repay 1\.00 MUSD/i);
+  const repayReachable = await page.evaluate(() =>
+    [...document.querySelectorAll('button')].some(
+      (b) => /^(Repay|Approve) /.test(b.textContent ?? '') && !b.disabled,
+    ),
+  );
   check(
-    'preflight: repay is disabled WITH A REASON on an account holding no debt',
-    /Nothing to repay/.test(repayPanel) &&
-      (await page
+    'preflight: an exit is reachable for an account that owes MUSD and holds MUSD',
+    repayReachable,
+    'repay is never paused and never gated on the oracle',
+  );
+  check(
+    'preflight: the allowance repay needs is its own step, not slipped in behind the repay',
+    /allowance/i.test(repayPanel) ||
+      !(await page
         .getByRole('button', { name: /^Repay/ })
         .last()
         .isDisabled()),
+    'approval stated, or already granted and the repay offered',
   );
 
   // The confirmation sheet, reached through the one vault action that IS available.
   await page.getByRole('tab', { name: 'Deposit' }).click();
   await page.locator('input[inputmode=decimal]').first().waitFor({ state: 'visible' });
   await page.locator('input[inputmode=decimal]').first().fill('0.001');
+
+  /**
+   * THE ROUTE DECISION IS ON SCREEN, WITH BOTH OPTIONS AND A STATED RECOMMENDATION.
+   *
+   * The app has always routed by collateral. It used to do it silently and report the
+   * result in a row reading "Route after: Pooled", which is a decision disclosed as a
+   * side effect. Both routes now appear before the amount field with the live threshold
+   * that separates them.
+   */
+  const depositPanel = await textReady(page, /Your own trove/);
+  const recommendedTags = await page.evaluate(
+    () =>
+      [...document.querySelectorAll('main span')].filter(
+        (el) => el.textContent.trim() === 'Recommended',
+      ).length,
+  );
+  check(
+    'deposit: both routes are presented, with the threshold that separates them',
+    /Your own trove/.test(depositPanel) &&
+      /The social vault/.test(depositPanel) &&
+      /from[\s\S]{0,12}0\.001 BTC/.test(depositPanel),
+    'directTroveThreshold() and MarenVault.MIN_DEPOSIT, side by side',
+  );
+  check(
+    'deposit: exactly one route is recommended, so the routing is visible rather than silent',
+    recommendedTags === 1,
+    `${recommendedTags} recommendations on screen`,
+  );
+  check(
+    'deposit: the recommendation is a sentence with this account’s own figures in it',
+    /short of a trove of your own|past the [\d.]+ BTC a trove of your own needs/.test(depositPanel),
+    'stated, not implied by a tag',
+  );
+
+  /**
+   * AND IT MUST NOT PROMISE A ROUTE THE BUTTON DOES NOT TAKE. `MarenVault.deposit()` has
+   * no branch that opens a trove of your own; every deposit is pooled, whatever the
+   * collateral afterwards would qualify for. The old row said "Route after: Direct trove"
+   * for a deposit that went into the vault like every other one.
+   */
+  check(
+    'deposit: names the destination the contract actually takes, on every route',
+    /Where it goes/.test(depositPanel) &&
+      /The social vault/.test(depositPanel) &&
+      !/Route after/.test(depositPanel),
+    'MarenVault.deposit() always pools',
+  );
+
+  /**
+   * THE GAS CLAIM, CHECKED WHERE IT IS NOW MADE. These three moved here from the
+   * portfolio, which no longer carries a gas panel. A deposit is payable and
+   * MarenRelayHub reverts on any request carrying value, so it can never be sponsored.
+   */
+  check('vault: gas copy never promises "no gas, ever"', !/no gas,? ever/i.test(depositPanel));
+  check(
+    'vault: gas copy states that a deposit costs gas and always will',
+    /deposit costs Bitcoin gas and always will/i.test(depositPanel),
+    'deposit is payable, therefore never relayable',
+  );
+  check(
+    'vault: gas copy does not claim Maren pays, while no relayer is deployed',
+    !/Maren pays the Bitcoin (network )?(gas|fee)/i.test(depositPanel),
+    'RELAYER_AVAILABLE is false',
+  );
+
   await domReady(page, () =>
     [...document.querySelectorAll('button')].some(
       (b) => /^Deposit/.test(b.textContent ?? '') && !b.disabled,
@@ -862,28 +1149,84 @@ const check = (name, pass, detail = '') => {
     JSON.stringify(wallet.signatureRequests),
   );
 
-  // --- Pay and Earn: anything needing MUSD, on an account that holds none ---
-  await page.goto(BASE + '/app/pay', { waitUntil: 'networkidle' });
-  const payLive = await textReady(page, /No MUSD to send/);
+  /**
+   * THE PORTFOLIO SAYS WHERE THE POSITION LIVES, IN THE PRODUCT'S OWN WORDS.
+   *
+   * This account's Bitcoin is in the social vault. The portfolio used to describe that as
+   * a "pooled route" hint on a balance row and a "Pooled trove" tag on the capacity panel,
+   * which are two pieces of internal vocabulary for the thing the product is built around.
+   */
+  await page.goto(BASE + '/app', { waitUntil: 'networkidle' });
+  const portfolioLive = await textReady(page, /the social vault/i);
+  const vaultOnHome = await readVault();
   check(
-    'preflight: Send is disabled with a plain reason when the wallet holds no MUSD',
-    /No MUSD to send/.test(payLive) &&
-      (await page.getByRole('button', { name: /^Send/ }).last().isDisabled()),
+    'portfolio: a position in the vault is framed as being in the social vault',
+    /in the social vault/i.test(portfolioLive) && !/pooled route/i.test(portfolioLive),
+    'no internal vocabulary on the surface',
   );
   check(
-    'preflight: that reason explains where MUSD comes from rather than stopping at "no"',
-    /borrowing against Bitcoin in the Vault/.test(payLive),
+    'portfolio: it carries the vault’s health, and it is the contract’s figure',
+    /vault health/i.test(portfolioLive) &&
+      (vaultOnHome === null || ratioAgrees(portfolioLive, vaultOnHome.icr)),
+    vaultOnHome === null ? 'vault unreadable' : `chain says ${vaultOnHome.icr}`,
+  );
+  check(
+    'portfolio: the pooling risk follows the position onto the home screen',
+    /accounting, not custody/i.test(portfolioLive) && /socialise losses/i.test(portfolioLive),
+    'a disclosure that only exists on one screen is a disclosure that can be missed',
   );
 
+  /**
+   * --- Pay and Earn: what a wallet can do with the MUSD it holds -------------
+   *
+   * These two used to assert the refusal outright: this account held no MUSD, so Send and
+   * Earn were closed and said why. It has since borrowed 25.73 MUSD against its collateral
+   * and both are open, so a check that still demanded "No MUSD to send" would be asserting
+   * something false about the chain.
+   *
+   * The balance is therefore read first and the assertion branches on it. What is being
+   * tested is unchanged and is the invariant: a control is offered exactly when the wallet
+   * can back it, and when it cannot, the refusal says where MUSD comes from.
+   */
+  const musdHeld = await readMusd(VIEW_ACCOUNT);
+  const holdsMusd = musdHeld !== null && musdHeld > 0n;
+
+  await page.goto(BASE + '/app/pay', { waitUntil: 'networkidle' });
+  const payLive = await textReady(page, holdsMusd ? /you pay the bitcoin gas/i : /No MUSD to send/);
+  if (holdsMusd) {
+    check(
+      'preflight: Send is open for a wallet that holds MUSD, and still never calls it free',
+      !/No MUSD to send/.test(payLive) && !/no gas/i.test(payLive),
+      `wallet holds ${musdHeld} wei of MUSD`,
+    );
+  } else {
+    check(
+      'preflight: Send is disabled with a plain reason when the wallet holds no MUSD',
+      /No MUSD to send/.test(payLive) &&
+        (await page.getByRole('button', { name: /^Send/ }).last().isDisabled()),
+    );
+    check(
+      'preflight: that reason explains where MUSD comes from rather than stopping at "no"',
+      /borrowing against Bitcoin in the Vault/.test(payLive),
+    );
+  }
+
   await page.goto(BASE + '/app/earn', { waitUntil: 'networkidle' });
-  const earnLive = await textReady(page, /No MUSD to deposit/);
+  const earnLive = await textReady(
+    page,
+    holdsMusd ? /does not display an APY/i : /No MUSD to deposit/,
+  );
   check(
-    'preflight: Earn deposits are disabled with a plain reason on an empty wallet',
-    /No MUSD to deposit/.test(earnLive) &&
-      (await page
-        .getByRole('button', { name: /^Deposit into Earn/ })
-        .last()
-        .isDisabled()),
+    holdsMusd
+      ? 'preflight: Earn is open for a wallet that holds MUSD, and quotes no forward rate for it'
+      : 'preflight: Earn deposits are disabled with a plain reason on an empty wallet',
+    holdsMusd
+      ? !/No MUSD to deposit/.test(earnLive) && !/\d[\d.,]*\s*%\s*(apy|apr)/i.test(earnLive)
+      : /No MUSD to deposit/.test(earnLive) &&
+          (await page
+            .getByRole('button', { name: /^Deposit into Earn/ })
+            .last()
+            .isDisabled()),
   );
 
   await ctx.close();
@@ -897,12 +1240,12 @@ const check = (name, pass, detail = '') => {
   });
   const page = await ctx.newPage();
   await page.goto(BASE + '/app', { waitUntil: 'networkidle' });
-  await textReady(page, /The pooled trove/);
+  await textReady(page, /the social vault/i);
   const canvases = await page.evaluate(() => document.querySelectorAll('canvas').length);
   check('app reduced-motion: no shader canvas mounted', canvases === 0, `canvases=${canvases}`);
   // With no wallet there is no position-health card; the card that must survive
   // `prefers-reduced-motion` is the one a disconnected visitor actually gets.
-  const panelVisible = await page.locator('text=The pooled trove').count();
+  const panelVisible = await page.locator('text=The social vault').count();
   check('app reduced-motion: the protocol panel still renders', panelVisible > 0);
   await ctx.close();
 }

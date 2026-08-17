@@ -2,14 +2,10 @@
 
 import { useMemo, useState } from 'react';
 import {
-  BORROWING_RATE,
   LIQUIDATION_RESERVE,
   MAREN_POLICY,
   MAREN_VAULT,
-  MIN_NET_DEBT,
-  assessBorrowRoute,
   borrowCeiling,
-  directTroveThreshold,
   formatApr,
   formatBtc,
   formatCollateralRatio,
@@ -37,7 +33,6 @@ import {
   ActionButton,
   AppCard,
   EmptyState,
-  Info,
   Label,
   Metric,
   MetricStrip,
@@ -49,7 +44,8 @@ import {
 import { TxSheet, useTxRunner, type TxIntent, type TxRunner } from '@/components/app/tx';
 import { ArrowRight, VaultIcon } from '@/components/ui/icons';
 import { ConnectPrompt } from '@/components/app/connect-prompt';
-import { ProtocolPanel } from '@/components/app/protocol-panel';
+import { RouteChoice } from '@/components/app/route-choice';
+import { SocialVaultPanel } from '@/components/app/social-vault';
 import {
   preflightBorrow,
   preflightDeposit,
@@ -80,6 +76,26 @@ const MODES = [
 
 /**
  * Vault — deposit BTC, draw MUSD, repay, withdraw.
+ *
+ * WHAT CHANGED IN THIS PASS: THE SOCIAL VAULT IS THE SCREEN'S SUBJECT.
+ *
+ * Maren's one invention is that many people share a single MUSD trove, which is the only
+ * reason a 0.001 BTC position can exist against a protocol whose minimum loan is 1,800
+ * MUSD. The app described that as a tag reading "Pooled trove" and a paragraph shown only
+ * to whoever had already been routed into it, below the controls. A reviewer could use the
+ * whole product without learning that the pooled position was the point.
+ *
+ * It is now `SocialVaultPanel`, above the tab strip, with the vault's own health on the
+ * same scale a user's position is judged on, its collateral and debt, and how full it is
+ * against `depositCap()`. The pooling risk is in the panel body rather than behind the
+ * info affordance. `RouteCard` is gone: it said the same thing to a smaller audience.
+ *
+ * And the routing is now a decision the user watches being made. `RouteChoice` sits above
+ * the deposit amount with both routes, the live threshold that separates them, and the
+ * recommendation as a sentence. It also corrects a claim that was never true: the old
+ * "Route after: Direct trove" row implied a large enough deposit would open a trove of
+ * your own, and `MarenVault.deposit()` has no such branch. Every deposit is pooled, and
+ * the row now says where the Bitcoin actually goes.
  *
  * WHAT CHANGED IN THIS PASS. Every panel opened with an `h3` and a sentence describing
  * what the panel was for: "Adds collateral and raises your ratio immediately", "Reduces
@@ -157,7 +173,9 @@ export default function VaultPage() {
           </span>
         </ConnectPrompt>
 
-        <ProtocolPanel />
+        {/* The vault itself is public, so a visitor with no wallet still gets the thing
+            the product is built around rather than a locked door. */}
+        <SocialVaultPanel />
       </div>
     );
   }
@@ -181,7 +199,9 @@ export default function VaultPage() {
           Deposit tab, and the deposit form IS this screen's empty state. */}
       {empty ? null : <PositionStrip livePrice={livePrice} />}
 
-      <RouteCard />
+      {/* The vault is the product, so it sits above the controls that act on it rather
+          than below them as a footnote for whoever was routed into it. */}
+      <SocialVaultPanel />
 
       <Segmented options={MODES} value={mode} onChange={setChosen} label="Vault action" />
 
@@ -214,11 +234,13 @@ function PositionStrip({ livePrice }: { livePrice: bigint | null }) {
     <Panel
       title="Your position"
       meta={
-        // Only when the route card below is not already carrying it. A pooled user saw
-        // "POOLED" twice in two stacked panels.
+        // Only when the vault panel below is not already carrying it. A pooled user saw
+        // the same route named twice in two stacked panels.
         position && position.route !== 'pooled' ? (
-          <span className="t-label text-text-subtle">Direct trove</span>
-        ) : null
+          <span className="t-label text-text-subtle">Your own trove</span>
+        ) : (
+          <span className="t-label text-text-subtle">In the social vault</span>
+        )
       }
     >
       <MetricStrip>
@@ -237,7 +259,9 @@ function PositionStrip({ livePrice }: { livePrice: bigint | null }) {
           label="Total debt"
           value={position ? <Musd wei={position.debtWei} size="lg" /> : <Dash size="lg" />}
           caption={
-            position?.route === 'direct' ? 'includes the 200 MUSD reserve' : 'no reserve, pooled'
+            position?.route === 'direct'
+              ? 'includes the 200 MUSD reserve'
+              : 'no reserve, social vault'
           }
         />
         <Metric
@@ -274,55 +298,6 @@ function worthStating(pre: Preflight, amountWei: bigint): boolean {
 function fieldError(pre: Preflight, amountWei: bigint): string | null {
   if (!pre.blocker || amountWei === 0n) return null;
   return pre.blocker.scope === 'input' || pre.blocker.scope === 'wallet' ? pre.blocker.title : null;
-}
-
-/**
- * Which route the user is on, and why.
- *
- * Only the POOLED route gets a panel of its own, because only the pooled route has
- * something a user must be told. "You hold your own trove and take no pooling risk" is
- * good news and one line long; it rides as a tag on the position strip instead.
- */
-function RouteCard() {
-  const { data: position } = usePosition();
-  const price = usePrice();
-  const livePrice = price.state === 'live' ? price.priceWei : null;
-
-  if (!position || position.route !== 'pooled') return null;
-
-  const assessment = livePrice
-    ? assessBorrowRoute(position.collateralWei, livePrice, MAREN_POLICY.targetCr, BORROWING_RATE)
-    : null;
-  const threshold = livePrice ? directTroveThreshold(livePrice) : null;
-
-  return (
-    <Panel
-      title="Pooled position"
-      meta={<span className="t-label text-text-subtle">Shared trove</span>}
-    >
-      <div className="px-5 py-4">
-        {/* The pooled-risk statement stays, in one sentence. It is the single most
-            important thing a pooled user does not otherwise know, and shortening a
-            disclosure is not the same as removing it. */}
-        <p className="text-text-muted max-w-[68ch] text-sm leading-relaxed">
-          Your deposit shares one trove with other users, segregated in{' '}
-          <em className="text-text not-italic">accounting, not custody</em>, so a drawdown faster
-          than the keeper could socialise losses.
-          {assessment?.eligible && assessment.route === 'direct'
-            ? ' Your collateral now supports a trove of your own, which would remove this risk.'
-            : ''}
-        </p>
-        <Info summary="How Maren limits that risk">
-          Maren liquidates a pooled position internally at{' '}
-          {policyRatio(MAREN_POLICY.vaultLiquidationCr)}, far above the protocol’s 110%, and backs
-          that with a 0.001 BTC floor, per-block keeper checks and an insurance buffer funded from
-          vault fees. These are mitigations, not a guarantee. You are here because a trove of your
-          own needs about {threshold ? formatBtc(threshold) : '0.079 BTC'}; MUSD will not open one
-          below {formatMusd(MIN_NET_DEBT)} of net debt.
-        </Info>
-      </div>
-    </Panel>
-  );
 }
 
 function BorrowPanel({
@@ -453,7 +428,7 @@ function BorrowPanel({
         : undefined,
     gas:
       position?.route === 'pooled'
-        ? gasNote(true, 'Draws MUSD against Maren’s pooled trove.')
+        ? gasNote(true, 'Draws MUSD against the social vault’s shared trove.')
         : {
             sponsored: false,
             note: 'Costs BTC gas. Maren does not sponsor direct-trove operations.',
@@ -585,7 +560,7 @@ function BorrowPanel({
           <MetricStrip>
             <Metric
               className="px-5 py-4"
-              label="Shared trove ratio"
+              label="Vault health"
               value={
                 <Num size="lg" className="text-warning" tone="inherit">
                   {formatCollateralRatio(stats.troveIcrWei)}
@@ -725,15 +700,8 @@ function DepositPanel({ runner, chain }: { runner: TxRunner; chain: VaultState }
 
   const pre = preflightDeposit(chain, wei);
 
-  const routeAfter =
-    livePrice && position
-      ? assessBorrowRoute(
-          position.collateralWei + wei,
-          livePrice,
-          MAREN_POLICY.targetCr,
-          BORROWING_RATE,
-        )
-      : null;
+  /** What this account holds once this deposit confirms. The route is judged on it. */
+  const collateralAfter = (position?.collateralWei ?? 0n) + wei;
 
   const intent = (): TxIntent => ({
     title: `Deposit ${formatBtc(wei)}`,
@@ -745,15 +713,11 @@ function DepositPanel({ runner, chain }: { runner: TxRunner; chain: VaultState }
         value: position ? <Btc wei={position.collateralWei + wei} /> : <Dash />,
       },
       {
-        label: 'Route after',
-        value:
-          routeAfter?.eligible === true ? (
-            <span className="text-text-muted">
-              {routeAfter.route === 'direct' ? 'Direct trove' : 'Pooled'}
-            </span>
-          ) : (
-            <Dash />
-          ),
+        // Not "route after". `MarenVault.deposit()` has no branch that opens a trove of
+        // your own, so the destination of THIS transaction is never in question, whatever
+        // the collateral afterwards would qualify for.
+        label: 'Where it goes',
+        value: <span className="text-text-muted">The social vault</span>,
       },
     ],
     changes: position
@@ -796,6 +760,12 @@ function DepositPanel({ runner, chain }: { runner: TxRunner; chain: VaultState }
         <span className="text-text-muted text-xs">Raises your ratio the moment it confirms</span>
       }
     >
+      {/* THE DECISION, BEFORE THE AMOUNT FIELD. It is a function of the amount, so it sits
+          next to the control that sets it and moves as that control moves. */}
+      <div className="border-b border-[var(--border-hairline)] px-5 py-5">
+        <RouteChoice collateralWei={collateralAfter} priceWei={livePrice} />
+      </div>
+
       <div className="px-5 py-5">
         <div className="max-w-md">
           <AmountField
@@ -818,18 +788,10 @@ function DepositPanel({ runner, chain }: { runner: TxRunner; chain: VaultState }
 
         {position ? (
           <div className="mt-6 max-w-md">
-            <StatRow label="Collateral after" value={<Btc wei={position.collateralWei + wei} />} />
+            <StatRow label="Collateral after" value={<Btc wei={collateralAfter} />} />
             <StatRow
-              label="Route after"
-              value={
-                routeAfter?.eligible === true ? (
-                  <span className="text-text text-sm">
-                    {routeAfter.route === 'direct' ? 'Direct trove' : 'Pooled'}
-                  </span>
-                ) : (
-                  <span className="text-text-subtle text-sm">needs a live price</span>
-                )
-              }
+              label="Where it goes"
+              value={<span className="text-text text-sm">The social vault</span>}
               last
             />
           </div>
