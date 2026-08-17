@@ -146,8 +146,16 @@ import {Math} from "@openzeppelin/contracts/utils/math/Math.sol";
  * liquidation, an owner close, or a redemption large enough to consume the trove entirely
  * does not. When the trove has left the active state every mutation halts with
  * `TroveNoLongerActive`, which is a hard stop and is meant to be: the honest response to
- * "the pool's trove is gone" is to stop paying claims first-come-first-served and let an
- * admin wind the vault down against whatever the CollSurplusPool still holds.
+ * "the pool's trove is gone" is to stop paying claims first-come-first-served, not to keep
+ * serving whoever transacts first.
+ *
+ * BE CLEAR ABOUT WHAT THAT COSTS. A halt is not a recovery. In that state the collateral the
+ * protocol did not take sits in the MUSD CollSurplusPool, `BorrowerOperations.claimCollateral`
+ * is the only way to reach it, and THIS CONTRACT DOES NOT CALL IT. Everyone is frozen until
+ * a wind-down path exists, and building one means deciding how a shortfall is shared out,
+ * which is a governance question and not a rounding question. It is deliberately not smuggled
+ * into this change. Freezing is the conservative failure, and it is the one users can be told
+ * about in advance.
  * ----------------------------------------------------------------------------
  *
  * DESIGN NOTE (EIP-7702): `deposit`, `borrow`, `repay` and `withdraw` are separate,
