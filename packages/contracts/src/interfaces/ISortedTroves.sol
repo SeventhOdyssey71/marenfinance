@@ -21,5 +21,12 @@ interface ISortedTroves {
 
     function getLast() external view returns (address);
 
+    /// @notice The next node walking DOWN the list, i.e. towards lower NICR. `getNext` of the
+    ///         tail is the zero address (verified live on matsnet 2026-08-17).
+    function getNext(address _id) external view returns (address);
+
+    /// @notice The previous node walking UP the list, i.e. towards higher NICR.
+    function getPrev(address _id) external view returns (address);
+
     function contains(address _id) external view returns (bool);
 }

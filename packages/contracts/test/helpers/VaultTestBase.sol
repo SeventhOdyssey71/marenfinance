@@ -89,11 +89,30 @@ abstract contract VaultTestBase is Test {
         vault.withdraw(amount, address(0), address(0));
     }
 
+    /**
+     * @dev Aims a redemption at the pooled trove, funding the redeemer with freshly minted
+     *      MUSD. The redeemer is an outsider: they are not a vault user, exactly like the
+     *      arbitrageur who actually does this on Mezo.
+     */
+    function _redeem(address redeemer, uint256 musdAmount) internal {
+        musd.mint(redeemer, musdAmount);
+        vm.prank(redeemer);
+        protocol.redeemCollateral(musdAmount, address(vault), address(0), address(0), 0, 0);
+    }
+
     /// @dev Sum of every account this suite ever touches, including the vault's own protocol
     ///      position. Used by the collateral-conservation assertions.
     function _sumTrackedCollateral() internal view returns (uint256 total) {
         total = vault.collateral(address(vault)) + vault.collateral(alice) + vault.collateral(bob)
             + vault.collateral(carol);
+    }
+
+    /// @dev The same sum, but of what each account can ACTUALLY claim: the ledger balance less
+    ///      any redemption debit it has not settled yet. This is the number that has to stay
+    ///      inside what the trove holds.
+    function _sumClaimableCollateral() internal view returns (uint256 total) {
+        total = vault.collateralOf(address(vault)) + vault.collateralOf(alice) + vault.collateralOf(bob)
+            + vault.collateralOf(carol);
     }
 
     function _sumTrackedDebt() internal view returns (uint256 total) {
