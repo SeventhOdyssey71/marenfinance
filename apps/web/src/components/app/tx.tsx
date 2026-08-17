@@ -681,11 +681,24 @@ function HashLine({ hash }: { hash: Hash }) {
         className="num text-text-muted hover:text-text inline-flex items-center gap-2 rounded-[var(--radius-pill)] text-xs transition-colors duration-[120ms] ease-out"
       >
         <span data-tx-hash>{shortHash(hash)}</span>
-        {copied ? (
-          <Check aria-hidden className="text-success size-3.5" />
-        ) : (
-          <CopyIcon aria-hidden className="size-3.5" />
-        )}
+        {/* Cross-fade on swap, not a snap: the copy glyph fades, shrinks and blurs
+            out while the check enters the same way, so the state change reads as
+            motion rather than a replacement. Both glyphs stay mounted and stacked;
+            the transition names opacity, transform and filter — nothing else. */}
+        <span className="relative grid size-3.5 place-items-center">
+          <CopyIcon
+            aria-hidden
+            className={`absolute transition-[opacity,transform,filter] duration-150 ease-out ${
+              copied ? 'scale-50 opacity-0 blur-[2px]' : 'scale-100 opacity-100 blur-0'
+            }`}
+          />
+          <Check
+            aria-hidden
+            className={`text-success absolute transition-[opacity,transform,filter] duration-150 ease-out ${
+              copied ? 'scale-100 opacity-100 blur-0' : 'scale-50 opacity-0 blur-[2px]'
+            }`}
+          />
+        </span>
         <span className="sr-only">{copied ? 'Copied' : 'Copy the full transaction hash'}</span>
       </button>
       <a

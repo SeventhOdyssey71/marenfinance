@@ -132,7 +132,7 @@ try {
   // on-chain proof script connect through, so the video cannot diverge from what the tests
   // already exercise.
   const { installWallet, installReadOnlyWallet } = await import(
-    join(webDir, 'scripts', 'injected-wallet.mjs'),
+    join(webDir, 'scripts', 'injected-wallet.mjs')
   );
 
   let account = null;

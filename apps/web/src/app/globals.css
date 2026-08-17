@@ -69,10 +69,20 @@
     color: var(--color-text);
     font-family: var(--font-sans);
     font-synthesis-weight: none;
+    /* Font smoothing once on the root, never per component. The Gecko flag is the
+       Firefox twin of the WebKit one above it. */
     -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
     text-rendering: optimizeLegibility;
     /* Never allow a horizontal scrollbar at 360px */
     overflow-x: clip;
+  }
+
+  /* Underlines clear descenders: `from-font` asks the typeface for its preferred
+     position, and `skip-ink` stops the line cutting through a 'g' or a 'p'. */
+  a {
+    text-underline-position: from-font;
+    text-decoration-skip-ink: auto;
   }
 
   ::selection {

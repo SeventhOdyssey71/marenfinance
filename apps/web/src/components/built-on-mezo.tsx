@@ -11,7 +11,7 @@ const facts = [
   {
     label: 'Gas token',
     value: 'Native BTC',
-    body: 'Mezo charges gas in Bitcoin. Maren is built so you will not have to hold a gas balance to use it — though today you still do, because no relayer is running.',
+    body: 'Mezo charges gas in Bitcoin. Maren is built so you will not have to hold a gas balance to use it, though today you still do, because no relayer is running.',
   },
   {
     label: 'Networks',

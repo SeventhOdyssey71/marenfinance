@@ -207,7 +207,7 @@ export function ActionLink({
   return (
     <a
       href={href}
-      className={`group inline-flex h-12 items-center justify-between gap-4 rounded-[var(--radius-pill)] pl-6 pr-2 text-[0.9375rem] font-medium transition-colors duration-[120ms] ease-out ${variants[variant]}`}
+      className={`group inline-flex h-12 items-center justify-between gap-4 rounded-[var(--radius-pill)] pl-6 pr-2 text-[0.9375rem] font-medium transition-[color,background-color,border-color,transform] duration-[120ms] ease-out active:scale-[0.97] ${variants[variant]}`}
     >
       <span className="whitespace-nowrap">{children}</span>
       {icon ? (

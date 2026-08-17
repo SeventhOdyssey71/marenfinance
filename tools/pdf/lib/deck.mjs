@@ -238,9 +238,7 @@ function parseStatRow(row) {
   const figure = (rawFigure ?? '').trim();
   const label = rest.join('|').trim();
   const split = figure.match(/^([^\s]+)\s+(.+)$/);
-  return split
-    ? { figure: split[1], unit: split[2], label }
-    : { figure, unit: null, label };
+  return split ? { figure: split[1], unit: split[2], label } : { figure, unit: null, label };
 }
 
 const NUMERIC_RE = /^[~≈<>≥≤±+\-−]{0,2}\s*[$]?\d[\d,._]*\s*(?:%|BTC|MUSD|USD|×|x|pp|bps)?$/i;
@@ -410,9 +408,7 @@ export function renderDeck({ body, meta, css }) {
   const slides = parseSlides(body);
   if (slides.length === 0) throw new Error('the deck has no slides');
 
-  const sections = slides
-    .map((slide, i) => renderSlide(slide, i, slides.length, meta))
-    .join('\n');
+  const sections = slides.map((slide, i) => renderSlide(slide, i, slides.length, meta)).join('\n');
 
   const html = `<!doctype html>
 <html lang="en"><head><meta charset="utf-8">

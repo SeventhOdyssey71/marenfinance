@@ -630,7 +630,9 @@ function LinkPanel({ runner }: { runner: TxRunner }) {
 
       {funds.ok && needsApproval && amountWei > 0n ? (
         <div className="mt-6">
-          <Note>MarenPay needs an allowance for {formatMusd(amountWei)} before it can escrow it.</Note>
+          <Note>
+            MarenPay needs an allowance for {formatMusd(amountWei)} before it can escrow it.
+          </Note>
         </div>
       ) : null}
 
