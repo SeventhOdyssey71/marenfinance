@@ -132,6 +132,7 @@ Headlines are tight and large. Body text never exceeds `68ch`.
   Controls (buttons, active tabs, active nav pills) may carry a fill because a control
   needs a hit surface. A decorative disc inside a card may not — it is the same floating
   lighter box at a smaller scale.
+
 - **Spacing scale:** 4 · 8 · 12 · 16 · 24 · 32 · 48 · 64 · 96 · 128. Nothing off-scale.
 - **Section rhythm:** `96px` vertical padding mobile, `128px` desktop.
 - **Grid:** 12-column, `1200px` max content width, `24px` gutters.
