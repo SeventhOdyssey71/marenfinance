@@ -3,7 +3,7 @@ title: Maren Finance — Product Plan
 subtitle: A money app for Bitcoin. Spend it in the real world, never sell it. The product, the phases, the economics, and how it is measured.
 docId: MRN-200
 date: 2026-08-17
-version: '1.1'
+version: '1.2'
 classification: Confidential
 audience: Mezo Ecosystem
 colophon: |
@@ -126,8 +126,18 @@ emissions and no points.
 
 ## What runs today, and what comes next
 
-Phase 1 is live on matsnet and verifiable at the addresses in the companion Progress &
-Evidence document.
+Phase 1 is live on Mezo matsnet, chain 31611, at these addresses, every one
+source-verified on Blockscout:
+
+| Contract      | Address                                      |
+| ------------- | -------------------------------------------- |
+| MarenVault    | `0x46252B00AB59384518d9dB6D1f210ffF1221645b` |
+| MarenPay      | `0xe475Ff919D54E055809f516E3bed8a5c7a101836` |
+| MarenRelayHub | `0x22cC1Adfb0C91D9359746dE3F7E8cB7F2B8eA98C` |
+| MarenRegistry | `0x9e123Cdd0CD524812CF9F552d3FAB13d8143b77E` |
+| MarenEarn     | `0xE3B02b215085B99Ce61E0F5ea9763Ac637aa7826` |
+
+The companion Progress & Evidence document carries the transaction-level proof.
 
 | Phase         | Scope                                                                                                | State                                     |
 | ------------- | ---------------------------------------------------------------------------------------------------- | ----------------------------------------- |

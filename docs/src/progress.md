@@ -3,7 +3,7 @@ title: Maren Finance — Progress & Evidence
 subtitle: What has been built so far, deployed where, proven how, and the exact commands and transaction hashes that let you check every claim without trusting us.
 docId: MRN-100
 date: 2026-08-17
-version: '1.2'
+version: '1.3'
 classification: Confidential
 audience: Mezo Ecosystem
 colophon: |
@@ -61,21 +61,46 @@ Five contracts, all source-verified on Blockscout.
 | MarenRegistry | `0x9e123Cdd0CD524812CF9F552d3FAB13d8143b77E` |
 | MarenEarn     | `0xE3B02b215085B99Ce61E0F5ea9763Ac637aa7826` |
 
-Deployment took 11 transactions from `0x5419...1885`, costing 11,688,063 gas in total,
-about 4 nano-BTC. Every creation hash is recorded in the repository's deployment log
-and resolves on `explorer.test.mezo.org`. MarenRelayHub is the single trusted
-forwarder; `MarenPay.trustedForwarder()` confirms it on-chain.
+Deployment took 11 transactions from the deployer
+`0x54196397D6f01b48739dB3957257cB33cD341885`, costing 11,688,063 gas in total, about
+4 nano-BTC. Every hash below resolves on `explorer.test.mezo.org`. MarenRelayHub is
+the single trusted forwarder; `MarenPay.trustedForwarder()` confirms it on-chain.
+
+| Contract      | Deploy transaction                                                   |
+| ------------- | -------------------------------------------------------------------- |
+| MarenVault    | `0x25250742fbd112c08e31611be30a818fbd79bf04a722f672c115dffec901d622` |
+| MarenPay      | `0xa91c3ea4ca9b6186f799ace9d5bfde9e8b3c2c689d0d5c0405f280b3835dc807` |
+| MarenRelayHub | `0xc1fdfd7e16a67b6ef7d6cc41cf95795bc17af48ccbca958b6b6ae42a9ea0db74` |
+| MarenRegistry | `0x1a48c318fa00ad914b466f6b5fb665bedf9c1ca77ed8b1ac97e45a0c82f4eae4` |
+| MarenEarn     | `0x47d7aea8ee6f27ad87a45129aed94db45ccd60ea3aa8003ef33feb6f794046c3` |
 
 ## Exercised on-chain, not just deployed
 
-Deployment proves compilation. What follows proves operation, each claim with its
-transaction.
+Deployment proves compilation. What follows proves operation. Every transaction
+referenced in this section is listed here in full, and each resolves on
+`explorer.test.mezo.org`.
+
+| Action                       | Transaction                                                          |
+| ---------------------------- | -------------------------------------------------------------------- |
+| Open the pooled trove        | `0x13ea27a7b5c9499640c48672028c96e3208aa9924fc5802578cc1044314e93f8` |
+| Register `@sele`, commit     | `0x91b7d9515e83792c16f173a695205399263afa061b957cc7652cd2bb915cad04` |
+| Register `@sele`, reveal     | `0x048451db7af36cf8a52da611906b256d54cd73f7923c8ad8f4070f88eb666581` |
+| Deposit, scripted            | `0xda9a536c732db989a7e6fb56d8676fed7e73f3e30fdc4106d20d37577472602b` |
+| Keeper top-up                | `0xb3b90cc57849ac659404802e36b496006e6f42ea57b8b3210f353dd0e101c7f2` |
+| Protocol collateral, 17 Aug  | `0x968dd8d9b849655e11cc908f9b8fcd3ef417ae414e5ac8e8a16668e9fd48a8c8` |
+| Keeper sweep, 17 Aug         | `0xdc0030b9b16b1fb24a3a329e5b113253ff4b0c1096b1c5712d8a44fe2c4d3cb8` |
+| User deposit, via the app    | `0x3b34e664140c594c3b10f4b500e4ea2e582f00002086485b93c972f1695e8dd2` |
+| User deposit, via the app    | `0xb9d2f965c3da71ec62e731c8366f8a97c6919cb597974a89675b313f4d70ce63` |
+| User withdrawal, via the app | `0x58798d759af23f9a9bf44d237577209f92f693cca618c68c05052540ea30cbb3` |
+| User borrow, via the app     | `0x28bb5ec1d065dc7bd1c1ab4c1997fb4eeb4a75af492bd38fd90442c888427ef2` |
+| Payment request, via the app | `0x059f329fda15d6eb430d514040f7060fe41b354eac478c2c9ad4e5dba490559a` |
+| Deleverage no-op             | `0x71adc0a5477cb64c95073360f6a984adb4a9c04f5a8fcc5b73d4249e5456c54d` |
 
 ### The pooled trove is live inside Mezo's own TroveManager
 
-Opened with `openPooledTrove` at 762,931 gas (tx `0x13ea...93f8`). It currently holds
-0.069 BTC of collateral against 2,001.9 MUSD of debt: an ICR of **220%**, with
-borrowing enabled. One call verifies it:
+Opened with `openPooledTrove` at 762,931 gas. It currently holds 0.069 BTC of
+collateral against 2,001.9 MUSD of debt: an ICR of **220%**, with borrowing enabled.
+One call verifies it:
 
 ```bash
 cast call 0xE47c80e8c23f6B4A1aE41c34837a0599D5D16bb0 \
@@ -84,29 +109,31 @@ cast call 0xE47c80e8c23f6B4A1aE41c34837a0599D5D16bb0 \
   --rpc-url https://rpc.test.mezo.org
 ```
 
-### A live borrow is offered, and correctly bounded
+### A real user borrowed through the app
 
-From the funded test account, a 30 MUSD borrow simulates clean and a 40 MUSD borrow
-reverts with `InsufficientCollateralRatio` at the account's own 180% floor. The
-interface offers exactly the range the contract accepts, computed before any
-signature is requested.
+On 17 August a user account deposited Bitcoin through the interface and drew
+**25.7 MUSD** against it, served by the pooled vault in a single 171,053-gas
+transaction (the user borrow in the log above). The bound is enforced as designed: at
+the same position, a 40 MUSD borrow reverts with `InsufficientCollateralRatio` at the
+account's own 180% floor. The interface offers exactly the range the contract
+accepts, computed before any signature is requested.
 
 ### Names work, and cannot be front-run
 
-The `@sele` handle is registered through commit-reveal: commit `0x91b7...ad04`, then
-reveal at 119,726 gas (`0x0484...6581`). `resolve("sele")` returns the deployer
-address on-chain. Commit-reveal exists so a name cannot be sniped from the mempool.
+The `@sele` handle is registered through commit-reveal, the reveal landing at
+119,726 gas. `resolve("sele")` returns the deployer address on-chain. Commit-reveal
+exists so a name cannot be sniped from the mempool.
 
 ### Real user flows, on the real chain
 
-Bitcoin deposits (`0xda9a...602b` among others), a withdrawal, keeper collateral
-top-ups (`0xb3b9...c7f2`, `0xdc00...3cb8`), and an on-chain payment request of
-0.50 MUSD. Each is a row in the app's Activity screen with its hash linked to the
-explorer.
+Deposits, a withdrawal, keeper collateral top-ups, the borrow above, and an on-chain
+payment request of 0.50 MUSD, all in the log. Each is a row in the app's Activity
+screen with its hash linked to the explorer.
 
 ### One honest failure, kept on the record
 
-An early `deleverage` call (`0x71ad...c54d`) reported success while doing nothing: at
+An early `deleverage` call (the last row of the log) reported success while doing
+nothing: at
 the protocol's minimum debt there was no repayment room, and the no-op path returned
 silently. It was found by reading state after the call rather than trusting the
 receipt, and the fix makes the silent path loud. It is included here because the

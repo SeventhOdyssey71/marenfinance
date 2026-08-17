@@ -67,7 +67,7 @@ Spend Bitcoin. Never sell it. Built on Mezo.
 | MarenEarn     | `0xE3B02b215085B99Ce61E0F5ea9763Ac637aa7826` |
 | MarenRelayHub | `0x22cC1Adfb0C91D9359746dE3F7E8cB7F2B8eA98C` |
 
-<!-- slide: stat | kicker: It is exercised | tag: On chain | foot: A user deposited 0.001 BTC from their own wallet, tx 0x3b34e664…95e8dd2. Ratio after the protocol-owned top-up of 17 August, which cleared Maren's own 180% borrow floor. -->
+<!-- slide: stat | kicker: It is exercised | tag: On chain | foot: A user deposited 0.001 BTC from their own wallet, tx 0x3b34e664140c594c3b10f4b500e4ea2e582f00002086485b93c972f1695e8dd2. Ratio after the protocol-owned top-up of 17 August, which cleared Maren's own 180% borrow floor. -->
 
 # The pooled trove is open and active in MUSD's own TroveManager.
 

@@ -393,6 +393,10 @@ figure.shot figcaption {
   letter-spacing: 0.01em;
 }
 
+/* A 66-character transaction hash owns its table cell; if the measure is ever too
+   narrow it breaks cleanly mid-string rather than overflowing the page. */
+td code { word-break: break-all; }
+
 figure.diagram {
   width: ${CONTENT_WIDTH_MM}mm;
   margin: 6mm 0 7mm;
