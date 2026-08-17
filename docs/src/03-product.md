@@ -10,16 +10,16 @@ classification: Shared with the Mezo ecosystem team
 
 Maren is a Bitcoin-backed account. Four surfaces, one identity, on web and iOS.
 
-| Surface       | What it does                                                  |
-| ------------- | ------------------------------------------------------------- |
-| **Vault**     | Deposit BTC, draw MUSD against it without selling             |
-| **Pay**       | Send, request, split, and link MUSD — gasless, to a `@handle` |
-| **Earn**      | Put idle MUSD to work                                         |
-| **Portfolio** | Position health, capacity, history, alerts                    |
+| Surface       | What it does                                                 |
+| ------------- | ------------------------------------------------------------ |
+| **Vault**     | Deposit BTC, draw MUSD against it without selling            |
+| **Pay**       | Send, request, split, and link MUSD, gasless, to a `@handle` |
+| **Earn**      | Put idle MUSD to work                                        |
+| **Portfolio** | Position health, capacity, history, alerts                   |
 
 The design constraint that shapes every screen: **a Maren user should never need to hold
 BTC to use their own money.** On a chain where BTC is the gas token, that is not a
-convenience — it is the difference between a product a Bitcoin holder will use and one
+convenience, it is the difference between a product a Bitcoin holder will use and one
 they will not.
 
 ---
@@ -31,14 +31,14 @@ Three panels, then a wallet. No email, no KYC, no waitlist.
 The first thing a new user sees is not a marketing claim but their actual situation:
 
 > **You hold 0.043 BTC.**
-> That is below the 0.079 BTC needed to open a Mezo loan directly — so Maren will pool
+> That is below the 0.079 BTC needed to open a Mezo loan directly, so Maren will pool
 > your deposit with others. Here is what that means, and what it risks.
 
 We show the constraint before we show the product. A user who understands why the pooled
 vault exists understands the risk they are taking, and a user who does not should not be
 in it.
 
-**Wallet:** connect an existing EVM wallet (Mezo is a standard EVM chain — no special SDK
+**Wallet:** connect an existing EVM wallet (Mezo is a standard EVM chain, no special SDK
 required), or create one in-app. On iOS the key lives in the Keychain behind biometrics,
 and every signature requires Face ID.
 
@@ -51,8 +51,8 @@ and every signature requires Face ID.
 Native BTC, minimum **0.001 BTC**. On deposit, Maren states which route the user is on
 and why:
 
-- **Direct trove** (≥ ~0.079 BTC at target ratio) — their own MUSD trove, no pooling risk.
-- **Pooled** (below that) — a share of Maren's managed trove, with the risk stated.
+- **Direct trove** (≥ ~0.079 BTC at target ratio), their own MUSD trove, no pooling risk.
+- **Pooled** (below that), a share of Maren's managed trove, with the risk stated.
 
 The interface **prefers the direct route whenever it is available**, even though pooled
 volume is better for Maren. A user with enough collateral is told, in plain words, that
@@ -62,7 +62,7 @@ they do not need to accept pooling risk.
 
 A slider, not a number field. Dragging it updates three things live:
 
-1. Collateral ratio (rounds **down** — never flatters)
+1. Collateral ratio (rounds **down**: never flatters)
 2. Liquidation price in dollars
 3. How far BTC can fall before liquidation
 
@@ -95,20 +95,20 @@ We never display a stale price as if it were live, and never let a user borrow a
 
 The habit-forming surface. Everything here is gasless.
 
-**Send** — to a `@handle` or an address. The resolved address is always displayed
+**Send**: to a `@handle` or an address. The resolved address is always displayed
 alongside the handle before confirmation; a user always sees where money is actually
 going. Optional memo, stored on-chain as an event.
 
-**Request** — generate a request another user fulfils in one action.
+**Request**: generate a request another user fulfils in one action.
 
-**Link** — a claimable payment link, hash-locked with a secret and an expiry. The
+**Link**: a claimable payment link, hash-locked with a secret and an expiry. The
 recipient needs no prior relationship with Maren and **no BTC**. This is the sharpest
 demonstration of the gasless architecture: a person with an empty wallet can receive and
 then spend money.
 
-**Split** — one signature, many recipients.
+**Split**: one signature, many recipients.
 
-**Scan to pay** (iOS) — QR, for in-person and merchant use.
+**Scan to pay** (iOS), QR, for in-person and merchant use.
 
 ## What "gasless" actually means, in the interface
 
@@ -126,8 +126,7 @@ before signing. The user is never surprised, and never blocked at the door.
 
 Deposit idle MUSD into an ERC-4626 vault over MUSD's Stability Pool.
 
-**This screen is deliberately unexciting.** MUSD's Stability Pool has no token emissions —
-returns come from liquidation gains, which are lumpy and unpredictable. So:
+**This screen is deliberately unexciting.** MUSD's Stability Pool has no token emissions, returns come from liquidation gains, which are lumpy and unpredictable. So:
 
 - We show **trailing realised yield**, explicitly labelled as backward-looking.
 - We show **no forward APY**, because we would be making it up.
@@ -145,12 +144,11 @@ The home screen. Position health is the hero element, not the balance.
 
 - Collateral ratio, liquidation price, and BTC drop tolerance, in that order
 - Health state as colour: healthy / caution / warning / danger, with the thresholds shown
-- Borrowing capacity — the **real** limit from
+- Borrowing capacity, the **real** limit from
   `TroveManager.getTroveMaxBorrowingCapacity()`, not an ICR-derived estimate
 
 That last point is a Mezo-specific trap worth stating. MUSD fixes a per-trove borrowing
-ceiling at the price when the trove opened, and **adding collateral does not raise it** —
-only `refinance()` does. A user whose BTC has doubled will see improved health and still
+ceiling at the price when the trove opened, and **adding collateral does not raise it**, only `refinance()` does. A user whose BTC has doubled will see improved health and still
 be unable to borrow more. Maren shows the real ceiling and offers refinance when it would
 help, instead of letting the transaction fail with an opaque revert.
 
@@ -165,7 +163,7 @@ Liquidation should never be the first time a user hears from us.
 round conservatively. Exact values on hover or long-press for anything abbreviated.
 
 **Transaction states.** A hash is not success. A payment is delivered only on a receipt
-with `status === 'success'` — checked in one shared place, applied everywhere.
+with `status === 'success'`: checked in one shared place, applied everywhere.
 
 **Reduced motion** honoured throughout. Full keyboard navigation on web, VoiceOver and
 dynamic type on iOS, 44pt minimum touch targets.
