@@ -147,7 +147,7 @@ function SendPanel({ runner }: { runner: TxRunner }) {
     ],
     gas: {
       sponsored: false,
-      note: 'An ERC-20 approval is a transaction on MUSD itself, not on Maren, so it could never be relayed through Maren’s hub. It approves exactly this amount.',
+      note: 'Approves exactly this amount, not an unlimited allowance. You pay the Bitcoin gas.',
     },
     confirmLabel: 'Approve',
     submit: writes.ready
@@ -474,7 +474,7 @@ function LinkPanel({ runner }: { runner: TxRunner }) {
     ],
     gas: {
       sponsored: false,
-      note: 'An ERC-20 approval is a transaction on MUSD itself. The escrow cannot be funded without it.',
+      note: 'The escrow cannot be funded without this. You pay the Bitcoin gas.',
     },
     confirmLabel: 'Approve',
     submit: writes.ready
