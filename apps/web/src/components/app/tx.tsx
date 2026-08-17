@@ -324,7 +324,7 @@ export function TxSheet({ runner }: { runner: TxRunner }) {
         aria-labelledby="tx-sheet-title"
         tabIndex={-1}
         data-tx-phase={phase.name}
-        className="bg-surface-raised relative m-0 w-full max-w-[30rem] rounded-t-[var(--radius-card)] border border-[var(--border-hairline)] p-6 shadow-[inset_0_1px_0_rgba(255,255,255,0.05)] sm:m-4 sm:rounded-[var(--radius-card)] sm:p-7"
+        className="card-modal relative m-0 w-full max-w-[30rem] rounded-b-none p-6 sm:m-4 sm:rounded-[var(--radius-card)] sm:p-7"
       >
         {phase.name === 'confirm' || phase.name === 'checking' || phase.name === 'signing' ? (
           <Confirming

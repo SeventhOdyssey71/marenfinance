@@ -8,12 +8,13 @@ import { Dash, Musd, Num } from '@/components/app/money';
 import {
   ActionButton,
   AppCard,
-  CardTitle,
   EmptyState,
   Info,
   Label,
   Metric,
+  MetricStrip,
   Note,
+  Panel,
   StatRow,
 } from '@/components/app/primitives';
 import { TxSheet, useTxRunner, type TxIntent } from '@/components/app/tx';
@@ -155,20 +156,16 @@ export default function EarnPage() {
       <div className="flex flex-col gap-6">
         <div>
           <Label>Earn</Label>
-          <h1 className="t-h2 mt-2">Idle MUSD</h1>
-          <p className="text-text-muted mt-3 max-w-[68ch] text-sm leading-relaxed">
-            MUSD you are not spending goes into the Stability Pool. Returns come from liquidations,
-            which are irregular.
-          </p>
+          <h1 className="t-h3 mt-1.5">Idle MUSD</h1>
         </div>
 
         <ConnectPrompt icon={<EarnIcon className="size-6" />} title="Connect to use Earn">
           {/* Carries the contrast hook while disconnected, so the muted-on-card worst case
               is still measured on this route. The connected screen has its own. */}
           <span data-contrast="earn-disclosure">
-            Earn holds your MUSD in the MUSD Stability Pool through an ERC-4626 vault. Maren does
-            not display an APY for Earn because there is no reliable one to display. The yield is
-            liquidation gains, which can be zero for months.
+            Your MUSD sits in the Stability Pool and is paid in the Bitcoin seized when somebody
+            else is liquidated. Maren does not display an APY for Earn, because that return can be
+            zero for months.
           </span>
         </ConnectPrompt>
 
@@ -182,110 +179,110 @@ export default function EarnPage() {
   }
 
   return (
-    <div className="flex flex-col gap-6">
+    <div className="flex flex-col gap-4">
       <div>
         <Label>Earn</Label>
-        <h1 className="t-h2 mt-2">Idle MUSD</h1>
-        <p className="text-text-muted mt-3 max-w-[68ch] text-sm leading-relaxed">
-          MUSD you are not spending goes into the Stability Pool. Returns come from liquidations,
-          which are irregular.
-        </p>
+        <h1 className="t-h3 mt-1.5">Idle MUSD</h1>
       </div>
 
-      <AppCard className="p-6 md:p-8">
-        <CardTitle>Your balance in Earn</CardTitle>
-        <div className="mt-6 flex flex-wrap items-baseline gap-3">
-          {earn ? (
-            <Num size="xl">{formatMusd(earn.assetsWei, { unit: false })}</Num>
-          ) : (
-            <Dash size="xl" />
-          )}
-          <span className="t-h3 text-text-muted">MUSD</span>
-        </div>
-        {/* Only once there is something to compare the balance against. Repeating
-            "0.00 MUSD" directly beneath a 0.00 MUSD headline is a row that carries no
-            information. */}
-        {!earn || earn.depositedWei > 0n ? (
-          <div className="mt-6">
-            <StatRow
-              label="Deposited"
-              hint="everything you have put in"
-              value={earn ? <Musd wei={earn.depositedWei} /> : <Dash />}
-              last
-            />
+      <Panel title="Your balance in Earn">
+        <div className="px-5 py-5">
+          <div className="flex flex-wrap items-baseline gap-3">
+            {earn ? (
+              <Num size="xl">{formatMusd(earn.assetsWei, { unit: false })}</Num>
+            ) : (
+              <Dash size="xl" />
+            )}
+            <span className="t-h3 text-text-muted">MUSD</span>
           </div>
-        ) : null}
-      </AppCard>
+          {/* Only once there is something to compare the balance against. Repeating
+              "0.00 MUSD" directly beneath a 0.00 MUSD headline is a row that carries no
+              information. */}
+          {!earn || earn.depositedWei > 0n ? (
+            <div className="mt-4">
+              <StatRow
+                label="Deposited"
+                hint="everything you have put in"
+                value={earn ? <Musd wei={earn.depositedWei} /> : <Dash />}
+                last
+              />
+            </div>
+          ) : null}
+        </div>
+      </Panel>
 
       {/* --------------------------------------------- Trailing realised yield */}
       {/* A window of zero days is not a window. Reporting "0.00 MUSD realised over 0
           days" to someone who has never deposited states the result of an experiment
           they did not run, which is the same dishonesty as a forward APY, backdated. */}
       {earn && earn.trailing.windowDays === 0 ? (
-        <AppCard className="p-6 md:p-8">
+        <AppCard className="p-5">
           <EmptyState title="No return to report yet">
             Returns appear here once you have deposited and a liquidation has been absorbed.
           </EmptyState>
         </AppCard>
       ) : (
-        <AppCard className="p-6 md:p-8">
-          <div className="flex flex-wrap items-center justify-between gap-4">
-            <CardTitle>Realised over the last {earn?.trailing.windowDays ?? 90} days</CardTitle>
-            <span className="bg-surface-inset text-text-muted inline-flex items-center gap-2 rounded-[var(--radius-pill)] border border-[var(--border-hairline)] px-3 py-1.5 text-xs">
-              Backward-looking
-            </span>
-          </div>
+        <Panel
+          title={`Realised over the last ${earn?.trailing.windowDays ?? 90} days`}
+          meta={<span className="t-label text-text-subtle">Backward-looking</span>}
+        >
+          <div className="px-5 py-5">
+            <div className="flex flex-wrap items-baseline gap-3">
+              {earn ? (
+                <Num size="xl">{formatMusd(earn.trailing.realisedWei, { unit: false })}</Num>
+              ) : (
+                <Dash size="xl" />
+              )}
+              <span className="t-h3 text-text-muted">MUSD</span>
+            </div>
 
-          <div className="mt-6 flex flex-wrap items-baseline gap-3">
-            {earn ? (
-              <Num size="xl">{formatMusd(earn.trailing.realisedWei, { unit: false })}</Num>
-            ) : (
-              <Dash size="xl" />
-            )}
-            <span className="t-h3 text-text-muted">MUSD</span>
+            {/* The disclosure that makes the number honest. Not a footnote, not a tooltip:
+                it sits directly under the figure it qualifies. One sentence; the mechanism
+                behind it sits one click down rather than being deleted. */}
+            <p
+              data-contrast="earn-disclosure"
+              className="text-text-muted mt-4 max-w-[68ch] text-sm leading-relaxed"
+            >
+              Realised in the past, not a forecast. Maren does not display an APY for Earn because
+              there is no reliable one to display.
+            </p>
+            <Info summary="Why there is no rate">
+              The MUSD Stability Pool has no token emissions. Its entire yield is the Bitcoin seized
+              in liquidations, sold and compounded back into MUSD, so whether it pays at all depends
+              on whether anyone gets liquidated. Returns arrive in lumps and can be zero for months,
+              and annualising three events in ninety days would be a lie with a percent sign on it.
+            </Info>
           </div>
-
-          {/* The disclosure that makes the number honest. Not a footnote, not a tooltip —
-            it sits directly under the figure it qualifies. One sentence; the mechanism
-            behind it sits one click down rather than being deleted. */}
-          <p
-            data-contrast="earn-disclosure"
-            className="text-text-muted mt-5 max-w-[68ch] text-sm leading-relaxed"
-          >
-            Realised in the past, not a forecast. Maren does not display an APY for Earn because
-            there is no reliable one to display.
-          </p>
-          <Info summary="Why there is no rate">
-            The MUSD Stability Pool has no token emissions. Its entire yield is the Bitcoin seized
-            in liquidations, sold and compounded back into MUSD, so whether it pays at all depends
-            on whether anyone gets liquidated. Returns arrive in lumps and can be zero for months,
-            and annualising three events in ninety days would be a lie with a percent sign on it.
-          </Info>
 
           {earn ? (
-            <div className="mt-6 grid grid-cols-1 gap-6 sm:grid-cols-3">
-              <Metric
-                label="Liquidation events"
-                value={<Num size="lg">{earn.trailing.liquidationEvents}</Num>}
-                caption="in this window"
-              />
-              <Metric
-                label="Most recent gain"
-                value={
-                  <Num size="lg">
-                    {earn.trailing.lastGainAt ? timeAgo(earn.trailing.lastGainAt) : 'none yet'}
-                  </Num>
-                }
-                caption="gains are lumpy"
-              />
-              <Metric
-                label="Forward rate"
-                value={<Dash size="lg" />}
-                caption="we would be making it up"
-              />
+            <div className="border-t border-[var(--border-hairline)]">
+              <MetricStrip>
+                <Metric
+                  className="px-5 py-4"
+                  label="Liquidation events"
+                  value={<Num size="lg">{earn.trailing.liquidationEvents}</Num>}
+                  caption="in this window"
+                />
+                <Metric
+                  className="px-5 py-4"
+                  label="Most recent gain"
+                  value={
+                    <Num size="lg">
+                      {earn.trailing.lastGainAt ? timeAgo(earn.trailing.lastGainAt) : 'none yet'}
+                    </Num>
+                  }
+                  caption="gains are lumpy"
+                />
+                <Metric
+                  className="px-5 py-4"
+                  label="Forward rate"
+                  value={<Dash size="lg" />}
+                  caption="we would be making it up"
+                />
+              </MetricStrip>
             </div>
           ) : null}
-        </AppCard>
+        </Panel>
       )}
 
       {/* ------------------------------------------------------------- Actions */}
@@ -299,72 +296,82 @@ export default function EarnPage() {
         label="Earn action"
       />
 
-      <AppCard className="p-6 md:p-8">
-        <CardTitle>{mode === 'deposit' ? 'Move into Earn' : 'Move back to spendable'}</CardTitle>
-
-        <div className="mt-8 max-w-md">
-          <AmountField
-            value={amount}
-            onChange={setAmount}
-            unit="MUSD"
-            label="Amount"
-            max={<Musd wei={ceiling} size="sm" />}
-            maxLabel={mode === 'deposit' ? 'Spendable MUSD' : 'In Earn'}
-            onMax={() => setAmount(formatMusd(ceiling, { unit: false }).replace(/,/g, ''))}
-            error={
-              pre.blocker && pre.blocker.scope !== 'loading' && !pre.rangeDead && wei > 0n
-                ? pre.blocker.title
-                : null
-            }
-          />
-        </div>
-
-        <p className="text-text-subtle mt-6 text-xs leading-relaxed">
-          Costs BTC gas. Maren’s relayer is not deployed, so your own wallet submits this.
-        </p>
-
-        {pre.blocker && !(pre.blocker.scope === 'input' && wei === 0n) ? (
-          <div className="mt-6">
-            <BlockedNote
-              blocker={pre.blocker}
-              id="earn-blocked"
-              role={pre.rangeDead ? 'status' : 'alert'}
+      <Panel title={mode === 'deposit' ? 'Move into Earn' : 'Move back to spendable'}>
+        <div className="px-5 py-5">
+          <div className="max-w-md">
+            <AmountField
+              value={amount}
+              onChange={setAmount}
+              unit="MUSD"
+              label="Amount"
+              max={<Musd wei={ceiling} size="sm" />}
+              maxLabel={mode === 'deposit' ? 'Spendable MUSD' : 'In Earn'}
+              onMax={() => setAmount(formatMusd(ceiling, { unit: false }).replace(/,/g, ''))}
+              error={
+                pre.blocker && pre.blocker.scope !== 'loading' && !pre.rangeDead && wei > 0n
+                  ? pre.blocker.title
+                  : null
+              }
             />
           </div>
-        ) : null}
 
-        {pre.ok && needsApproval ? (
-          <div className="mt-6">
-            <Note>
-              Earn has to be allowed to take {formatMusd(wei)} of your MUSD before it can be
-              deposited. That is one approval transaction, and it is shown to you rather than
-              slipped in behind the deposit.
-            </Note>
+          <div className="mt-6 max-w-md">
+            <StatRow
+              label={mode === 'deposit' ? 'In Earn after' : 'Spendable after'}
+              value={<Musd wei={mode === 'deposit' ? inEarn + wei : spendable + wei} />}
+              last
+            />
           </div>
-        ) : null}
 
-        <div className="mt-7 flex flex-wrap gap-3">
-          {needsApproval ? (
+          {/* The preflight's refusal, in the place the amount was typed. `rangeDead` means
+              no amount can work, which is a status rather than an error about this input. */}
+          {pre.blocker && !(pre.blocker.scope === 'input' && wei === 0n) ? (
+            <div className="mt-5 max-w-md">
+              <BlockedNote
+                blocker={pre.blocker}
+                id="earn-blocked"
+                role={pre.rangeDead ? 'status' : 'alert'}
+              />
+            </div>
+          ) : null}
+
+          {pre.ok && needsApproval ? (
+            <div className="mt-5 max-w-md">
+              <Note>
+                Earn needs an allowance for {formatMusd(wei)} first. That is a separate transaction,
+                shown here rather than slipped in behind the deposit.
+              </Note>
+            </div>
+          ) : null}
+        </div>
+
+        <div className="border-t border-[var(--border-hairline)] px-5 py-4">
+          <div className="flex flex-wrap items-center gap-x-5 gap-y-3">
+            {needsApproval ? (
+              <ActionButton
+                onClick={() => runner.request(approvalIntent())}
+                disabled={!pre.ok || !writes.ready}
+                aria-describedby="earn-blocked"
+                icon={<ArrowRight className="size-4" />}
+              >
+                Approve {formatMusd(wei)}
+              </ActionButton>
+            ) : null}
             <ActionButton
-              onClick={() => runner.request(approvalIntent())}
-              disabled={!pre.ok || !writes.ready}
+              variant={needsApproval ? 'secondary' : 'primary'}
+              onClick={() => runner.request(intent())}
+              disabled={!pre.ok || needsApproval || !writes.ready}
               aria-describedby="earn-blocked"
               icon={<ArrowRight className="size-4" />}
             >
-              Approve {formatMusd(wei)}
+              {mode === 'deposit' ? 'Deposit into Earn' : 'Withdraw from Earn'}
             </ActionButton>
-          ) : null}
-          <ActionButton
-            variant={needsApproval ? 'secondary' : 'primary'}
-            onClick={() => runner.request(intent())}
-            disabled={!pre.ok || needsApproval || !writes.ready}
-            aria-describedby="earn-blocked"
-            icon={<ArrowRight className="size-4" />}
-          >
-            {mode === 'deposit' ? 'Deposit into Earn' : 'Withdraw from Earn'}
-          </ActionButton>
+            <span className="text-text-subtle text-xs">
+              You pay the Bitcoin gas. No relayer is running yet.
+            </span>
+          </div>
         </div>
-      </AppCard>
+      </Panel>
 
       {/* The risk statement stays. It is the one thing a depositor cannot infer from the
           screen: this is not a savings account, and the principal is at risk. */}
