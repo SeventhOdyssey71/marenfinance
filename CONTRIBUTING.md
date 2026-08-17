@@ -57,10 +57,13 @@ it. Drive it through the `contracts:*` root scripts.
 CI=true pnpm --filter @maren/web dev        # :3000
 CI=true pnpm --filter @maren/web build
 CI=true pnpm --filter @maren/web typecheck
+CI=true pnpm --filter @maren/web test       # 36 cases, all offline
 ```
 
-Path alias `@/*` → `./src/*`. Components are **kebab-case**. Unit coverage is thin —
-`src/lib/chain/errors.test.ts` is the only suite, and it covers the revert decoder. The
+Path alias `@/*` → `./src/*`. Components are **kebab-case**. The vitest suite is
+deliberately narrow: `chain/errors.test.ts` covers the revert decoder,
+`chain/preflight.test.ts` covers the rules that decide whether a write is even offered,
+and `lib/em-dash.test.ts` guards the copy. Nothing rendered is asserted there. The
 behavioural surface is covered instead by `scripts/verify-behaviour.mjs`, which drives a
 real build against matsnet; it is not wired into `pnpm test` and will not run unless you
 run it. Weigh that when reviewing a change here.
@@ -118,39 +121,70 @@ regression tests in `src/borrow.test.ts`.
 ### `packages/contracts` — Foundry
 
 ```bash
-CI=true pnpm contracts:test          # forge test — 236 tests
+CI=true pnpm contracts:test          # forge test — 236 passing, 8 skipped
 CI=true pnpm contracts:build         # forge build --sizes
 CI=true pnpm contracts:fmt           # forge fmt --check
 ```
 
 Submodules must be present: `git submodule update --init --recursive`.
 
+The eight skipped tests are the fork suite. They run against the real MUSD deployment and
+are the only place the protocol assumptions are checked against deployed bytecode rather
+than a mock:
+
+```bash
+MEZO_TESTNET_RPC_URL=https://rpc.test.mezo.org forge test --match-path 'test/fork/*' -vv
+```
+
 ### `tools/pdf` — the document builder
 
 ```bash
-CI=true pnpm docs:pdf                # docs/src/*.md -> docs/build/*.pdf (seven)
+CI=true pnpm docs:pdf                # docs/src/*.md -> docs/build/*.pdf (nine)
 CI=true pnpm docs:preview
 ```
 
-Needs a real Chrome. Set `MAREN_PDF_CHROME` if it is not on a standard path. The seven
+Needs a real Chrome. Set `MAREN_PDF_CHROME` if it is not on a standard path. The nine
 PDFs are **committed intentionally** so reviewers can read them without a toolchain.
+
+The PDF build is deliberately _not_ wired into `turbo run build`. Its package scripts are
+named `docs:pdf` and `docs:preview` rather than `build`, so a root `pnpm build` never
+needs a browser and never rebuilds nine documents to check that TypeScript compiles.
 
 ---
 
 ## The full check, before you push
 
-Run these in order. This is exactly what CI runs, plus the contract suite.
+Run these in order. This is exactly what CI runs. The authoritative copy of the sequence
+is the header comment in `.github/workflows/ci.yml`, which is kept in step with it.
 
 ```bash
 CI=true pnpm install --frozen-lockfile
+node tools/copy/em-dash-scan.mjs
 CI=true pnpm format:check
 CI=true pnpm typecheck
 CI=true pnpm lint
 CI=true pnpm build
-CI=true pnpm test
-CI=true pnpm contracts:test    # expect 236 passing
-CI=true pnpm docs:pdf          # expect seven PDFs
+CI=true pnpm test              # expect 345 passing
+CI=true pnpm contracts:test    # expect 236 passing, 8 skipped
+CI=true pnpm docs:pdf          # expect nine PDFs
 ```
+
+Inside `packages/contracts`, CI additionally runs the gas snapshot and coverage:
+
+```bash
+forge snapshot --check --tolerance 5 \
+  --no-match-contract "MarenVaultInvariantTest|MarenVaultForkTest"
+forge coverage --report summary --ir-minimum
+```
+
+The exclusions are not cosmetic. The fork suite is skipped without an RPC, and foundry
+records an invariant run descriptor rather than a gas figure, so `--check` reported a
+drift on every run for both. A warning that always fires is a warning nobody reads.
+
+Coverage compiles via-IR with the optimizer off, which is a different pipeline from
+`forge test`. It is a real gate, not `|| true`: it has already caught two tests that
+passed only under the legacy pipeline because they re-read `block.timestamp` after a
+`vm.warp` instead of snapshotting the expected revert payload before it.
 
 `pnpm format` rewrites; `pnpm format:check` only reports.
 
@@ -158,13 +192,17 @@ CI=true pnpm docs:pdf          # expect seven PDFs
 
 Be honest with yourself about the gaps rather than trusting a green run:
 
-- **`pnpm lint` cannot fail.** There is no ESLint config in the repo. Three workspaces
-  define `lint` as an `echo … && exit 0` stub and two define none at all, so
-  `turbo run lint` is a no-op everywhere. A green "Lint" step means nothing.
-- **`pnpm test` does not touch `apps/web`.** No test script, no tests.
-- **`pnpm build` runs the PDF build**, which needs Chrome. In CI this works only because
-  the runner image happens to ship one.
+- **`pnpm lint` is nearly a no-op.** Only `apps/ios` has a real config (`expo lint` over
+  `eslint-config-expo`). `packages/sdk` and `apps/relayer` define `lint` as an
+  `echo … && exit 0` stub, and `apps/web` defines none at all. A green "Lint" step says
+  almost nothing about the web app.
+- **`pnpm test` does not run the behavioural suite.** `apps/web`'s 36 vitest cases cover
+  revert decoding and the preflight rules offline. The 87 checks in
+  `scripts/verify-behaviour.mjs` and the 36 in `scripts/prove-preflight.mjs` need a
+  running build and a live chain, and CI does not run either.
 - Without `anvil`, the relayer's chain tests skip rather than fail.
+- The eight fork tests skip without `MEZO_TESTNET_RPC_URL`. Run them before changing
+  anything that touches the MUSD interfaces.
 
 ---
 
