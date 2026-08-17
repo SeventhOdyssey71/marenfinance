@@ -355,3 +355,27 @@ export function ActionButton({
 }) {
   return <PillAction variant={variant === 'quiet' ? 'ghost' : variant} {...rest} />;
 }
+
+/**
+ * A quiet in-flight state: spinner and one sentence of what is being read.
+ *
+ * Under `prefers-reduced-motion` the ring is hidden outright and a static dot
+ * takes its place — pausing a spin animation would freeze the ring mid-rotation,
+ * which reads as broken rather than as motion declined (same treatment as the
+ * transaction sheet's spinner).
+ */
+export function Loading({ children }: { children: ReactNode }) {
+  return (
+    <div className="text-text-muted flex items-center gap-3 py-6 text-sm" role="status">
+      <span
+        aria-hidden
+        className="size-3.5 shrink-0 animate-spin rounded-[var(--radius-pill)] border-2 border-current border-t-transparent motion-reduce:hidden"
+      />
+      <span
+        aria-hidden
+        className="hidden size-1.5 shrink-0 rounded-[var(--radius-pill)] bg-current motion-reduce:block"
+      />
+      <span>{children}</span>
+    </div>
+  );
+}
