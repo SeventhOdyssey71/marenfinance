@@ -178,7 +178,7 @@ export function PillAction({
       type={type}
       onClick={onClick}
       disabled={disabled}
-      className={`group inline-flex items-center justify-between rounded-[var(--radius-pill)] transition-colors duration-[120ms] ease-out disabled:cursor-not-allowed ${sizing[size]} ${variants[variant]} ${disabledVariants[variant]} ${className}`}
+      className={`group inline-flex items-center justify-between rounded-[var(--radius-pill)] transition-[color,background-color,border-color,transform] duration-[120ms] ease-out active:scale-[0.97] disabled:cursor-not-allowed ${sizing[size]} ${variants[variant]} ${disabledVariants[variant]} ${className}`}
       {...rest}
     >
       <span className="whitespace-nowrap">{children}</span>

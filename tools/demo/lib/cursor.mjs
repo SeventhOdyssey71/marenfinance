@@ -63,11 +63,10 @@ function overlay() {
       }
     };
 
-    window.addEventListener(
-      'mousemove',
-      (e) => place(e.clientX, e.clientY),
-      { capture: true, passive: true },
-    );
+    window.addEventListener('mousemove', (e) => place(e.clientX, e.clientY), {
+      capture: true,
+      passive: true,
+    });
 
     window.addEventListener(
       'mousedown',
