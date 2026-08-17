@@ -19,8 +19,10 @@
  * line with code (`const x = 1; // note —`) is reported. That is a false positive, and
  * the fix is to move the note to its own line, which this codebase does anyway.
  */
-import { readdirSync, readFileSync, statSync } from 'node:fs';
-import { join } from 'node:path';
+import { existsSync, readdirSync, readFileSync, statSync } from 'node:fs';
+import { dirname, join, relative, resolve } from 'node:path';
+import { argv, exit } from 'node:process';
+import { fileURLToPath } from 'node:url';
 
 const EM_DASH = '—';
 const EXTENSIONS = ['.ts', '.tsx', '.js', '.jsx', '.css'];
@@ -93,3 +95,47 @@ export function findEmDashes(roots) {
 }
 
 export { EM_DASH };
+
+/**
+ * Every tree that holds user-visible copy, together.
+ *
+ * The two vitest suites each scan only their own app, because a failure there should
+ * name the app it belongs to. This list is the union, and it is what the command line
+ * scans. A new app has to be added here or the command-line gate silently stops covering
+ * it, which is the failure the existence check below exists to make impossible.
+ */
+const REPO_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..', '..');
+export const COPY_ROOTS = [
+  join(REPO_ROOT, 'apps', 'web', 'src'),
+  join(REPO_ROOT, 'apps', 'ios', 'app'),
+  join(REPO_ROOT, 'apps', 'ios', 'src'),
+];
+
+/**
+ * Running this file directly scans every copy root and exits non-zero on a hit, so the
+ * rule is enforceable from a shell and from CI without a package install. Importing it
+ * does nothing, which is what the vitest suites rely on.
+ */
+if (argv[1] && resolve(argv[1]) === fileURLToPath(import.meta.url)) {
+  // A root that has moved or been renamed would otherwise scan zero files and report a
+  // clean run. An empty scan is the one result this gate must never confuse with a pass.
+  const missing = COPY_ROOTS.filter((root) => !existsSync(root));
+  if (missing.length > 0) {
+    console.error('These copy roots do not exist, so nothing was scanned in them:');
+    for (const root of missing) console.error(`  ${relative(REPO_ROOT, root)}`);
+    console.error('\nFix the list in tools/copy/em-dash-scan.mjs.');
+    exit(1);
+  }
+
+  const hits = findEmDashes(COPY_ROOTS);
+  if (hits.length > 0) {
+    for (const hit of hits) {
+      console.error(`${relative(REPO_ROOT, hit.file)}:${hit.line}\n    ${hit.text}`);
+    }
+    console.error(
+      `\n${hits.length} em dash(es) in user-visible copy. Rewrite the sentence; do not just delete the glyph.`,
+    );
+    exit(1);
+  }
+  console.log(`No em dashes in user-visible copy (${COPY_ROOTS.length} trees scanned).`);
+}
