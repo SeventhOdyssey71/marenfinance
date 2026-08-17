@@ -1,10 +1,10 @@
 # Maren Finance, demo-day narration
 
-Timed to `maren-walkthrough.webm` as recorded on 16 August 2026: **118.6 seconds**, nine
+Timed to `maren-walkthrough.webm` as recorded on 17 August 2026: **114.6 seconds**, nine
 scenes. Timestamps are where each scene begins in that take.
 
-The spoken lines run to about **270 words**. At a normal speaking pace, near 145 words per
-minute, that is a little under two minutes and leaves real silence inside the long holds.
+The spoken lines run to about **285 words**. At a normal speaking pace, near 150 words per
+minute, that is close to the length of the video and leaves real silence inside the holds.
 The silence is the point. Do not fill it. The drawn-to-scale bar and the shared trove ratio
 both need a beat where nobody is talking.
 
@@ -37,17 +37,17 @@ speeding up the delivery. `record.mjs` prints the real start time of every scene
 >
 > Maren pools deposits into one shared trove, so that minimum is paid once.
 
-### 0:32 Launch and connect
+### 0:31 Launch and connect
 
 > One trove, with a per-user ledger inside it. This is a real wallet connecting to matsnet.
 > Every figure from here is a live contract read.
 
-### 0:48 Portfolio
+### 0:46 Portfolio
 
 > Position health, collateral ratio, borrowing capacity, all read live. This account has no
 > debt, so there is no liquidation price. Maren leaves it blank rather than inventing one.
 
-### 1:02 Vault
+### 1:00 Vault
 
 **This beat has two versions, and which one you get is decided by the chain, not by you.**
 Maren's pooled trove is shared, so anyone topping it up or drawing on it moves the ratio.
@@ -80,17 +80,17 @@ _Version A is the stronger demo and it is worth checking the log on the morning,
 ratio has drifted back under. It is not worth engineering. Topping the pool down to force a
 refusal would be staging the exact thing this walkthrough refuses to stage._
 
-### 1:22 Pay
+### 1:15 Pay
 
 > Payments resolve a handle to an address on chain, before anything is signed. This wallet
 > holds no dollars, so Maren refuses to arm the button. Same reasoning, second screen.
 
-### 1:35 Earn
+### 1:30 Earn
 
 > Idle dollars go to the Stability Pool. Returns come from liquidations, which are irregular,
 > so there is no forward rate here. Only what has actually been paid, which is nothing yet.
 
-### 1:45 Activity, and the explorer
+### 1:40 Activity, and the explorer
 
 > Every action, read back from contract logs since the block Maren was deployed. And it links
 > out. Nothing here is a number you have to take on trust.
