@@ -6,10 +6,10 @@ import { formatBtc, formatMusd, getChain, shortAddress, shortHash } from '@maren
 import { ConnectPrompt } from '@/components/app/connect-prompt';
 import { Segmented } from '@/components/app/controls';
 import { Btc, Num } from '@/components/app/money';
-import { EmptyState, Info, Label, Note, Panel } from '@/components/app/primitives';
+import { EmptyState, Info, Label, Loading, Note, Panel } from '@/components/app/primitives';
 import { ArrowUpRight } from '@/components/ui/icons';
 import { activityDirection, activityTitle, statusLabel, timeAgo } from '@/lib/copy';
-import { NETWORK, useActivity } from '@/lib/data/source';
+import { NETWORK, useActivity, useDataSource } from '@/lib/data/source';
 import type { ActivityItem, ActivityKind } from '@/lib/data/types';
 
 type Filter = 'all' | 'payments' | 'vault' | 'earn';
@@ -51,6 +51,7 @@ const explorer = getChain(NETWORK).blockExplorers.default;
  * few days". Those are different claims and only one of them is a fact about the user.
  */
 export default function ActivityPage() {
+  const source = useDataSource();
   const { data: window, isPending, error } = useActivity();
   const [filter, setFilter] = useState<Filter>('all');
 
@@ -65,6 +66,7 @@ export default function ActivityPage() {
       </div>
 
       <Body
+        connected={source.connected}
         filter={filter}
         setFilter={setFilter}
         rows={rows}
@@ -78,6 +80,7 @@ export default function ActivityPage() {
 }
 
 function Body({
+  connected,
   filter,
   setFilter,
   rows,
@@ -86,6 +89,7 @@ function Body({
   isPending,
   error,
 }: {
+  connected: boolean;
   filter: Filter;
   setFilter: (f: Filter) => void;
   rows: ActivityItem[];
@@ -94,10 +98,19 @@ function Body({
   isPending: boolean;
   error: unknown;
 }) {
-  // Not connected: `useActivity` is disabled, so it sits pending forever. Say why rather
-  // than spinning.
-  if (!window && !error && isPending) {
+  /**
+   * Two different absences, two different screens. Disconnected means the query never
+   * runs, so pending-forever is the resting state and "connect" is the answer. Connected
+   * with no data yet means the log scan is IN FLIGHT — telling that user to connect,
+   * while their address sits in the header, was this page's bug: it conflated the two
+   * because both look like `!window && isPending` from inside the query.
+   */
+  if (!connected) {
     return <ActivityUnread />;
+  }
+
+  if (!window && !error && isPending) {
+    return <Loading>Reading your history from Maren&rsquo;s contract logs&hellip;</Loading>;
   }
 
   /**
