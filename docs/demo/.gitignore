@@ -1,0 +1,20 @@
+# The walkthrough is a build output, not a document.
+#
+# This is the opposite call to docs/build/, where the PDFs ARE committed so reviewers can
+# open them without a toolchain. The difference is diffability and lifespan. A take is about
+# 18MB of WebM plus MP4 plus stills, none of it diffable, and git would keep a complete new
+# copy on every re-record rather than a delta. It is also stale the moment anyone touches the
+# UI, which on this repo is most weeks.
+#
+# What is committed instead is the recorder (tools/demo/) and the narration (SCRIPT.md), so
+# anyone can regenerate the video in about two minutes:
+#
+#   CI=true pnpm --filter @maren/web build
+#   node tools/demo/record.mjs
+#
+# If a specific take ever needs to be preserved — the one actually shown at a demo day, say —
+# put it somewhere built for binaries and link it from SCRIPT.md. Do not commit it here.
+
+*.webm
+*.mp4
+frames/

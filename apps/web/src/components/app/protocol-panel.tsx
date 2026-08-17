@@ -129,8 +129,8 @@ export function ProtocolPanel() {
           Mezo fixes a per-trove ceiling at the price the trove opened at, and reports it from{' '}
           <span className="num">TroveManager.getTroveMaxBorrowingCapacity()</span> rather than
           deriving it from the collateral ratio. Adding collateral does not raise it: only a
-          refinance does, which re-fixes the ceiling at today’s price for a fee and is blocked
-          while the system is in Recovery Mode.
+          refinance does, which re-fixes the ceiling at today’s price for a fee and is blocked while
+          the system is in Recovery Mode.
         </Info>
 
         {belowFloor ? (

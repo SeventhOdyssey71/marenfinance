@@ -132,6 +132,7 @@ Headlines are tight and large. Body text never exceeds `68ch`.
   Controls (buttons, active tabs, active nav pills) may carry a fill because a control
   needs a hit surface. A decorative disc inside a card may not — it is the same floating
   lighter box at a smaller scale.
+
 - **Spacing scale:** 4 · 8 · 12 · 16 · 24 · 32 · 48 · 64 · 96 · 128. Nothing off-scale.
 - **Section rhythm:** `96px` vertical padding mobile, `128px` desktop.
 - **Grid:** 12-column, `1200px` max content width, `24px` gutters.
@@ -217,6 +218,37 @@ daylight, and because a grant committee should not have to fight a black PDF.
 - Same type pairing (Satoshi / Geist Mono).
 - Every page carries a footer: `Maren Finance · <Doc title> · <page>/<total>`.
 - Tables: no vertical rules, `1px` horizontal hairlines only, numeric columns right-aligned in mono.
+
+### 7.1 The deck is the exception: it stays dark
+
+`docs/src/deck.md` builds to `docs/build/deck.pdf` and **does not invert**. It keeps the
+product palette: `bg` ground, violet accent, `text` on near-black.
+
+The rule in §7 is not "documents are light". It is **match the surface the thing is read
+on**. The seven papers are light because they get printed and read in daylight, and a
+committee should not have to fight a black PDF. The deck is never printed. It is
+projected, in a room with the lights down, where a light ground is a wall of glare behind
+the speaker and every slide bleaches out the presenter. Same rule, opposite answer.
+
+Everything else about the deck follows the brand unchanged: Satoshi display, **Geist Mono
+with tabular figures for every numeral**, violet as the only saturated colour, the same
+grain pass and accent rule as the document cover.
+
+|                                | Papers                      | Deck                       |
+| ------------------------------ | --------------------------- | -------------------------- |
+| Page                           | A4 portrait, `20mm` margins | 16:9 landscape, `1280x720` |
+| Ground                         | `#FFFFFF`                   | `#08080A`                  |
+| Text                           | `#111114`                   | `#FAFAFA`                  |
+| Read at                        | Arm's length, on paper      | Six feet away, projected   |
+| Smallest type carrying meaning | 9pt                         | 20px                       |
+
+Two constraints follow from projection rather than from the palette:
+
+- **Nothing carrying meaning is set below 20px.** The type scale is decided by the back
+  of the room, not by the grid.
+- **`text-subtle` (`#6B6B75`) is not used for words.** It fails WCAG AA on dark, which is
+  survivable on a phone held at arm's length and is not survivable on a projector.
+  `text-muted` (`#A1A1AA`) is the floor for anything anyone has to read.
 
 ---
 

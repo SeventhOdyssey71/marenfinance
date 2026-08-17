@@ -119,7 +119,10 @@ export function PulseCanvas({
       smoke={0.25}
       smokeSize={0.5}
       speed={running ? 0.6 : 0}
-      fit="cover"
+      // No `fit`. PulsingBorder draws its border against the canvas edges via responsive
+      // UVs; `fit="cover"` instead scaled a virtual world box to cover the canvas, which
+      // on a wide card cropped the border into a detached rounded rectangle floating
+      // mid-card. The default (`none`) is the only mode where a border shader makes sense.
       maxPixelCount={600_000}
       minPixelRatio={1}
       style={{ width: '100%', height: '100%' }}

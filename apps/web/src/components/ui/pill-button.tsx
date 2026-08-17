@@ -43,6 +43,21 @@ const variants: Record<Variant, string> = {
   ghost: 'bg-transparent text-text-muted hover:text-text border border-transparent font-medium',
 };
 
+/**
+ * Disabled paint, per variant.
+ *
+ * Held here rather than at the call site because a disabled control is now load-bearing in
+ * this product: `lib/chain/preflight.ts` disables anything that cannot succeed, so the
+ * disabled state is a state users will genuinely see, beside a sentence explaining it. It
+ * has to read as "not available", not as "broken", and it has to stay legible — white at
+ * 25% on `surface` is below AA, which is why primary keeps a 40% fill.
+ */
+const disabledVariants: Record<Variant, string> = {
+  primary: 'disabled:bg-white/40 disabled:text-[#08080A]/70',
+  secondary: 'disabled:text-text-subtle disabled:border-[var(--border-hairline)]',
+  ghost: 'disabled:text-text-subtle',
+};
+
 const badgeVariants: Record<Variant, string> = {
   primary: 'bg-violet-500 text-white',
   secondary: 'bg-white/[0.06] text-text-muted border border-[var(--border-hairline)]',
@@ -119,6 +134,66 @@ export function PillButton({
     <Link href={href} className={classes} {...rest}>
       {inner}
     </Link>
+  );
+}
+
+/**
+ * The same pill, as a `<button>`.
+ *
+ * One definition of the Maren pill, shared by the marketing site's links and the dApp's
+ * actions. It exists because the transaction sheet's confirm and close controls were a
+ * plain grey blob — a `<button>` that had drifted away from the pill every other surface
+ * uses, because the pill was only available as a `<Link>`. Anything that performs an
+ * action rather than navigating renders this; `ActionButton` in `components/app/primitives`
+ * is a thin alias kept for the call sites that already import it.
+ *
+ * The icon badge is opt-in here, unlike `PillButton`, where a navigating link always earns
+ * its arrow. A confirm button with no badge is still the pill; a Cancel with a violet
+ * badge would be shouting.
+ */
+export function PillAction({
+  children,
+  onClick,
+  disabled = false,
+  variant = 'primary',
+  size = 'md',
+  type = 'button',
+  icon,
+  className = '',
+  ...rest
+}: {
+  children: ReactNode;
+  onClick?: () => void;
+  disabled?: boolean;
+  variant?: Variant;
+  size?: Size;
+  type?: 'button' | 'submit';
+  icon?: ReactNode;
+  className?: string;
+  'aria-label'?: string;
+  'aria-describedby'?: string;
+}) {
+  return (
+    <button
+      type={type}
+      onClick={onClick}
+      disabled={disabled}
+      className={`group inline-flex items-center justify-between rounded-[var(--radius-pill)] transition-[color,background-color,border-color,transform] duration-[120ms] ease-out active:scale-[0.97] disabled:cursor-not-allowed ${sizing[size]} ${variants[variant]} ${disabledVariants[variant]} ${className}`}
+      {...rest}
+    >
+      <span className="whitespace-nowrap">{children}</span>
+      {/* The badge greys out with the button. A violet badge is the loudest thing on a
+          Maren screen; leaving it at full strength on a disabled control points at the one
+          thing the user cannot do. */}
+      {icon ? (
+        <span
+          aria-hidden
+          className={`group-disabled:text-text-subtle grid shrink-0 place-items-center rounded-[var(--radius-pill)] transition-transform duration-[120ms] ease-out group-enabled:group-hover:translate-x-0.5 group-disabled:bg-white/[0.06] ${badgeSizing[size]} ${badgeVariants[variant]}`}
+        >
+          {icon}
+        </span>
+      ) : null}
+    </button>
   );
 }
 

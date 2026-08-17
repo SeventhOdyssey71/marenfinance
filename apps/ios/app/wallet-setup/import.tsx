@@ -86,8 +86,8 @@ export default function ImportWallet() {
         <View style={styles.invalid} accessibilityRole="alert">
           <Icon name="alert" size={16} color={semantic.danger} />
           <Txt variant="small" style={{ color: semantic.danger, flex: 1 }}>
-            Not a valid key. Expected exactly 64 hexadecimal characters, with or without a 0x prefix
-            — got {normaliseLength(raw)}.
+            Not a valid key. Expected exactly 64 hexadecimal characters, with or without a 0x
+            prefix. Got {normaliseLength(raw)}.
           </Txt>
         </View>
       ) : null}

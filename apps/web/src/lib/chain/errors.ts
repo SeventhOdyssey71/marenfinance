@@ -1,4 +1,4 @@
-import { formatBtc, formatMusd } from '@maren/sdk';
+import { formatBtc, formatCollateralRatio, formatMusd } from '@maren/sdk';
 import { BaseError, ContractFunctionRevertedError, decodeErrorResult, type Hex } from 'viem';
 
 /**
@@ -284,12 +284,35 @@ export interface RevertReason {
   name: string | null;
 }
 
-const percent = (wad: bigint): string => `${(Number(wad) / 1e16).toFixed(1)}%`;
+/**
+ * A collateral ratio in these messages, rounded the safe way.
+ *
+ * This was `(Number(wad) / 1e16).toFixed(1)`, which ROUNDS TO NEAREST — so the pooled
+ * trove's live 1.510537…e18 was reported to users as "151.1%" while the Portfolio, which
+ * goes through the SDK, called the same number "151.0%". Two figures for one ratio is bad;
+ * the direction is worse. BRAND.md §8: never round a number up in a way that flatters a
+ * position's safety. `formatCollateralRatio` truncates, always, for exactly this reason,
+ * and it is now the only thing in the app that turns a ratio into a string.
+ */
+const percent = (wad: bigint): string => formatCollateralRatio(wad);
 
 /**
  * Copy for each error. Written per-error rather than templated, because "what to do
  * instead" is different every time and a generic "the transaction failed" helps nobody.
+ *
+ * EXPORTED, and that is the point of this pass.
+ *
+ * This table used to be reachable only by failing. `lib/chain/preflight.ts` now calls it
+ * directly with the arguments the contract WOULD have reverted with, so the sentence a
+ * user reads on a disabled Borrow button is the identical sentence they would have read
+ * after paying for the revert — same words, same live numbers, one source. Writing a
+ * second, softer version of "the pool itself is fully drawn right now" for the disabled
+ * state is exactly how the two would drift apart, with the cheap one going stale.
  */
+export function describeRevert(name: string, args: readonly unknown[] = []): RevertReason {
+  return describe(name, args);
+}
+
 function describe(name: string, args: readonly unknown[]): RevertReason {
   const n = (i: number) => (typeof args[i] === 'bigint' ? (args[i] as bigint) : 0n);
   const s = (i: number) => String(args[i] ?? '');
@@ -302,7 +325,7 @@ function describe(name: string, args: readonly unknown[]): RevertReason {
         title: 'The shared trove is too thin to lend against',
         detail:
           `Borrowing would leave Maren's pooled trove at ${percent(n(0))}, under the ` +
-          `${percent(n(1))} floor it has to keep. This is not about your position — the pool ` +
+          `${percent(n(1))} floor it has to keep. This is not about your position. The pool ` +
           `itself is fully drawn right now, so no new MUSD can come out of it until someone ` +
           `deposits more Bitcoin or repays. Your collateral is untouched and you can withdraw it.`,
       };
@@ -338,7 +361,7 @@ function describe(name: string, args: readonly unknown[]): RevertReason {
         name,
         title: 'Borrowing is paused',
         detail:
-          'A guardian has halted new borrowing. Repay and withdraw stay open — Maren closes ' +
+          'A guardian has halted new borrowing. Repay and withdraw stay open. Maren closes ' +
           'entries before exits, never the other way round.',
       };
     case 'DepositBelowMinimum':
@@ -498,8 +521,8 @@ function describe(name: string, args: readonly unknown[]): RevertReason {
         name,
         title: 'Debt is still outstanding',
         detail:
-          'This cannot be closed while MUSD is still owed against it. Repay in full first — ' +
-          'repayment is never paused.',
+          'This cannot be closed while MUSD is still owed against it. Repay in full first. ' +
+          'Repayment is never paused.',
       };
     case 'CollateralTransferFailed':
       return {
@@ -563,7 +586,7 @@ function describe(name: string, args: readonly unknown[]): RevertReason {
         name,
         title: 'Too early to reclaim',
         detail:
-          'A link can only be reclaimed after it expires — until then the escrow belongs to ' +
+          'A link can only be reclaimed after it expires. Until then the escrow belongs to ' +
           'whoever holds the link.',
       };
     case 'NotLinkCreator':
@@ -664,7 +687,7 @@ function describe(name: string, args: readonly unknown[]): RevertReason {
         name,
         title: 'The contract refused this',
         detail:
-          `${name}${args.length > 0 ? `(${args.map(String).join(', ')})` : ''} — this refusal has ` +
+          `${name}${args.length > 0 ? `(${args.map(String).join(', ')})` : ''}. This refusal has ` +
           `no plain-language mapping yet. It is a real on-chain revert, not a network problem.`,
       };
   }

@@ -149,10 +149,17 @@ const TICKS = 1000n;
 /**
  * The borrow slider.
  *
- * `max` is the exact amount that lands the position on Maren's 180% floor, so the
- * control physically cannot be dragged into a state we would refuse. That is a
- * deliberate choice over validating on submit: a slider that goes somewhere and then
- * throws an error has already told the user they can do something they cannot.
+ * `max` IS THE HARD STOP, AND IT IS NOT A PRESENTATION DETAIL. The caller passes the
+ * largest amount that can actually succeed — `Preflight.maxWei`, which accounts for Maren's
+ * 180% floor, Mezo's per-trove ceiling, and the shared trove's own ratio — so the control
+ * physically cannot be dragged into a state the chain would refuse. That is a deliberate
+ * choice over validating on submit: a slider that goes somewhere and then throws an error
+ * has already told the user they can do something they cannot.
+ *
+ * When NOTHING can succeed the caller passes `max = 0` and `disabled`, and supplies a
+ * `describedBy` pointing at the sentence that says why. A dead control with no explanation
+ * is the failure this whole pass exists to remove, so the explanation is wired into the
+ * accessibility tree rather than merely printed nearby.
  *
  * Values are bigint throughout. The DOM only ever sees an integer tick index, which is
  * mapped back through `max` — no float ever touches a borrow amount.
@@ -165,6 +172,7 @@ export function AmountSlider({
   describeValue,
   marker,
   disabled = false,
+  describedBy,
   endLabels,
 }: {
   value: bigint;
@@ -175,6 +183,8 @@ export function AmountSlider({
   describeValue: (value: bigint) => string;
   marker?: { at: bigint; label: string; onSelect?: () => void };
   disabled?: boolean;
+  /** Id of the element explaining why this is disabled. */
+  describedBy?: string;
   endLabels?: { start: string; end: string };
 }) {
   const ticks = max > 0n ? Number((value * TICKS) / max) : 0;
@@ -201,6 +211,7 @@ export function AmountSlider({
           onChange={(event) => onChange((BigInt(event.target.value) * max) / TICKS)}
           aria-label={label}
           aria-valuetext={describeValue(value)}
+          aria-describedby={describedBy}
           className="range-maren w-full"
           style={{ '--range-fill': `${fillPercent}%` } as CSSProperties}
         />

@@ -125,7 +125,9 @@ export const PERMIT2_ADDRESS: Address = '0x000000000022D473030F116dDEE9F6B43aC78
 
 /**
  * ERC-4337 EntryPoint v0.7 IS deployed here (verified: 32,073 bytes, byte-identical
- * to Ethereum L1) — but it is INERT. It has never processed a single UserOperation,
+ * to Ethereum L1) — but it is INERT. Per the Mezo block explorer's index it has never
+ * processed a single UserOperation (zero transactions, no logs; verified against a control
+ * read of MUSD, which returns 104,681, so the empty result is not an indexer artefact),
  * and Mezo's RPCs do not implement `debug_traceCall`, so no ERC-7562-compliant bundler
  * can run against it.
  *
