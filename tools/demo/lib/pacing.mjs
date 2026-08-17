@@ -31,7 +31,7 @@
  *
  * Set DEMO_PACE=1.0 for a slower read, 0.5 for a tighter one.
  */
-const PACE = Number(process.env.DEMO_PACE ?? 0.6);
+const PACE = Number(process.env.DEMO_PACE ?? 0.55);
 
 const beat = (ms) => Math.round(ms * PACE);
 
