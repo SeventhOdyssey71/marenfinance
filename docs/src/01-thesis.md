@@ -21,11 +21,14 @@ The constraint on Mezo is not the primitive. It is distribution. Three numbers f
 
 | Measure                     | Value                    | Read from                                    |
 | --------------------------- | ------------------------ | -------------------------------------------- |
-| MUSD holders                | 29,360                   | MUSD token contract, mainnet                 |
-| Troves open on Mezo mainnet | 26                       | `TroveManager.getTroveOwnersCount()`         |
+| MUSD holders                | ~29,360                  | MUSD token contract, mainnet                 |
+| Troves open on Mezo mainnet | 27                       | `TroveManager.getTroveOwnersCount()`         |
 | Collateral to open one      | 0.079346 BTC ($5,004.50) | `minNetDebt()` at 250% CR, live oracle price |
 
-Tens of thousands of people hold MUSD. Twenty-six can mint it. That gap is not a
+Read from mainnet on 16 August 2026 at block 11,166,763. The first two move daily; re-run
+`evidence/VERIFY.sh` before quoting them. The gap between them does not move.
+
+Tens of thousands of people hold MUSD. Fewer than thirty can mint it. That gap is not a
 marketing problem — it is three mechanical frictions, and every one is fixable in
 application code without Mezo changing anything.
 
@@ -105,8 +108,8 @@ who clones the repository can check it.
 > for the protocol and wrong for the consumer. That is exactly the kind of gap an
 > application layer exists to close.
 
-The consequence is visible on-chain. Mezo mainnet carries **26 troves**. Not 26 thousand.
-Twenty-six. Meanwhile MUSD has **29,360 holders** and roughly 31.08 million supply. The
+The consequence is visible on-chain. Mezo mainnet carries **27 troves**. Not 27 thousand.
+Twenty-seven. Meanwhile MUSD has **roughly 29,360 holders** and roughly 31.06 million supply. The
 people are already here. They arrived through bridges, the Mezo Market, and points
 programmes. What they cannot do is mint, because minting has a $5,000 door.
 
@@ -209,9 +212,9 @@ someone who has never heard of Mezo onto the chain.
 This is not a general-purpose wallet that happens to support Mezo. Every part of the
 argument is chain-specific.
 
-**Every Maren user is a new MUSD borrower.** Maren does not compete for the existing 26
+**Every Maren user is a new MUSD borrower.** Maren does not compete for the existing
 troves. It addresses the population underneath the 1,800 MUSD floor, which is currently
-zero and which is where the 29,360 MUSD holders mostly live. The pooled vault mints new
+zero and which is where the ~29,000 MUSD holders mostly live. The pooled vault mints new
 MUSD against new BTC collateral; the direct-trove path sends larger users to Mezo's own
 contracts unchanged.
 
@@ -420,8 +423,9 @@ We are asking you to fund the layer that takes a $5,004.50 minimum down to $63.0
 requirement to hold Bitcoin in order to spend against Bitcoin, and gives MUSD somewhere
 to go — on a chain where the gas to do all of that costs less than a cent a transaction.
 
-Mezo's borrower count is 26 because of a floor, not because of a lack of interest. There
-are 29,360 people already holding the stablecoin. Maren is the shortest path from that
+Mezo's borrower count is in the twenties because of a floor, not because of a lack of
+interest. There
+are more than 29,000 people already holding the stablecoin. Maren is the shortest path from that
 number to the other one.
 
 The technical case, including the contract-level integration surface, the seven ways MUSD

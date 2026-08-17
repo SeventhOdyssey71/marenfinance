@@ -100,7 +100,7 @@ export function TxSheet({ runner }: { runner: TxRunner }) {
               caption={
                 state.phase === 'signing'
                   ? 'Waiting for Face ID, then broadcasting.'
-                  : 'Broadcast. Waiting for an on-chain receipt — a hash alone is not a confirmation.'
+                  : 'Broadcast. Waiting for an on-chain receipt. A hash alone is not a confirmation.'
               }
             />
           ) : null}
@@ -195,7 +195,7 @@ function Settled({
             <Label>Gas you paid</Label>
             {outcome.receipt.gasPaidByUser === 0n ? (
               <Txt variant="small" style={{ color: semantic.success }}>
-                None — relayer sponsored
+                None, relayer sponsored
               </Txt>
             ) : (
               <Sats wei={outcome.receipt.gasPaidByUser} />

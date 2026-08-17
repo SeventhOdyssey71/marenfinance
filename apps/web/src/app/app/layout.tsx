@@ -9,7 +9,7 @@ import { AppProviders } from './providers';
 export const metadata: Metadata = {
   title: {
     default: 'App',
-    template: '%s — Maren App',
+    template: '%s · Maren App',
   },
   description:
     'Bitcoin-backed credit, gasless payments and trailing yield on Mezo. Position health, borrowing capacity and history in one place.',
@@ -43,7 +43,7 @@ export default function AppLayout({ children }: { children: ReactNode }) {
               collateral segregated in accounting rather than custody, are the two facts
               a user most needs and least expects. Tightened to one sentence, not cut. */}
           <p className="max-w-[68ch] leading-relaxed">
-            Pre-audit — MarenVault and MarenPay hold user funds and have not been audited. Pooled
+            Pre-audit: MarenVault and MarenPay hold user funds and have not been audited. Pooled
             collateral is segregated in accounting, not custody.
           </p>
           <div className="flex flex-wrap items-center gap-5">

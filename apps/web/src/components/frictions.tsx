@@ -45,7 +45,7 @@ const items: readonly Item[] = [
     index: '03',
     friction: 'There is nowhere to spend it',
     answer: 'Payments that feel like messaging',
-    body: 'MUSD exists. A consumer-grade surface for it does not. Maren adds handles, links, requests and splits — the shapes people already use to move money.',
+    body: 'MUSD exists. A consumer-grade surface for it does not. Maren adds handles, links, requests and splits: the shapes people already use to move money.',
     points: [
       'Send to an @handle. The address it resolves to is shown before you sign',
       'Send a link. The person claiming it needs no prior relationship and no BTC',

@@ -180,6 +180,17 @@ export interface ProtocolStats {
   reserveMusdWei: bigint;
   /** The trove's Mezo-fixed borrowing ceiling. */
   troveMaxBorrowingCapacityWei: bigint;
+  /**
+   * `MarenVault.troveOpen`. False before the pooled trove is seeded, when `borrow` reverts
+   * with TroveNotOpen() and `troveStatus()` reports an ICR of `type(uint256).max`. Carried
+   * as its own flag so a preflight can tell "there is no trove" from "the trove is
+   * enormously overcollateralised".
+   */
+  troveOpen: boolean;
+  /** `MarenVault.depositCap` — the collateral ceiling `deposit` refuses to cross. */
+  depositCapWei: bigint;
+  /** BTC credited to users but not yet pushed into the trove. */
+  idleCollateralWei: bigint;
   /** True when the vault has paused new deposits. */
   depositsPaused: boolean;
   /** True when the vault has paused new borrowing. */

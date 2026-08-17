@@ -28,7 +28,7 @@ export function ChainStatus() {
 
   return (
     <p className="text-text-subtle text-xs leading-relaxed">
-      Maren is not deployed on Mezo {NETWORK} — those addresses are still zero, so there is nothing
+      Maren is not deployed on Mezo {NETWORK}. Those addresses are still zero, so there is nothing
       to read. Point <span className="num">NEXT_PUBLIC_MEZO_NETWORK</span> at{' '}
       <span className="num">testnet</span>, where it is live.
     </p>

@@ -155,7 +155,7 @@ const CERTIFYING_CALLS = ['eth_call', 'eth_getLogs', 'eth_getBlockByNumber'] as 
 ```
 
 > [!VERIFIED]
-> `TroveManager.getTroveOwnersCount()` → `26`, executed against
+> `TroveManager.getTroveOwnersCount()` → `27`, executed against
 > `https://jsonrpc-mezo.boar.network` on 2026-08-15. This is simultaneously the
 > endpoint certification and the trove count the investment thesis rests on.
 
@@ -253,7 +253,8 @@ const [upperHint, lowerHint] = await sortedTroves.read.findInsertPosition([
 ]);
 ```
 
-With 26 troves on mainnet, `numTrials` is 75 and the search is effectively free. This is
+With 27 troves on mainnet, `numTrials` is 75 — `15 * isqrt(27)`, and integer truncation
+keeps it at 75 until the list reaches 36 — and the search is effectively free. This is
 a case where the current smallness of Mezo is an operational advantage: hint computation
 is a solved cost today, and `MarenVault` holds one trove regardless of how many users
 sit inside it, so Maren's hint cost does not grow with Maren's user count.
@@ -416,7 +417,7 @@ The remainder sits in protocol-owned strategies and the Wormhole NTT bridge.
 **Consequence:** the CDP portion is fully Bitcoin-backed and that claim is defensible.
 A blanket "every MUSD is backed by Bitcoin" statement is not, and Maren does not repeat
 it to users. This is also the clearest illustration of the thesis's central number: 31.08
-million MUSD and 29,360 holders sit above a CDP with 26 troves in it.
+million MUSD and some 29,360 holders sit above a CDP with 27 troves in it.
 
 ## Maren's contract architecture
 
@@ -601,12 +602,21 @@ is absent:
 
 | Check                                                                    | Result                    |
 | ------------------------------------------------------------------------ | ------------------------- |
-| UserOperations ever processed                                            | Zero                      |
+| UserOperations ever processed                                            | Zero (explorer index)     |
 | Contract verified on the explorer                                        | No                        |
 | Blockscout account-abstraction indexer                                   | `501 Service is disabled` |
 | `debug_traceCall` on Mezo RPCs                                           | Not implemented           |
 | Pimlico, Biconomy, ZeroDev, Alchemy, Candide, Coinbase Paymaster, Gelato | Not listed                |
 | OpenZeppelin Defender hosted relaying                                    | Retired 2026-07-01        |
+
+The zero in the first row is sourced from the Mezo block explorer's index, not from an
+exhaustive `eth_getLogs` sweep of all 11.17 million blocks. It is worth stating how it was
+checked, because "we found nothing" and "there is nothing" are different claims. The
+address reports `transactions_count: 0`, `has_logs: false`, and empty `logs`,
+`transactions` and `internal-transactions` collections. As a control against the result
+being an indexing artefact rather than a fact, the same endpoints return 104,681
+transactions and a populated log array for MUSD. The indexer works; the zero is real as
+far as the index goes.
 
 The root cause is one row of that table. Every ERC-7562-compliant bundler validates a
 UserOperation by tracing it to enforce the opcode and storage-access rules, and that
@@ -638,8 +648,13 @@ transaction, no gas. Maren interoperates with this rather than competing with it
 payment rail that the chain operates and that Maren's users can settle against is an
 asset, not a rival.
 
-**3. EIP-7702, as the upgrade path.** EIP-7702 is **live on Mezo mainnet from block
-9,275,000**, with both Prague and Osaka active. mezod ships a dedicated specification
+**3. EIP-7702, as the upgrade path.** **Mezo mainnet accepts EIP-7702 type-4
+transactions** — verified by signing one from a funded-to-zero key and submitting it: the
+node decoded the authorization list and rejected on insufficient balance, not on
+`transaction type not supported`. mezod's configuration puts the activation at block
+9,275,000, with Prague and Osaka active; that block exists, but no fork marker is visible
+in its header and no delegated account has been observed, so treat acceptance as the
+verified claim and live usage as unverified. mezod ships a dedicated specification
 whose stated intent is that sponsored-transaction flows work "without external
 relayers". That is the path to transaction batching and session keys, and combined with
 the active `P256VERIFY` precompile it is also the path to passkey-authorised accounts.

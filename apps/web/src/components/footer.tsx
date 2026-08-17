@@ -111,7 +111,7 @@ export function Footer() {
 
         <div className="hairline-t flex flex-col-reverse gap-4 py-8 sm:flex-row sm:items-center sm:justify-between">
           <p className="text-text-subtle text-xs">
-            © {new Date().getFullYear()} Maren Finance. Pre-audit software — deposit only what you
+            © {new Date().getFullYear()} Maren Finance. Pre-audit software. Deposit only what you
             can afford to lose.
           </p>
           <p className="text-text-subtle inline-flex items-center gap-2.5 text-xs">

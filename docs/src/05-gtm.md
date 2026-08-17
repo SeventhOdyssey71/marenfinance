@@ -10,7 +10,7 @@ classification: Shared with the Mezo ecosystem team
 
 Maren's go-to-market rests on a single observation about Mezo:
 
-> **MUSD has 29,360 holders. Mezo mainnet has 26 troves.**
+> **MUSD has roughly 29,360 holders. Mezo mainnet has 27 troves.**
 
 Tens of thousands of people already hold Mezo's stablecoin. Fewer than thirty can mint it.
 The distance between those two numbers is not a marketing problem — it is a **1,800 MUSD
@@ -77,7 +77,7 @@ _Success:_ 50 testnet users, every core flow exercised, a written list of what b
 
 Vault capped at 5 BTC. Direct troves uncapped.
 
-- Launch post: the 26-vs-29,360 gap, stated with the numbers.
+- Launch post: the troves-vs-holders gap, stated with numbers measured that morning.
 - Technical writeup of the seven ways MUSD diverges from Liquity and the three
   doc/bytecode discrepancies — offered as a contribution to other Mezo builders, not as
   criticism. **This is the piece most likely to travel**, because it is genuinely useful
@@ -189,7 +189,8 @@ and the predecessor product held the same line.
 
 Revenue instead comes from spread on real usage: a margin over the protocol's 1% borrow
 rate on pooled positions, a fee on payment volume above the free tier, and a performance
-fee on Earn. At **$0.0092 per 100,000 gas**, the gas Maren sponsors is a rounding error
+fee on Earn. At **$0.0092 per 100,000 gas** (1,462,500 wei at a $62,922 BTC price), the gas Maren
+sponsors is a rounding error
 against any of these — sponsorship is a customer-acquisition cost measured in cents.
 
 ---
