@@ -285,16 +285,17 @@ CI=true pnpm docs:pdf
 **All seven documents build**, 93 pages in total. The six that existed before this one came
 to 75.
 
-| Doc       | Document                             |  Pages |
-| --------- | ------------------------------------ | -----: |
-| MRN-001   | Investment & Grant Thesis            |     16 |
-| MRN-002   | Technical Feasibility & Architecture |     28 |
-| MRN-003   | Product Specification                |      7 |
-| MRN-004   | Security & Risk                      |      9 |
-| MRN-005   | Go-to-Market                         |      9 |
-| MRN-006   | Roadmap & Grant Milestones           |      9 |
-| MRN-007   | Work Summary — this document         |     19 |
-| **Total** |                                      | **97** |
+| Doc       | Document                             |   Pages |
+| --------- | ------------------------------------ | ------: |
+| MRN-000   | Grant Package Overview               |       4 |
+| MRN-001   | Investment & Grant Thesis            |      16 |
+| MRN-002   | Technical Feasibility & Architecture |      28 |
+| MRN-003   | Product Specification                |       7 |
+| MRN-004   | Security & Risk                      |       9 |
+| MRN-005   | Go-to-Market                         |       9 |
+| MRN-006   | Roadmap & Grant Milestones           |       9 |
+| MRN-007   | Work Summary — this document         |      19 |
+| **Total** |                                      | **101** |
 
 The build is deterministic: dates are taken from each document's own frontmatter rather than
 from the clock, so rebuilding unchanged sources produces byte-identical files instead of a
