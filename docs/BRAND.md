@@ -192,13 +192,13 @@ Everything else about the deck follows the brand unchanged: Satoshi display, **G
 with tabular figures for every numeral**, violet as the only saturated colour, the same
 grain pass and accent rule as the document cover.
 
-| | Papers | Deck |
-| --- | --- | --- |
-| Page | A4 portrait, `20mm` margins | 16:9 landscape, `1280x720` |
-| Ground | `#FFFFFF` | `#08080A` |
-| Text | `#111114` | `#FAFAFA` |
-| Read at | Arm's length, on paper | Six feet away, projected |
-| Smallest type carrying meaning | 9pt | 20px |
+|                                | Papers                      | Deck                       |
+| ------------------------------ | --------------------------- | -------------------------- |
+| Page                           | A4 portrait, `20mm` margins | 16:9 landscape, `1280x720` |
+| Ground                         | `#FFFFFF`                   | `#08080A`                  |
+| Text                           | `#111114`                   | `#FAFAFA`                  |
+| Read at                        | Arm's length, on paper      | Six feet away, projected   |
+| Smallest type carrying meaning | 9pt                         | 20px                       |
 
 Two constraints follow from projection rather than from the palette:
 
