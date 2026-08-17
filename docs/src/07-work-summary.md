@@ -4,7 +4,7 @@ subtitle: What was built, what has been verified, what has not, and what to do n
 docId: MRN-007
 date: 2026-08-15
 version: '1.1'
-classification: Internal — Maren Finance
+classification: Internal, Maren Finance
 audience: Sele
 colophon: |
   An account of the repository at `github.com/SeventhOdyssey71/marenfinance` as of 15 August 2026, written for the person who will be asked to defend it.
@@ -18,7 +18,7 @@ colophon: |
 
 This is the seventh document in the Maren set and the only one written inward rather than
 outward. The other six argue a case to the Mezo ecosystem team. This one records what is
-actually in the repository, what has been proven about it, and what has not — so that
+actually in the repository, what has been proven about it, and what has not, so that
 nothing in the first six has to be taken on trust when someone asks where a number came
 from.
 
@@ -29,7 +29,7 @@ It is organised as four questions:
 3. **What is not.** The gaps, the risks, and the two claims that were withdrawn.
 4. **What to do next.** In priority order.
 
-Parts of it will inform what goes to Mezo. It is not itself the reply — that draft is
+Parts of it will inform what goes to Mezo. It is not itself the reply, that draft is
 `docs/research/OUTREACH-REPLY.md`, and it should stay a separate artefact.
 
 <!-- pagebreak -->
@@ -45,7 +45,7 @@ document set.
 | Landing page | `apps/web`           | Merged (PR #2)                          |
 | iOS app      | `apps/ios`           | Merged                                  |
 | SDK          | `packages/sdk`       | Merged                                  |
-| Relayer      | `apps/relayer`       | **PR #1, open — not merged**            |
+| Relayer      | `apps/relayer`       | **PR #1, open, not merged**             |
 | Documents    | `docs/src`           | Seven sources, built to branded A4 PDFs |
 
 ### Contracts
@@ -71,13 +71,13 @@ It exists because of a specific finding, not because a hub seemed tidy. Both obv
 to charge a relay fee are broken, and the second one is broken in a way that looks correct.
 
 **A trailing `uint256 relayFee` parameter on every function was rejected.** The signature
-covers it, but no contract does anything with it — consent to a number with no settlement
+covers it, but no contract does anything with it, consent to a number with no settlement
 attached. It also drags relayer economics into `MarenPay` and `MarenVault`, which have no
 business knowing about them.
 
 **Batching a fee leg and a work leg through `executeBatch` was rejected because it does
 not do what its name implies.** OpenZeppelin's `ERC2771Forwarder.executeBatch` is **not
-atomic for inner-call failures**. The `atomic` flag governs _validation_ only — untrusted
+atomic for inner-call failures**. The `atomic` flag governs _validation_ only, untrusted
 target, expired deadline, bad signature. The inner call is a raw `call` whose `success` is
 recorded and then used for nothing except deciding whether to refund `value`. A batched fee
 leg therefore settles even when the work leg reverts, including with
@@ -122,14 +122,14 @@ that a reduced-motion user cannot opt out of.
 `apps/ios` is Expo with `expo-router`: onboarding, wallet setup, portfolio, vault, pay,
 earn, activity, settings, and scan-to-pay. All position math, number formatting, and
 protocol constants come from `@maren/sdk` and are real. Chain reads and transaction
-submission are mocked, and the README enumerates exactly which is which — the split is that
+submission are mocked, and the README enumerates exactly which is which, the split is that
 everything deciding what a user _believes about their money_ is real, and only the transport
 is stubbed.
 
 ### Documents
 
 Seven Markdown sources in `docs/src` become branded A4 PDFs through headless Chrome:
-Markdown to HTML, printed in three parts — a zero-margin cover so the gradient reaches the
+Markdown to HTML, printed in three parts, a zero-margin cover so the gradient reaches the
 trim edge, a body with a running footer, and a contents page whose page numbers are measured
 from a first pass and stamped into a second. `pdf-lib` stitches them and sets the metadata.
 Fonts are embedded as base64 so a PDF renders identically on a machine that has never heard
@@ -146,7 +146,7 @@ was written in, and the command is given so it can be run again.
 cd packages/contracts && forge test
 ```
 
-**236 tests passed, 0 failed**, across ten suites, with 8 skipped — the skips are the fork
+**236 tests passed, 0 failed**, across ten suites, with 8 skipped, the skips are the fork
 tests, which skip rather than fail when no RPC is configured, so that a public testnet
 cannot break CI.
 
@@ -179,8 +179,7 @@ MEZO_TESTNET_RPC_URL=https://rpc.test.mezo.org \
   forge test --match-path 'test/fork/*'
 ```
 
-**8 tests passed, 0 failed**, against the real MUSD contracts deployed on matsnet —
-`BorrowerOperations`, `TroveManager`, MUSD itself, `SortedTroves`, `HintHelpers`, and the
+**8 tests passed, 0 failed**, against the real MUSD contracts deployed on matsnet, `BorrowerOperations`, `TroveManager`, MUSD itself, `SortedTroves`, `HintHelpers`, and the
 `PriceFeed` contract's own staleness logic, all real deployed bytecode. They cover the full
 lifecycle, that the real protocol rejects a sub-minimum holder, that trove debt includes the
 gas compensation, that `maxBorrowingCapacity` stays frozen until `refinance()`, that a stale
@@ -209,7 +208,7 @@ would be allowlisted.
 ### The headline number
 
 The collateral needed to reach MUSD's 1,800 MUSD minimum net debt at a 250% collateral
-ratio is **0.079346 BTC — $5,004.50** at the oracle price of $63,071.83 recorded on
+ratio is **0.079346 BTC, $5,004.50** at the oracle price of $63,071.83 recorded on
 15 August.
 
 That figure is **proven, not calculated in a document**. It is the output of
@@ -252,7 +251,7 @@ price.
 
 At the $62,921.65 oracle price read on 16 August, that is **$0.0092** to send and $0.0082
 at the base fee. A million sponsored transactions costs about **$9,200**. **$0.0092 is the
-gas-price figure** — a sponsor pays gas price, not base fee, so it is the correct number
+gas-price figure**: a sponsor pays gas price, not base fee, so it is the correct number
 for what the relayer spends.
 
 The earlier draft printed $0.0092 under the label "base fee" and explained the gap to
@@ -268,8 +267,8 @@ today. The scripts that produce the first two are in the repository and can be r
 `apps/web/scripts/verify-behaviour.mjs` and `apps/web/scripts/verify-contrast.mjs`.
 
 **Landing page.** Next.js 15, **112 kB first load**, fully static, three shaders.
-**17 of 17 behavioural checks** pass — reduced-motion shader fallback, accordion ARIA,
-keyboard operation, focus rings, landmarks — and **8 of 8 contrast probes** pass with WebGL
+**17 of 17 behavioural checks** pass, reduced-motion shader fallback, accordion ARIA,
+keyboard operation, focus rings, landmarks, and **8 of 8 contrast probes** pass with WebGL
 enabled, which is the case that matters, because a contrast measurement taken with the
 shader disabled measures a page nobody sees.
 
@@ -298,7 +297,7 @@ slide overflows its frame.
 | MRN-004   | Security & Risk                      |       9 |
 | MRN-005   | Go-to-Market                         |       9 |
 | MRN-006   | Roadmap & Grant Milestones           |       9 |
-| MRN-007   | Work Summary — this document         |      19 |
+| MRN-007   | Work Summary, this document          |      19 |
 | **Total** |                                      | **101** |
 
 The build is deterministic: dates are taken from each document's own frontmatter rather than
@@ -314,7 +313,7 @@ contracts are deployed and source-verified on Mezo matsnet (31611), and `MAREN_A
 in `packages/sdk/src/addresses.ts` carries their real addresses. `MarenRegistry.register`,
 `MarenVault.openPooledTrove`, `deposit` and `topUpCollateral` have all executed on-chain
 against real MUSD. Tx hashes are in `docs/DEPLOYMENTS.md`, along with the two findings
-that only appeared by running it — a pooled trove seeded at the protocol minimum can
+that only appeared by running it, a pooled trove seeded at the protocol minimum can
 never let a user borrow, and `deleverage()` reported success while doing nothing.
 
 **Mainnet is still all zero addresses**, and `isDeployed()` still exists so that every
@@ -352,20 +351,20 @@ it as one.
 
 `MarenVault` holds one trove. A user's collateral is **segregated in accounting, not in
 custody**. If the MUSD protocol ever liquidated that trove, the loss would fall across all
-pooled users pro rata — including users whose own position was perfectly healthy.
+pooled users pro rata, including users whose own position was perfectly healthy.
 
 The mitigations are distance from the cliff (no borrowing below 180%, internal liquidation
 at 140%, against the protocol's 110%), a per-user ledger, a deposit cap that widens on
 evidence rather than on schedule, an insurance buffer funded from the 5% liquidation
 penalty, and the rule that entries pause before exits do. They reduce the probability. They
-are not a guarantee, and the commitment in the roadmap — ship without the pooled vault if it
-cannot be made safe to our own satisfaction — is the honest backstop.
+are not a guarantee, and the commitment in the roadmap, ship without the pooled vault if it
+cannot be made safe to our own satisfaction, is the honest backstop.
 
 ### Everything is pre-audit
 
 No third party has reviewed any of this. `MarenVault`, `MarenForwarder`, and
 `MarenRelayHub` are the audit scope: the first holds the funds, and the other two hold
-authority — the hub can make an arbitrary allowlisted call appear to come from any user who
+authority, the hub can make an arbitrary allowlisted call appear to come from any user who
 has signed anything, and it moves fees under user allowances.
 
 ### Two environment limitations worth recording
@@ -388,7 +387,7 @@ the chain id up in a built-in chain list, and Mezo is not in it, so _any_ `[ethe
 entry naming 31611 or 31612 makes `forge script` fail outright with
 `Error: Chain 31611 not supported` before it does anything else. Established by bisection.
 Verification therefore passes `--verifier blockscout --verifier-url ...` on the command
-line, which works today. Note the `api.` subdomain — `explorer.mezo.org/api` without it
+line, which works today. Note the `api.` subdomain, `explorer.mezo.org/api` without it
 returns 404.
 
 ## Two findings that did not survive verification
@@ -401,8 +400,7 @@ discipline is not decoration, it has already stopped two errors from reaching Me
 
 An early probe sweep showed `https://mezo.drpc.org` returning
 `-32601 "the method does not exist/is not available"` for `eth_call`, `eth_getLogs`,
-`eth_estimateGas`, and `eth_blockNumber`, and this was written down as a capability limit —
-that the endpoint serves `eth_chainId` and nothing else.
+`eth_estimateGas`, and `eth_blockNumber`, and this was written down as a capability limit, that the endpoint serves `eth_chainId` and nothing else.
 
 **It was a transient outage.** On re-test the same endpoint served the same methods
 correctly 10 out of 10 times about an hour later. A degraded backend behind a load balancer
@@ -422,15 +420,15 @@ the same change that adds this document.
 
 ### The mis-citation
 
-The two MUSD documentation-versus-bytecode discrepancies — the borrower redemption-fee
+The two MUSD documentation-versus-bytecode discrepancies, the borrower redemption-fee
 waiver that the deployed `TroveManager` does not implement, and the refinance fee that
-computes to roughly 0.02% rather than the documented 0.1% — were initially placed in the
+computes to roughly 0.02% rather than the documented 0.1%, were initially placed in the
 `mezo-org/musd` repository.
 
 **They are not there.** `mezo-org/musd` does not state the borrower waiver at all; its
 closest line says the opposite. Both claims live in **`mezo-org/documentation`**, at
 `users/borrow/fees.md` and `users/borrow/index.md`. The underlying code observations are
-accurate — only the location was wrong — and the issue text was rewritten to quote the
+accurate, only the location was wrong, and the issue text was rewritten to quote the
 correct files.
 
 A related correction went with it: `isAccountFeeExempt` is a **governance-managed
@@ -440,7 +438,7 @@ are exempt" and "fee-exempt accounts" are two different things.
 > [!WARNING]
 > This is the one to not repeat in front of Mezo. Telling their team that a discrepancy is
 > "in the musd repo" when it is in the documentation repo is a thirty-second correction that
-> costs the credibility of the other nine things in the message — and the whole strategy of
+> costs the credibility of the other nine things in the message, and the whole strategy of
 > the outreach is that the findings are trustworthy. The prepared issue text already quotes
 > the right files. Use it verbatim rather than paraphrasing from memory.
 
@@ -450,19 +448,19 @@ Three pull requests and one issue are written, verified, and **pushed to Sele's 
 **Nothing has been opened against any upstream repository.** Each is one command to fire, and
 all four are in `docs/research/UPSTREAM-PRS.md` with the evidence.
 
-**1 — a pull request against `wevm/viem`.** Mezo mainnet's default RPC host does not
+**1, a pull request against `wevm/viem`.** Mezo mainnet's default RPC host does not
 resolve, and the definition omits `multicall3` although Multicall3 is deployed at the
 canonical address, birth block 351760.
 
-**2 — a pull request against `mezo-org/documentation`.** Three RPC and explorer hosts that
+**2, a pull request against `mezo-org/documentation`.** Three RPC and explorer hosts that
 return NXDOMAIN, two of them inside copy-pasteable snippets that therefore fail at the first
 line.
 
-**3 — a pull request against `mezo-org/documentation`.** The Goldsky network slug is `mezo`,
+**3, a pull request against `mezo-org/documentation`.** The Goldsky network slug is `mezo`,
 not the documented `mezo-mainnet`, so a manifest copied from the docs is rejected at deploy
 time.
 
-**4 — an issue against `mezo-org/musd`.** The two documentation-versus-bytecode
+**4, an issue against `mezo-org/musd`.** The two documentation-versus-bytecode
 discrepancies, framed as questions rather than as reports, because whether the docs or the
 contracts should change is the maintainers' call.
 
@@ -491,7 +489,7 @@ The verifier goes on the command line, not in `foundry.toml`, for the reason in 
 `packages/sdk/src/addresses.ts` from `deployments/<chainid>.json`. The post-deploy checklist
 in `packages/contracts/README.md` is the one to work through, not this paragraph.
 
-**2. Merge the relayer once re-verification passes — and not before.** It holds a funded hot
+**2. Merge the relayer once re-verification passes, and not before.** It holds a funded hot
 key. The economic abuse layer is the part that was broken, the fixes are pushed, and the
 re-verification is the gate. A merge before that gate is the single most expensive thing that
 could be done this week.
@@ -502,8 +500,7 @@ contract sitting on top of it far more cheaply than one starting cold. It is als
 Mezo to give, which is why it should be asked for early and directly rather than saved.
 
 **4. Open the four upstream contributions.** They are one command each. Opening them before
-the reply goes out turns "I've drafted PRs and can send them whenever" into "they're open" —
-which is a materially stronger sentence, and it costs nothing.
+the reply goes out turns "I've drafted PRs and can send them whenever" into "they're open", which is a materially stronger sentence, and it costs nothing.
 
 **5. Reply to Judy.** The draft is `docs/research/OUTREACH-REPLY.md`. Two things to settle first:
 re-confirm the trove count on the day it is sent, because it moves, and decide whether the
@@ -522,7 +519,7 @@ documents.
 
 What does not exist is a mainnet address, an audit, or a single satoshi of anyone else's
 money. The pooled trove on matsnet holds 0.049 BTC of the author's own testnet
-collateral, and the first thing it did was refuse a borrow — correctly.
+collateral, and the first thing it did was refuse a borrow, correctly.
 
 The distance between those two paragraphs is an audit, and everything in section 4 should
 be said out loud before anyone else has to find it.

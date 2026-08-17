@@ -24,7 +24,7 @@ Three things a reader should take from it:
    price oracle is a chain precompile secured by Mezo's validator set. Both are
    reasonable choices by Mezo. Neither is something Maren can insure against.
 3. **Our controls are derived from failures that already happened**, in a payments
-   system the same author shipped, audited on 24 July 2026 — 7 Critical and 13 High
+   system the same author shipped, audited on 24 July 2026, 7 Critical and 13 High
    findings. Each one is now a rule in this codebase.
 
 ---
@@ -47,7 +47,7 @@ Ordered by expected harm, not by likelihood.
 
 ---
 
-# 2. R-1 — The pooled vault
+# 2. R-1: The pooled vault
 
 This is the risk that matters. Everything else in this document is smaller.
 
@@ -57,7 +57,7 @@ This is the risk that matters. Everything else in this document is smaller.
 and debt inside it. A user's collateral is **segregated in accounting, not in custody**.
 
 That sentence is the whole risk. If the pooled trove were ever liquidated by the MUSD
-protocol, the loss would fall across pooled users in proportion to their share — including
+protocol, the loss would fall across pooled users in proportion to their share, including
 users whose own position was perfectly healthy.
 
 We are not going to describe this as "your funds are safe". They are subject to a
@@ -66,7 +66,7 @@ mechanism, and the mechanism can fail.
 ## Why we build it anyway
 
 MUSD requires **1,800 MUSD of minimum net debt**. At a responsible 250% collateral ratio
-and BTC at $63,071.83, that is **0.079346 BTC — $5,004.50** of collateral before a user
+and BTC at $63,071.83, that is **0.079346 BTC, $5,004.50** of collateral before a user
 can open a position at all. (That figure is not an estimate: it is the output of
 `collateralRequiredFor()` in `packages/sdk/src/position.ts`, executed against the live
 oracle price, and asserted in the test suite.)
@@ -106,8 +106,8 @@ one is economically rational for a keeper.
 
 ## The residual risk we accept
 
-A BTC drawdown faster than the keeper can act — a gap down through 140% to below 110%
-without an intervening block in which liquidation is possible — could socialise losses.
+A BTC drawdown faster than the keeper can act, a gap down through 140% to below 110%
+without an intervening block in which liquidation is possible, could socialise losses.
 The buffer makes this remote. It does not make it impossible.
 
 **If we cannot satisfy ourselves that this is safe, we ship without the pooled vault.**
@@ -116,7 +116,7 @@ in the roadmap and it is binding.
 
 ---
 
-# 3. R-2 — Inherited MUSD risk
+# 3. R-2: Inherited MUSD risk
 
 Findings from reading the deployed contracts, offered without editorial.
 
@@ -128,7 +128,7 @@ currently return the zero address, so effective control sits with a Thesis/Mezo 
 rather than with tokenholders. Mezo's documentation is explicit that immutability is a
 later-stage goal, so this is a disclosed choice rather than an oversight.
 
-**Maren cannot mitigate this.** We can only disclose it, and avoid compounding it — which
+**Maren cannot mitigate this.** We can only disclose it, and avoid compounding it, which
 is why Maren's own upgradeable contracts are behind a multisig _and_ a timelock from
 deployment day one, rather than "before mainnet".
 
@@ -145,7 +145,7 @@ Maren does not repeat a blanket backing claim in its interface.
    `TroveManager`, which applies `getRedemptionRate()` unconditionally. **Maren does not
    promise this waiver.**
 2. The docs list the refinance fee as 0.1%. The code computes 20% of old net debt, then a
-   0.1% borrowing fee on that — approximately **0.02%**.
+   0.1% borrowing fee on that, approximately **0.02%**.
 3. The supply/backing gap above.
 
 These are raised with Mezo as observations, not complaints. It is entirely possible they
@@ -153,10 +153,10 @@ describe intended future behaviour.
 
 ---
 
-# 4. R-3 — Oracle
+# 4. R-3: Oracle
 
 MUSD's price feed reads a **native Mezo precompile** at
-`0x7b7c000000000000000000000000000000000015` — Mezo's own Skip Connect `x/oracle` module,
+`0x7b7c000000000000000000000000000000000015`: Mezo's own Skip Connect `x/oracle` module,
 fed by the validator set. It is not Chainlink and not Pyth.
 
 **Consequences we design around:**
@@ -178,7 +178,7 @@ through: it stops opening new debt and continues to permit withdrawals.
 
 ---
 
-# 5. R-4 to R-9 — Controls
+# 5. R-4 to R-9: Controls
 
 ## Keeper (R-4)
 
@@ -226,8 +226,8 @@ transaction simulation with a human-readable summary before every signature.
 # 6. Rules inherited from a real audit
 
 The author's previous product, Talise, was audited on 24 July 2026: **7 Critical, 13
-High, 20 Medium, 24 Low**. The core custody model held — the auditors found no way for one
-user to move another's funds, and the IDOR sweep came back clean — but the findings are
+High, 20 Medium, 24 Low**. The core custody model held, the auditors found no way for one
+user to move another's funds, and the IDOR sweep came back clean, but the findings are
 now hard rules in this repository, recorded in `docs/research/SECURITY-LESSONS.md` and
 enforced in review.
 
@@ -235,7 +235,7 @@ The load-bearing ones:
 
 - **Bind the funding source to the caller.** A relayer that accepts a client-asserted
   funding source can be made to fund an attacker.
-- **Every value-moving parameter lives inside the signed struct** — recipient, amount,
+- **Every value-moving parameter lives inside the signed struct**: recipient, amount,
   fee, deadline, nonce. Nothing economically meaningful travels beside the signature.
 - **Never key escrow by a shared address.** This enabled a Critical finding where a user
   could fund their own claim from someone else's deposit.
