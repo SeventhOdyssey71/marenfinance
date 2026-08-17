@@ -56,6 +56,29 @@ if (!TEST_PRIVATE_KEY) {
   process.exit(1);
 }
 
+/**
+ * Wait for a live registry read to settle, rather than sleeping and hoping.
+ *
+ * These statuses are backed by a real `MarenRegistry` call over Mezo's public RPC, which
+ * routinely takes longer than the 2500ms this script used to sleep for. That made three
+ * checks fail intermittently on "Resolving handle…" — a slow network reported as a broken
+ * product. Polling until the pending text clears tests the assertion the check is actually
+ * about, and still fails if the read never returns.
+ */
+async function settled(page, selector, pending = 'Resolving|Checking the registry') {
+  await page
+    .waitForFunction(
+      ([sel, src]) => {
+        const el = document.querySelector(sel);
+        return Boolean(el) && !new RegExp(src).test(el.textContent ?? '');
+      },
+      [selector, pending],
+      { timeout: 20000 },
+    )
+    .catch(() => {});
+  return page.locator(selector).innerText();
+}
+
 const results = [];
 const check = (name, pass, detail = '') => {
   results.push({ name, pass, detail });
@@ -522,8 +545,7 @@ const check = (name, pass, detail = '') => {
   // `@sele` is registered on matsnet to the deploying account. This resolves it through
   // MarenRegistry.tryResolve — a real read against a real registration.
   await page.locator('#pay-to').fill('@sele');
-  await page.waitForTimeout(2500);
-  const resolvedInline = await page.locator('#pay-to-status').innerText();
+  const resolvedInline = await settled(page, '#pay-to-status');
   check(
     'pay: a real handle resolves and its address is shown beside it',
     /0x[0-9a-fA-F]{40}/.test(resolvedInline),
@@ -532,8 +554,7 @@ const check = (name, pass, detail = '') => {
 
   // An unregistered handle must fail loudly rather than falling back to anything.
   await page.locator('#pay-to').fill('@nosuchhandle_zzz');
-  await page.waitForTimeout(2500);
-  const unresolved = await page.locator('#pay-to-status').innerText();
+  const unresolved = await settled(page, '#pay-to-status');
   check(
     'pay: an unregistered handle fails loudly rather than resolving to something',
     /No such handle/.test(unresolved),
@@ -587,12 +608,14 @@ const check = (name, pass, detail = '') => {
 
   // Availability is a live registry read, not an optimistic assumption.
   await page.locator('#handle-input').fill('sele');
-  await page.waitForTimeout(2500);
+  const handleStatus = await settled(page, '#handle-status');
   check(
     'handle: an already-registered handle is reported as taken',
-    /already registered/i.test(await page.locator('#handle-status').innerText()),
+    /already registered/i.test(handleStatus),
     'MarenRegistry.available()',
   );
+  // The button's disabled state follows the same read; give React a frame to apply it.
+  await page.waitForTimeout(300);
   check(
     'handle: committing to a taken handle is refused',
     await page

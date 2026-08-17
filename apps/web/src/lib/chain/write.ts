@@ -54,7 +54,15 @@ const musd = getMusdAddresses(NETWORK);
  */
 export const RELAYER_AVAILABLE = false;
 
-/** Honest gas copy for an action that WOULD be sponsored if a relayer were running. */
+/**
+ * Honest gas copy for an action that WOULD be sponsored if a relayer were running.
+ *
+ * The disclosure used to be three sentences: what the relayer would normally do, that no
+ * relayer is running, that the contracts are ready and the service is not deployed. In a
+ * confirmation sheet that is four lines of infrastructure above the button the user is
+ * about to press. The fact survives; the explanation of it does not. What a signer needs
+ * to know is who is paying, and that is one clause.
+ */
 export function gasNote(
   sponsorable: boolean,
   detail: string,
@@ -62,10 +70,7 @@ export function gasNote(
   if (sponsorable && !RELAYER_AVAILABLE) {
     return {
       sponsored: false,
-      note:
-        `${detail} Maren's relayer would normally pay the Bitcoin gas for this, but no relayer ` +
-        `is running yet — so this transaction is submitted by your own wallet and you pay the ` +
-        `gas. The contracts are ready for it; the service is not deployed.`,
+      note: `${detail} You pay the Bitcoin gas. No relayer is running yet.`,
     };
   }
   return { sponsored: sponsorable && RELAYER_AVAILABLE, note: detail };
