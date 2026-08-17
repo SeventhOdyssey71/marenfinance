@@ -246,6 +246,13 @@ code, .num, .mono {
   white-space: nowrap;
 }
 
+/* A standards-style identifier, wrapped by the renderer's IDENTIFIER_RE. The hyphen in
+   "EIP-7702" is a legal break opportunity to the layout engine, so without this a
+   footline wrapped it as "EIP-" / "7702" and the name of the standard stopped reading as
+   one thing. The span carries no other styling: this is a line-breaking rule, not a
+   decoration. */
+.nb { white-space: nowrap; }
+
 /* ── Statistics ──────────────────────────────────────────────────────────── */
 
 .stats {

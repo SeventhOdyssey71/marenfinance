@@ -48,7 +48,32 @@ function escapeHtml(s) {
     .replace(/"/g, '&quot;');
 }
 
-/** Curly quotes and proper ellipses, with inline code spans held out. */
+/**
+ * A standards-style identifier: capitals, a hyphen, then digits. `EIP-7702`, `ERC-2771`.
+ *
+ * These must not break across a line. The hyphen is a legal break opportunity as far as
+ * the layout engine is concerned, so a label reading "Mainnet block where EIP-7702 went
+ * live" wrapped as "EIP-" / "7702" and the name of the standard stopped being readable as
+ * one thing. Nothing else here is hyphen-sensitive: "source-verified" and "on-chain" are
+ * ordinary compounds and may break wherever they like, so the pattern is deliberately
+ * narrow rather than a blanket rule about hyphens.
+ */
+const IDENTIFIER_RE = /\b([A-Z]{2,}-\d+)\b/g;
+
+/**
+ * A word of one or two letters must not be left at the end of a line.
+ *
+ * `text-wrap: balance` evens the lines of a headline and stops it stranding its last word
+ * on a line of its own, which is the failure it exists to prevent. It does not care what
+ * the line ends *with*, so "One trove. A ledger inside it." balanced into "One trove. A" /
+ * "ledger inside it." and left the article hanging. Binding a short word to the word after
+ * it removes the break opportunity, so balancing has to find its next-best split, which is
+ * the one a typesetter would have chosen. The bound run is at most a couple of characters
+ * longer than the word it joins, so this cannot push a headline past its measure.
+ */
+const SHORT_WORD_RE = /(^|[\s(\[{“‘])([A-Za-z]{1,2})[ ]+(?=[^\s])/g;
+
+/** Curly quotes, proper ellipses, and the two no-break rules, with code spans held out. */
 function typographic(source) {
   return source
     .split(/(`[^`\n]*`)/g)
@@ -61,7 +86,9 @@ function typographic(source) {
             .replace(/(\w)'(\w)/g, '$1’$2')
             .replace(/(^|[\s(\[{])'/gm, '$1‘')
             .replace(/'/g, '’')
-            .replace(/\.\.\./g, '…'),
+            .replace(/\.\.\./g, '…')
+            .replace(IDENTIFIER_RE, '<span class="nb">$1</span>')
+            .replace(SHORT_WORD_RE, '$1$2 '),
     )
     .join('');
 }
