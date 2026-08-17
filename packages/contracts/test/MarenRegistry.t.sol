@@ -200,15 +200,17 @@ contract MarenRegistryTest is Test {
         vm.prank(alice);
         registry.commit(_commitment("sele", alice, SECRET));
         uint256 committedAt = block.timestamp;
+        uint256 openAt = committedAt + registry.MIN_COMMITMENT_AGE();
 
-        vm.warp(committedAt + registry.MIN_COMMITMENT_AGE() - 1);
-        vm.expectRevert(
-            abi.encodeWithSelector(
-                MarenRegistry.CommitmentTooNew.selector,
-                committedAt,
-                committedAt + registry.MIN_COMMITMENT_AGE()
-            )
-        );
+        // Encode the expected payload BEFORE the warp, deliberately. Encoding it after
+        // leaves `committedAt` free to be re-read from `block.timestamp` at the use site,
+        // which the via-IR pipeline `forge coverage --ir-minimum` uses actually does. The
+        // test then expects the post-warp timestamp and fails against a correct contract.
+        bytes memory expected =
+            abi.encodeWithSelector(MarenRegistry.CommitmentTooNew.selector, committedAt, openAt);
+
+        vm.warp(openAt - 1);
+        vm.expectRevert(expected);
         vm.prank(alice);
         registry.register("sele", SECRET);
     }
@@ -218,14 +220,14 @@ contract MarenRegistryTest is Test {
         registry.commit(_commitment("sele", alice, SECRET));
         uint256 committedAt = block.timestamp;
 
-        vm.warp(committedAt + registry.MAX_COMMITMENT_AGE() + 1);
-        vm.expectRevert(
-            abi.encodeWithSelector(
-                MarenRegistry.CommitmentExpired.selector,
-                committedAt,
-                committedAt + registry.MAX_COMMITMENT_AGE()
-            )
-        );
+        uint256 expiresAt = committedAt + registry.MAX_COMMITMENT_AGE();
+
+        // Encoded before the warp for the same reason as the test above.
+        bytes memory expected =
+            abi.encodeWithSelector(MarenRegistry.CommitmentExpired.selector, committedAt, expiresAt);
+
+        vm.warp(expiresAt + 1);
+        vm.expectRevert(expected);
         vm.prank(alice);
         registry.register("sele", SECRET);
     }
