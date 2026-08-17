@@ -198,7 +198,7 @@ export default function Earn() {
       <Card tone="inset" style={styles.riskCard}>
         <Txt variant="small" tone="muted">
           Stability Pool deposits absorb liquidated debt. In exchange for the BTC gains you take on
-          the risk that your MUSD is used to close somebody else’s position — historically
+          the risk that your MUSD is used to close somebody else’s position. Historically
           profitable, not guaranteed, and not principal-protected.
         </Txt>
       </Card>

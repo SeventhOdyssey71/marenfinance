@@ -56,7 +56,7 @@ export function statusLabel(status: ActivityStatus): string {
     case 'confirmed':
       return 'Confirmed';
     case 'failed':
-      return 'Failed — no funds moved';
+      return 'Failed, no funds moved';
   }
 }
 

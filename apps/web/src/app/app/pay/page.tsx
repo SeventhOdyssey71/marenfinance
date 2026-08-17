@@ -60,10 +60,9 @@ export default function PayPage() {
       <div className="flex flex-col gap-6">
         <Header />
         <ConnectPrompt icon={<PayIcon className="size-6" />} title="Connect to send MUSD">
-          Pay moves MUSD to an `@handle` or a plain address, with an optional memo written on-chain.
-          You need MUSD to send, and a connected wallet to sign.
+          Send MUSD to an @handle or a plain address, with an optional memo written on-chain.
         </ConnectPrompt>
-        <GasTruth />
+        <GasLine />
       </div>
     );
   }
@@ -71,7 +70,6 @@ export default function PayPage() {
   return (
     <div className="flex flex-col gap-6">
       <Header />
-      <GasTruth />
 
       <Segmented options={TABS} value={tab} onChange={setTab} label="Payment type" />
 
@@ -98,23 +96,19 @@ function Header() {
 }
 
 /**
- * The gas statement, replacing the sponsorship banner.
+ * The gas disclosure, compressed to one line at the point of action.
  *
- * The architecture supports sponsorship — MarenPay is an `ERC2771Context` and trusts
- * `MarenRelayHub`, which is deployed — but no relayer service is running anywhere to
- * submit through it. Saying "no gas" on that basis would be describing a design rather
- * than a product.
+ * It used to be a four-line block at the top of the screen explaining that MarenPay is an
+ * `ERC2771Context`, that it trusts `MarenRelayHub` under ERC-2771, and that no relayer is
+ * deployed to submit through it. All true, and all a description of the architecture rather
+ * than of what is about to happen to the user's money. The fact a payer needs is that they
+ * are paying, and that is the whole line now. The mechanism lives in the FAQ.
  */
-function GasTruth() {
+function GasLine() {
   return (
-    <Note>
-      <p className="text-text">You pay the Bitcoin gas for these transactions.</p>
-      <p className="mt-1">
-        MarenPay is built to be sponsored — it trusts Maren’s relay hub under ERC-2771 — but no
-        relayer is deployed, so your own wallet submits and pays. This screen will not describe a
-        payment as free until something is actually paying for it.
-      </p>
-    </Note>
+    <p className="text-text-subtle text-xs leading-relaxed">
+      You pay the Bitcoin gas. No relayer is running yet.
+    </p>
   );
 }
 
@@ -173,7 +167,7 @@ function SendPanel({ runner }: { runner: TxRunner }) {
     ],
     gas: {
       sponsored: false,
-      note: 'An ERC-20 approval is a transaction on MUSD itself, not on Maren, so it could never be relayed through Maren’s hub. It approves exactly this amount.',
+      note: 'Approves exactly this amount, not an unlimited allowance. You pay the Bitcoin gas.',
     },
     confirmLabel: 'Approve',
     submit: writes.ready
@@ -316,14 +310,17 @@ function SendPanel({ runner }: { runner: TxRunner }) {
       {funds.ok && needsApproval && amountWei > 0n ? (
         <div className="mt-6">
           <Note>
-            MarenPay has to be allowed to take {formatMusd(amountWei)} of your MUSD before it can be
-            sent. That is one approval transaction, shown to you rather than slipped in behind the
-            payment.
+            MarenPay needs an allowance for {formatMusd(amountWei)} first. That is a separate
+            transaction, shown here rather than slipped in behind the payment.
           </Note>
         </div>
       ) : null}
 
-      <div className="mt-8 flex flex-wrap gap-3">
+      <div className="mt-8">
+        <GasLine />
+      </div>
+
+      <div className="mt-4 flex flex-wrap gap-3">
         {needsApproval && amountWei > 0n ? (
           <ActionButton
             onClick={() => runner.request(approvalIntent())}
@@ -388,7 +385,7 @@ function RequestPanel({ runner }: { runner: TxRunner }) {
     ],
     gas: gasNote(
       true,
-      'A request creates no obligation and moves no funds — it is an ask the other side fulfils in one action.',
+      'A request creates no obligation and moves no funds. It is an ask the other side fulfils in one action.',
     ),
     confirmLabel: 'Create request',
     submit: writes.ready ? () => writes.createRequest(payer, amountWei, memo) : undefined,
@@ -446,6 +443,10 @@ function RequestPanel({ runner }: { runner: TxRunner }) {
       </div>
 
       <div className="mt-8">
+        <GasLine />
+      </div>
+
+      <div className="mt-4">
         <ActionButton
           onClick={() => runner.request(intent())}
           disabled={amountWei === 0n || !writes.ready || (isHandle && !resolved)}
@@ -459,7 +460,7 @@ function RequestPanel({ runner }: { runner: TxRunner }) {
           creates appear in Activity, decoded from the contract's own RequestCreated
           events — a real list is better than a plausible one. */}
       <p className="text-text-subtle mt-8 text-xs leading-relaxed">
-        Requests you create appear in Activity, read from MarenPay’s own event log.
+        Requests you create appear in Activity.
       </p>
     </AppCard>
   );
@@ -515,7 +516,7 @@ function LinkPanel({ runner }: { runner: TxRunner }) {
     ],
     gas: {
       sponsored: false,
-      note: 'An ERC-20 approval is a transaction on MUSD itself. The escrow cannot be funded without it.',
+      note: 'The escrow cannot be funded without this. You pay the Bitcoin gas.',
     },
     confirmLabel: 'Approve',
     submit: writes.ready
@@ -630,13 +631,16 @@ function LinkPanel({ runner }: { runner: TxRunner }) {
       {funds.ok && needsApproval && amountWei > 0n ? (
         <div className="mt-6">
           <Note>
-            MarenPay has to be allowed to take {formatMusd(amountWei)} of your MUSD before it can be
-            escrowed.
+            MarenPay needs an allowance for {formatMusd(amountWei)} before it can escrow it.
           </Note>
         </div>
       ) : null}
 
-      <div className="mt-8 flex flex-wrap gap-3">
+      <div className="mt-8">
+        <GasLine />
+      </div>
+
+      <div className="mt-4 flex flex-wrap gap-3">
         {needsApproval && amountWei > 0n ? (
           <ActionButton
             onClick={() => runner.request(approvalIntent())}
@@ -663,7 +667,7 @@ function LinkPanel({ runner }: { runner: TxRunner }) {
       {created ? (
         <div className="mt-6">
           <Note tone="warning">
-            <p className="text-text">Copy this now — it is shown once.</p>
+            <p className="text-text">Copy this now. It is shown once.</p>
             <p className="num text-text-muted mt-2 break-all text-xs">
               {typeof window !== 'undefined' ? window.location.origin : ''}/claim#{created.secret}
             </p>
@@ -694,8 +698,8 @@ function LinkPanel({ runner }: { runner: TxRunner }) {
           are visible in Activity, from MarenPay's LinkCreated events. */}
       <Info summary="Why past links cannot be shown again">
         The claim key exists only in the URL fragment you copy. Maren never receives it and never
-        writes it down, so a list of your old links could show that they exist and their amounts —
-        which Activity does, from the contract’s events — but never the keys needed to claim them.
+        writes it down, so a list of your old links could show that they exist and their amounts
+        (which Activity does, from the contract’s events), but never the keys needed to claim them.
         That is the cost of the secret being genuinely secret.
       </Info>
     </AppCard>

@@ -306,10 +306,13 @@ async function prepareForPrint(page) {
   });
 }
 
-export async function loadPage(browser, server, html, { mermaid = [], warn }) {
+/** A4 at 96dpi, which is the shape every document body is laid out against. */
+const A4_VIEWPORT = { width: 1240, height: 1754, deviceScaleFactor: 1 };
+
+export async function loadPage(browser, server, html, { mermaid = [], warn, viewport } = {}) {
   server.setHtml(html);
   const page = await browser.newPage();
-  await page.setViewport({ width: 1240, height: 1754, deviceScaleFactor: 1 });
+  await page.setViewport(viewport ?? A4_VIEWPORT);
   await page.goto(`${server.origin}/doc.html`, { waitUntil: 'networkidle0', timeout: 60_000 });
   await page.emulateMediaType('print');
   await renderMermaid(page, mermaid, { warn });

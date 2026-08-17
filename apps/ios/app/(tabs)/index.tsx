@@ -221,8 +221,8 @@ export default function Home() {
         </View>
         <Txt variant="small" tone="muted" style={styles.gasBody}>
           Mezo charges gas in BTC. Depositing sends Bitcoin, so a relayer cannot carry it for you
-          and you pay gas on that one transaction. Everything after it — borrow, repay, withdraw,
-          every payment and every Earn move — is signed by you, submitted by Maren’s relayer, and
+          and you pay gas on that one transaction. Everything after it (borrow, repay, withdraw,
+          every payment and every Earn move) is signed by you, submitted by Maren’s relayer, and
           costs you nothing.
         </Txt>
       </Card>

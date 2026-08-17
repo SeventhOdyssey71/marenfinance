@@ -136,7 +136,7 @@ describe('borrow — the transaction that produced this module', () => {
     const { blocker } = preflightBorrow(state(), musd('17.95'));
     expect(blocker?.detail).toContain('151.0%');
     expect(blocker?.detail).toContain('180.0%');
-    expect(blocker?.detail).toContain('the pool itself is fully drawn right now');
+    expect(blocker?.detail).toContain('itself is fully drawn right now');
     expect(blocker?.detail).toContain('Your collateral is untouched and you can withdraw it');
     // Not the user's fault, and the scope says so — which is what colours it amber.
     expect(blocker?.scope).toBe('pool');

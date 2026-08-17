@@ -5,20 +5,20 @@ const steps = [
   {
     k: '01',
     title: 'Connect',
-    body: 'Any EVM wallet — injected or WalletConnect. Mezo is a standard EVM chain, so there is no special SDK and nothing to install.',
+    body: 'Any EVM wallet, injected or WalletConnect. Nothing to install.',
     meta: 'No BTC balance needed',
   },
   {
     k: '02',
     title: 'Deposit BTC, draw MUSD',
-    body: 'From 0.001 BTC into the pooled vault, or a direct trove if you are above the protocol minimum. Maren shows your ratio, your capacity and your distance to liquidation before you sign.',
+    body: 'From 0.001 BTC. You see your ratio, your capacity and how far Bitcoin can fall before liquidation, before you sign.',
     meta: 'From 0.001 BTC',
   },
   {
     k: '03',
-    title: 'Spend it, gaslessly',
-    body: 'Pay a handle, send a link, request, or split. Sign once; the relayer settles the BTC gas. Idle MUSD can sit in Earn instead of sitting still.',
-    meta: 'First 25 actions free',
+    title: 'Spend it',
+    body: 'Pay a handle, send a link, request, or split. Idle MUSD can sit in Earn instead of sitting still.',
+    meta: 'You pay the gas today',
   },
 ] as const;
 

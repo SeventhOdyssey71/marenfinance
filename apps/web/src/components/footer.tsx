@@ -65,7 +65,7 @@ export function Footer() {
                     target="_blank"
                     rel="noreferrer noopener"
                     aria-label={label}
-                    className="bg-surface text-text-muted hover:text-text grid size-11 place-items-center rounded-[var(--radius-pill)] border border-[var(--border-hairline)] transition-colors duration-[120ms] ease-out hover:border-[var(--border-strong)]"
+                    className="text-text-muted hover:text-text grid size-11 place-items-center rounded-[var(--radius-pill)] border border-[var(--border-hairline)] transition-colors duration-[120ms] ease-out hover:border-[var(--border-strong)]"
                   >
                     <Icon className="size-4" />
                   </a>
@@ -111,7 +111,7 @@ export function Footer() {
 
         <div className="hairline-t flex flex-col-reverse gap-4 py-8 sm:flex-row sm:items-center sm:justify-between">
           <p className="text-text-subtle text-xs">
-            © {new Date().getFullYear()} Maren Finance. Pre-audit software — deposit only what you
+            © {new Date().getFullYear()} Maren Finance. Pre-audit software. Deposit only what you
             can afford to lose.
           </p>
           <p className="text-text-subtle inline-flex items-center gap-2.5 text-xs">

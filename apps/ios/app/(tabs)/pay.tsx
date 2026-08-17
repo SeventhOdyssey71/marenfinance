@@ -349,8 +349,8 @@ function RequestPanel() {
         ) : null}
 
         <Txt variant="small" tone="muted" style={styles.qrCaption}>
-          Anyone with Maren can scan this and pay you. They pay no BTC gas either — the relayer
-          covers both sides.
+          Anyone with Maren can scan this and pay you. They pay no BTC gas either, because the
+          relayer covers both sides.
         </Txt>
       </Card>
 
