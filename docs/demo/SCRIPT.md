@@ -41,7 +41,7 @@ this file follows it.
 > The grey bar is Mezo's minimum. The violet one is Maren's floor, at one point two seven
 > percent of it.
 >
-> *(pause, let the bar sit)*
+> _(pause, let the bar sit)_
 >
 > Maren pools deposits into one shared trove, so the minimum is paid once, by the pool,
 > instead of by every person who wants in. Everyone in that gap is being turned away right
@@ -69,7 +69,7 @@ this file follows it.
 > hundred and eighty percent floor Maren keeps for itself. So borrowing is refused. Not
 > warned about. Refused, before any gas is spent.
 >
-> *(pause)*
+> _(pause)_
 >
 > It names the contract check that would have reverted, and it says plainly that your own
 > collateral is untouched and still withdrawable. A demo where I clicked Borrow and it

@@ -91,6 +91,37 @@ async function settled(page, selector, pending = 'Resolving|Checking the registr
   return page.locator(selector).innerText();
 }
 
+/**
+ * Wait until the DOM actually says the thing a check is about.
+ *
+ * Every wait below used to be a fixed sleep chosen to be "long enough" for Mezo's public
+ * RPC. That is a guess, and a guess that is too short reports a slow network as a broken
+ * product while a guess that is too long makes the suite crawl. Each of these now polls
+ * for the condition its sleep was standing in for, so the check fails only when the app
+ * genuinely never gets there.
+ */
+async function textReady(page, re, { selector = 'main', timeout = 30_000 } = {}) {
+  await page
+    .waitForFunction(
+      ([sel, src, flags]) => {
+        const el = document.querySelector(sel);
+        return Boolean(el) && new RegExp(src, flags).test(el.textContent ?? '');
+      },
+      [selector, re.source, re.flags],
+      { timeout },
+    )
+    .catch(() => {});
+  return page.locator(selector).innerText();
+}
+
+/** The same idea for a condition that is not text. Resolves false on timeout. */
+async function domReady(page, fn, arg = null, timeout = 30_000) {
+  return page
+    .waitForFunction(fn, arg, { timeout })
+    .then(() => true)
+    .catch(() => false);
+}
+
 const results = [];
 const check = (name, pass, detail = '') => {
   results.push({ name, pass, detail });
@@ -112,7 +143,12 @@ const check = (name, pass, detail = '') => {
       await new Promise((r) => requestAnimationFrame(() => setTimeout(r, 60)));
     }
   });
-  await page.waitForTimeout(800);
+  // The reveals finishing is the condition the old 800ms sleep was buying.
+  await domReady(page, () =>
+    [...document.querySelectorAll('.reveal')].every(
+      (el) => Number(getComputedStyle(el).opacity) > 0.99,
+    ),
+  );
   const canvases = await page.evaluate(() => document.querySelectorAll('canvas').length);
   check('reduced-motion: zero shader canvases mounted', canvases === 0, `canvases=${canvases}`);
 
@@ -260,7 +296,8 @@ const check = (name, pass, detail = '') => {
   // used to be a populated demo portfolio; the whole point of these assertions is that it
   // is not one again.
   await page.goto(BASE + '/app', { waitUntil: 'networkidle' });
-  await page.waitForTimeout(1200);
+  // The protocol panel is backed by live contract reads; wait for one to land.
+  await textReady(page, /\d+\.\d+%/);
 
   check('app: exactly one h1', (await page.locator('h1').count()) === 1);
   const landmarks = await page.evaluate(() => ({
@@ -398,7 +435,7 @@ const check = (name, pass, detail = '') => {
 
   // --- Vault, with no wallet ---------------------------------------------
   await page.goto(BASE + '/app/vault', { waitUntil: 'networkidle' });
-  await page.waitForTimeout(900);
+  await textReady(page, /connect/i);
   const vaultAnon = await page.locator('main').innerText();
   check(
     'vault (no wallet): offers a connect prompt, not a slider attached to nothing',
@@ -412,7 +449,7 @@ const check = (name, pass, detail = '') => {
 
   // --- Activity, with no wallet ------------------------------------------
   await page.goto(BASE + '/app/activity', { waitUntil: 'networkidle' });
-  await page.waitForTimeout(900);
+  await textReady(page, /connect/i);
   const activityAnon = await page.locator('main').innerText();
   check(
     'activity (no wallet): says history is per-account rather than inventing a feed',
@@ -427,7 +464,7 @@ const check = (name, pass, detail = '') => {
 
   // --- Earn, with no wallet ----------------------------------------------
   await page.goto(BASE + '/app/earn', { waitUntil: 'networkidle' });
-  await page.waitForTimeout(700);
+  await textReady(page, /does not display an APY/i);
   const earnAnon = await page.locator('main').innerText();
   check(
     'earn: no forward rate is quoted anywhere on the page',
@@ -437,7 +474,7 @@ const check = (name, pass, detail = '') => {
 
   // --- Pay, with no wallet -----------------------------------------------
   await page.goto(BASE + '/app/pay', { waitUntil: 'networkidle' });
-  await page.waitForTimeout(700);
+  await textReady(page, /connect/i);
   const payAnon = await page.locator('main').innerText();
   check(
     'pay (no wallet): never describes a payment as free while no relayer is deployed',
@@ -465,9 +502,11 @@ const check = (name, pass, detail = '') => {
   const page = await ctx.newPage();
 
   await page.goto(BASE + '/app', { waitUntil: 'networkidle' });
-  await page.waitForTimeout(800);
+  await domReady(page, () => document.querySelector('main') !== null);
   const connected = await connectWallet(page);
-  await page.waitForTimeout(2500);
+  // The account rendering IS the handshake completing; poll for it rather than guessing.
+  await textReady(page, new RegExp(wallet.address.slice(0, 10)));
+  await textReady(page, /No position yet|collateral ratio/i);
 
   const connectedBody = await page.locator('main').innerText();
   check('app: a real injected signer connects', connected, wallet.address);
@@ -497,7 +536,12 @@ const check = (name, pass, detail = '') => {
 
   // --- Vault, connected --------------------------------------------------
   await page.goto(BASE + '/app/vault', { waitUntil: 'networkidle' });
-  await page.waitForTimeout(2000);
+  // The default tab is chosen from the position read, so wait for a tab to be selected.
+  await domReady(page, () =>
+    [...document.querySelectorAll('[role=tab]')].some(
+      (t) => t.getAttribute('aria-selected') === 'true',
+    ),
+  );
   check(
     'vault (empty account): lands on Deposit rather than an unusable Borrow slider',
     (await page.getByRole('tab', { name: 'Deposit' }).getAttribute('aria-selected')) === 'true',
@@ -507,7 +551,7 @@ const check = (name, pass, detail = '') => {
   // ever opens, rather than as a `DepositBelowMinimum` revert the user pays to discover.
   const amountInput = page.locator('input#amount, input[inputmode=decimal]').first();
   await amountInput.fill('0.0001');
-  await page.waitForTimeout(400);
+  await textReady(page, /minimum deposit/i);
   const belowMin = await page.locator('main').innerText();
   check(
     'vault: a deposit under the 0.001 BTC minimum is refused before signing',
@@ -523,8 +567,7 @@ const check = (name, pass, detail = '') => {
   // Borrowing against nothing. The panel refuses rather than showing a slider bounded by
   // zero, which is a control that cannot be moved and explains nothing.
   await page.getByRole('tab', { name: 'Borrow' }).click();
-  await page.waitForTimeout(800);
-  const borrowPanel = await page.locator('main').innerText();
+  const borrowPanel = await textReady(page, /Deposit first/);
   check(
     'vault: borrowing with no collateral explains itself instead of offering a dead slider',
     /Deposit first/.test(borrowPanel),
@@ -532,8 +575,10 @@ const check = (name, pass, detail = '') => {
 
   // --- Activity, connected ------------------------------------------------
   await page.goto(BASE + '/app/activity', { waitUntil: 'networkidle' });
-  await page.waitForTimeout(4000);
-  const activityLive = await page.locator('main').innerText();
+  // A log scan over the whole deployed range; the block-range line is what it produces.
+  const activityLive = await textReady(page, /Read (every block from|blocks)\s/, {
+    timeout: 60_000,
+  });
   check(
     'activity: states the block range it actually read',
     /Read (every block from|blocks)\s/.test(activityLive),
@@ -552,7 +597,7 @@ const check = (name, pass, detail = '') => {
 
   // --- Pay, connected -----------------------------------------------------
   await page.goto(BASE + '/app/pay', { waitUntil: 'networkidle' });
-  await page.waitForTimeout(1500);
+  await domReady(page, () => document.querySelector('#pay-to') !== null);
 
   // `@sele` is registered on matsnet to the deploying account. This resolves it through
   // MarenRegistry.tryResolve — a real read against a real registration.
@@ -576,15 +621,17 @@ const check = (name, pass, detail = '') => {
   // The confirmation sheet, reached through Request — which moves no funds and so works
   // for an account holding no MUSD.
   await page.getByRole('tab', { name: 'Request' }).click();
-  await page.waitForTimeout(600);
+  await page.locator('input[inputmode=decimal]').first().waitFor({ state: 'visible' });
   await page.locator('input[inputmode=decimal]').first().fill('10');
-  await page.waitForTimeout(400);
-  await page
-    .getByRole('button', { name: /^Request / })
-    .last()
-    .click();
-  await page.waitForTimeout(600);
+  const requestButton = page.getByRole('button', { name: /^Request / }).last();
+  await domReady(page, () =>
+    [...document.querySelectorAll('button')].some(
+      (b) => /^Request /.test(b.textContent ?? '') && !b.disabled,
+    ),
+  );
+  await requestButton.click();
   const dialog = page.locator('[role=dialog]');
+  await dialog.waitFor({ state: 'visible', timeout: 15_000 });
   check('pay: confirmation is a modal dialog', (await dialog.count()) === 1);
   check(
     'pay: dialog is aria-modal and labelled',
@@ -597,13 +644,12 @@ const check = (name, pass, detail = '') => {
     dialogText.slice(0, 80).replace(/\n/g, ' '),
   );
   await page.keyboard.press('Escape');
-  await page.waitForTimeout(300);
+  await dialog.waitFor({ state: 'detached', timeout: 10_000 }).catch(() => {});
   check('pay: Escape closes the dialog', (await page.locator('[role=dialog]').count()) === 0);
 
   // --- The handle registration flow --------------------------------------
   await page.getByRole('tab', { name: 'Handle' }).click();
-  await page.waitForTimeout(600);
-  const handlePanel = await page.locator('main').innerText();
+  const handlePanel = await textReady(page, /step 1: commit/i);
   check(
     'handle: registration is presented as two steps with the 60s wait explained',
     /step 1: commit/i.test(handlePanel) &&
@@ -626,8 +672,13 @@ const check = (name, pass, detail = '') => {
     /already registered/i.test(handleStatus),
     'MarenRegistry.available()',
   );
-  // The button's disabled state follows the same read; give React a frame to apply it.
-  await page.waitForTimeout(300);
+  // The button's disabled state follows the same read, so poll for it rather than
+  // assuming React has committed the render by now.
+  await domReady(page, () =>
+    [...document.querySelectorAll('button')].some(
+      (b) => /^Commit/.test(b.textContent ?? '') && b.disabled,
+    ),
+  );
   check(
     'handle: committing to a taken handle is refused',
     await page
@@ -660,85 +711,110 @@ const check = (name, pass, detail = '') => {
   const page = await ctx.newPage();
 
   await page.goto(BASE + '/app/vault', { waitUntil: 'networkidle' });
-  await page.waitForTimeout(1200);
+  await domReady(page, () => document.querySelector('main') !== null);
   await connectWallet(page);
-  await page.waitForTimeout(4000);
+  // The tab strip only renders once the position read lands, which is the handshake
+  // completing. Waiting on it is what the 4s sleep here was standing in for.
+  await domReady(page, () =>
+    [...document.querySelectorAll('[role=tab]')].some(
+      (t) => t.getAttribute('aria-selected') === 'true',
+    ),
+  );
   await page.getByRole('tab', { name: 'Borrow' }).click();
-  await page.waitForTimeout(2500);
+  // The slider's range is a function of live reads, so wait for the control itself.
+  await page.locator('input[type=range]').waitFor({ state: 'visible', timeout: 30_000 });
 
   const borrowPanel = await page.locator('main').innerText();
-  const troveUnderFloor = /the pool itself is fully drawn right now/.test(borrowPanel);
-
-  check(
-    'preflight: the borrow refusal is on the panel BEFORE anything is attempted',
-    troveUnderFloor,
-    'the shared trove is under MIN_TROVE_CR, so no borrow can succeed at any amount',
-  );
-  check(
-    'preflight: the reason is the contract’s own words, not a second copy deck',
-    /This is not about your position/.test(borrowPanel) &&
-      /Your collateral is untouched and you can withdraw it/.test(borrowPanel),
-    'built by describeRevert(), same string the revert carries',
-  );
-  check(
-    'preflight: the refusal names the contract check, so the claim is falsifiable',
-    /TroveCollateralRatioTooLow/.test(borrowPanel),
-  );
-  check(
-    'preflight: the Borrow button is disabled rather than offered',
-    await page
-      .getByRole('button', { name: /^Borrow/ })
-      .last()
-      .isDisabled(),
-  );
-
   const slider = page.locator('input[type=range]');
-  check('preflight: the borrow slider is disabled', await slider.isDisabled());
+
+  /**
+   * THE POOLED TROVE IS ABOVE ITS FLOOR AGAIN, SO THIS SECTION ASSERTS THE OPEN STATE.
+   *
+   * It used to assert the refusal: the trove sat at 152.9% against the vault's 180%
+   * `MIN_TROVE_CR`, no borrow could succeed at any amount, and the whole panel was one
+   * explanation of that. On 17 August the trove was topped up to ~220% with
+   * protocol-owned collateral, and a 30 MUSD borrow from this account now simulates
+   * clean while 40 MUSD is refused at the user's own floor.
+   *
+   * An assertion that still demanded the refusal would now be asserting a lie about the
+   * chain, and would have gone green for exactly the wrong reason. The guarantee being
+   * tested is unchanged and is the one that matters: THE PANEL AGREES WITH THE CONTRACT.
+   * When the contract refuses, the panel refuses first and for free; when the contract
+   * accepts, the panel offers a control whose whole range the contract accepts.
+   */
   check(
-    'preflight: the slider cannot travel into the reverting range',
-    (await slider.getAttribute('aria-valuetext'))?.includes('Borrowing is unavailable') === true,
-    'the control that was dragged to 17.95 MUSD now has no reachable value',
-  );
-  check(
-    'preflight: the disabled slider points at the sentence explaining it',
-    (await slider.getAttribute('aria-describedby')) === 'borrow-blocked',
+    'preflight: with the pooled trove above its floor, borrowing is OFFERED, not refused',
+    !/the pool itself is fully drawn right now/.test(borrowPanel) &&
+      !/TroveCollateralRatioTooLow/.test(borrowPanel),
+    'MarenVault.troveStatus().icr is back above MIN_TROVE_CR',
   );
 
-  // Forcing the click must change nothing at all.
-  await page
-    .getByRole('button', { name: /^Borrow/ })
-    .last()
-    .click({ force: true })
-    .catch(() => {});
-  await page.waitForTimeout(900);
+  const sliderMax = Number((await slider.getAttribute('max')) ?? '0');
   check(
-    'preflight: forcing a click on the disabled control opens no confirmation sheet',
-    (await page.locator('[role=dialog]').count()) === 0,
+    'preflight: the slider has a real range rather than a track bounded by zero',
+    sliderMax > 0 && !(await slider.isDisabled()),
+    `max=${sliderMax}`,
   );
+  check(
+    'preflight: the slider describes the maximum it will actually travel to',
+    /of a maximum/.test((await slider.getAttribute('aria-valuetext')) ?? '') &&
+      !/Borrowing is unavailable/.test((await slider.getAttribute('aria-valuetext')) ?? ''),
+    (await slider.getAttribute('aria-valuetext')) ?? '',
+  );
+
+  const borrowButton = page.getByRole('button', { name: /^Borrow/ }).last();
+  check(
+    'preflight: the Borrow button is enabled at a valid amount',
+    !(await borrowButton.isDisabled()),
+    'the panel defaults to the recommended borrow, which the contract accepts',
+  );
+  check(
+    'preflight: the panel names which ceiling is binding, so the number is falsifiable',
+    /Capped by (Mezo’s per-trove ceiling|Maren’s)/.test(borrowPanel),
+    'borrowCeiling() reports the binding constraint, and the panel states it',
+  );
+
+  /**
+   * The open state has to keep the promise the closed state kept: reaching a confirmation
+   * is not the same as signing. The signer here CANNOT sign, and the measurement is that
+   * nothing ever asked it to. Nothing below is broadcast — the sheet is opened and closed.
+   */
+  await borrowButton.click();
+  const borrowSheet = page.locator('[role=dialog]');
+  await borrowSheet.waitFor({ state: 'visible', timeout: 20_000 });
+  check(
+    'preflight: an offered borrow opens a confirmation, and it is a labelled modal dialog',
+    (await borrowSheet.getAttribute('aria-modal')) === 'true' &&
+      (await borrowSheet.getAttribute('data-tx-phase')) === 'confirm',
+  );
+  await page.keyboard.press('Escape');
+  await borrowSheet.waitFor({ state: 'detached', timeout: 10_000 }).catch(() => {});
   check(
     'preflight: NO SIGNATURE WAS REQUESTED, at any point',
     wallet.signatureRequests.length === 0,
     `${wallet.signatureRequests.length} requests recorded`,
   );
 
-  // Exits stay open while entries are shut. This is the product's own promise and the
-  // preflight has to keep it rather than disabling everything it is unsure about.
+  // Exits stay open. This is the product's own promise, and it holds whether or not
+  // entries happen to be open today.
   await page.getByRole('tab', { name: 'Withdraw' }).click();
-  await page.waitForTimeout(1200);
+  await page.locator('input[inputmode=decimal]').first().waitFor({ state: 'visible' });
   await page.getByRole('button', { name: /BTC$/ }).first().click();
-  await page.waitForTimeout(600);
+  await domReady(page, () => {
+    const el = document.querySelector('input[inputmode=decimal]');
+    return Boolean(el) && el.value !== '' && el.value !== '0';
+  });
   check(
-    'preflight: withdrawal stays OPEN while borrowing is shut',
+    'preflight: withdrawal is OPEN, and is never the thing that closes first',
     !(await page
       .getByRole('button', { name: /^Withdraw/ })
       .last()
       .isDisabled()),
-    'entries close before exits, never the other way round',
+    'if Maren ever closes entries, exits are the last thing to go',
   );
 
   await page.getByRole('tab', { name: 'Repay' }).click();
-  await page.waitForTimeout(1000);
-  const repayPanel = await page.locator('main').innerText();
+  const repayPanel = await textReady(page, /Nothing to repay/);
   check(
     'preflight: repay is disabled WITH A REASON on an account holding no debt',
     /Nothing to repay/.test(repayPanel) &&
@@ -750,9 +826,13 @@ const check = (name, pass, detail = '') => {
 
   // The confirmation sheet, reached through the one vault action that IS available.
   await page.getByRole('tab', { name: 'Deposit' }).click();
-  await page.waitForTimeout(1000);
+  await page.locator('input[inputmode=decimal]').first().waitFor({ state: 'visible' });
   await page.locator('input[inputmode=decimal]').first().fill('0.001');
-  await page.waitForTimeout(500);
+  await domReady(page, () =>
+    [...document.querySelectorAll('button')].some(
+      (b) => /^Deposit/.test(b.textContent ?? '') && !b.disabled,
+    ),
+  );
   await page
     .locator('main')
     .getByRole('button', { name: /^Deposit/ })
@@ -760,7 +840,10 @@ const check = (name, pass, detail = '') => {
     .click();
   const sheet = page.locator('[role=dialog]');
   await sheet.waitFor({ state: 'visible', timeout: 15_000 });
-  await page.waitForTimeout(600);
+  await domReady(page, () => {
+    const d = document.querySelector('[role=dialog]');
+    return Boolean(d) && d.getAttribute('data-tx-phase') === 'confirm';
+  });
   check(
     'sheet: an available action opens a confirmation, and it is a labelled modal dialog',
     (await sheet.getAttribute('aria-modal')) === 'true' &&
@@ -771,7 +854,7 @@ const check = (name, pass, detail = '') => {
     /you pay the/i.test(await sheet.innerText()) && !/no gas/i.test(await sheet.innerText()),
   );
   await page.keyboard.press('Escape');
-  await page.waitForTimeout(400);
+  await sheet.waitFor({ state: 'detached', timeout: 10_000 }).catch(() => {});
   check('sheet: Escape closes it', (await page.locator('[role=dialog]').count()) === 0);
   check(
     'preflight: still no signature requested after opening and closing a sheet',
@@ -781,8 +864,7 @@ const check = (name, pass, detail = '') => {
 
   // --- Pay and Earn: anything needing MUSD, on an account that holds none ---
   await page.goto(BASE + '/app/pay', { waitUntil: 'networkidle' });
-  await page.waitForTimeout(3000);
-  const payLive = await page.locator('main').innerText();
+  const payLive = await textReady(page, /No MUSD to send/);
   check(
     'preflight: Send is disabled with a plain reason when the wallet holds no MUSD',
     /No MUSD to send/.test(payLive) &&
@@ -794,8 +876,7 @@ const check = (name, pass, detail = '') => {
   );
 
   await page.goto(BASE + '/app/earn', { waitUntil: 'networkidle' });
-  await page.waitForTimeout(3000);
-  const earnLive = await page.locator('main').innerText();
+  const earnLive = await textReady(page, /No MUSD to deposit/);
   check(
     'preflight: Earn deposits are disabled with a plain reason on an empty wallet',
     /No MUSD to deposit/.test(earnLive) &&
@@ -816,7 +897,7 @@ const check = (name, pass, detail = '') => {
   });
   const page = await ctx.newPage();
   await page.goto(BASE + '/app', { waitUntil: 'networkidle' });
-  await page.waitForTimeout(900);
+  await textReady(page, /The pooled trove/);
   const canvases = await page.evaluate(() => document.querySelectorAll('canvas').length);
   check('app reduced-motion: no shader canvas mounted', canvases === 0, `canvases=${canvases}`);
   // With no wallet there is no position-health card; the card that must survive
@@ -832,7 +913,7 @@ const check = (name, pass, detail = '') => {
   const page = await ctx.newPage();
   for (const path of ['/app', '/app/vault', '/app/pay', '/app/earn', '/app/activity']) {
     await page.goto(`${BASE}${path}`, { waitUntil: 'networkidle' });
-    await page.waitForTimeout(400);
+    await domReady(page, () => document.querySelector('main') !== null);
     const overflow = await page.evaluate(
       () => document.documentElement.scrollWidth - document.documentElement.clientWidth,
     );

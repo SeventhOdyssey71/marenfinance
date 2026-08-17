@@ -31,7 +31,7 @@ export function ConnectPrompt({
   icon?: ReactNode;
 }) {
   return (
-    <AppCard className="p-6 md:p-10">
+    <AppCard className="p-5">
       <EmptyState icon={icon} title={title} action={<ConnectButton />}>
         {children}
       </EmptyState>

@@ -1,5 +1,6 @@
 import type { ReactNode } from 'react';
 
+import { InfoIcon } from '@/components/ui/icons';
 import { PillAction } from '@/components/ui/pill-button';
 
 /**
@@ -41,9 +42,89 @@ export function Label({ children, className = '' }: { children: ReactNode; class
 }
 
 /**
- * A label/value row on a hairline. `hint` is the place to put the thing a user would
- * otherwise have to know — "includes the 200 MUSD gas compensation" — rather than
- * leaving a figure that quietly means something other than it appears to.
+ * A panel: a hairline card with a compact header bar and rows that run edge to edge.
+ *
+ * This is the shape a lending interface is built from — Aave, Spark, Liquity all do it —
+ * and it is what the dApp was missing. A titled card with `p-6` and an `h3` gives every
+ * group of four numbers the visual weight of a chapter heading; a `t-label` bar over a
+ * hairline gives it the weight of a column header, which is what it is.
+ *
+ * The body carries its own horizontal padding so `StatRow` hairlines reach the panel edge
+ * and the rows read as a table rather than as a stack of paragraphs.
+ */
+export function Panel({
+  title,
+  meta,
+  children,
+  className = '',
+  labelledBy,
+}: {
+  title?: string;
+  /** Right side of the header bar: a health chip, a route tag, a link. */
+  meta?: ReactNode;
+  children: ReactNode;
+  className?: string;
+  labelledBy?: string;
+}) {
+  return (
+    <section
+      className={`card ${className}`}
+      {...(labelledBy ? { 'aria-labelledby': labelledBy } : {})}
+    >
+      {title || meta ? (
+        // A `div`, not a `header`. `<header>` is a landmark, and a page with six panels
+        // would expose six of them — which is how verify-behaviour caught this: the dApp
+        // shell went from one header landmark to four the moment panels shipped.
+        <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2 border-b border-[var(--border-hairline)] px-5 py-3">
+          {title ? (
+            <h2 id={labelledBy} className="t-label text-text-subtle">
+              {title}
+            </h2>
+          ) : (
+            <span />
+          )}
+          {meta ? <div className="flex flex-wrap items-center gap-3">{meta}</div> : null}
+        </div>
+      ) : null}
+      {children}
+    </section>
+  );
+}
+
+/** The row area of a `Panel`. Separate so a panel can also hold a form or a strip. */
+export function PanelBody({
+  children,
+  className = '',
+}: {
+  children: ReactNode;
+  className?: string;
+}) {
+  return <div className={`px-5 py-1.5 ${className}`}>{children}</div>;
+}
+
+/**
+ * A row of figures across the top of a panel, divided by hairlines.
+ *
+ * `divide-x` rather than gaps: on a numbers-forward screen the rule between two figures is
+ * what says they are separate readings of the same thing, and a gap says they are two
+ * unrelated blocks. Stacks to a single column below `sm`, where the divider flips to
+ * horizontal so the same reading survives.
+ */
+export function MetricStrip({ children }: { children: ReactNode }) {
+  return (
+    <div className="grid grid-cols-1 divide-y divide-[var(--border-hairline)] sm:auto-cols-fr sm:grid-flow-col sm:divide-x sm:divide-y-0">
+      {children}
+    </div>
+  );
+}
+
+/**
+ * A label/value row on a hairline, one line tall.
+ *
+ * It used to be two: the label stacked over a `hint`, the value stacked over a `sub`, at
+ * `py-3.5`. Four rows of that is a screen. The hint now rides on the label after a middot
+ * and the sub rides before the value, so a table of eight facts is eight lines. Anything
+ * that genuinely needs a sentence goes behind `Info` at panel level instead.
  */
 export function StatRow({
   label,
@@ -53,6 +134,7 @@ export function StatRow({
   last = false,
 }: {
   label: string;
+  /** A few words, on the same line. Not a sentence — use `Info` for those. */
   hint?: string;
   value: ReactNode;
   sub?: ReactNode;
@@ -60,18 +142,18 @@ export function StatRow({
 }) {
   return (
     <div
-      className={`flex items-start justify-between gap-6 py-3.5 ${
+      className={`flex items-baseline justify-between gap-4 py-2.5 ${
         last ? '' : 'border-b border-[var(--border-hairline)]'
       }`}
     >
-      <div className="min-w-0">
-        <div className="text-text-muted text-sm">{label}</div>
-        {hint ? <div className="text-text-subtle mt-1 text-xs">{hint}</div> : null}
-      </div>
-      <div className="shrink-0 text-right">
-        <div>{value}</div>
-        {sub ? <div className="mt-1">{sub}</div> : null}
-      </div>
+      <span className="text-text-muted min-w-0 truncate text-sm">
+        {label}
+        {hint ? <span className="text-text-subtle"> · {hint}</span> : null}
+      </span>
+      <span className="flex shrink-0 items-baseline gap-3 text-right">
+        {sub ? <span className="text-text-subtle text-xs">{sub}</span> : null}
+        {value}
+      </span>
     </div>
   );
 }
@@ -91,16 +173,19 @@ export function Metric({
   value,
   caption,
   align = 'left',
+  className = '',
 }: {
   label: string;
   value: ReactNode;
   caption?: ReactNode;
   align?: 'left' | 'right';
+  /** Padding when the metric sits in a `MetricStrip` rather than a plain grid. */
+  className?: string;
 }) {
   return (
-    <div className={`min-w-0 ${align === 'right' ? 'text-right' : ''}`}>
+    <div className={`min-w-0 ${align === 'right' ? 'text-right' : ''} ${className}`}>
       <Label>{label}</Label>
-      <div className="mt-2 truncate">{value}</div>
+      <div className="mt-1.5 truncate">{value}</div>
       {/* `text-muted`, not `text-subtle`: a caption that qualifies a headline figure —
           "capped by Mezo's per-trove ceiling" — is decision-relevant, and the subtle
           token measures 3.6:1 against `surface`, under WCAG AA for body text. Subtle is
@@ -136,9 +221,7 @@ export function Info({
   return (
     <details id={id} className="group mt-4">
       <summary className="text-text-muted hover:text-text inline-flex cursor-pointer list-none items-center gap-1.5 rounded-[var(--radius-pill)] text-xs transition-colors duration-[120ms] ease-out marker:content-none">
-        <svg viewBox="0 0 16 16" aria-hidden className="size-3.5 shrink-0" fill="currentColor">
-          <path d="M8 1.5a6.5 6.5 0 100 13 6.5 6.5 0 000-13zm0 1.2a5.3 5.3 0 110 10.6A5.3 5.3 0 018 2.7zm-.75 2.4h1.5v1.5h-1.5V5.1zm0 2.6h1.5v4h-1.5v-4z" />
-        </svg>
+        <InfoIcon className="size-3.5 shrink-0" />
         {summary}
       </summary>
       <div className="text-text-muted mt-2.5 max-w-[68ch] text-xs leading-relaxed">{children}</div>
@@ -165,19 +248,23 @@ export function EmptyState({
   icon?: ReactNode;
 }) {
   return (
-    <div className="flex flex-col items-start gap-4 py-4">
+    // A band, not a column. Stacked, this was a 450px-tall card with content in its
+    // top-left quadrant and nothing anywhere else — the least dense thing on a screen
+    // whose whole point is density. Icon, copy and action now sit on one line from `sm`
+    // up, and the card is a strip.
+    <div className="flex flex-col items-start gap-4 sm:flex-row sm:items-center sm:gap-6">
       {icon ? (
-        <span className="bg-surface-inset grid size-12 place-items-center rounded-[var(--radius-pill)] border border-[var(--border-hairline)] text-violet-400">
+        <span className="bg-surface-inset grid size-11 shrink-0 place-items-center rounded-[var(--radius-pill)] border border-[var(--border-hairline)] text-violet-400">
           {icon}
         </span>
       ) : null}
-      <div>
+      <div className="min-w-0 flex-1">
         <h3 className="t-h3">{title}</h3>
         {children ? (
-          <p className="text-text-muted mt-2 max-w-[52ch] text-sm leading-relaxed">{children}</p>
+          <p className="text-text-muted mt-1.5 max-w-[62ch] text-sm leading-relaxed">{children}</p>
         ) : null}
       </div>
-      {action ? <div className="mt-1">{action}</div> : null}
+      {action ? <div className="shrink-0">{action}</div> : null}
     </div>
   );
 }

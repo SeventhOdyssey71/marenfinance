@@ -298,10 +298,10 @@ Gated on the audit, not on engineering. Which is why the introduction is the ask
 - Have the explorer open on a second screen with the vault address already pasted.
 - Know the deposit tx hash, or have it one keystroke away.
 - Do not use the word "revolutionary". Do not use the word "just".
- a specific list of what went
-wrong. The first one has a published audit that found 7 Critical and 13 High. That is a
-credibility asset, not a liability: we know exactly what to avoid, and the security
-lessons from it are written down as rules the new codebase is checked against.
+  a specific list of what went
+  wrong. The first one has a published audit that found 7 Critical and 13 High. That is a
+  credibility asset, not a liability: we know exactly what to avoid, and the security
+  lessons from it are written down as rules the new codebase is checked against.
 
 **"What went wrong in this build?"**
 Answer it fully; the list is short and it is a strength. Fabricated activity rows with
