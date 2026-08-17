@@ -8,8 +8,8 @@
     "maren-docs-pdf": "./build.mjs"
   },
   "scripts": {
-    "build": "node ./build.mjs",
-    "preview": "node ./preview.mjs"
+    "docs:pdf": "node ./build.mjs",
+    "docs:preview": "node ./preview.mjs"
   },
   "dependencies": {
     "highlight.js": "^11.11.1",
