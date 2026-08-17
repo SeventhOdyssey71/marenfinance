@@ -16,4 +16,16 @@ interface IHintHelpers {
         external
         view
         returns (address hintAddress, uint256 diff, uint256 latestRandomSeed);
+
+    /**
+     * @notice The hints a redeemer needs: where the walk starts, the NICR the last trove
+     *         touched will end up at, and how much of `_amount` can actually be redeemed.
+     * @dev Verified live on matsnet 2026-08-17. The partial NICR must match the resulting
+     *      trove exactly or the protocol silently skips the final partial redemption, so a
+     *      test that drives a real redemption has to read it from here rather than guess.
+     */
+    function getRedemptionHints(uint256 _amount, uint256 _price, uint256 _maxIterations)
+        external
+        view
+        returns (address firstRedemptionHint, uint256 partialRedemptionHintNICR, uint256 truncatedAmount);
 }

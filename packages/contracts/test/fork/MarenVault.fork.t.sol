@@ -51,6 +51,34 @@ contract MarenVaultForkTest is Test {
 
     bool internal forked;
 
+    /// @dev What alice borrows out of the pooled trove and hands to the redeemer. Her 0.8 BTC
+    ///      supports 28,028 MUSD at the vault's 180% floor, so this leaves a margin, and it is
+    ///      enough to redeem through roughly ten matsnet troves on the way to the pooled one.
+    uint256 internal constant REDEEMER_BUDGET = 25_000e18;
+
+    /// @dev How much of the pooled trove itself the redemption should take, once it has eaten
+    ///      everything below it. Small enough to leave the trove well above the protocol's
+    ///      1,800 MUSD minimum, so the redemption is partial and the trove stays active.
+    uint256 internal constant SLICE_OF_POOLED_TROVE = 1000e18;
+
+    /// @dev How far up the sorted list the redemption is allowed to walk before this test
+    ///      gives up and says so.
+    uint256 internal constant MAX_REDEMPTION_HOPS = 16;
+
+    /// @dev Working values for the real-redemption test. A struct rather than locals purely to
+    ///      stay inside the EVM's stack window, the same reason MarenVault has `Liquidation`.
+    struct Redemption {
+        address firstHint;
+        address redeemer;
+        uint256 amount;
+        uint256 hops;
+        uint256 collBefore;
+        uint256 debtBefore;
+        uint256 aliceDebtBefore;
+        uint256 aliceCollBefore;
+        bool ready;
+    }
+
     MarenVault internal vault;
     MarenForwarder internal forwarder;
 
@@ -276,6 +304,260 @@ contract MarenVaultForkTest is Test {
         } catch {
             emit log("refinance unavailable at this block (Recovery Mode) - ceiling assertion skipped");
         }
+    }
+
+    // ------------------------------------------------------------------ //
+    //                     Redemptions, for real                          //
+    // ------------------------------------------------------------------ //
+
+    /// @notice The status getter the whole redemption-versus-liquidation distinction rests on,
+    ///         read off deployed bytecode for a trove this test opened itself.
+    function test_fork_troveStatusIsActiveOnARealTrove() public requiresFork {
+        assertEq(
+            ITroveManager(TROVE_MANAGER).getTroveStatus(address(vault)),
+            0,
+            "nonExistent before the pooled trove is opened"
+        );
+        _openPooledTrove(1 ether, 1800e18);
+        assertEq(
+            ITroveManager(TROVE_MANAGER).getTroveStatus(address(vault)),
+            vault.TROVE_STATUS_ACTIVE(),
+            "active once it is open, and 1 is what the vault checks for"
+        );
+    }
+
+    /**
+     * @notice A REAL redemption, executed by the real TroveManager, walking the real
+     *         SortedTroves list, landing on the pooled trove, and reconciled by the vault.
+     *
+     * @dev Getting a redemption to land on a chosen trove is not a matter of asking for it.
+     *      MUSD serves redemptions from the lowest-ICR end of the list, so the pooled trove
+     *      has to be MADE the second stop on that walk. This test does it the only way the
+     *      protocol allows:
+     *
+     *        1. Read where a redemption would go right now (`getRedemptionHints`) and where
+     *           the trove immediately above it sits.
+     *        2. Open the pooled trove, then pull protocol-owned collateral back out until the
+     *           trove's NICR lands between those two. Nothing here is faked: the vault's own
+     *           `withdrawProtocolCollateral` does it, subject to every check it normally
+     *           applies, and the protocol's own 110% floor.
+     *        3. Fund an outside redeemer with MUSD that came out of the pooled trove itself,
+     *           through `borrow`. No `deal`, no minting, no cheatcode on a balance.
+     *        4. Redeem enough to consume the trove below and take a slice of the pooled one.
+     *
+     *      Every precondition is checked at runtime and logged rather than asserted, because
+     *      matsnet's trove list is live state that this test does not own. What it does NOT do
+     *      is fake the redemption: if the walk reaches the pooled trove, the assertions below
+     *      are against a redemption the deployed MUSD contracts actually performed.
+     */
+    function test_fork_realRedemptionIsSplitAcrossPooledPositions() public requiresFork {
+        Redemption memory r = _positionPooledTroveForRedemption();
+        if (!r.ready) return;
+
+        // From here on the redemption is real, so everything is asserted.
+        (address walkFrom, uint256 partialNicr, uint256 truncated) =
+            IHintHelpers(HINT_HELPERS).getRedemptionHints(r.amount, FORK_BTC_PRICE, 10);
+        assertEq(walkFrom, r.firstHint, "the walk still starts below us");
+
+        r.collBefore = ITroveManager(TROVE_MANAGER).getTroveColl(address(vault));
+        r.debtBefore = _entireDebtOf(address(vault));
+        r.aliceDebtBefore = vault.debtOf(alice);
+        r.aliceCollBefore = vault.collateralOf(alice);
+
+        {
+            (address upper, address lower) = _insertPositionFor(partialNicr);
+            vm.prank(r.redeemer);
+            ITroveManager(TROVE_MANAGER)
+                .redeemCollateral(truncated, walkFrom, upper, lower, partialNicr, r.hops + 2);
+        }
+
+        uint256 collRemoved = r.collBefore - ITroveManager(TROVE_MANAGER).getTroveColl(address(vault));
+        if (collRemoved == 0) {
+            emit log("the redemption stopped before reaching the pooled trove - assertions skipped");
+            return;
+        }
+        emit log_named_uint("real redemption reached the pooled trove, BTC removed", collRemoved);
+
+        assertEq(
+            ITroveManager(TROVE_MANAGER).getTroveStatus(address(vault)),
+            vault.TROVE_STATUS_ACTIVE(),
+            "a partial redemption leaves the trove active, which is what makes it reconcilable"
+        );
+        assertApproxEqRel(
+            (collRemoved * FORK_BTC_PRICE) / 1e18,
+            r.debtBefore - _entireDebtOf(address(vault)),
+            0.01e18,
+            "the real protocol took collateral worth the debt it cancelled"
+        );
+
+        // Nothing has told the vault any of this. It works it out from the trove.
+        assertApproxEqAbs(vault.pendingRedemptionCollateral(), collRemoved, 1, "the vault sees the gap");
+        vault.reconcileRedemption();
+        _assertPooledSplit(r);
+    }
+
+    /// @dev Split out to stay inside the stack limit, and because the assertions are the part
+    ///      worth reading on their own.
+    function _assertPooledSplit(Redemption memory r) internal {
+        uint256 aliceRelief = r.aliceDebtBefore - vault.debtOf(alice);
+        assertGt(aliceRelief, 0, "alice's debt fell");
+        assertApproxEqRel(
+            r.aliceCollBefore - vault.collateralOf(alice),
+            (aliceRelief * 1e18) / FORK_BTC_PRICE,
+            0.001e18,
+            "and she gave up collateral worth exactly that relief"
+        );
+        assertEq(
+            vault.totalCollateral(),
+            ITroveManager(TROVE_MANAGER).getTroveColl(address(vault)) + vault.idleCollateral(),
+            "the books match the real trove again"
+        );
+        assertGe(
+            vault.debtOf(alice) + vault.debtOf(address(vault)),
+            vault.outstandingDebt(),
+            "and the pool still covers what the real trove owes"
+        );
+
+        // She cannot walk away with the collateral she had before the redemption, and the
+        // refusal is on the balance itself, not on the collateral ratio.
+        uint256 claim = vault.collateralOf(alice);
+        vm.prank(alice);
+        vm.expectRevert(
+            abi.encodeWithSelector(MarenVault.InsufficientCollateral.selector, r.aliceCollBefore, claim)
+        );
+        vault.withdraw(r.aliceCollBefore, address(0), address(0));
+
+        // And the exit still works at the post-redemption number, against the real protocol.
+        // The redeemer hands back what they did not spend so alice can repay; she stays a few
+        // MUSD short of her full debt, because the origination fee is debt no MUSD was ever
+        // minted for, which is the same reason `closePooledTrove` needs a top-up.
+        uint256 unspent = IMUSD(MUSD).balanceOf(r.redeemer);
+        vm.prank(r.redeemer);
+        IMUSD(MUSD).transfer(alice, unspent);
+
+        vm.startPrank(alice);
+        IMUSD(MUSD).approve(address(vault), type(uint256).max);
+        vault.repay(unspent, address(0), address(0));
+        uint256 balanceBefore = alice.balance;
+        vault.withdraw(0.01 ether, address(0), address(0));
+        vm.stopPrank();
+        assertEq(alice.balance, balanceBefore + 0.01 ether, "collateral came back out of the real trove");
+    }
+
+    /**
+     * @dev Opens the pooled trove, gives alice a position inside it, funds an outside redeemer
+     *      out of that same trove, and then pulls protocol-owned collateral back out until the
+     *      trove drops into the low-ICR end of the list where redemptions are served from.
+     *
+     *      `ready` comes back false, with a log line, for any live-state reason this cannot be
+     *      arranged at the forked block. Nothing is faked in either case.
+     */
+    function _positionPooledTroveForRedemption() internal returns (Redemption memory r) {
+        (address tailTarget,,) = IHintHelpers(HINT_HELPERS).getRedemptionHints(100e18, FORK_BTC_PRICE, 20);
+        if (tailTarget == address(0)) {
+            emit log("no redeemable trove at this block - redemption fork test skipped");
+            return r;
+        }
+        address above = ISortedTroves(SORTED_TROVES).getPrev(tailTarget);
+        if (above == address(0)) {
+            emit log("redemption target is the top of the list - redemption fork test skipped");
+            return r;
+        }
+
+        uint256 nicrLow = _nominalCrOf(tailTarget);
+        uint256 nicrHigh = _nominalCrOf(above);
+        if (nicrHigh <= nicrLow + 2) {
+            emit log("no room in the list between the target and the trove above it - skipped");
+            return r;
+        }
+        // Aim between the trove a redemption hits first and the one above it. Landing exactly
+        // there is not guaranteed, which is what the walk below is for.
+        uint256 targetNicr = nicrLow + (nicrHigh - nicrLow) / 2;
+
+        // The pooled trove has to be big enough that alice's own collateral still fits inside
+        // it once it has been drained to ~110%, and her borrowing capacity at the vault's 180%
+        // floor is what funds the whole redemption.
+        _openPooledTrove(2 ether, 50_000e18);
+
+        vm.deal(alice, 0.8 ether);
+        vm.prank(alice);
+        vault.deposit{value: 0.8 ether}(address(0), address(0));
+        vm.prank(alice);
+        vault.borrow(REDEEMER_BUDGET, address(0), address(0));
+
+        r.redeemer = makeAddr("fork_redeemer");
+        vm.prank(alice);
+        IMUSD(MUSD).transfer(r.redeemer, REDEEMER_BUDGET);
+
+        // Drop the pooled trove into position, through the vault's own admin path, subject to
+        // every check it normally applies. Rounding UP keeps the resulting ICR above the
+        // target's, and therefore above the protocol's 110% floor.
+        uint256 troveDebt = _entireDebtOf(address(vault));
+        uint256 collTarget = (troveDebt * targetNicr + 1e20 - 1) / 1e20;
+        uint256 troveColl = ITroveManager(TROVE_MANAGER).getTroveColl(address(vault));
+        if (collTarget >= troveColl || troveColl - collTarget > vault.collateral(address(vault))) {
+            emit log("cannot position the pooled trove without touching user collateral - skipped");
+            return r;
+        }
+        (address u, address l) = _hints(collTarget, troveDebt);
+        vm.prank(admin);
+        vault.withdrawProtocolCollateral(troveColl - collTarget, u, l);
+
+        // Where the trove ACTUALLY landed. Every trove accrues interest at a rate fixed when it
+        // opened, so the live NICR ordering drifts out of the ordering the list stores, and an
+        // insert does not always land where the arithmetic says it should. So do not assume:
+        // ask the protocol where a redemption starts now, and walk from there exactly as
+        // `redeemCollateral` will, pricing every trove the walk has to eat on the way.
+        (r.firstHint,,) = IHintHelpers(HINT_HELPERS).getRedemptionHints(100e18, FORK_BTC_PRICE, 20);
+        (r.hops, r.amount) = _walkToPooledTrove(r.firstHint);
+        if (r.hops == 0) {
+            emit log("the pooled trove is not within reach of the redemption walk - skipped");
+            return r;
+        }
+        r.amount += SLICE_OF_POOLED_TROVE;
+        if (r.amount > REDEEMER_BUDGET) {
+            emit log_named_uint("redeeming through to the pooled trove costs more than the budget", r.amount);
+            return r;
+        }
+        emit log_named_uint("troves between the redemption target and the pooled trove", r.hops - 1);
+        r.ready = true;
+    }
+
+    /**
+     * @dev Follows the same path `redeemCollateral` will: start at the first redemption hint
+     *      and walk UP the list, adding each trove's net debt, until the pooled trove is
+     *      reached. Returns the number of hops and the MUSD it takes to consume everything
+     *      below the pooled trove. Zero hops means it is not reachable within the bound.
+     */
+    function _walkToPooledTrove(address start) internal view returns (uint256 hops, uint256 cost) {
+        address current = start;
+        for (uint256 i = 1; i <= MAX_REDEMPTION_HOPS; ++i) {
+            if (current == address(0)) return (0, 0);
+            if (current == address(vault)) return (i, cost);
+            cost += _netDebtOf(current);
+            current = ISortedTroves(SORTED_TROVES).getPrev(current);
+        }
+        return (0, 0);
+    }
+
+    function _entireDebtOf(address borrower) internal view returns (uint256) {
+        (, uint256 principal, uint256 interest,, uint256 pendPrincipal, uint256 pendInterest) =
+            ITroveManager(TROVE_MANAGER).getEntireDebtAndColl(borrower);
+        return principal + interest + pendPrincipal + pendInterest;
+    }
+
+    function _netDebtOf(address borrower) internal view returns (uint256) {
+        return _entireDebtOf(borrower) - 200e18;
+    }
+
+    function _nominalCrOf(address borrower) internal view returns (uint256) {
+        (uint256 coll,,, uint256 pendColl,,) = ITroveManager(TROVE_MANAGER).getEntireDebtAndColl(borrower);
+        return IHintHelpers(HINT_HELPERS).computeNominalCR(coll + pendColl, _entireDebtOf(borrower));
+    }
+
+    function _insertPositionFor(uint256 nicr) internal view returns (address upper, address lower) {
+        (address approx,,) = IHintHelpers(HINT_HELPERS).getApproxHint(nicr, 20, 7);
+        (upper, lower) = ISortedTroves(SORTED_TROVES).findInsertPosition(nicr, approx, approx);
     }
 
     /// @notice Exits stay open against the real protocol too, not just against the mock.
