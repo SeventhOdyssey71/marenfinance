@@ -236,10 +236,12 @@ async function sceneConnect(ctx) {
       .getByRole('menuitem')
       .filter({ hasNotText: /Disconnect/i })
       .first();
-    if (!(await option.waitFor({ state: 'visible', timeout: 8_000 }).then(
-      () => true,
-      () => false,
-    ))) {
+    if (
+      !(await option.waitFor({ state: 'visible', timeout: 8_000 }).then(
+        () => true,
+        () => false,
+      ))
+    ) {
       await page.keyboard.press('Escape').catch(() => {});
       return false;
     }
@@ -321,7 +323,10 @@ async function scenePortfolio(ctx) {
   if ((await health.count()) > 0) {
     await centre(page, health, { duration: 1_200, bias: 0.34 });
     await pointer.moveToElement(health, { duration: 1_000, settle: 0 }).catch(() => {});
-    seen.health = (await health.locator('..').innerText()).replace(/\s+/g, ' ').trim().slice(0, 160);
+    seen.health = (await health.locator('..').innerText())
+      .replace(/\s+/g, ' ')
+      .trim()
+      .slice(0, 160);
     log(`  health: ${seen.health}`);
     await sleep(BEATS.dwell);
   }
@@ -331,7 +336,10 @@ async function scenePortfolio(ctx) {
   if ((await capacity.count()) > 0) {
     await centre(page, capacity, { duration: 1_300, bias: 0.34 });
     await pointer.moveToElement(capacity, { duration: 900, settle: 0 }).catch(() => {});
-    seen.capacity = (await capacity.locator('..').innerText()).replace(/\s+/g, ' ').trim().slice(0, 200);
+    seen.capacity = (await capacity.locator('..').innerText())
+      .replace(/\s+/g, ' ')
+      .trim()
+      .slice(0, 200);
     log(`  capacity: ${seen.capacity}`);
     await sleep(BEATS.dwell);
   }
@@ -526,9 +534,7 @@ async function sceneEarn(ctx) {
 
   // Either the realised-yield card (an account with gains) or the empty state (this one).
   // Both are true; whichever is present gets the same hold.
-  const result = page
-    .getByText(/Realised over the last|No return to report yet/i)
-    .first();
+  const result = page.getByText(/Realised over the last|No return to report yet/i).first();
   if ((await result.count()) > 0) {
     await centre(page, result, { duration: 1_100, bias: 0.4 });
     await pointer.moveToElement(result, { duration: 900, settle: 0 }).catch(() => {});
@@ -577,9 +583,7 @@ async function sceneActivity(ctx) {
     // and the amount live.
     const firstRow = rows.first().locator('xpath=ancestor::div[2]');
     await pointer.moveToElement(rows.first(), { duration: 1_000, settle: 0 }).catch(() => {});
-    seen.firstRow = (await firstRow.innerText().catch(() => ''))
-      .replace(/\s+/g, ' ')
-      .trim();
+    seen.firstRow = (await firstRow.innerText().catch(() => '')).replace(/\s+/g, ' ').trim();
     log(`  first row: ${seen.firstRow}`);
     await sleep(BEATS.dwell);
   } else {
@@ -593,9 +597,7 @@ async function sceneActivity(ctx) {
 
   // The closing shot: the link out to the explorer, where every figure in this video can be
   // checked by hand.
-  const explorer = page
-    .getByRole('link', { name: /open on|explorer|blockscout|view on/i })
-    .first();
+  const explorer = page.getByRole('link', { name: /open on|explorer|blockscout|view on/i }).first();
   if ((await explorer.count()) > 0) {
     await centre(page, explorer, { duration: 1_100, bias: 0.45 }).catch(() => {});
     await pointer.moveToElement(explorer, { duration: 1_200, settle: 0 });
