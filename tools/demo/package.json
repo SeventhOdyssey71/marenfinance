@@ -1,0 +1,17 @@
+{
+  "name": "@maren/demo",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Screen-recorded walkthrough of the Maren Finance web app, driven by Playwright.",
+  "type": "module",
+  "bin": {
+    "maren-demo-record": "./record.mjs"
+  },
+  "scripts": {
+    "record": "node ./record.mjs",
+    "browsers": "playwright-core install chromium ffmpeg"
+  },
+  "dependencies": {
+    "playwright-core": "1.62.1"
+  }
+}

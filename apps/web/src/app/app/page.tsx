@@ -88,8 +88,18 @@ export default function PortfolioPage() {
    */
   const empty = position !== undefined && position.collateralWei === 0n && position.debtWei === 0n;
 
+  /**
+   * Deposited but not yet borrowed. This account has collateral and zero debt, which
+   * means it has NO health figure: no ratio (it would be infinite), no liquidation
+   * price (nothing can be liquidated), no distance-to-anything. Rendering the gauge
+   * here produced an infinity symbol, two dashes, and a marker pinned to the end of a
+   * scale that measures nothing — a dashboard of placeholders where the only real fact
+   * is "you have Bitcoin deposited and you could borrow against it".
+   */
+  const debtFree = position !== undefined && !empty && position.debtWei === 0n;
+
   const health =
-    position && livePrice && !empty
+    position && livePrice && !empty && !debtFree
       ? assessHealth(position.collateralWei, position.debtWei, livePrice)
       : null;
 
@@ -113,7 +123,40 @@ export default function PortfolioPage() {
       </div>
 
       {/* ---------------------------------------------------------------- Hero */}
-      {health && position ? (
+      {debtFree && position ? (
+        <AppCard className="p-6 md:p-8">
+          <div className="flex flex-wrap items-center justify-between gap-4">
+            <CardTitle>Position health</CardTitle>
+            <span className="text-text-muted rounded-[var(--radius-pill)] border border-[var(--border-hairline)] px-3 py-1 text-xs">
+              No debt
+            </span>
+          </div>
+
+          <div className="mt-6 flex flex-wrap items-baseline gap-3">
+            <Btc wei={position.collateralWei} size="xl" />
+            <span className="text-text-subtle text-sm">
+              deposited
+              {collateralUsd !== null ? (
+                <>
+                  {' '}
+                  · worth <Usd wei={collateralUsd} size="sm" />
+                </>
+              ) : null}
+            </span>
+          </div>
+
+          <p className="text-text-muted mt-5 max-w-[64ch] text-sm leading-relaxed">
+            Nothing borrowed, so there is no collateral ratio and no liquidation price. Your Bitcoin
+            cannot be liquidated while your debt is zero.
+          </p>
+
+          <div className="mt-6 border-t border-[var(--border-hairline)] pt-5">
+            <ActionLink href="/app/vault" icon={<ArrowRight className="size-4" />}>
+              Borrow MUSD against it
+            </ActionLink>
+          </div>
+        </AppCard>
+      ) : health && position ? (
         <LivePulseFrame colors={toneShaderColors[healthTone[health.status]]}>
           <AppCard className="p-6 md:p-8">
             <div className="flex flex-wrap items-center justify-between gap-4">
@@ -578,9 +621,9 @@ function QuickLink({
   return (
     <Link
       href={href}
-      className="card hover:bg-surface-raised group flex items-center gap-4 p-5 transition-colors duration-[120ms] ease-out"
+      className="card group flex items-center gap-4 p-5 transition-colors duration-[120ms] ease-out hover:border-[var(--border-strong)]"
     >
-      <span className="bg-surface-raised grid size-10 shrink-0 place-items-center rounded-[var(--radius-pill)] border border-[var(--border-hairline)] text-violet-400">
+      <span className="grid size-10 shrink-0 place-items-center rounded-[var(--radius-pill)] border border-[var(--border-hairline)] text-violet-400">
         {icon}
       </span>
       <span className="min-w-0">

@@ -100,12 +100,27 @@ case, since one is an error and the other is a legitimate boundary.
 
 - **A gasless meta-transaction through `MarenRelayHub`.** The hub is deployed, verified,
   and wired as `MarenPay`'s trusted forwarder, but no relayed call has been broadcast.
-- **A user borrow, and therefore a gasless MUSD payment.** Blocked by finding 1: the
-  trove is at 154% and the floor is 180%. It needs roughly 0.008 BTC more collateral.
+- **A user borrow, and therefore a gasless MUSD payment.** Unblocked on 17 August: the
+  pooled trove was topped up to **220% ICR** (protocol-owned collateral, two
+  transactions below) and a 30 MUSD borrow from the test wallet now simulates clean,
+  with 40 MUSD correctly refused at the user's own 180% floor. The borrow itself has
+  not been broadcast yet.
 - **`MarenEarn` deposit into the Stability Pool.**
 
-None of these is blocked by anything unknown. They need ~0.01 BTC more of testnet
-collateral, which is one more faucet drip.
+### The top-up, 17 August 2026
+
+Deployer pushed 0.0211 BTC of protocol collateral through `depositProtocolCollateral` +
+`topUpCollateral` (KEEPER_ROLE), taking the pooled trove from 152.9% to **220.03% ICR**
+with zero idle left:
+
+- `0x968dd8d9b849655e11cc908f9b8fcd3ef417ae414e5ac8e8a16668e9fd48a8c8` — deposit; the
+  inline push reverted inside `_tryPushCollateral`'s catch and the BTC landed idle
+- `0xdc0030b9b16b1fb24a3a329e5b113253ff4b0c1096b1c5712d8a44fe2c4d3cb8` — keeper
+  `topUpCollateral` swept all 0.0211 BTC into the trove
+
+That first transaction is finding 2 wearing new clothes: **the deposit path reported
+success while the push silently failed**, and only reading `idleCollateral` afterwards
+revealed it. One more argument for making the silent catches loud.
 
 ## Mainnet (chain 31612)
 

@@ -116,7 +116,7 @@ pooled vault uncapped without a review. That is a commitment, not a caveat.
 
 ## Why these numbers
 
-Mezo mainnet currently has **26 troves** against **29,360 MUSD holders**. The gap between
+Mezo mainnet currently has **27 troves** against **roughly 29,360 MUSD holders** (16 August 2026). The gap between
 those two figures is the entire thesis: tens of thousands of people hold MUSD and
 almost none of them can mint it, because the protocol's 1,800 MUSD minimum net debt
 requires roughly **0.079 BTC (~$5,000)** of collateral at a responsible ratio.
@@ -128,7 +128,7 @@ hit.
 
 The $250,000 borrowed figure is deliberately modest relative to the position count,
 because the users this product is built for are, by definition, small. The point is not
-volume. The point is that the borrower base stops being 26 people.
+volume. The point is that the borrower base stops being a few dozen people.
 
 ---
 
@@ -201,7 +201,7 @@ Stated plainly, so it can be held against the outcome.
   manifest copied from the docs fails to deploy), and to several dead RPC hosts in the
   developer documentation. These are prepared and will be offered regardless of the
   grant's outcome.
-- **A consumer surface for MUSD.** MUSD has 29,360 holders and, today, nowhere
+- **A consumer surface for MUSD.** MUSD has more than 29,000 holders and, today, nowhere
   consumer-grade to spend it.
 
 ---
