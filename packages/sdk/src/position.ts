@@ -144,6 +144,28 @@ export interface PositionHealth {
 }
 
 /**
+ * Classify a ratio that has ALREADY been measured.
+ *
+ * This exists for the pooled trove, whose ratio arrives from `MarenVault.troveStatus()`
+ * as a single number rather than as a collateral and a debt. Recomputing it from the two
+ * figures beside it would produce a second answer that can disagree with the one the
+ * contract ranks and liquidates on, in the last decimal place, on exactly the day it
+ * matters. The sentinel at or above `MAX_CR` is the no-debt case, which `troveStatus()`
+ * reports as `type(uint256).max` before the trove is seeded.
+ *
+ * Thresholds are Maren's product policy and are deliberately far stricter than the
+ * protocol's 110% cliff — see MAREN_POLICY in constants.ts.
+ */
+export function classifyRatio(cr: bigint): HealthStatus {
+  if (cr >= MAX_CR) return 'none';
+  if (cr < MCR) return 'liquidatable';
+  if (cr < MAREN_POLICY.vaultLiquidationCr) return 'danger';
+  if (cr < MAREN_POLICY.warnCr) return 'warning';
+  if (cr < MAREN_POLICY.minHealthyCr) return 'caution';
+  return 'healthy';
+}
+
+/**
  * Classify a position. Thresholds are Maren's product policy and are deliberately far
  * stricter than the protocol's 110% cliff — see MAREN_POLICY in constants.ts.
  */
@@ -153,14 +175,7 @@ export function assessHealth(
   priceWei: bigint,
 ): PositionHealth {
   const cr = collateralRatio(collateralWei, debtWei, priceWei);
-
-  let status: HealthStatus;
-  if (debtWei === 0n) status = 'none';
-  else if (cr < MCR) status = 'liquidatable';
-  else if (cr < MAREN_POLICY.vaultLiquidationCr) status = 'danger';
-  else if (cr < MAREN_POLICY.warnCr) status = 'warning';
-  else if (cr < MAREN_POLICY.minHealthyCr) status = 'caution';
-  else status = 'healthy';
+  const status: HealthStatus = debtWei === 0n ? 'none' : classifyRatio(cr);
 
   return {
     status,
