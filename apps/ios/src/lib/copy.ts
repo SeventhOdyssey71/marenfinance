@@ -26,19 +26,19 @@ import type { ActivityKind, ActivityStatus } from '../data/types';
  */
 export const gasCopy = {
   /** Headline on a screen whose actions are all relayed. */
-  sponsoredTitle: 'Gasless — you pay no BTC',
+  sponsoredTitle: 'Gasless: you pay no BTC',
   sponsoredBody:
     'You sign an EIP-712 message; Maren’s relayer submits it and pays the BTC gas. Your Bitcoin stays collateral.',
 
   /** Headline on the one action that cannot be relayed. */
   unsponsoredTitle: 'This deposit costs BTC gas',
   unsponsoredBody:
-    'Deposits send Bitcoin, and a relayer cannot carry your BTC for you — so this one transaction you sign and pay for yourself. Every action after it, including borrowing and every payment, is gasless.',
+    'Deposits send Bitcoin, and a relayer cannot carry your BTC for you. This one transaction you sign and pay for yourself. Every action after it, including borrowing and every payment, is gasless.',
 
   /** The honest one-liner for onboarding and marketing surfaces. */
   onboardingTitle: 'Spend without gas',
   onboardingBody:
-    'Mezo charges gas in BTC. Your first deposit is an ordinary transaction you pay for — after that Maren’s relayer pays the gas on everything, so you can borrow and spend MUSD without keeping a BTC balance. You sign; we settle.',
+    'Mezo charges gas in BTC. Your first deposit is an ordinary transaction you pay for. After that Maren’s relayer pays the gas on everything, so you can borrow and spend MUSD without keeping a BTC balance. You sign; we settle.',
 } as const;
 
 /** Caption under the drop-to-liquidation figure. */
@@ -81,7 +81,7 @@ export function statusLabel(status: ActivityStatus): string {
     case 'confirmed':
       return 'Confirmed';
     case 'failed':
-      return 'Failed — no funds moved';
+      return 'Failed, no funds moved';
   }
 }
 

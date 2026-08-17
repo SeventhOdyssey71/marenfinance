@@ -60,7 +60,7 @@ export default function Scan() {
         </Txt>
         <Txt variant="body" tone="muted" style={styles.permissionBody}>
           Maren uses the camera only to read payment QR codes. Nothing is recorded, stored or
-          uploaded — the frame is decoded on device and discarded.
+          uploaded. The frame is decoded on device and discarded.
         </Txt>
         <PillButton label="Allow camera" onPress={requestPermission} style={styles.permissionCta} />
         <PillButton label="Not now" variant="ghost" onPress={() => router.back()} />

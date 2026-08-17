@@ -88,8 +88,18 @@ export default function PortfolioPage() {
    */
   const empty = position !== undefined && position.collateralWei === 0n && position.debtWei === 0n;
 
+  /**
+   * Deposited but not yet borrowed. This account has collateral and zero debt, which
+   * means it has NO health figure: no ratio (it would be infinite), no liquidation
+   * price (nothing can be liquidated), no distance-to-anything. Rendering the gauge
+   * here produced an infinity symbol, two dashes, and a marker pinned to the end of a
+   * scale that measures nothing — a dashboard of placeholders where the only real fact
+   * is "you have Bitcoin deposited and you could borrow against it".
+   */
+  const debtFree = position !== undefined && !empty && position.debtWei === 0n;
+
   const health =
-    position && livePrice && !empty
+    position && livePrice && !empty && !debtFree
       ? assessHealth(position.collateralWei, position.debtWei, livePrice)
       : null;
 
@@ -113,7 +123,40 @@ export default function PortfolioPage() {
       </div>
 
       {/* ---------------------------------------------------------------- Hero */}
-      {health && position ? (
+      {debtFree && position ? (
+        <AppCard className="p-6 md:p-8">
+          <div className="flex flex-wrap items-center justify-between gap-4">
+            <CardTitle>Position health</CardTitle>
+            <span className="text-text-muted rounded-[var(--radius-pill)] border border-[var(--border-hairline)] px-3 py-1 text-xs">
+              No debt
+            </span>
+          </div>
+
+          <div className="mt-6 flex flex-wrap items-baseline gap-3">
+            <Btc wei={position.collateralWei} size="xl" />
+            <span className="text-text-subtle text-sm">
+              deposited
+              {collateralUsd !== null ? (
+                <>
+                  {' '}
+                  · worth <Usd wei={collateralUsd} size="sm" />
+                </>
+              ) : null}
+            </span>
+          </div>
+
+          <p className="text-text-muted mt-5 max-w-[64ch] text-sm leading-relaxed">
+            Nothing borrowed, so there is no collateral ratio and no liquidation price. Your Bitcoin
+            cannot be liquidated while your debt is zero.
+          </p>
+
+          <div className="mt-6 border-t border-[var(--border-hairline)] pt-5">
+            <ActionLink href="/app/vault" icon={<ArrowRight className="size-4" />}>
+              Borrow MUSD against it
+            </ActionLink>
+          </div>
+        </AppCard>
+      ) : health && position ? (
         <LivePulseFrame colors={toneShaderColors[healthTone[health.status]]}>
           <AppCard className="p-6 md:p-8">
             <div className="flex flex-wrap items-center justify-between gap-4">
@@ -285,7 +328,7 @@ export default function PortfolioPage() {
           {activity && recent.length === 0 ? (
             <p className="text-text-subtle py-3 text-sm">
               {activity.complete
-                ? 'Nothing yet — this account has never transacted with Maren.'
+                ? 'Nothing yet. This account has never transacted with Maren.'
                 : 'Nothing in the blocks we can scan. See Activity for the range.'}
             </p>
           ) : null}
@@ -320,8 +363,8 @@ function GasCard() {
         action is submitted by your own wallet.
       </p>
       <p className="text-text-muted mt-2 max-w-[68ch] text-sm leading-relaxed">
-        <strong className="text-text font-medium">Your first deposit costs gas</strong> — and always
-        will, even once the relayer runs: it carries Bitcoin with the call, and the relay hub
+        <strong className="text-text font-medium">Your first deposit costs gas</strong>, and always
+        will, even once the relayer runs. It carries Bitcoin with the call, and the relay hub
         refuses any request with value.
       </p>
       <Info summary="What sponsorship would change">
@@ -409,13 +452,13 @@ function BorrowingCapacity() {
         {position.route === 'pooled' ? (
           <>
             This ceiling belongs to the pooled trove and is shared by everyone inside it. Your own
-            limit is Maren’s 180% floor on your share — whichever binds first stops the transaction.
+            limit is Maren’s 180% floor on your share. Whichever binds first stops the transaction.
           </>
         ) : (
           <>
             Mezo fixes a per-trove ceiling at the price the trove opened at, and reports it from{' '}
             <span className="num">TroveManager.getTroveMaxBorrowingCapacity()</span> rather than
-            deriving it from your collateral ratio. Adding collateral does not raise it — only a
+            deriving it from your collateral ratio. Adding collateral does not raise it. Only a
             refinance does, which re-fixes the ceiling at today’s price for a fee and is blocked
             while the system is in Recovery Mode.
           </>
@@ -531,7 +574,7 @@ function NotConnected() {
       </div>
 
       <ConnectPrompt icon={<VaultIcon className="size-6" />} title="No wallet connected">
-        Maren shows you your own position and nothing else — there is no sample account to look at.
+        Maren shows you your own position and nothing else. There is no sample account to look at.
         Connect and every figure on this screen becomes a contract read you can check on the
         explorer.
       </ConnectPrompt>
@@ -578,9 +621,9 @@ function QuickLink({
   return (
     <Link
       href={href}
-      className="card hover:bg-surface-raised group flex items-center gap-4 p-5 transition-colors duration-[120ms] ease-out"
+      className="card group flex items-center gap-4 p-5 transition-colors duration-[120ms] ease-out hover:border-[var(--border-strong)]"
     >
-      <span className="bg-surface-raised grid size-10 shrink-0 place-items-center rounded-[var(--radius-pill)] border border-[var(--border-hairline)] text-violet-400">
+      <span className="grid size-10 shrink-0 place-items-center rounded-[var(--radius-pill)] border border-[var(--border-hairline)] text-violet-400">
         {icon}
       </span>
       <span className="min-w-0">

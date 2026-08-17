@@ -13,7 +13,9 @@ Mezo runs the same pattern in production ("Get Gas"): user signs a permit, a bac
 relay submits. This is well-trodden ground.
 
 **The economics are not the hard part.** Mezo's base fee is 1,300,000 wei, so a
-100,000-gas transaction costs about **$0.0092**. Sponsoring a million transactions
+100,000-gas transaction costs about **$0.0092** at the 1,462,500 wei gas price. (Mezo's
+*base fee* is lower, 1,300,000 wei or $0.0082 — but a sponsor pays gas price, so $0.0092
+is the number that matters here.) Sponsoring a million transactions
 costs roughly **$9,200**. Sponsorship is cheap. _Abuse control is the actual
 engineering problem_, and that is what most of this codebase is.
 

@@ -1,12 +1,20 @@
 import { PillButton } from './ui/pill-button';
 import { EyebrowPill } from './ui/section';
-import { ArrowDown } from './ui/icons';
+import { ArrowUpRight } from './ui/icons';
 import { HeroMesh } from './shaders/hero-mesh';
 
+/**
+ * Three facts, each one readable off the contracts today.
+ *
+ * The third used to be "25 — Free actions, once relayed", which is a promise about a
+ * relayer that is deployed nowhere. The rest of this codebase spent a whole pass deleting
+ * claims of that shape; leaving one above the fold, where it is the first number anybody
+ * sees, was the loudest remaining instance. The borrow rate is fixed, on-chain and true.
+ */
 const heroFacts = [
   { value: '0.001 BTC', label: 'Minimum deposit' },
   { value: '140%', label: 'Maren liquidation CR' },
-  { value: '25', label: 'Free actions, once relayed' },
+  { value: '1.00%', label: 'Fixed borrow APR' },
 ] as const;
 
 export function Hero() {
@@ -51,12 +59,19 @@ export function Hero() {
 
           <p className="text-text-muted mx-auto mt-6 max-w-[42rem] text-[1.0625rem] leading-relaxed">
             Deposit from <span className="num text-text">0.001 BTC</span>, draw MUSD against it, and
-            pay anyone — without selling a satoshi.
+            pay anyone without selling a satoshi.
           </p>
 
           <div className="mt-9 flex flex-col items-center gap-3 sm:flex-row sm:justify-center">
             <PillButton href="/app">Launch App</PillButton>
-            <PillButton href="#problem" variant="secondary" icon={<ArrowDown className="size-4" />}>
+            {/* Same up-right arrow as Launch App. The two pills sit side by side and a
+                down arrow next to an up-right one read as two different kinds of action
+                when both are simply "go and read this". */}
+            <PillButton
+              href="#problem"
+              variant="secondary"
+              icon={<ArrowUpRight className="size-4" />}
+            >
               Read the thesis
             </PillButton>
           </div>

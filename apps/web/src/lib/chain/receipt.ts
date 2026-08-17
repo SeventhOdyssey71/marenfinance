@@ -97,7 +97,7 @@ export function describeOutcome(outcome: TxOutcome): { title: string; detail: st
       return {
         title: 'Not confirmed yet',
         detail:
-          'No receipt within the timeout. This is not a failure — the transaction may still be included. Check Activity before retrying.',
+          'No receipt within the timeout. This is not a failure. The transaction may still be included. Check Activity before retrying.',
       };
     case 'unreachable':
       return {

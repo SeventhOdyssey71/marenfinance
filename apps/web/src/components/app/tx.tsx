@@ -315,7 +315,8 @@ export function TxSheet({ runner }: { runner: TxRunner }) {
         onClick={() => !busy && runner.close()}
         className="bg-[#08080A]/78 absolute inset-0 cursor-default backdrop-blur-lg"
       />
-
+      {/* `card-modal`, not `card`: cards are border-only now, and a transparent dialog
+          would show the screen it is interrupting straight through itself. */}
       <div
         ref={dialogRef}
         role="dialog"
@@ -434,7 +435,7 @@ function Confirming({
       ) : null}
       {signing ? (
         <p className="text-text-muted mt-3 max-w-[52ch] text-sm leading-relaxed">
-          It would succeed against the chain as it is right now. Approve it in your wallet — this is
+          It would succeed against the chain as it is right now. Approve it in your wallet. This is
           the only signature this action needs.
         </p>
       ) : null}
@@ -489,7 +490,7 @@ function Pending({ intent, hash }: { intent: TxIntent; hash: Hash }) {
         {intent.title}
       </h2>
       <p className="text-text-muted mt-3 max-w-[52ch] text-sm leading-relaxed">
-        Waiting for a receipt. A transaction hash is not a result — nothing is marked delivered
+        Waiting for a receipt. A transaction hash is not a result, so nothing is marked delivered
         until the chain returns one with <span className="num">status success</span>.
       </p>
       {/* The explorer link appears WITH THE HASH, not with the receipt. A user watching a
@@ -680,11 +681,24 @@ function HashLine({ hash }: { hash: Hash }) {
         className="num text-text-muted hover:text-text inline-flex items-center gap-2 rounded-[var(--radius-pill)] text-xs transition-colors duration-[120ms] ease-out"
       >
         <span data-tx-hash>{shortHash(hash)}</span>
-        {copied ? (
-          <Check aria-hidden className="text-success size-3.5" />
-        ) : (
-          <CopyIcon aria-hidden className="size-3.5" />
-        )}
+        {/* Cross-fade on swap, not a snap: the copy glyph fades, shrinks and blurs
+            out while the check enters the same way, so the state change reads as
+            motion rather than a replacement. Both glyphs stay mounted and stacked;
+            the transition names opacity, transform and filter — nothing else. */}
+        <span className="relative grid size-3.5 place-items-center">
+          <CopyIcon
+            aria-hidden
+            className={`absolute transition-[opacity,transform,filter] duration-150 ease-out ${
+              copied ? 'scale-50 opacity-0 blur-[2px]' : 'scale-100 opacity-100 blur-0'
+            }`}
+          />
+          <Check
+            aria-hidden
+            className={`text-success absolute transition-[opacity,transform,filter] duration-150 ease-out ${
+              copied ? 'scale-100 opacity-100 blur-0' : 'scale-50 opacity-0 blur-[2px]'
+            }`}
+          />
+        </span>
         <span className="sr-only">{copied ? 'Copied' : 'Copy the full transaction hash'}</span>
       </button>
       <a

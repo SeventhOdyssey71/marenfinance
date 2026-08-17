@@ -325,7 +325,7 @@ function describe(name: string, args: readonly unknown[]): RevertReason {
         title: 'The shared trove is too thin to lend against',
         detail:
           `Borrowing would leave Maren's pooled trove at ${percent(n(0))}, under the ` +
-          `${percent(n(1))} floor it has to keep. This is not about your position — the pool ` +
+          `${percent(n(1))} floor it has to keep. This is not about your position. The pool ` +
           `itself is fully drawn right now, so no new MUSD can come out of it until someone ` +
           `deposits more Bitcoin or repays. Your collateral is untouched and you can withdraw it.`,
       };
@@ -361,7 +361,7 @@ function describe(name: string, args: readonly unknown[]): RevertReason {
         name,
         title: 'Borrowing is paused',
         detail:
-          'A guardian has halted new borrowing. Repay and withdraw stay open — Maren closes ' +
+          'A guardian has halted new borrowing. Repay and withdraw stay open. Maren closes ' +
           'entries before exits, never the other way round.',
       };
     case 'DepositBelowMinimum':
@@ -521,8 +521,8 @@ function describe(name: string, args: readonly unknown[]): RevertReason {
         name,
         title: 'Debt is still outstanding',
         detail:
-          'This cannot be closed while MUSD is still owed against it. Repay in full first — ' +
-          'repayment is never paused.',
+          'This cannot be closed while MUSD is still owed against it. Repay in full first. ' +
+          'Repayment is never paused.',
       };
     case 'CollateralTransferFailed':
       return {
@@ -586,7 +586,7 @@ function describe(name: string, args: readonly unknown[]): RevertReason {
         name,
         title: 'Too early to reclaim',
         detail:
-          'A link can only be reclaimed after it expires — until then the escrow belongs to ' +
+          'A link can only be reclaimed after it expires. Until then the escrow belongs to ' +
           'whoever holds the link.',
       };
     case 'NotLinkCreator':
@@ -687,7 +687,7 @@ function describe(name: string, args: readonly unknown[]): RevertReason {
         name,
         title: 'The contract refused this',
         detail:
-          `${name}${args.length > 0 ? `(${args.map(String).join(', ')})` : ''} — this refusal has ` +
+          `${name}${args.length > 0 ? `(${args.map(String).join(', ')})` : ''}. This refusal has ` +
           `no plain-language mapping yet. It is a real on-chain revert, not a network problem.`,
       };
   }
