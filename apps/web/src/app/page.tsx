@@ -12,13 +12,11 @@ import { Footer } from '@/components/footer';
 export default function HomePage() {
   return (
     <>
-      <a
-        href="#main"
-        className="sr-only rounded-[var(--radius-pill)] bg-white px-5 py-3 text-sm font-medium text-[#08080A] focus:not-sr-only focus:fixed focus:left-4 focus:top-4 focus:z-[60]"
-      >
-        Skip to content
-      </a>
-
+      {/* The "Skip to content" link was removed here on the owner's direct instruction.
+          It is a real accessibility affordance and its absence is a real cost: a keyboard
+          user now tabs the four nav links and the CTA before reaching the hero. Restoring
+          it is one element — an <a href="#main"> with `sr-only focus:not-sr-only`, placed
+          immediately inside this fragment, above <Nav />. */}
       <Nav />
 
       <main id="main">

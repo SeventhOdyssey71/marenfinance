@@ -19,7 +19,7 @@ Spend Bitcoin. Never sell it. Built on Mezo.
 
 ```stat
 27 | Troves open on Mezo mainnet
-29,361 | People holding MUSD
+29,360 | People holding MUSD
 ```
 
 <!-- slide: stat | kicker: Why | tag: Protocol | foot: minNetDebt() returns 1,800 MUSD. 250% is a responsible ratio, not the 110% liquidation floor. -->
@@ -28,7 +28,7 @@ Spend Bitcoin. Never sell it. Built on Mezo.
 
 ```stat
 1,800 MUSD | Minimum net debt, before anyone can borrow
-0.079346 BTC | What that needs in collateral, about $5,000
+0.079346 BTC | What that needs in collateral, about $5,004
 ```
 
 <!-- slide: stat | kicker: The wedge | tag: Verified | foot: 0.079346 / 0.001 = 79.346. Asserted in packages/sdk/src/position.test.ts against a pinned oracle price. -->
@@ -67,14 +67,14 @@ Spend Bitcoin. Never sell it. Built on Mezo.
 | MarenEarn     | `0xE3B02b215085B99Ce61E0F5ea9763Ac637aa7826` |
 | MarenRelayHub | `0x22cC1Adfb0C91D9359746dE3F7E8cB7F2B8eA98C` |
 
-<!-- slide: stat | kicker: It is exercised | tag: On chain | foot: A user deposited 0.001 BTC from their own wallet, tx 0x3b34e664…95e8dd2, block 14,923,865. -->
+<!-- slide: stat | kicker: It is exercised | tag: On chain | foot: A user deposited 0.001 BTC from their own wallet, tx 0x3b34e664…95e8dd2. Ratio after the protocol-owned top-up of 17 August, which cleared Maren's own 180% borrow floor. -->
 
 # The pooled trove is open and active in MUSD's own TroveManager.
 
 ```stat
-0.048 BTC | Collateral
-2,001.84 MUSD | Debt
-150.8% | Collateral ratio
+0.069 BTC | Collateral
+2,001.8 MUSD | Debt
+220.0% | Collateral ratio
 ```
 
 <!-- slide: stat | kicker: What we found in the chain | tag: Findings | foot: Zero per the Mezo explorer index. No Mezo RPC implements debug_traceCall, so no compliant bundler can run. Mainnet does accept EIP-7702 type-4 transactions. -->

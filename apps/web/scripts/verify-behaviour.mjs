@@ -68,6 +68,29 @@ if (!process.env.MAREN_TEST_PRIVATE_KEY) {
  */
 const VIEW_ACCOUNT = process.env.MAREN_VIEW_ADDRESS ?? '0x457e46E52bE1b4A05e3f49d07e58d845ec15CE31';
 
+/**
+ * Wait for a live registry read to settle, rather than sleeping and hoping.
+ *
+ * These statuses are backed by a real `MarenRegistry` call over Mezo's public RPC, which
+ * routinely takes longer than the 2500ms this script used to sleep for. That made three
+ * checks fail intermittently on "Resolving handle…" — a slow network reported as a broken
+ * product. Polling until the pending text clears tests the assertion the check is actually
+ * about, and still fails if the read never returns.
+ */
+async function settled(page, selector, pending = 'Resolving|Checking the registry') {
+  await page
+    .waitForFunction(
+      ([sel, src]) => {
+        const el = document.querySelector(sel);
+        return Boolean(el) && !new RegExp(src).test(el.textContent ?? '');
+      },
+      [selector, pending],
+      { timeout: 20000 },
+    )
+    .catch(() => {});
+  return page.locator(selector).innerText();
+}
+
 const results = [];
 const check = (name, pass, detail = '') => {
   results.push({ name, pass, detail });
@@ -158,11 +181,31 @@ const check = (name, pass, detail = '') => {
     JSON.stringify(ring),
   );
 
-  // skip link is the first tab stop — reload so focus starts at document top
+  /**
+   * The skip link is GONE, on the owner's direct instruction, so this no longer asserts
+   * that it is the first tab stop — it asserts what replaced it.
+   *
+   * The check is kept rather than deleted because tab order is still load-bearing: the
+   * first thing a keyboard user reaches must be a real, labelled control in the header,
+   * not a stray focusable div or something buried below the fold. If the skip link is
+   * ever restored, this flips back to expecting "Skip to content".
+   */
   await page.reload({ waitUntil: 'networkidle' });
   await page.keyboard.press('Tab');
-  const firstStop = await page.evaluate(() => document.activeElement?.textContent?.trim());
-  check('skip link is first tab stop', firstStop === 'Skip to content', `got="${firstStop}"`);
+  const firstStop = await page.evaluate(() => {
+    const el = document.activeElement;
+    return {
+      label: el?.getAttribute('aria-label') ?? el?.textContent?.trim() ?? '',
+      inHeader: Boolean(el?.closest('header')),
+      skipLink: el?.textContent?.trim() === 'Skip to content',
+    };
+  });
+  check('skip link is not present as a tab stop', !firstStop.skipLink, `got="${firstStop.label}"`);
+  check(
+    'first tab stop is a labelled control in the header',
+    firstStop.inHeader && firstStop.label.length > 0,
+    JSON.stringify(firstStop),
+  );
 
   check('no 4xx/5xx responses', bad.length === 0, bad.join(', '));
   await ctx.close();
@@ -232,12 +275,22 @@ const check = (name, pass, detail = '') => {
     JSON.stringify(landmarks),
   );
 
+  // Same change as the landing page: the skip link was removed on the owner's
+  // instruction, so tab order is asserted on what is actually first now.
   await page.keyboard.press('Tab');
-  const firstStop = await page.evaluate(() => document.activeElement?.textContent?.trim());
+  const appFirstStop = await page.evaluate(() => {
+    const el = document.activeElement;
+    return {
+      label: el?.getAttribute('aria-label') ?? el?.textContent?.trim() ?? '',
+      inHeader: Boolean(el?.closest('header')),
+      skipLink: el?.textContent?.trim() === 'Skip to content',
+    };
+  });
+  check('app: skip link is not present as a tab stop', !appFirstStop.skipLink, appFirstStop.label);
   check(
-    'app: skip link is the first tab stop',
-    firstStop === 'Skip to content',
-    `got="${firstStop}"`,
+    'app: first tab stop is a labelled control in the header',
+    appFirstStop.inHeader && appFirstStop.label.length > 0,
+    JSON.stringify(appFirstStop),
   );
 
   // The borrowing ceiling must be the contract's real one, not an ICR estimate, and the
@@ -504,8 +557,7 @@ const check = (name, pass, detail = '') => {
   // `@sele` is registered on matsnet to the deploying account. This resolves it through
   // MarenRegistry.tryResolve — a real read against a real registration.
   await page.locator('#pay-to').fill('@sele');
-  await page.waitForTimeout(2500);
-  const resolvedInline = await page.locator('#pay-to-status').innerText();
+  const resolvedInline = await settled(page, '#pay-to-status');
   check(
     'pay: a real handle resolves and its address is shown beside it',
     /0x[0-9a-fA-F]{40}/.test(resolvedInline),
@@ -514,8 +566,7 @@ const check = (name, pass, detail = '') => {
 
   // An unregistered handle must fail loudly rather than falling back to anything.
   await page.locator('#pay-to').fill('@nosuchhandle_zzz');
-  await page.waitForTimeout(2500);
-  const unresolved = await page.locator('#pay-to-status').innerText();
+  const unresolved = await settled(page, '#pay-to-status');
   check(
     'pay: an unregistered handle fails loudly rather than resolving to something',
     /No such handle/.test(unresolved),
@@ -569,12 +620,14 @@ const check = (name, pass, detail = '') => {
 
   // Availability is a live registry read, not an optimistic assumption.
   await page.locator('#handle-input').fill('sele');
-  await page.waitForTimeout(2500);
+  const handleStatus = await settled(page, '#handle-status');
   check(
     'handle: an already-registered handle is reported as taken',
-    /already registered/i.test(await page.locator('#handle-status').innerText()),
+    /already registered/i.test(handleStatus),
     'MarenRegistry.available()',
   );
+  // The button's disabled state follows the same read; give React a frame to apply it.
+  await page.waitForTimeout(300);
   check(
     'handle: committing to a taken handle is refused',
     await page

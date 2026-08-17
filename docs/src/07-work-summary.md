@@ -227,7 +227,7 @@ Maren's floor is 0.001 BTC, which is **79.3× lower**.
 
 ### The chain facts the thesis rests on
 
-**Mezo mainnet has 26 troves. MUSD has 29,360 holders.** That gap is the thesis: tens of
+**Mezo mainnet has 27 troves. MUSD has roughly 29,360 holders** (16 August 2026)**.** That gap is the thesis: tens of
 thousands of people hold the stablecoin and fewer than thirty can mint it, because minting
 has a five-thousand-dollar door.
 
@@ -242,17 +242,24 @@ cast call 0x94AfB503dBca74aC3E4929BACEeDfCe19B93c193 \
 
 ### Gas
 
-Mezo's base fee is **1,300,000 wei**, so a 100,000-gas transaction costs
-**1.3 × 10⁻⁷ BTC**. That part is exact and does not move with the Bitcoin price.
+Two different gas numbers are true at once, and an earlier draft of this document
+mislabelled one as the other, so both are stated here.
 
-In dollars it is **$0.0092**, and a million sponsored transactions costs about **$9,200**,
-at the planning price the rest of the document set uses. At the $63,071.83 oracle price
-recorded on 15 August the same transaction is $0.0082 and the million is $8,200.
+Mezo's **base fee** is 1,300,000 wei; the **gas price** a transaction actually pays is
+1,462,500 wei. A 100,000-gas transaction therefore costs **1.4625 × 10⁻⁷ BTC** to send and
+**1.3 × 10⁻⁷ BTC** at the floor. Those parts are exact and do not move with the Bitcoin
+price.
 
-Quote the BTC figure and say which price you converted at. The conclusion is insensitive to
-the choice — gasless on Mezo is cheap at any Bitcoin price a Bitcoin holder would be happy
-about — but being asked "at what price?" and not having the answer is an avoidable way to
-lose a room.
+At the $62,921.65 oracle price read on 16 August, that is **$0.0092** to send and $0.0082
+at the base fee. A million sponsored transactions costs about **$9,200**. **$0.0092 is the
+gas-price figure** — a sponsor pays gas price, not base fee, so it is the correct number
+for what the relayer spends.
+
+The earlier draft printed $0.0092 under the label "base fee" and explained the gap to
+$0.0082 as a Bitcoin-price difference. It is not: 1.3 × 10⁻⁷ BTC only reaches $0.0092 at a
+BTC price of $70,769, which nothing here uses. The gap was always base fee versus gas
+price. Quote the BTC figure, name which of the two it is, and say what price you converted
+at.
 
 ### The applications
 
@@ -280,14 +287,14 @@ to 75.
 
 | Doc       | Document                             |  Pages |
 | --------- | ------------------------------------ | -----: |
-| MRN-001   | Investment & Grant Thesis            |     14 |
-| MRN-002   | Technical Feasibility & Architecture |     26 |
+| MRN-001   | Investment & Grant Thesis            |     16 |
+| MRN-002   | Technical Feasibility & Architecture |     28 |
 | MRN-003   | Product Specification                |      7 |
-| MRN-004   | Security & Risk                      |     10 |
+| MRN-004   | Security & Risk                      |      9 |
 | MRN-005   | Go-to-Market                         |      9 |
 | MRN-006   | Roadmap & Grant Milestones           |      9 |
-| MRN-007   | Work Summary — this document         |     18 |
-| **Total** |                                      | **93** |
+| MRN-007   | Work Summary — this document         |     19 |
+| **Total** |                                      | **97** |
 
 The build is deterministic: dates are taken from each document's own frontmatter rather than
 from the clock, so rebuilding unchanged sources produces byte-identical files instead of a

@@ -97,7 +97,7 @@ export default function EarnPage() {
     ],
     gas: {
       sponsored: false,
-      note: 'An ERC-20 approval is a transaction on MUSD itself, not on Maren, so it could never be relayed through Maren’s hub. It approves exactly this amount, not an unlimited allowance.',
+      note: 'Approves exactly this amount, not an unlimited allowance. You pay the Bitcoin gas.',
     },
     confirmLabel: 'Approve',
     submit: writes.ready
