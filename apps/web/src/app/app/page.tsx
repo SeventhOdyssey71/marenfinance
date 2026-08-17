@@ -37,6 +37,7 @@ import {
 } from '@/components/app/primitives';
 import { ConnectPrompt } from '@/components/app/connect-prompt';
 import { ProtocolPanel } from '@/components/app/protocol-panel';
+import { SocialVaultPanel } from '@/components/app/social-vault';
 import { LivePulseFrame } from '@/components/shaders/live-pulse';
 import { ArrowRight, VaultIcon } from '@/components/ui/icons';
 import { healthTone, policyRatio, toneShaderColors } from '@/lib/health';
@@ -230,6 +231,12 @@ export default function PortfolioPage() {
         </Panel>
       )}
 
+      {/* WHERE THIS POSITION ACTUALLY LIVES, said in the product's own words rather than
+          left to the reader to infer from a "pooled route" tag. Only for an account that
+          is in the vault: a user with a trove of their own shares nothing and has nothing
+          to be told here. */}
+      {position?.route === 'pooled' ? <SocialVaultPanel variant="compact" /> : null}
+
       {/* Read together, so laid out together, at equal height. */}
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
         <Panel
@@ -264,7 +271,7 @@ export default function PortfolioPage() {
               hint={
                 position?.route === 'direct'
                   ? 'includes the 200 MUSD reserve'
-                  : 'no reserve, pooled route'
+                  : 'no reserve, social vault'
               }
               value={position ? <Musd wei={position.debtWei} size="lg" /> : <Dash size="lg" />}
               last
@@ -337,7 +344,7 @@ function BorrowingCapacity() {
       title="Borrowing capacity"
       meta={
         <span className="t-label text-text-subtle">
-          {position.route === 'pooled' ? 'Pooled trove' : 'Direct trove'}
+          {position.route === 'pooled' ? 'In the social vault' : 'Your own trove'}
         </span>
       }
     >
@@ -378,8 +385,8 @@ function BorrowingCapacity() {
         <Info summary="Why the ceiling does not move">
           {position.route === 'pooled' ? (
             <>
-              This ceiling belongs to the pooled trove and is shared by everyone inside it. Your own
-              limit is Maren’s 180% floor on your share; whichever binds first stops the
+              This ceiling belongs to the social vault’s trove and is shared by everyone in it. Your
+              own limit is Maren’s 180% floor on your share; whichever binds first stops the
               transaction.
             </>
           ) : (

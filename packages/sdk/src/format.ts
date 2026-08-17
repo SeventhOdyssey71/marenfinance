@@ -47,6 +47,22 @@ export function formatCollateralRatio(cr: bigint): string {
   return `${groupThousands(whole.toString())}.${frac}%`;
 }
 
+/**
+ * Format a percentage supplied as integer TENTHS of a percent: 137 -> "13.7%".
+ *
+ * Integer in, string out, with no floating-point step anywhere between. The obvious
+ * alternative — carrying 13.7 as a `number` and calling `toFixed(1)` — rounds to nearest
+ * and does it on a value that is already inexact, so a truncated 0.7 stored as
+ * 0.6999999999999999 renders as "0.7" today and could render as "0.6" after one more
+ * arithmetic step. The callers in `vault.ts` truncate in bigint and hand the tenths
+ * straight here, so what is computed is what is shown.
+ */
+export function formatPercentTenths(tenths: number): string {
+  const negative = tenths < 0;
+  const abs = Math.trunc(Math.abs(tenths));
+  return `${negative ? '-' : ''}${groupThousands(String(Math.trunc(abs / 10)))}.${abs % 10}%`;
+}
+
 /** Format a basis-point rate, e.g. 100 -> "1.00%". */
 export function formatBps(bps: number): string {
   return `${(bps / 100).toFixed(2)}%`;
