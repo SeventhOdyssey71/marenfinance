@@ -6,17 +6,17 @@ const facts = [
   {
     label: 'Stablecoin',
     value: 'MUSD',
-    body: 'A Threshold-USD / Liquity-v1 fork operated by Mezo. Maren integrates it directly and uses its EIP-2612 permit, so approving and paying is one signature.',
+    body: 'Mezo’s own dollar, borrowed against Bitcoin. Maren does not fork it or wrap it. Approving and paying is one signature, not two.',
   },
   {
     label: 'Gas token',
     value: 'Native BTC',
-    body: 'Mezo settles gas in BTC at 18 decimals. Maren sponsors it through an ERC-2771 relayer so users never have to hold it.',
+    body: 'Mezo charges gas in Bitcoin. Maren is built so you will not have to hold a gas balance to use it, though today you still do, because no relayer is running.',
   },
   {
     label: 'Networks',
     value: '31612 / 31611',
-    body: 'Mezo mainnet and matsnet. Standard EVM — viem and wagmi, no bespoke SDK, no proprietary wallet requirement.',
+    body: 'Mezo mainnet and matsnet. Any EVM wallet works, and nothing here needs a bespoke SDK.',
   },
 ] as const;
 

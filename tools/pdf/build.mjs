@@ -29,6 +29,8 @@ import { renderMarkdown } from './lib/markdown.mjs';
 import { coverHtml, bodyHtml, footerTemplate, EMPTY_HEADER } from './lib/template.mjs';
 import { launchBrowser, startServer, loadPage } from './lib/browser.mjs';
 import { extractPageNumbers } from './lib/pages.mjs';
+import { renderDeck } from './lib/deck.mjs';
+import { deckCss, SLIDE_W, SLIDE_H, SLIDE_W_IN, SLIDE_H_IN } from './lib/deck-styles.mjs';
 
 const require = createRequire(import.meta.url);
 const HERE = path.dirname(fileURLToPath(import.meta.url));
@@ -160,17 +162,11 @@ async function printBody({ browser, server, html, mermaid, meta, footerCss }) {
   return pdf;
 }
 
-async function merge({ coverPdf, bodyPdf, meta }) {
-  const out = await PDFDocument.create();
-
-  for (const bytes of [coverPdf, bodyPdf]) {
-    const src = await PDFDocument.load(bytes);
-    const pages = await out.copyPages(src, src.getPageIndices());
-    for (const p of pages) out.addPage(p);
-  }
-
-  // Fixed dates from the document's own date, so a rebuild of unchanged sources
-  // produces an unchanged file rather than a new timestamp.
+/**
+ * Fixed dates from the document's own date, so a rebuild of unchanged sources produces
+ * an unchanged file rather than a new timestamp.
+ */
+function applyMetadata(out, meta) {
   const stamp = new Date(`${meta.isoDate ?? '1970-01-01'}T00:00:00Z`);
   out.setTitle(meta.title);
   out.setAuthor('Maren Finance');
@@ -182,8 +178,69 @@ async function merge({ coverPdf, bodyPdf, meta }) {
     out.setCreationDate(stamp);
     out.setModificationDate(stamp);
   }
+}
 
+async function merge({ coverPdf, bodyPdf, meta }) {
+  const out = await PDFDocument.create();
+
+  for (const bytes of [coverPdf, bodyPdf]) {
+    const src = await PDFDocument.load(bytes);
+    const pages = await out.copyPages(src, src.getPageIndices());
+    for (const p of pages) out.addPage(p);
+  }
+
+  applyMetadata(out, meta);
   return out.save({ useObjectStreams: true });
+}
+
+/**
+ * The deck.
+ *
+ * A document is printed in two passes and three parts because its pagination is
+ * discovered rather than declared. A deck has neither problem: every slide is exactly one
+ * page of a known size, so this is one print of one document, and the only thing worth
+ * checking afterwards is that the page count came out equal to the slide count. When it
+ * does not, a slide has overflowed its frame and spilled onto a second page — the single
+ * failure this layout can have, and the build refuses it rather than shipping it.
+ */
+async function buildDeck({ browser, server, meta, body, fonts, keepHtml, base }) {
+  const css = deckCss({ fontCss: fonts.css, satoshi: fonts.satoshi, mono: fonts.mono });
+  const { html, count } = renderDeck({ body, meta, css });
+  log(`${count} slides, ${SLIDE_W}x${SLIDE_H} (16:9)`);
+
+  const page = await loadPage(browser, server, html, {
+    warn,
+    viewport: { width: SLIDE_W, height: SLIDE_H, deviceScaleFactor: 1 },
+  });
+  const pdf = await page.pdf({
+    width: `${SLIDE_W_IN}in`,
+    height: `${SLIDE_H_IN}in`,
+    printBackground: true,
+    displayHeaderFooter: false,
+    preferCSSPageSize: true,
+    margin: { top: '0', right: '0', bottom: '0', left: '0' },
+  });
+  await page.close();
+
+  const doc = await PDFDocument.load(pdf);
+  const pages = doc.getPageCount();
+  if (pages !== count) {
+    throw new Error(
+      `the deck printed ${pages} pages from ${count} slides — a slide has overflowed ` +
+        'its 16:9 frame. Shorten it or split it in two.',
+    );
+  }
+  applyMetadata(doc, meta);
+  const merged = await doc.save({ useObjectStreams: true });
+
+  const outFile = path.join(OUT_DIR, `${base}.pdf`);
+  await fs.writeFile(outFile, merged);
+  if (keepHtml) await fs.writeFile(path.join(TMP_DIR, `${base}.deck.html`), html);
+
+  const kb = Math.round(merged.byteLength / 1024);
+  log(`${count} slides, ${kb} kB → docs/build/${base}.pdf`);
+
+  return { base, title: meta.title, docId: meta.docId, pages: count, kb, unit: 'sl' };
 }
 
 async function buildDocument({ browser, server, file, fonts, footerCss, keepHtml }) {
@@ -192,6 +249,13 @@ async function buildDocument({ browser, server, file, fonts, footerCss, keepHtml
   const base = path.basename(file, '.md');
 
   step(`${base}.md  →  ${meta.title}`);
+
+  // A deck is a different object from a document and takes a different path: fixed 16:9
+  // frames, no cover, no contents, no running footer, and the dark palette (BRAND.md
+  // §7.1). Everything below this line is the document pipeline, unchanged.
+  if (meta.format === 'deck') {
+    return buildDeck({ browser, server, meta, body, fonts, keepHtml, base });
+  }
 
   const { html: content, toc, mermaid } = renderMarkdown(body);
   log(`${toc.length} contents entries, ${mermaid.length} diagram(s)`);
@@ -263,7 +327,13 @@ async function main() {
 
   let entries;
   try {
-    entries = (await fs.readdir(SRC_DIR)).filter((f) => f.endsWith('.md')).sort();
+    // `*-notes.md` is companion prose for a document rather than a document: the deck's
+    // speaker notes live beside the deck so the two are edited together, but they are a
+    // script to read before walking on, not something to print. They carry no
+    // frontmatter, so without this they would fail the build rather than be skipped.
+    entries = (await fs.readdir(SRC_DIR))
+      .filter((f) => f.endsWith('.md') && !f.endsWith('-notes.md'))
+      .sort();
   } catch {
     throw new Error(`no document sources at ${path.relative(ROOT, SRC_DIR)}`);
   }
@@ -307,7 +377,10 @@ async function main() {
   const seconds = ((Date.now() - t0) / 1000).toFixed(1);
   console.log(`\n── built ${built.length} document(s) in ${seconds}s`);
   for (const doc of built) {
-    console.log(`   ${doc.docId.padEnd(18)} ${String(doc.pages).padStart(3)} pp   ${doc.title}`);
+    const unit = doc.unit ?? 'pp';
+    console.log(
+      `   ${doc.docId.padEnd(18)} ${String(doc.pages).padStart(3)} ${unit}   ${doc.title}`,
+    );
   }
   if (warnings.length > 0) {
     console.log(`\n   ${warnings.length} warning(s) — the build completed anyway.`);

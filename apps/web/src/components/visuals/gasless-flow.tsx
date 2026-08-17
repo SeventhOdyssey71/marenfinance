@@ -4,17 +4,17 @@ const steps = [
   {
     k: '01',
     title: 'You sign',
-    body: 'An EIP-712 ForwardRequest. A signature, not a transaction — so it costs no gas.',
+    body: 'A signature, not a transaction. Signing costs nothing.',
   },
   {
     k: '02',
-    title: 'Maren relays',
-    body: 'Our relayer verifies the signature, simulates the call, and pays the BTC gas.',
+    title: 'Maren submits',
+    body: 'It checks the signature, tries the call, and pays the Bitcoin fee.',
   },
   {
     k: '03',
     title: 'Mezo settles',
-    body: 'ERC-2771 executes it as you. Funds move wallet to wallet under your own permit.',
+    body: 'The money moves wallet to wallet. Maren never holds it.',
   },
 ] as const;
 
@@ -48,17 +48,19 @@ export function GaslessFlow() {
         ))}
       </ol>
 
-      <div className="bg-violet-500/6 mt-7 flex flex-wrap items-center gap-x-3 gap-y-2 rounded-[var(--radius-card)] border border-violet-500/20 px-5 py-4">
-        <span className="num text-2xl font-medium text-violet-400">25</span>
+      {/* The honest state of step 02, on the visual that describes step 02. The panel
+          used to end on "25 free actions per address" instead, which is a promise made
+          by a service that is deployed nowhere. */}
+      <div className="bg-warning/6 border-warning/25 mt-7 flex flex-wrap items-center gap-x-3 gap-y-2 rounded-[var(--radius-card)] border px-5 py-4">
         <span className="text-text-muted text-sm">
-          free actions per address. After that, a small fee is taken in MUSD inside the same
-          transaction — never in BTC.
+          <span className="text-warning">Step 02 is not running yet.</span> Until it is, your own
+          wallet submits and you pay the Bitcoin fee.
         </span>
       </div>
 
       <p className="text-text-subtle mt-5 flex items-center gap-2 text-xs">
         <ArrowRight className="size-3.5 shrink-0" aria-hidden />
-        The relayer never holds user funds. Compromising it costs us gas, not your Bitcoin.
+        Whatever submits for you can never move your Bitcoin, only pay for the gas.
       </p>
     </div>
   );

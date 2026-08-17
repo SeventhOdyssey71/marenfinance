@@ -3,7 +3,7 @@ import type { ReactNode } from 'react';
 import { satoshi, geistMono } from './fonts';
 import './globals.css';
 
-const title = 'Maren Finance — Spend Bitcoin. Never sell it.';
+const title = 'Maren Finance: Spend Bitcoin. Never sell it.';
 const description =
   'Bitcoin-backed liquidity. Deposit from 0.001 BTC, draw MUSD, and spend it without holding a gas balance. Built on Mezo.';
 
@@ -11,7 +11,7 @@ export const metadata: Metadata = {
   metadataBase: new URL('https://maren.finance'),
   title: {
     default: title,
-    template: '%s — Maren Finance',
+    template: '%s · Maren Finance',
   },
   description,
   applicationName: 'Maren Finance',
@@ -45,6 +45,8 @@ export const viewport: Viewport = {
   width: 'device-width',
   initialScale: 1,
 };
+
+export const dynamic = 'force-dynamic';
 
 export default function RootLayout({ children }: Readonly<{ children: ReactNode }>) {
   return (

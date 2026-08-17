@@ -97,7 +97,7 @@ export default function EarnPage() {
     ],
     gas: {
       sponsored: false,
-      note: 'An ERC-20 approval is a transaction on MUSD itself, not on Maren, so it could never be relayed through Maren’s hub. It approves exactly this amount, not an unlimited allowance.',
+      note: 'Approves exactly this amount, not an unlimited allowance. You pay the Bitcoin gas.',
     },
     confirmLabel: 'Approve',
     submit: writes.ready
@@ -140,7 +140,7 @@ export default function EarnPage() {
       },
       {
         label: 'Return',
-        value: <span className="text-text-muted">liquidation gains only — no fixed rate</span>,
+        value: <span className="text-text-muted">liquidation gains only, no fixed rate</span>,
       },
     ],
     gas: gasNote(true, 'Moves MUSD between your wallet and the Stability Pool.'),
@@ -167,13 +167,15 @@ export default function EarnPage() {
               is still measured on this route. The connected screen has its own. */}
           <span data-contrast="earn-disclosure">
             Earn holds your MUSD in the MUSD Stability Pool through an ERC-4626 vault. Maren does
-            not display an APY for Earn because there is no reliable one to display — the yield is
+            not display an APY for Earn because there is no reliable one to display. The yield is
             liquidation gains, which can be zero for months.
           </span>
         </ConnectPrompt>
 
         <Note>
-          <p>Your MUSD absorbs liquidated debt — not principal-protected, and not guaranteed.</p>
+          <p>
+            Your MUSD absorbs liquidated debt. It is not principal-protected, and not guaranteed.
+          </p>
         </Note>
       </div>
     );
@@ -250,7 +252,7 @@ export default function EarnPage() {
             data-contrast="earn-disclosure"
             className="text-text-muted mt-5 max-w-[68ch] text-sm leading-relaxed"
           >
-            Realised in the past, not a forecast — Maren does not display an APY for Earn because
+            Realised in the past, not a forecast. Maren does not display an APY for Earn because
             there is no reliable one to display.
           </p>
           <Info summary="Why there is no rate">
@@ -318,7 +320,7 @@ export default function EarnPage() {
         </div>
 
         <p className="text-text-subtle mt-6 text-xs leading-relaxed">
-          Costs BTC gas — Maren’s relayer is not deployed, so your own wallet submits this.
+          Costs BTC gas. Maren’s relayer is not deployed, so your own wallet submits this.
         </p>
 
         {pre.blocker && !(pre.blocker.scope === 'input' && wei === 0n) ? (
@@ -367,7 +369,7 @@ export default function EarnPage() {
       {/* The risk statement stays. It is the one thing a depositor cannot infer from the
           screen: this is not a savings account, and the principal is at risk. */}
       <Note>
-        <p>Your MUSD absorbs liquidated debt — not principal-protected, and not guaranteed.</p>
+        <p>Your MUSD absorbs liquidated debt. It is not principal-protected, and not guaranteed.</p>
         <Info summary="What that means in practice">
           Stability Pool deposits are spent closing other people’s positions, and you are paid in
           the Bitcoin seized doing it. Historically profitable, but not guaranteed. The vault also

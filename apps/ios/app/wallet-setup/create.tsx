@@ -135,7 +135,7 @@ export default function CreateWallet() {
               {stored
                 ? 'The key is unreadable without a successful biometric check, which is required on every signature. It is marked this-device-only, so it is excluded from iCloud Keychain and from encrypted backups.'
                 : protection?.mode === 'session-only'
-                  ? `${protection.reason} Maren did not write an unprotected key to disk. Your account will not survive a restart — enrol biometrics and create the key again to persist it.`
+                  ? `${protection.reason} Maren did not write an unprotected key to disk. Your account will not survive a restart. Enrol biometrics and create the key again to persist it.`
                   : ''}
             </Txt>
           </Card>
@@ -143,7 +143,7 @@ export default function CreateWallet() {
           <View style={styles.warning}>
             <Txt variant="small" tone="muted">
               Maren holds no copy of this key. If you lose the device without an export, the funds
-              it controls are gone. Not recoverable by us — gone.
+              it controls are gone. Not recoverable by us. Gone.
             </Txt>
           </View>
 
