@@ -59,8 +59,7 @@ export function Surfaces() {
                 <h3 className="t-h3">Pay</h3>
               </div>
               <p className="text-text-muted mt-6 text-[0.9375rem] leading-relaxed">
-                Send MUSD to an @handle, a link, a request or a split, with a memo written
-                on-chain.
+                Send MUSD to an @handle, a link, a request or a split, with a memo written on-chain.
               </p>
               <ul className="mt-auto space-y-2.5 pt-8">
                 {[

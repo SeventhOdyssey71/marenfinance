@@ -378,7 +378,9 @@ async function main() {
   console.log(`\n── built ${built.length} document(s) in ${seconds}s`);
   for (const doc of built) {
     const unit = doc.unit ?? 'pp';
-    console.log(`   ${doc.docId.padEnd(18)} ${String(doc.pages).padStart(3)} ${unit}   ${doc.title}`);
+    console.log(
+      `   ${doc.docId.padEnd(18)} ${String(doc.pages).padStart(3)} ${unit}   ${doc.title}`,
+    );
   }
   if (warnings.length > 0) {
     console.log(`\n   ${warnings.length} warning(s) — the build completed anyway.`);

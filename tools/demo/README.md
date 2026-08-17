@@ -34,15 +34,15 @@ zero gas and can be run as often as needed.
 
 ## Layout
 
-| File | Responsibility |
-| --- | --- |
-| `record.mjs` | Orchestration, CLI flags, the run report |
-| `lib/server.mjs` | Boots `next start` from the production build on a free port |
-| `lib/browser.mjs` | Chromium resolution and the WebGL launch flags |
-| `lib/cursor.mjs` | The on-screen pointer, and hand-paced mouse travel |
-| `lib/pacing.mjs` | Beat durations, eased scrolling, "do not film a loading state" |
-| `lib/scenes.mjs` | **The walkthrough itself. This is the file that goes stale.** |
-| `lib/encode.mjs` | Finalising the WebM, the optional MP4, contact-sheet stills |
+| File              | Responsibility                                                 |
+| ----------------- | -------------------------------------------------------------- |
+| `record.mjs`      | Orchestration, CLI flags, the run report                       |
+| `lib/server.mjs`  | Boots `next start` from the production build on a free port    |
+| `lib/browser.mjs` | Chromium resolution and the WebGL launch flags                 |
+| `lib/cursor.mjs`  | The on-screen pointer, and hand-paced mouse travel             |
+| `lib/pacing.mjs`  | Beat durations, eased scrolling, "do not film a loading state" |
+| `lib/scenes.mjs`  | **The walkthrough itself. This is the file that goes stale.**  |
+| `lib/encode.mjs`  | Finalising the WebM, the optional MP4, contact-sheet stills    |
 
 Everything except `scenes.mjs` is about producing a video at all. `scenes.mjs` is coupled to
 the current markup — heading text, tab labels, the copy inside a disabled control — and is
@@ -69,13 +69,13 @@ the narration in `docs/demo/SCRIPT.md`.
 
 ## Environment
 
-| Variable | Effect |
-| --- | --- |
+| Variable                 | Effect                                                                                                                                          |
+| ------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------- |
 | `MAREN_TEST_PRIVATE_KEY` | The signer injected into the page. **Never commit this.** Without it the app is filmed disconnected, which is a real screen but a thinner demo. |
-| `MEZO_RPC_URL` | Defaults to `https://rpc.test.mezo.org` |
-| `MAREN_DEMO_HANDLE` | Handle typed into Pay (default `@sele`) |
-| `DEMO_BASE_URL` | Record against a server already running, skipping the boot |
-| `CHROME_EXECUTABLE` | Use a specific Chromium instead of the managed build |
+| `MEZO_RPC_URL`           | Defaults to `https://rpc.test.mezo.org`                                                                                                         |
+| `MAREN_DEMO_HANDLE`      | Handle typed into Pay (default `@sele`)                                                                                                         |
+| `DEMO_BASE_URL`          | Record against a server already running, skipping the boot                                                                                      |
+| `CHROME_EXECUTABLE`      | Use a specific Chromium instead of the managed build                                                                                            |
 
 ## Flags
 
