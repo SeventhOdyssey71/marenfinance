@@ -225,7 +225,7 @@ daylight, and because a grant committee should not have to fight a black PDF.
 product palette: `bg` ground, violet accent, `text` on near-black.
 
 The rule in §7 is not "documents are light". It is **match the surface the thing is read
-on**. The seven papers are light because they get printed and read in daylight, and a
+on**. The eight papers are light because they get printed and read in daylight, and a
 committee should not have to fight a black PDF. The deck is never printed. It is
 projected, in a room with the lights down, where a light ground is a wall of glare behind
 the speaker and every slide bleaches out the presenter. Same rule, opposite answer.
