@@ -30,7 +30,7 @@ export function Surfaces() {
                 </div>
                 <p className="text-text-muted mt-6 max-w-lg text-[0.9375rem] leading-relaxed">
                   Deposit BTC, draw MUSD. A direct trove for positions above the protocol minimum; a
-                  pooled trove — from 0.001 BTC — for everyone the minimum currently excludes.
+                  pooled trove (from 0.001 BTC) for everyone the minimum currently excludes.
                 </p>
                 <dl className="mt-auto grid grid-cols-2 gap-4 pt-10 sm:grid-cols-3">
                   <div>
@@ -59,8 +59,7 @@ export function Surfaces() {
                 <h3 className="t-h3">Pay</h3>
               </div>
               <p className="text-text-muted mt-6 text-[0.9375rem] leading-relaxed">
-                Send MUSD to an @handle, a link, a request or a split, with a memo written
-                on-chain.
+                Send MUSD to an @handle, a link, a request or a split, with a memo written on-chain.
               </p>
               <ul className="mt-auto space-y-2.5 pt-8">
                 {[

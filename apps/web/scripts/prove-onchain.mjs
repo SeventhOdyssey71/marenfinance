@@ -70,19 +70,22 @@ page.on('console', (m) => {
 const log = (...args) => console.log(...args);
 
 /**
- * The sheet has settled when its footer "Close" button exists.
+ * The sheet has settled when it says so.
  *
  * Matching on prose was wrong: the pending copy reads "nothing is marked delivered until
  * the chain returns one with status success", which a /Delivered/i test matches happily —
  * so the first version of this script declared success while still waiting for a receipt.
- * The Close button is only rendered in the settled and error states.
+ * It then matched on a footer button labelled "Close", which was right until the sheet
+ * redesign gave the delivered state a "Done" button instead.
+ *
+ * `data-tx-phase` is the sheet's own state machine, rendered onto the dialog element
+ * precisely so a harness does not have to infer it from copy that is free to change.
  */
 const waitForSettled = (label) =>
   page.waitForFunction(
     () => {
-      const d = document.querySelector('[role=dialog]');
-      if (!d) return false;
-      return [...d.querySelectorAll('button')].some((b) => b.textContent.trim() === 'Close');
+      const phase = document.querySelector('[role=dialog]')?.getAttribute('data-tx-phase');
+      return phase === 'settled' || phase === 'error';
     },
     undefined,
     { timeout: 180_000 },

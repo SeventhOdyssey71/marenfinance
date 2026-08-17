@@ -1,6 +1,7 @@
 import type { ReactNode } from 'react';
 
 import { InfoIcon } from '@/components/ui/icons';
+import { PillAction } from '@/components/ui/pill-button';
 
 /**
  * The small shared pieces every app screen is built from. Deliberately the same shapes
@@ -66,7 +67,10 @@ export function Panel({
   labelledBy?: string;
 }) {
   return (
-    <section className={`card ${className}`} {...(labelledBy ? { 'aria-labelledby': labelledBy } : {})}>
+    <section
+      className={`card ${className}`}
+      {...(labelledBy ? { 'aria-labelledby': labelledBy } : {})}
+    >
       {title || meta ? (
         // A `div`, not a `header`. `<header>` is a landmark, and a page with six panels
         // would expose six of them — which is how verify-behaviour caught this: the dApp
@@ -290,7 +294,7 @@ export function ActionLink({
   return (
     <a
       href={href}
-      className={`group inline-flex h-12 items-center justify-between gap-4 rounded-[var(--radius-pill)] pl-6 pr-2 text-[0.9375rem] font-medium transition-colors duration-[120ms] ease-out ${variants[variant]}`}
+      className={`group inline-flex h-12 items-center justify-between gap-4 rounded-[var(--radius-pill)] pl-6 pr-2 text-[0.9375rem] font-medium transition-[color,background-color,border-color,transform] duration-[120ms] ease-out active:scale-[0.97] ${variants[variant]}`}
     >
       <span className="whitespace-nowrap">{children}</span>
       {icon ? (
@@ -326,15 +330,17 @@ export function Note({
   );
 }
 
-/** A pill button that performs an action rather than navigating. */
+/**
+ * A pill button that performs an action rather than navigating.
+ *
+ * This used to carry its own copy of the pill's paint — a second set of fills, radii and
+ * badge colours living a few files away from `components/ui/pill-button.tsx`. They had
+ * already drifted: the disabled primary here was `white/25`, below AA against `surface`,
+ * on a control that the preflight work now makes users look at often. It delegates, so
+ * there is one pill in the product. `quiet` maps to the shared `ghost`.
+ */
 export function ActionButton({
-  children,
-  onClick,
-  disabled = false,
   variant = 'primary',
-  type = 'button',
-  icon,
-  className = '',
   ...rest
 }: {
   children: ReactNode;
@@ -347,37 +353,5 @@ export function ActionButton({
   'aria-label'?: string;
   'aria-describedby'?: string;
 }) {
-  const variants = {
-    primary:
-      'bg-white text-[#08080A] hover:bg-white/90 active:bg-white/80 disabled:bg-white/25 disabled:text-[#08080A]/60',
-    secondary:
-      'bg-surface-raised text-text border border-[var(--border-hairline)] hover:border-[var(--border-strong)] disabled:text-text-subtle',
-    quiet: 'bg-transparent text-text-muted hover:text-text',
-  } as const;
-
-  const badges = {
-    primary: 'bg-violet-500 text-white',
-    secondary: 'bg-white/[0.06] text-text-muted',
-    quiet: 'bg-white/[0.06] text-text-muted',
-  } as const;
-
-  return (
-    <button
-      type={type}
-      onClick={onClick}
-      disabled={disabled}
-      className={`group inline-flex h-12 items-center justify-between gap-4 rounded-[var(--radius-pill)] pl-6 pr-2 text-[0.9375rem] font-medium transition-colors duration-[120ms] ease-out disabled:cursor-not-allowed ${variants[variant]} ${className}`}
-      {...rest}
-    >
-      <span className="whitespace-nowrap">{children}</span>
-      {icon ? (
-        <span
-          aria-hidden
-          className={`grid size-9 shrink-0 place-items-center rounded-[var(--radius-pill)] transition-transform duration-[120ms] ease-out group-enabled:group-hover:translate-x-0.5 ${badges[variant]}`}
-        >
-          {icon}
-        </span>
-      ) : null}
-    </button>
-  );
+  return <PillAction variant={variant === 'quiet' ? 'ghost' : variant} {...rest} />;
 }

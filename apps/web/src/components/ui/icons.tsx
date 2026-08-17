@@ -72,6 +72,40 @@ export const ArrowDown = icon(ArrowDown01Icon, 'ArrowDown');
 export const Plus = icon(Add01Icon, 'Plus');
 export const Minus = icon(MinusSignIcon, 'Minus');
 
+/**
+ * Two icons that stayed hand-rolled because they are used at a size where HugeIcons'
+ * 24-unit grid renders too thin even with `vector-effect: non-scaling-stroke`, and they
+ * are used in exactly one place each. If a third call site appears, move them to HugeIcons.
+ */
+const svgBase = {
+  fill: 'none',
+  stroke: 'currentColor',
+  strokeWidth: 1.6,
+  strokeLinecap: 'round' as const,
+  strokeLinejoin: 'round' as const,
+  'aria-hidden': true,
+  focusable: false,
+};
+
+/** Confirmation. Used once, on the delivered transaction sheet. */
+export function Check(props: SVGProps<SVGSVGElement>) {
+  return (
+    <svg viewBox="0 0 16 16" {...svgBase} {...props}>
+      <path d="M3.5 8.5 6.5 11.5 12.5 4.5" />
+    </svg>
+  );
+}
+
+/** Copy-to-clipboard. The affordance that lets a transaction hash be truncated. */
+export function CopyIcon(props: SVGProps<SVGSVGElement>) {
+  return (
+    <svg viewBox="0 0 16 16" {...svgBase} {...props}>
+      <rect x="5.75" y="5.75" width="7.5" height="7.5" rx="1.75" />
+      <path d="M10.25 3.75a1.5 1.5 0 0 0-1.5-1.5h-4.5a2.5 2.5 0 0 0-2.5 2.5v4.5a1.5 1.5 0 0 0 1.5 1.5" />
+    </svg>
+  );
+}
+
 // ── Product surfaces ─────────────────────────────────────────────────────────
 
 /** Vault — a safe holding Bitcoin, which is literally what MarenVault is. */

@@ -113,7 +113,7 @@ function Body({
         <p className="text-warning">Could not read your history</p>
         <p className="mt-1">
           Mezo’s RPC did not answer the log query, so this list is unknown rather than empty. Your
-          transactions are unaffected — nothing here reads or writes your position.{' '}
+          transactions are unaffected. Nothing here reads or writes your position.{' '}
           {error instanceof Error ? error.message : ''}
         </p>
       </Note>
@@ -137,7 +137,7 @@ function Body({
                 </EmptyState>
               ) : window?.complete ? (
                 <EmptyState title="Nothing here yet">
-                  This account has never transacted with Maren — we read every block since the
+                  This account has never transacted with Maren. We read every block since the
                   contracts were deployed, so that is the whole story rather than a recent slice.
                   Deposit Bitcoin in the Vault and the first row appears here.
                 </EmptyState>
@@ -160,20 +160,20 @@ function Body({
           <Info summary="What these statuses mean">
             <ul className="space-y-2">
               <li>
-                <span className="text-text">Confirmed</span> — a receipt came back successful. A
+                <span className="text-text">Confirmed</span>: a receipt came back successful. A
                 transaction hash on its own is never shown as a result.
               </li>
               <li>
-                <span className="text-text">Awaiting receipt</span> — we have a hash and no receipt
+                <span className="text-text">Awaiting receipt</span>: we have a hash and no receipt
                 yet. It may still land; check here before retrying.
               </li>
               <li>
-                <span className="text-text">Failed — no funds moved</span> — mined, then reverted. A
+                <span className="text-text">Failed, no funds moved</span>: mined, then reverted. A
                 reverted transaction emits no events, so it can only appear here if its receipt says
                 so.
               </li>
               <li>
-                <span className="text-text">Gas</span> — what you actually paid in BTC, from the
+                <span className="text-text">Gas</span>: what you actually paid in BTC, from the
                 receipt. No relayer is deployed, so no row is sponsored today.
               </li>
             </ul>
@@ -189,7 +189,7 @@ function ActivityUnread() {
   return (
     <ConnectPrompt title="Connect to see your history">
       Activity is read from Maren’s contract logs for your address specifically. There is no sample
-      history to show you — the app does not keep one.
+      history to show you. The app does not keep one.
     </ConnectPrompt>
   );
 }
@@ -209,14 +209,14 @@ function Coverage({ window }: { window: NonNullable<ReturnType<typeof useActivit
       {window.complete ? (
         <>
           Read every block from <span className="num">{window.fromBlock.toString()}</span>, where
-          Maren was deployed, to <span className="num">{window.toBlock.toString()}</span> — the
-          complete history.
+          Maren was deployed, to <span className="num">{window.toBlock.toString()}</span>. That is
+          the complete history.
         </>
       ) : (
         <>
           Read blocks <span className="num">{window.fromBlock.toString()}</span> to{' '}
           <span className="num">{window.toBlock.toString()}</span> ({span} blocks). Mezo’s public
-          RPC caps a log query at 10,000 blocks, so older history needs an indexer — see{' '}
+          RPC caps a log query at 10,000 blocks, so older history needs an indexer. See{' '}
           <span className="num">apps/web/README.md</span>.
         </>
       )}

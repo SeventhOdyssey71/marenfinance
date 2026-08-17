@@ -35,7 +35,7 @@ const items: readonly Item[] = [
       <>
         <p>
           No. Payments move MUSD wallet to wallet via <span className="num">transferFrom</span>{' '}
-          under your own permit — Maren never takes possession.
+          under your own permit. Maren never takes possession.
         </p>
         <p>
           The pooled vault is the honest exception and we will not soften it:{' '}
@@ -49,7 +49,7 @@ const items: readonly Item[] = [
           The mitigations are the 140/110 buffer, the 0.001 BTC deposit floor, per-block keeper
           checks, and a protocol-owned insurance buffer funded from vault fees. They are
           mitigations, not a guarantee. If you hold more than the protocol minimum, Maren steers you
-          to a direct trove, which carries no pooling risk at all — and the interface says so at the
+          to a direct trove, which carries no pooling risk at all, and the interface says so at the
           point of decision.
         </p>
       </>
@@ -89,7 +89,7 @@ const items: readonly Item[] = [
         <p>
           <strong className="text-text font-medium">Not yet. Maren is pre-audit.</strong> A
           third-party audit of <span className="num">MarenVault</span> and{' '}
-          <span className="num">MarenForwarder</span> — the two contracts that carry real risk — is
+          <span className="num">MarenForwarder</span> (the two contracts that carry real risk) is
           scheduled after the full matsnet deployment and before mainnet.
         </p>
         <p>
@@ -105,8 +105,8 @@ const items: readonly Item[] = [
     a: (
       <>
         <p>
-          If you hold more than roughly 0.079 BTC, it partly is not — and Maren will tell you to
-          open a direct trove, because that avoids pooling risk entirely. What Maren adds there is
+          If you hold more than roughly 0.079 BTC, it partly is not, and Maren will tell you to open
+          a direct trove, because that avoids pooling risk entirely. What Maren adds there is
           gasless execution and a payments surface.
         </p>
         <p>
@@ -141,7 +141,7 @@ const items: readonly Item[] = [
         <p>
           Yes. Repay your share of the debt and withdraw your collateral, at any time. If the pooled
           trove ever approaches Maren&rsquo;s internal policy limit, borrowing is halted{' '}
-          <em className="text-text not-italic">before</em> withdrawal is — exits stay open when
+          <em className="text-text not-italic">before</em> withdrawal is. Exits stay open when
           entries close.
         </p>
       </>

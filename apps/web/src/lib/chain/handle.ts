@@ -157,7 +157,7 @@ export function validateHandle(input: string): string | null {
   if (handle.length > 32) return 'Handles are at most 32 characters.';
   const bad = [...handle].find((c) => !/[a-z0-9_]/.test(c));
   if (bad !== undefined) {
-    return `“${bad}” is not allowed — handles use lowercase letters, digits and underscores only.`;
+    return `“${bad}” is not allowed. Handles use lowercase letters, digits and underscores only.`;
   }
   return null;
 }
