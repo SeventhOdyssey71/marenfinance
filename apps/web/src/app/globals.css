@@ -50,6 +50,56 @@
     /* Content grid: 1200px max, 24px gutters */
     --content-max: 1200px;
   }
+
+  /* -------------------------------------------------------------------------
+     The app runs light; the marketing site stays dark.
+
+     One attribute on the app shell re-derives every token, so no component
+     needs to know which world it is in. Text colours are darkened until they
+     hold AA on #F7F6FB; violet-400 collapses onto violet-500 because the
+     lighter tint only ever existed to survive a dark background.
+  ------------------------------------------------------------------------- */
+  [data-app-theme='light'] {
+    --color-bg: #f7f6fb;
+    --color-surface: #ffffff;
+    --color-surface-raised: #ffffff;
+    --color-surface-inset: #efedf6;
+    --color-text: #17171b;
+    --color-text-muted: #55555e;
+    --color-text-subtle: #82828c;
+    --color-violet-400: #5b3df5;
+    --color-violet-900: #ece8ff;
+    --color-success: #0f9d6a;
+    --color-warning: #b45309;
+    --color-danger: #dc2626;
+    --color-musd: #0d9e70;
+    --border-hairline: rgba(20, 18, 35, 0.08);
+    --border-strong: rgba(20, 18, 35, 0.16);
+    background-color: var(--color-bg);
+    color: var(--color-text);
+  }
+
+  /* On dark, a card is a hairline and nothing else. On light, the hairline
+     alone reads as an unfinished wireframe — the card IS a white surface with
+     a soft drop, which is the whole consumer feel in one rule. */
+  [data-app-theme='light'] .card {
+    background-color: var(--color-surface);
+    border-color: transparent;
+    box-shadow:
+      0 1px 2px rgba(23, 20, 41, 0.05),
+      0 8px 24px -12px rgba(23, 20, 41, 0.14);
+  }
+
+  [data-app-theme='light'] .card-modal {
+    box-shadow:
+      0 4px 12px rgba(23, 20, 41, 0.08),
+      0 24px 64px -16px rgba(23, 20, 41, 0.28);
+  }
+
+  [data-app-theme='light'] ::selection {
+    background-color: color-mix(in srgb, var(--color-violet-500) 25%, transparent);
+    color: var(--color-text);
+  }
 }
 
 @layer base {
