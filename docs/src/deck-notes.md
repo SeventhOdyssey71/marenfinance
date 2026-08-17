@@ -30,8 +30,8 @@ Then move on. This slide is worth four seconds.
 Put the slide up. Say the two numbers, slowly, and then say nothing for a beat longer
 than is comfortable.
 
-"Twenty-seven troves open on Mezo mainnet. Twenty-nine thousand, three hundred and sixty
-people holding MUSD."
+"Twenty-seven troves open on Mezo mainnet. Twenty-nine thousand, three hundred and
+sixty-one people holding MUSD."
 
 Let them do the arithmetic themselves. Do not explain it. The next slide explains it.
 
@@ -93,7 +93,7 @@ guarantees, and our documents say exactly that."
 Do not oversell this. A room of Bitcoin people will trust you more for naming it.
 
 If asked why anyone would use the pooled trove rather than a direct one: they would not,
-if they qualify. The interface routes anyone above the threshold to a *direct* trove,
+if they qualify. The interface routes anyone above the threshold to a _direct_ trove,
 because that carries no pooling risk, even though pooled volume is better for us. Say
 that. It is a costly signal and it is true.
 
@@ -141,7 +141,7 @@ The tx hash is on the footline. If anyone wants it, it is
 
 **Be ready for: "can a user borrow yet?"** The answer is no, and you volunteer it:
 "Not yet, and the reason is interesting. Seeding the trove at the protocol minimum pins
-debt at 2,001.8 MUSD, and clearing our own 180% borrow floor against that debt needs
+debt at 2,001.84 MUSD, and clearing our own 180% borrow floor against that debt needs
 about 0.057 BTC. We seeded with less. So the borrow reverted, correctly, with our own
 safety rail refusing it. It needs one more faucet drip. The general lesson is that
 **MUSD's minimum debt sets a minimum viable pooled vault that is larger than the minimum
@@ -164,8 +164,26 @@ Three numbers. Do not narrate all three; pick the room.
   thousand gas. Sponsoring a million user actions costs about nine thousand dollars.
   Gasless is affordable here in a way it is not anywhere else."
 
-Either way, close with 7702: "and EIP-7702 is live, so the upgrade path exists without
-4337."
+**Do not attach the words "base fee" to $0.0092.** They are two different numbers and our
+own documents paired the wrong label with the wrong figure for a while. The base fee is
+1,300,000 wei, which works out at about $0.0082. The $0.0092 comes from the gas *price*,
+1,462,500 wei. A sponsor pays gas price, so $0.0092 is the correct number for what
+relaying actually costs us; it is simply not the base fee. If someone asks for the base
+fee, give them 1.3 million wei and say the sponsor figure is the higher one.
+
+Either way, close with 7702: "and Mezo mainnet accepts EIP-7702 type-4 transactions, so
+the upgrade path exists without 4337."
+
+**Say it exactly that way.** What was verified is that the node accepts a type-4
+transaction: a signed one came back rejected for insufficient funds, not for an
+unsupported type. No fork marker is visible in the block header and no delegated account
+was found, so **do not say "live since block 9,275,000"** even though our earlier drafts
+did. The weaker claim is the one that survives being checked.
+
+Same discipline on the zero: it comes from the Mezo block explorer's index, not from an
+exhaustive sweep of 11.17 million blocks. Say "zero according to the explorer index". If
+challenged on whether the indexer simply misses them, the control is that MUSD shows
+104,681 transactions through the same endpoints, so the index is working.
 
 ---
 

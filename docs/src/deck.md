@@ -19,7 +19,7 @@ Spend Bitcoin. Never sell it. Built on Mezo.
 
 ```stat
 27 | Troves open on Mezo mainnet
-29,360 | People holding MUSD
+29,361 | People holding MUSD
 ```
 
 <!-- slide: stat | kicker: Why | tag: Protocol | foot: minNetDebt() returns 1,800 MUSD. 250% is a responsible ratio, not the 110% liquidation floor. -->
@@ -28,7 +28,7 @@ Spend Bitcoin. Never sell it. Built on Mezo.
 
 ```stat
 1,800 MUSD | Minimum net debt, before anyone can borrow
-0.079346 BTC | The collateral that needs, about $5,004
+0.079346 BTC | What that needs in collateral, about $5,000
 ```
 
 <!-- slide: stat | kicker: The wedge | tag: Verified | foot: 0.079346 / 0.001 = 79.346. Asserted in packages/sdk/src/position.test.ts against a pinned oracle price. -->
@@ -72,18 +72,17 @@ Spend Bitcoin. Never sell it. Built on Mezo.
 # The pooled trove is open and active in MUSD's own TroveManager.
 
 ```stat
-0.050 BTC | Collateral
-2,001.8 MUSD | Debt
-157.6% | Collateral ratio
+0.048 BTC | Collateral
+2,001.84 MUSD | Debt
+150.8% | Collateral ratio
 ```
 
-<!-- slide: stat | kicker: What we found in the chain | tag: Findings | foot: The RPCs do not implement debug_traceCall, so no compliant bundler can run against Mezo. -->
+<!-- slide: stat | kicker: What we found in the chain | tag: Findings | foot: Zero per the Mezo explorer index. No Mezo RPC implements debug_traceCall, so no compliant bundler can run. Mainnet does accept EIP-7702 type-4 transactions. -->
 
 # We read the chain, not the documentation.
 
 ```stat
-0 | UserOperations ever processed by the deployed EntryPoint
-9,275,000 | Mainnet block where EIP-7702 went live
+0 | UserOperations ever processed by the deployed ERC-4337 EntryPoint
 $0.0092 | What 100,000 gas costs
 ```
 
