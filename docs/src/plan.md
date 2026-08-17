@@ -1,15 +1,16 @@
 ---
 title: Maren Finance — Product Plan
-subtitle: A money app for Bitcoin. Spend it in the real world, never sell it.
+subtitle: A money app for Bitcoin. Spend it in the real world, never sell it. The product, the phases, the economics, and how it is measured.
 docId: MRN-200
 date: 2026-08-17
-version: '1.0'
+version: '1.1'
 classification: Confidential
 audience: Mezo Ecosystem
 colophon: |
   This document plans forward, and it marks the boundary honestly: sections describing
   what exists are stated as fact and are verifiable on-chain; sections describing what
-  comes next are plans, and say so. Chain figures were read live on 17 August 2026.
+  comes next are plans and say so; revenue figures are illustrative worked examples,
+  labelled as such, not projections. Chain figures were read live on 17 August 2026.
 ---
 
 ## The goal
@@ -22,6 +23,22 @@ against it. But the product is not a lending dashboard. It is a money app. You p
 Bitcoin in once, and from then on you pay a name, drop money into a link and send it
 to anyone, request and get paid, cash out to your bank, and pay at a shop. Your
 Bitcoin stays yours the whole time, and when you repay, you get all of it back.
+
+## Who it is for
+
+Three people, in order:
+
+1. **The holder who will not sell.** They have Bitcoin, they have expenses, and today
+   their only choices are selling (a taxable event and an ideological defeat) or a
+   centralised lender (custody risk they specifically got into Bitcoin to avoid).
+   Maren gives them spendable dollars against self-custodied collateral, from 0.001
+   BTC, which no venue on Mezo offers today.
+2. **The person being paid.** Money links and requests work for people who have never
+   held crypto: open a link, claim the money. Every link recipient is a prospective
+   depositor who arrives with a funded account and a reason to stay.
+3. **The MUSD holder with nowhere to spend.** Mezo has tens of thousands of MUSD
+   holders and, today, almost no consumer surface. Maren's payments layer works for
+   them from day one, borrowing or not.
 
 ## Why this, why here
 
@@ -39,7 +56,9 @@ Maren removes all three barriers in one product:
 | Every action costs BTC gas | Users sign; Maren's relayer submits and pays. About one cent per action |
 | Nowhere to spend MUSD      | Names, links, requests, cashout, and shops, below                       |
 
-Every Maren user is a new borrower Mezo could not otherwise have.
+Every Maren user is a new borrower Mezo could not otherwise have. Maren does not
+compete with the existing troves; it addresses the population underneath the minimum,
+which is currently zero by construction.
 
 ## The app
 
@@ -59,6 +78,8 @@ A slider, bounded by what the contract will actually accept, with a recommended 
 level marked. The app computes every rule the contract enforces before asking for a
 signature, so an offer on screen is an offer that clears. Health is shown as a plain
 number with a plain meaning: how far Bitcoin can fall before anything is at risk.
+Maren refuses new borrowing below a 180% collateral ratio, well above the protocol's
+110% liquidation threshold, because the buffer is the product.
 
 ### Pay a name
 
@@ -71,7 +92,8 @@ to get wrong. Raw addresses still work for anyone without a name yet.
 Put MUSD into a link and send the link: WhatsApp, iMessage, anywhere text goes. The
 recipient opens it and claims the money, with or without a Maren account. Unclaimed
 links can be cancelled and refunded. This is how money crosses from Maren users to
-everyone else.
+everyone else, and it is the product's built-in growth loop: every link is an
+invitation carrying money.
 
 ### Requests
 
@@ -82,16 +104,18 @@ the transaction hash attached.
 ### Cash out to a bank
 
 MUSD out to local currency in a bank account. Off-ramp partners are integrated behind
-one screen, starting with the corridors our users actually live in, so "cash out"
-feels like part of the app rather than a trip to an exchange. This is planned, not
-built; partner selection and licensing review is part of the next phase.
+one screen, starting with the corridors our users actually live in, so cashing out
+feels like part of the app rather than a trip to an exchange. Regulatory posture:
+Maren integrates licensed off-ramp providers rather than taking custody of fiat
+itself; partner selection and compliance review are part of the phase, not an
+afterthought. Planned, not built.
 
 ### Pay at a shop
 
 Merchant payments settle in MUSD with a QR at the counter, built on the x402 payment
 rail Mezo already operates: the buyer signs once, the merchant is settled on-chain,
-nobody handles gas. The plan starts with a small merchant pilot rather than a
-directory nobody uses. Planned, not built.
+nobody handles gas. The plan starts with a small merchant pilot in one city rather
+than a directory nobody uses. Planned, not built.
 
 ### Earn
 
@@ -114,29 +138,99 @@ Evidence document.
 
 The order is a safety decision, not a marketing one: nothing that touches other
 people's Bitcoin reaches mainnet before an independent audit, and the vault launches
-capped either way.
+capped either way, with the cap raised only as the position proves out.
+
+## Revenue
+
+No token, and no plan for one. Revenue is spread on real usage, on four lines. The
+rates below are target ranges, set conservatively; final pricing is decided at mainnet
+and stated in the app rather than buried.
+
+| Line                    | Mechanism                                                                                                                                                                | Target pricing                                                 |
+| ----------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | -------------------------------------------------------------- |
+| Pooled borrowing spread | A margin over the protocol's 1.00% fixed APR, charged to pooled borrowers for the service of existing below the protocol minimum                                         | 1.0 to 2.0 points over, fixed at open like the underlying rate |
+| Payments                | Fee on MUSD payment volume above a free tier. The first 25 sponsored actions per address are always free, so a new user is never charged to find out what the product is | 10 to 30 basis points on volume past the tier                  |
+| Cashout                 | Margin inside the off-ramp partner's quote, disclosed as one all-in rate on the confirmation screen                                                                      | 30 to 50 basis points                                          |
+| Earn performance fee    | A share of realised liquidation gains only. No yield, no fee                                                                                                             | 10% of realised gains                                          |
+
+Two properties of this design matter more than any single rate. First, every line
+scales with usage the chain can measure, so revenue claims are auditable the same way
+the product's other claims are. Second, nothing charges for holding: fees sit on
+actions, so an account that parks Bitcoin and does nothing costs its owner nothing.
+
+### An illustrative year, labelled as such
+
+These are worked examples at stated assumptions, not projections. At 2,000 funded
+accounts averaging 400 MUSD of pooled debt (0.8M MUSD outstanding), a 1.5 point
+spread earns about $12,000 a year. The same accounts moving $150 a month each through
+payments past the free tier, at 20 basis points, add $7,200. Cashout at 40% of that
+payment volume and 40 basis points adds about $5,800. Earn contributes only what
+liquidations actually yield and is deliberately not modelled here.
+
+Against that, costs are small and mostly fixed: sponsoring one user action on Mezo
+costs about one cent at current gas prices, so even a million sponsored actions cost
+under $10,000 a year; relayer hosting is a single small server; the significant
+one-time cost is the independent audit, which is priced separately and treated as the
+gate to mainnet. The point of the example is shape, not precision: break-even sits at
+a few thousand active accounts, and every driver of it is a number Mezo can read off
+its own chain.
+
+## Distribution
+
+- **Mezo's own community first.** The people most likely to want MUSD without $5,000
+  of collateral already hold MUSD or sit in Mezo's Discord. A testnet cohort drawn
+  from there is the first fifty users, and their transactions are the launch evidence.
+- **Money links as the loop.** Every link sent to a non-user is an onboarding with
+  money inside. This is the channel the product is structurally built around.
+- **The predecessor's audience.** The team's previous product validated this exact
+  consumer pattern on another chain: 1,900 waitlisted, 1,400 names claimed on-chain.
+  That audience is contactable and the pattern is proven; the chain moved, the users
+  can too.
+- **Co-marketing with the ecosystem** at mainnet: launch post, walkthrough video, and
+  the on-chain numbers stated plainly, in public, dated.
 
 ## Being straight about risk
 
-Pooled deposits share one large, conservatively managed position. Maren keeps it far
-from the protocol's liquidation threshold, pauses new borrowing long before exits, and
-steers anyone holding more than the protocol minimum to their own separate position,
-because that carries no pooling risk at all. A catastrophic, faster-than-keeper crash
-could still socialise losses across the pool, and the app says this where the decision
-is made rather than in a footnote. Bitcoin can fall; a collateralised loan can be
-liquidated. No design removes that, and no screen in Maren pretends otherwise.
+**Pooling risk.** Pooled deposits share one large, conservatively managed position.
+Maren keeps it far from the protocol's liquidation threshold, liquidates internally at
+140% against the protocol's 110%, pauses new borrowing long before exits, and steers
+anyone holding more than the protocol minimum to their own separate position, because
+that carries no pooling risk at all. A catastrophic, faster-than-keeper crash could
+still socialise losses across the pool, and the app says this where the decision is
+made rather than in a footnote.
 
-## What this costs to run
+**Market risk.** Bitcoin can fall; a collateralised loan can be liquidated. No design
+removes that, and no screen in Maren pretends otherwise. The default borrowing level
+the app recommends (250%) is set so that Bitcoin must roughly halve before a position
+approaches Maren's internal threshold.
 
-Sponsoring a user action on Mezo costs about a cent. The revenue design is spread on
-real usage rather than a token: a small margin over the protocol's 1% borrow rate on
-pooled positions, a fee on payment volume above a free tier, and a performance fee on
-realised Earn yield. Gas sponsorship is a customer-acquisition cost measured in cents;
-there is no token and no plan for one.
+**Oracle and infrastructure risk.** Mezo's price feed reverts when stale, and public
+RPCs are transiently flaky. Both apps carry explicit degraded states and never render
+a stale figure as live.
+
+**Regulatory surface.** Borrowing against self-custodied collateral and on-chain
+payments are the core; fiat touches the system only through licensed off-ramp
+partners, and the merchant pilot settles on-chain in MUSD. Scope grows corridor by
+corridor with the partner's licence, not ahead of it.
+
+**Execution risk.** The honest one. The mitigations are the ones evidenced in the
+companion document: verification-first engineering, adversarial review that has
+already caught real money bugs before users could, and a mainnet gate that is an
+audit rather than a date.
 
 ## The measure of success
 
-Positions funded and dollars moving: borrowers who could not exist under the $5,000
-minimum, payments settling against names and links, and Bitcoin that never had to be
-sold. All of it readable from the chain by anyone, which is how this document prefers
-every claim to be checked.
+Positions funded and dollars moving, all readable from the chain by anyone:
+
+| Metric                                      | Meaning                                        |
+| ------------------------------------------- | ---------------------------------------------- |
+| Funded positions below the protocol minimum | Borrowers who could not exist without Maren    |
+| MUSD borrowed through the pooled vault      | New MUSD in circulation, attributable on-chain |
+| Payments settled against names and links    | The money-app claim, measured                  |
+| Link claims by brand-new addresses          | The growth loop working                        |
+| Realised Earn yield distributed             | Yield paid from real events, not emissions     |
+
+The first public target is simple: several hundred funded positions and six figures of
+borrowing within the first quarter after mainnet, which would multiply the number of
+borrowing accounts on Mezo, and every step of it checkable by the people it is
+reported to.
