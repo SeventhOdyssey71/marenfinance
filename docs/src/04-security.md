@@ -71,7 +71,7 @@ can open a position at all. (That figure is not an estimate: it is the output of
 `collateralRequiredFor()` in `packages/sdk/src/position.ts`, executed against the live
 oracle price, and asserted in the test suite.)
 
-Mezo mainnet has **26 troves**. MUSD has **29,360 holders**. The gap between those two
+Mezo mainnet has **27 troves**. MUSD has **roughly 29,360 holders** (16 August 2026). The gap between those two
 numbers is a product problem, and the pooled vault is the only honest way to close it.
 
 ## Mitigations
@@ -193,7 +193,7 @@ The relayer is never an owner, approver, or custodian of user funds. It relays o
 allowlisted Maren contracts, only for allowlisted selectors, and derives the payer from
 the _recovered_ signature rather than from any client-supplied field.
 
-At Mezo's base fee, a 100,000-gas transaction costs **$0.0092**, so the float on hand is
+At Mezo's gas price, a 100,000-gas transaction costs **$0.0092**, so the float on hand is
 small in absolute terms even when the sponsorship budget is generous.
 
 ## Contracts (R-6)

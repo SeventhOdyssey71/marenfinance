@@ -83,3 +83,8 @@ Thumbs.db
 
 # Private grant package — context, pitch, and correspondence. Never committed.
 _grant/
+
+# agent working litter, never source
+.harness/
+scratch/
+Screenshot*.png

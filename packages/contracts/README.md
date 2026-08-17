@@ -34,7 +34,8 @@ authorisation.
 > **Not ERC-4337.** EntryPoint v0.7 is deployed on Mezo at
 > `0x0000000071727De22E5E9d8BAf0edAc6f37da032`, byte-identical to L1, but inert: zero
 > UserOperations, and mezod does not implement `debug_traceCall`, so no ERC-7562-compliant
-> bundler can validate. EIP-7702 (live on mainnet since block 9,275,000) is the upgrade path,
+> bundler can validate. EIP-7702 (mainnet accepts type-4 transactions; verified by
+> submission) is the upgrade path,
 > which is why every user-facing entrypoint here is small and independently callable rather
 > than a monolith — a 7702-delegated account can batch them.
 
