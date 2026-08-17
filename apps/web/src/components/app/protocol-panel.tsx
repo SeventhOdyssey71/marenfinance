@@ -41,7 +41,7 @@ export function ProtocolPanel() {
 
   return (
     <Panel
-      title="The pooled trove"
+      title="The social vault"
       meta={<span className="t-label text-text-subtle">Everyone’s, not yours</span>}
     >
       <div className="px-5 py-5">
@@ -62,7 +62,7 @@ export function ProtocolPanel() {
         <MetricStrip>
           <Metric
             className="px-5 py-4"
-            label="Trove collateral"
+            label="Vault collateral"
             value={
               stats ? (
                 <Num size="lg" title={`${formatBtc(stats.troveCollateralWei)} exactly`}>
@@ -76,13 +76,13 @@ export function ProtocolPanel() {
           />
           <Metric
             className="px-5 py-4"
-            label="Trove debt"
+            label="Vault debt"
             value={stats ? <Musd wei={stats.troveNetDebtWei} size="lg" /> : <Dash size="lg" />}
             caption="net of the liquidation reserve"
           />
           <Metric
             className="px-5 py-4"
-            label="Trove ratio"
+            label="Vault health"
             value={
               stats ? (
                 <Num size="lg" className={belowFloor ? 'text-warning' : ''} tone="inherit">
