@@ -91,6 +91,65 @@ import {Math} from "@openzeppelin/contracts/utils/math/Math.sol";
  * trove changes nothing for users — which is precisely what makes `deleverage()` safe.
  * ----------------------------------------------------------------------------
  *
+ * ------------------------------ REDEMPTIONS ---------------------------------
+ * A redemption is the one event that reaches into the pooled trove without anyone here
+ * asking for it. Any MUSD holder may swap MUSD for trove collateral at the oracle price,
+ * and the protocol serves that swap from the lowest-ICR troves first. When it lands on this
+ * vault the trove loses collateral and loses exactly the same VALUE of debt. The redeemer
+ * pays the 0.75% redemption fee out of the collateral they receive, so the trove itself is
+ * value neutral at the instant it happens.
+ *
+ * The trove is value neutral. The BOOKS are not, and that is the whole problem: nothing in
+ * the per-user ledger moved. Left alone, the first users to withdraw would take collateral
+ * that is no longer there and the last ones would find the trove empty, and the debt relief
+ * the protocol just handed the pool could never reach the people who paid for it, because
+ * `interestIndex` only ever goes up.
+ *
+ * `reconcileRedemption()` is the reconciliation, and it is deliberately boring:
+ *
+ *   1. MEASURE, do not model. `collateralRemoved` is what the books say should be inside the
+ *      trove (`totalCollateral - idleCollateral`) minus what the trove actually holds.
+ *      `debtRemoved` is what shareholders are accounted for minus what the trove actually
+ *      owes. Both come from TroveManager, never from a redemption event or a parameter.
+ *   2. SPLIT PRO RATA BY DEBT SHARES, not by collateral. A redemption cancels debt, so the
+ *      people who owe that debt are the people it belongs to. A depositor with no debt is
+ *      untouched: they were handed no relief, so they surrender no collateral.
+ *   3. DEBT falls by scaling `interestIndex` down by exactly the measured relief. This is the
+ *      ONE place the index moves down, and it moves by a measured quantity, never a modelled
+ *      one. Everywhere else it is monotonic. Rounding is UP, so shareholders still owe at
+ *      least what the trove owes.
+ *   4. COLLATERAL falls through `redemptionCollateralPerShare`, a cumulative debit per debt
+ *      share, applied to an account lazily against `redemptionSnapshot[account]`. Rounding is
+ *      UP, so the pool keeps the dust rather than an individual withdrawer. There is no loop
+ *      over users anywhere, at any pool size.
+ *
+ * Each debtor therefore loses collateral worth exactly the debt they stopped owing. Nobody's
+ * net position value changes at the instant of redemption, and every position's collateral
+ * ratio improves, which is the same thing that happens to a redeemed standalone trove.
+ *
+ * The reconciliation runs at the top of EVERY user-facing mutation, not only when a keeper
+ * remembers to call it. No deposit, borrow, repay or withdraw can execute against books that
+ * predate a redemption, so there is no window in which a user can withdraw a pre-redemption
+ * entitlement. It needs no price, so it keeps working while Mezo's oracle is down.
+ *
+ * KNOWN LIMIT, stated rather than buried. A redemption large enough to cancel essentially all
+ * pooled user debt re-pegs the index down towards its floor of 1. Everything stays correct,
+ * but every share count minted afterwards is enormous, because shares are debt divided by that
+ * index. `REDEMPTION_PRECISION` is 1e36 rather than 1e18 precisely so the per-share rounding
+ * stays negligible in that state; see the constant. The invariant suite drives the vault into
+ * it deliberately.
+ *
+ * A LIQUIDATION of the pooled trove looks identical on the collateral ledger and must never
+ * be reconciled as a redemption: it removes collateral WITHOUT cancelling an equal value of
+ * user debt, so splitting it this way would hand users debt relief the pool never received.
+ * `getTroveStatus` tells them apart. A partial redemption leaves the trove active; a
+ * liquidation, an owner close, or a redemption large enough to consume the trove entirely
+ * does not. When the trove has left the active state every mutation halts with
+ * `TroveNoLongerActive`, which is a hard stop and is meant to be: the honest response to
+ * "the pool's trove is gone" is to stop paying claims first-come-first-served and let an
+ * admin wind the vault down against whatever the CollSurplusPool still holds.
+ * ----------------------------------------------------------------------------
+ *
  * DESIGN NOTE (EIP-7702): `deposit`, `borrow`, `repay` and `withdraw` are separate,
  * independently callable entrypoints rather than one monolithic `depositAndBorrow`, so a
  * 7702-delegated account can batch permit + deposit + borrow + pay in a single transaction.
@@ -116,6 +175,20 @@ contract MarenVault is AccessControl, ERC2771Context, ReentrancyGuard {
     uint256 internal constant WAD = 1e18;
     uint256 internal constant BPS = 10_000;
 
+    /**
+     * @notice Fixed-point scale of `redemptionCollateralPerShare`, deliberately 1e36 and not
+     *         1e18.
+     * @dev The per-share debit rounds UP, so one unit of it is worth `totalDebtShares / SCALE`
+     *      wei of BTC across the pool. That is nothing at 1e18 scale in ordinary conditions,
+     *      and it is NOT nothing after a redemption that cancels almost all pooled user debt:
+     *      the interest index is re-pegged towards its floor, every subsequent borrow mints
+     *      shares against a tiny index, and `totalDebtShares` can reach 1e40. At 1e18 scale
+     *      the rounding would then cost thousands of BTC. At 1e36 it costs ten-thousandths of
+     *      a satoshi. The invariant suite found this by driving the index into the floor and
+     *      borrowing afterwards, which is exactly the sequence a large redemption produces.
+     */
+    uint256 internal constant REDEMPTION_PRECISION = 1e36;
+
     /// @notice The whole point of this contract: ~80x below the protocol's effective minimum.
     uint256 public constant MIN_DEPOSIT = 0.001 ether;
 
@@ -139,6 +212,10 @@ contract MarenVault is AccessControl, ERC2771Context, ReentrancyGuard {
     /// @notice Protocol floor on net debt. The pooled trove can never be repaid below it
     ///         without closing, which is why `reserveMUSD` exists.
     uint256 public constant MIN_NET_DEBT = 1800e18;
+
+    /// @notice `TroveManager.Status.active`. Anything else means the pooled trove has left
+    ///         the system, by liquidation, by an owner close, or by a full redemption.
+    uint256 public constant TROVE_STATUS_ACTIVE = 1;
 
     // ------------------------------------------------------------------ //
     //                               Types                                //
@@ -195,6 +272,36 @@ contract MarenVault is AccessControl, ERC2771Context, ReentrancyGuard {
     /// @notice Debt written off as uncollectable, for reporting. Never nets off user balances.
     uint256 public badDebtRecognised;
 
+    /**
+     * @notice Cumulative BTC debited per debt share by redemptions, `REDEMPTION_PRECISION`
+     *         scaled.
+     * @dev The whole redemption splitter in one number. An account owes
+     *      `debtShares * (redemptionCollateralPerShare - redemptionSnapshot) / 1e36` of
+     *      collateral, settled the next time it is touched. Monotonically non-decreasing.
+     */
+    uint256 public redemptionCollateralPerShare;
+
+    /// @notice Where each account has already settled up to. An account that has never held
+    ///         debt shares is simply moved forward with nothing to pay.
+    mapping(address account => uint256 perShare) public redemptionSnapshot;
+
+    /// @notice Lifetime BTC taken out of the pooled trove by redemptions, for reporting.
+    uint256 public totalCollateralRedeemed;
+
+    /// @notice Lifetime MUSD of user debt cancelled by those redemptions, for reporting.
+    uint256 public totalDebtRedeemed;
+
+    /**
+     * @notice Redemption collateral that could NOT be charged to the account that owed it.
+     * @dev Only reachable for a position already below 100% collateralisation, where the
+     *      debit exceeds every wei the account holds. It is capped at the account's balance,
+     *      added back to `totalCollateral` and recorded here rather than being spread silently
+     *      onto other users, in exactly the same spirit as `badDebtRecognised`. While it is
+     *      non-zero the pool's credited collateral exceeds the trove's by this amount, and an
+     *      admin makes it whole with `depositProtocolCollateral`.
+     */
+    uint256 public redemptionShortfall;
+
     bool public troveOpen;
 
     /// @notice Blocks `deposit`. NEVER blocks withdraw, repay, closePosition or liquidation.
@@ -231,6 +338,20 @@ contract MarenVault is AccessControl, ERC2771Context, ReentrancyGuard {
     event PooledTroveClosed(uint256 collateralReturned);
     event CollateralPushedToTrove(uint256 amount);
     event CollateralHeldIdle(uint256 amount, uint256 totalIdle);
+    /// @dev Carries the revert selector so a keeper can tell "the trove had no room" or "the
+    ///      oracle is stale" from "the call reverted for a reason nobody predicted". Zero
+    ///      means the callee reverted with no returndata at all.
+    event CollateralPushFailed(uint256 amount, bytes4 reason);
+    event RepaymentPushFailed(uint256 amount, bytes4 reason);
+    event RedemptionReconciled(
+        uint256 collateralRemoved,
+        uint256 debtRemoved,
+        uint256 oldInterestIndex,
+        uint256 newInterestIndex,
+        uint256 collateralPerShare
+    );
+    event RedemptionSettled(address indexed account, uint256 collateralDebited, uint256 newCollateral);
+    event RedemptionShortfallRecognised(address indexed account, uint256 amount);
     event Deleveraged(uint256 musdRepaidIntoTrove, uint256 reserveRemaining);
     event Refinanced(uint256 newMaxBorrowingCapacity);
     event ProtocolCollateralAdded(uint256 amount);
@@ -264,6 +385,16 @@ contract MarenVault is AccessControl, ERC2771Context, ReentrancyGuard {
     error OutstandingUserDebt(uint256 shares);
     error CollateralTransferFailed(address to, uint256 amount);
     error NothingToSkim();
+
+    /// @notice The pooled trove has left the active state: liquidated, closed, or fully
+    ///         redeemed. Every mutation halts rather than guess which, because a liquidation
+    ///         and a redemption look the same on the collateral ledger and are not the same
+    ///         thing. Carries the raw `TroveManager.Status` so the UI can say which.
+    error TroveNoLongerActive(uint256 status);
+
+    /// @notice `deleverage()` moved nothing. Previously this emitted `Deleveraged(0, ...)` and
+    ///         looked like a success to a keeper watching events.
+    error NothingRepaid();
 
     // ------------------------------------------------------------------ //
     //                            Construction                            //
@@ -314,11 +445,14 @@ contract MarenVault is AccessControl, ERC2771Context, ReentrancyGuard {
         uint256 amount = msg.value;
         if (amount < MIN_DEPOSIT) revert DepositBelowMinimum(amount, MIN_DEPOSIT);
 
+        address user = _msgSender();
+        // Before anything else, and before the cap is measured: a redemption may have shrunk
+        // both the pool and this user's claim since the last time anyone touched the vault.
+        _syncState();
+        _settleRedemption(user);
+
         uint256 newTotal = totalCollateral + amount;
         if (newTotal > depositCap) revert DepositCapExceeded(newTotal, depositCap);
-
-        address user = _msgSender();
-        _accrue();
 
         collateral[user] += amount;
         totalCollateral = newTotal;
@@ -339,7 +473,8 @@ contract MarenVault is AccessControl, ERC2771Context, ReentrancyGuard {
         if (!troveOpen) revert TroveNotOpen();
 
         address user = _msgSender();
-        _accrue();
+        _syncState();
+        _settleRedemption(user);
         uint256 price = _price();
 
         uint256 outstandingBefore = _outstandingDebt();
@@ -372,7 +507,8 @@ contract MarenVault is AccessControl, ERC2771Context, ReentrancyGuard {
      */
     function repay(uint256 amount, address upperHint, address lowerHint) external nonReentrant {
         address user = _msgSender();
-        _accrue();
+        _syncState();
+        _settleRedemption(user);
         uint256 repaid = _repay(user, amount, upperHint, lowerHint);
         emit Repaid(user, repaid, debtOf(user));
     }
@@ -385,7 +521,10 @@ contract MarenVault is AccessControl, ERC2771Context, ReentrancyGuard {
      */
     function withdraw(uint256 amount, address upperHint, address lowerHint) external nonReentrant {
         address user = _msgSender();
-        _accrue();
+        // The reconciliation happens BEFORE the balance is read, so a withdrawal racing a
+        // redemption is measured against the post-redemption entitlement, never the stale one.
+        _syncState();
+        _settleRedemption(user);
         _withdraw(user, amount, upperHint, lowerHint);
         emit Withdrawn(user, amount, collateral[user]);
     }
@@ -393,7 +532,8 @@ contract MarenVault is AccessControl, ERC2771Context, ReentrancyGuard {
     /// @notice Repay everything owed and take back all remaining collateral, in one call.
     function closePosition(address upperHint, address lowerHint) external nonReentrant {
         address user = _msgSender();
-        _accrue();
+        _syncState();
+        _settleRedemption(user);
 
         uint256 repaid = _repay(user, type(uint256).max, upperHint, lowerHint);
         uint256 coll = collateral[user];
@@ -424,7 +564,11 @@ contract MarenVault is AccessControl, ERC2771Context, ReentrancyGuard {
         onlyRole(KEEPER_ROLE)
         nonReentrant
     {
-        _accrue();
+        _syncState();
+        // Both ledgers this touches have to be current before anything is computed from them:
+        // the defaulter's, and the protocol's own position that receives the penalty.
+        _settleRedemption(user);
+        _settleRedemption(address(this));
         Liquidation memory m = _computeLiquidation(user);
         address liquidator = _msgSender();
 
@@ -501,6 +645,7 @@ contract MarenVault is AccessControl, ERC2771Context, ReentrancyGuard {
         if (seedDebt < MIN_NET_DEBT) revert SeedDebtBelowProtocolMinimum(seedDebt, MIN_NET_DEBT);
         if (msg.value == 0) revert ZeroAmount();
         _price(); // fail with PriceFeedUnavailable() rather than BorrowerOperations' revert
+        _settleRedemption(address(this));
 
         uint256 newTotal = totalCollateral + msg.value;
         if (newTotal > depositCap) revert DepositCapExceeded(newTotal, depositCap);
@@ -527,6 +672,7 @@ contract MarenVault is AccessControl, ERC2771Context, ReentrancyGuard {
         nonReentrant
     {
         if (!troveOpen) revert TroveNotOpen();
+        _syncState();
         if (amount == 0 || amount > idleCollateral) revert InsufficientCollateral(amount, idleCollateral);
         _price();
         idleCollateral -= amount;
@@ -549,14 +695,49 @@ contract MarenVault is AccessControl, ERC2771Context, ReentrancyGuard {
         if (!troveOpen) revert TroveNotOpen();
         if (amount == 0) revert ZeroAmount();
         if (amount > reserveMUSD) revert ReserveTooSmall(amount, reserveMUSD);
+        _syncState();
         uint256 pushed = _pushRepayment(amount, upperHint, lowerHint);
+        // A best-effort push that moved nothing is a failed deleverage, and a keeper reacting
+        // to a drawdown has to learn that from the transaction rather than from a `Deleveraged`
+        // event carrying a zero it will not read. The two ways to get here are the trove
+        // already sitting at the 1,800 MUSD floor and `repayMUSD` reverting, most often on a
+        // stale oracle; `RepaymentPushFailed` distinguishes them.
+        if (pushed == 0) revert NothingRepaid();
         emit Deleveraged(pushed, reserveMUSD);
     }
 
-    /// @notice Recompute the interest index from the live trove. Callable by anyone; it can
-    ///         only ever move the index in the protocol's favour.
+    /**
+     * @notice Bring the vault's books in line with the live trove: apply any redemption that
+     *         has landed on the pooled trove, then recompute the interest index.
+     * @dev Callable by anyone, permissionlessly, and it needs no price, so it still works
+     *      while Mezo's oracle is down. Nobody has to call it for the vault to be correct:
+     *      every user-facing mutation runs the same code first. It exists so a keeper, an
+     *      indexer or a passing stranger can make the public view functions exact without
+     *      having to transact against a position.
+     */
+    function reconcileRedemption() external nonReentrant {
+        _syncState();
+    }
+
+    /**
+     * @notice Write one account's share of past redemptions into its ledger balance.
+     * @dev Also permissionless, and for the same reason it is safe to be: settling can only
+     *      move an account from its stale balance to the entitlement every view already
+     *      reports, and it is what that account's own next transaction would do anyway.
+     *      Nobody needs to call this. It exists so a keeper can flush an account that has gone
+     *      quiet, which is what turns an unrecognised shortfall on an underwater position into
+     *      a recorded one.
+     */
+    function settleRedemption(address account) external nonReentrant {
+        _syncState();
+        _settleRedemption(account);
+    }
+
+    /// @notice Recompute the interest index from the live trove, reconciling any redemption
+    ///         first. Callable by anyone. Kept under its original name because the deployed
+    ///         SDK and keeper call it; it is `reconcileRedemption()` by another name.
     function syncTrove() external nonReentrant {
-        _accrue();
+        _syncState();
     }
 
     /**
@@ -574,7 +755,8 @@ contract MarenVault is AccessControl, ERC2771Context, ReentrancyGuard {
     {
         if (!troveOpen) revert TroveNotOpen();
         _price();
-        _accrue();
+        _syncState();
+        _settleRedemption(address(this));
         borrowerOperations.refinance(upperHint, lowerHint);
         // The refinancing fee lands on the trove as new debt; charge it to the protocol's
         // own position rather than to users.
@@ -592,7 +774,8 @@ contract MarenVault is AccessControl, ERC2771Context, ReentrancyGuard {
         nonReentrant
     {
         if (msg.value == 0) revert ZeroAmount();
-        _accrue();
+        _syncState();
+        _settleRedemption(address(this));
         collateral[address(this)] += msg.value;
         totalCollateral += msg.value;
         idleCollateral += msg.value;
@@ -618,7 +801,10 @@ contract MarenVault is AccessControl, ERC2771Context, ReentrancyGuard {
      */
     function closePooledTrove() external onlyRole(DEFAULT_ADMIN_ROLE) nonReentrant {
         if (!troveOpen) revert TroveNotOpen();
-        _accrue();
+        _syncState();
+        // The protocol's own shares are about to be deleted, so its share of any outstanding
+        // redemption has to be charged to it before they are.
+        _settleRedemption(address(this));
 
         uint256 userShares = totalDebtShares - debtShares[address(this)];
         if (userShares > 0) revert OutstandingUserDebt(userShares);
@@ -647,6 +833,7 @@ contract MarenVault is AccessControl, ERC2771Context, ReentrancyGuard {
     function skim() external onlyRole(DEFAULT_ADMIN_ROLE) {
         uint256 surplus = address(this).balance - idleCollateral;
         if (surplus == 0) revert NothingToSkim();
+        _settleRedemption(address(this));
         collateral[address(this)] += surplus;
         totalCollateral += surplus;
         idleCollateral += surplus;
@@ -661,7 +848,8 @@ contract MarenVault is AccessControl, ERC2771Context, ReentrancyGuard {
         onlyRole(DEFAULT_ADMIN_ROLE)
         nonReentrant
     {
-        _accrue();
+        _syncState();
+        _settleRedemption(address(this));
         _withdraw(address(this), amount, upperHint, lowerHint);
     }
 
@@ -703,11 +891,35 @@ contract MarenVault is AccessControl, ERC2771Context, ReentrancyGuard {
         return Math.mulDiv(debtShares[user], _previewIndex(), WAD, Math.Rounding.Ceil);
     }
 
+    /**
+     * @notice BTC `user` can actually claim, after any redemption that has landed on the
+     *         pooled trove, whether or not anyone has reconciled it yet.
+     * @dev This, not the raw `collateral` mapping, is what a UI should show and what every
+     *      other view here is computed from. The two are equal except in the window between a
+     *      redemption landing and that account's next transaction, and in that window the
+     *      mapping is the stale one.
+     */
+    function collateralOf(address user) external view returns (uint256) {
+        return _effectiveCollateral(user);
+    }
+
+    /// @notice Collateral `user` still owes to redemptions it has not settled. The difference
+    ///         between `collateral(user)` and `collateralOf(user)`.
+    function pendingRedemptionDebitOf(address user) external view returns (uint256) {
+        return _pendingRedemptionDebit(user);
+    }
+
+    /// @notice BTC that has left the pooled trove to a redemption and is not on the books yet.
+    ///         Anyone can clear it with `reconcileRedemption()`, and any user action does.
+    function pendingRedemptionCollateral() external view returns (uint256) {
+        return _pendingRedemptionCollateral();
+    }
+
     /// @notice Collateral ratio, 1e18 scaled. `type(uint256).max` when the user has no debt.
     /// @dev Reverts with `PriceFeedUnavailable()` when Mezo's oracle is stale.
     function collateralRatioOf(address user) external view returns (uint256) {
         return _collateralRatio(
-            collateral[user],
+            _effectiveCollateral(user),
             Math.mulDiv(debtShares[user], _previewIndex(), WAD, Math.Rounding.Ceil),
             _price()
         );
@@ -717,7 +929,7 @@ contract MarenVault is AccessControl, ERC2771Context, ReentrancyGuard {
     function isLiquidatable(address user) external view returns (bool) {
         uint256 debt = Math.mulDiv(debtShares[user], _previewIndex(), WAD, Math.Rounding.Ceil);
         if (debt == 0) return false;
-        return _collateralRatio(collateral[user], debt, _price()) < LIQUIDATION_CR;
+        return _collateralRatio(_effectiveCollateral(user), debt, _price()) < LIQUIDATION_CR;
     }
 
     /**
@@ -737,7 +949,7 @@ contract MarenVault is AccessControl, ERC2771Context, ReentrancyGuard {
      */
     function maxBorrowable(address user) external view returns (uint256) {
         uint256 price = _price();
-        uint256 maxDebt = Math.mulDiv(collateral[user], price, MIN_BORROW_CR, Math.Rounding.Floor);
+        uint256 maxDebt = Math.mulDiv(_effectiveCollateral(user), price, MIN_BORROW_CR, Math.Rounding.Floor);
         uint256 debt = Math.mulDiv(debtShares[user], _previewIndex(), WAD, Math.Rounding.Ceil);
         return maxDebt > debt ? maxDebt - debt : 0;
     }
@@ -783,7 +995,7 @@ contract MarenVault is AccessControl, ERC2771Context, ReentrancyGuard {
     function liquidationPriceOf(address user) external view returns (uint256) {
         uint256 debt = Math.mulDiv(debtShares[user], _previewIndex(), WAD, Math.Rounding.Ceil);
         if (debt == 0) return 0;
-        uint256 coll = collateral[user];
+        uint256 coll = _effectiveCollateral(user);
         if (coll == 0) return type(uint256).max;
         return Math.mulDiv(debt, LIQUIDATION_CR, coll, Math.Rounding.Ceil);
     }
@@ -845,19 +1057,204 @@ contract MarenVault is AccessControl, ERC2771Context, ReentrancyGuard {
         return Math.mulDiv(totalDebtShares, interestIndex, WAD, Math.Rounding.Floor);
     }
 
+    /**
+     * @dev The index a view should quote: what `_syncState()` would set if it ran right now.
+     *      That is the redemption re-peg first, then the interest accrual, in the same order
+     *      and with the same rounding as the real thing. Without the first step every view on
+     *      this contract would over-report debt between a redemption and the next transaction.
+     */
     function _previewIndex() private view returns (uint256 index) {
         index = interestIndex;
         uint256 shares = totalDebtShares;
         if (shares == 0) return index;
-        uint256 candidate = Math.mulDiv(_outstandingDebt(), WAD, shares, Math.Rounding.Ceil);
+
+        uint256 outstanding = _outstandingDebt();
+        if (_pendingRedemptionCollateral() > 0) {
+            uint256 accounted = _accountedDebt();
+            if (accounted > outstanding) {
+                index = Math.mulDiv(index, outstanding, accounted, Math.Rounding.Ceil);
+                if (index == 0) index = 1;
+            }
+        }
+
+        uint256 candidate = Math.mulDiv(outstanding, WAD, shares, Math.Rounding.Ceil);
         if (candidate > index) index = candidate;
     }
 
+    /// @dev BTC that has left the pooled trove without the vault asking, and has not been
+    ///      reconciled yet. Zero in the ordinary case, and zero once anyone transacts.
+    function _pendingRedemptionCollateral() private view returns (uint256) {
+        if (!troveOpen) return 0;
+        if (troveManager.getTroveStatus(address(this)) != TROVE_STATUS_ACTIVE) return 0;
+        (uint256 troveColl,) = _troveCollAndNetDebt();
+        uint256 booksInTrove = totalCollateral > idleCollateral ? totalCollateral - idleCollateral : 0;
+        return troveColl >= booksInTrove ? 0 : booksInTrove - troveColl;
+    }
+
+    /// @dev The per-share debit a view should quote, including a redemption nobody has
+    ///      reconciled yet, so `collateralOf` is right the instant the redemption lands.
+    function _previewCollateralPerShare() private view returns (uint256 perShare) {
+        perShare = redemptionCollateralPerShare;
+        uint256 shares = totalDebtShares;
+        if (shares == 0) return perShare;
+        uint256 pending = _pendingRedemptionCollateral();
+        if (pending > 0) perShare += Math.mulDiv(pending, REDEMPTION_PRECISION, shares, Math.Rounding.Ceil);
+    }
+
+    /// @dev What `account` can actually claim: its ledger balance less every redemption debit
+    ///      it has not settled yet, floored at zero.
+    function _effectiveCollateral(address account) private view returns (uint256) {
+        uint256 coll = collateral[account];
+        uint256 debit = _pendingRedemptionDebit(account);
+        return debit >= coll ? 0 : coll - debit;
+    }
+
+    function _pendingRedemptionDebit(address account) private view returns (uint256) {
+        uint256 perShare = _previewCollateralPerShare();
+        uint256 snapshot = redemptionSnapshot[account];
+        if (perShare <= snapshot) return 0;
+        uint256 shares = debtShares[account];
+        if (shares == 0) return 0;
+        return Math.mulDiv(shares, perShare - snapshot, REDEMPTION_PRECISION, Math.Rounding.Ceil);
+    }
+
+    // ------------------------------------------------------------------ //
+    //                Internals: the redemption splitter                  //
+    // ------------------------------------------------------------------ //
+
+    /// @dev The single entry point every mutation runs first: reconcile a redemption, then
+    ///      accrue interest, in that order. Reconciling first matters, because the accrual
+    ///      compares accounted debt against a trove figure that the redemption has changed.
+    function _syncState() private {
+        _reconcileRedemption();
+        _accrue();
+    }
+
+    /// @dev Halts everything if the pooled trove has left the active state. See the REDEMPTIONS
+    ///      note at the top of this file for why this is a hard stop and not a fallback.
+    function _requireTroveActive() private view {
+        uint256 status = troveManager.getTroveStatus(address(this));
+        if (status != TROVE_STATUS_ACTIVE) revert TroveNoLongerActive(status);
+    }
+
     /**
-     * @dev Distribute the trove's debt growth across all shares. The index is monotonic: it
-     *      never falls, so a rounding surplus already charged to users is absorbed by the next
-     *      interest accrual rather than refunded, and `sum(debtOf) >= outstandingDebt` holds
-     *      for the life of the contract.
+     * @dev Detects a redemption by comparing the books against the live trove, and rolls it
+     *      through every position at once.
+     *
+     *      Only a SHORTFALL is a redemption. A trove holding MORE collateral than the books
+     *      expect is a redistribution gain from someone else's liquidation, which is a
+     *      windfall, not a loss, and is left alone for `skim()` rather than distributed here.
+     *
+     *      The debt side is only touched when the collateral side moved. Accounted debt sits a
+     *      few wei above outstanding debt in normal operation, as the rounding surplus the
+     *      accrual deliberately keeps; re-pegging the index on that alone would hand the
+     *      surplus back to users on every single call.
+     */
+    function _reconcileRedemption() private {
+        if (!troveOpen) return;
+        _requireTroveActive();
+
+        (uint256 troveColl,) = _troveCollAndNetDebt();
+        uint256 booksInTrove = totalCollateral > idleCollateral ? totalCollateral - idleCollateral : 0;
+        if (troveColl >= booksInTrove) return;
+
+        uint256 collateralRemoved = booksInTrove - troveColl;
+        uint256 shares = totalDebtShares;
+        uint256 oldIndex = interestIndex;
+        uint256 debtRemoved;
+
+        if (shares == 0) {
+            // A redemption with no debt shares outstanding. There is nobody it can be charged
+            // to pro rata, so the protocol's own collateral absorbs it and any remainder is
+            // recognised. In practice unreachable: a redemption needs trove debt to cancel,
+            // and trove debt with no shares means the reserve alone backs it.
+            uint256 own = collateral[address(this)];
+            uint256 charged = own < collateralRemoved ? own : collateralRemoved;
+            collateral[address(this)] = own - charged;
+            _recogniseShortfall(address(this), collateralRemoved - charged);
+        } else {
+            uint256 accounted = _accountedDebt();
+            uint256 outstanding = _outstandingDebt();
+            if (accounted > outstanding) {
+                // `debtRemoved` is the redemption plus whatever rounding surplus the accrual
+                // had banked, which is bounded by `totalDebtShares / 1e18` wei and is handed
+                // back here. It cannot break `sum(debtOf) >= outstandingDebt`, which is
+                // re-established below by construction, and it is worth roughly 1e-15 MUSD
+                // per 1,000 MUSD of pooled debt. Measuring the relief from the trove is worth
+                // more than defending dust of that size.
+                debtRemoved = accounted - outstanding;
+                // The one downward move the index ever makes, by exactly the measured relief
+                // and no more. Rounding UP keeps `sum(debtOf) >= outstandingDebt` intact, and
+                // the floor at 1 keeps `_mintDebtShares` from dividing by zero after a
+                // redemption that cancelled every last unit of user debt.
+                uint256 newIndex = Math.mulDiv(oldIndex, outstanding, accounted, Math.Rounding.Ceil);
+                interestIndex = newIndex == 0 ? 1 : newIndex;
+            }
+            // Rounding UP the per-share debit means the debits collectively exceed what left
+            // the trove, so the dust stays in the pool rather than in a withdrawer's pocket.
+            // The overshoot is bounded by `totalDebtShares / REDEMPTION_PRECISION` wei of BTC,
+            // which is what one unit of per-share error is worth across every holder.
+            redemptionCollateralPerShare += Math.mulDiv(
+                collateralRemoved, REDEMPTION_PRECISION, shares, Math.Rounding.Ceil
+            );
+        }
+
+        totalCollateral -= collateralRemoved;
+        totalCollateralRedeemed += collateralRemoved;
+        totalDebtRedeemed += debtRemoved;
+
+        emit RedemptionReconciled(
+            collateralRemoved, debtRemoved, oldIndex, interestIndex, redemptionCollateralPerShare
+        );
+    }
+
+    /**
+     * @dev Charges `account` its share of every redemption since it was last touched. O(1),
+     *      and it must run BEFORE anything reads that account's collateral or changes its debt
+     *      shares, because the debit is priced against the shares held when the redemption
+     *      happened.
+     */
+    function _settleRedemption(address account) private {
+        uint256 perShare = redemptionCollateralPerShare;
+        uint256 snapshot = redemptionSnapshot[account];
+        if (snapshot == perShare) return;
+
+        redemptionSnapshot[account] = perShare;
+        uint256 shares = debtShares[account];
+        if (shares == 0) return;
+
+        uint256 owed = Math.mulDiv(shares, perShare - snapshot, REDEMPTION_PRECISION, Math.Rounding.Ceil);
+        if (owed == 0) return;
+
+        uint256 coll = collateral[account];
+        if (owed > coll) {
+            // Only reachable below 100% collateralisation: the debit is the value of the debt
+            // this account stopped owing, so it can only exceed the collateral held if that
+            // collateral was already worth less than the debt.
+            _recogniseShortfall(account, owed - coll);
+            owed = coll;
+        }
+
+        collateral[account] = coll - owed;
+        emit RedemptionSettled(account, owed, coll - owed);
+    }
+
+    /// @dev Puts an uncharged redemption debit back on the books instead of quietly spreading
+    ///      it across the other users. `totalCollateral` is credited back so the per-account
+    ///      ledger never sums to more than it, which would brick withdrawals on an underflow.
+    function _recogniseShortfall(address account, uint256 amount) private {
+        if (amount == 0) return;
+        redemptionShortfall += amount;
+        totalCollateral += amount;
+        emit RedemptionShortfallRecognised(account, amount);
+    }
+
+    /**
+     * @dev Distribute the trove's debt growth across all shares. The index is monotonic here:
+     *      it never falls, so a rounding surplus already charged to users is absorbed by the
+     *      next interest accrual rather than refunded, and `sum(debtOf) >= outstandingDebt`
+     *      holds for the life of the contract. `_reconcileRedemption` is the one and only
+     *      thing that moves it the other way, and only by a measured amount.
      */
     function _accrue() private {
         uint256 shares = totalDebtShares;
@@ -964,9 +1361,25 @@ contract MarenVault is AccessControl, ERC2771Context, ReentrancyGuard {
             idleCollateral -= amount;
             emit CollateralPushedToTrove(amount);
             return true;
-        } catch {
+        } catch (bytes memory reason) {
+            // "Held idle" alone cannot be acted on: a keeper cannot tell a stale oracle, which
+            // fixes itself, from a revert nobody anticipated, which does not. The selector
+            // goes out with the event so the two are distinguishable off-chain.
+            emit CollateralPushFailed(amount, _revertSelector(reason));
             emit CollateralHeldIdle(amount, idleCollateral);
             return false;
+        }
+    }
+
+    /// @dev First four bytes of revert data: an error selector, a `Error(string)` selector for
+    ///      a require, or zero when the callee reverted with nothing at all.
+    function _revertSelector(bytes memory reason) private pure returns (bytes4 selector) {
+        if (reason.length < 4) return bytes4(0);
+        assembly {
+            selector := and(
+                mload(add(reason, 0x20)),
+                0xffffffff00000000000000000000000000000000000000000000000000000000
+            )
         }
     }
 
@@ -993,7 +1406,8 @@ contract MarenVault is AccessControl, ERC2771Context, ReentrancyGuard {
 
         try borrowerOperations.repayMUSD(pushed, upperHint, lowerHint) {
             reserveMUSD = reserve - pushed;
-        } catch {
+        } catch (bytes memory reason) {
+            emit RepaymentPushFailed(pushed, _revertSelector(reason));
             pushed = 0;
         }
     }

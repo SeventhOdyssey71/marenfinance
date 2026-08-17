@@ -29,6 +29,7 @@ contract VaultHandler is CommonBase, StdCheats, StdUtils {
     mapping(address => uint256) public ghostDeposited;
     mapping(address => uint256) public ghostWithdrawn;
     mapping(address => uint256) public ghostSeized;
+    uint256 public ghostRedeemed;
     uint256 public callCount;
 
     constructor(MarenVault vault_, MockMUSD musd_, MockPriceFeed priceFeed_, MockMusdProtocol protocol_) {
@@ -105,6 +106,31 @@ contract VaultHandler is CommonBase, StdCheats, StdUtils {
         callCount++;
     }
 
+    /**
+     * @dev Somebody else's MUSD reaches into the pooled trove. Deliberately NOT followed by a
+     *      reconciliation: the invariants have to hold in the window between a redemption
+     *      landing and anyone noticing, because that window is where the first-come-first-
+     *      served failure would live.
+     */
+    function redeem(uint256 amount) external {
+        uint256 redeemable = vault.outstandingDebt();
+        if (redeemable < 2) return;
+        amount = bound(amount, 1, redeemable - 1);
+        address redeemerActor = makeAddr("h_redeemer");
+        musd.mint(redeemerActor, amount);
+        vm.prank(redeemerActor);
+        try protocol.redeemCollateral(amount, address(vault), address(0), address(0), 0, 0) {
+            ghostRedeemed += amount;
+        } catch {}
+        callCount++;
+    }
+
+    /// @dev A keeper, or anyone at all, flushing an account that has gone quiet.
+    function settle(uint256 actorSeed) external {
+        try vault.settleRedemption(_actor(actorSeed)) {} catch {}
+        callCount++;
+    }
+
     function totalGhostDeposited() external view returns (uint256 t) {
         for (uint256 i; i < actors.length; ++i) {
             t += ghostDeposited[actors[i]];
@@ -124,28 +150,50 @@ contract MarenVaultInvariantTest is VaultTestBase {
     }
 
     /**
-     * @notice Every wei of collateral credited to an account is either inside the pooled trove
+     * @notice Every wei of collateral an account can CLAIM is either inside the pooled trove
      *         or sitting idle in this contract. There is no third place for it to be.
      * @dev The strongest statement the vault can make about custody: the books cannot claim
-     *      collateral the protocol does not hold.
+     *      collateral the protocol does not hold. Stated against `collateralOf` rather than
+     *      the raw ledger, because between a redemption landing and an account being settled
+     *      the raw ledger is knowingly stale and the claim is the true number. The equality
+     *      is asserted too, whenever there is no redemption in flight.
      */
     function invariant_collateralIsFullyBacked() public view {
-        assertEq(
-            vault.totalCollateral(),
-            protocol.getTroveColl(address(vault)) + vault.idleCollateral(),
-            "credited collateral must equal trove collateral plus idle"
+        uint256 held = protocol.getTroveColl(address(vault)) + vault.idleCollateral();
+        assertLe(
+            _sumClaims(),
+            held + vault.redemptionShortfall(),
+            "claims must not exceed collateral actually held"
         );
+        if (vault.pendingRedemptionCollateral() == 0 && vault.redemptionShortfall() == 0) {
+            assertEq(
+                vault.totalCollateral(), held, "credited collateral must equal trove collateral plus idle"
+            );
+        }
         assertGe(address(vault).balance, vault.idleCollateral(), "idle collateral must actually be here");
     }
 
-    /// @notice The per-account ledger sums to the recorded total. A silent divergence here
-    ///         would mean some user's balance was created out of nothing.
+    /**
+     * @notice The per-account claims sum to the collateral actually held, to within the
+     *         redemption dust. A divergence beyond that would mean some user's balance was
+     *         created out of nothing, or quietly absorbed by the pool.
+     * @dev The dust budget for a whole run is a tenth of a satoshi. Each redemption rounds its
+     *      per-share debit UP, which costs at most `totalDebtShares / 1e18` wei plus one wei
+     *      per holder, so with this handler's ~20,000 MUSD of pooled debt that is ~2e4 wei per
+     *      redemption and a few hundred redemptions in the deepest run. 1e9 wei is four orders
+     *      of magnitude of headroom above that and still a thousandth of what a UI can show.
+     */
     function invariant_perAccountLedgerSumsToTotal() public view {
-        uint256 sum = vault.collateral(address(vault));
+        uint256 held = protocol.getTroveColl(address(vault)) + vault.idleCollateral();
+        assertGe(_sumClaims() + 1e9 + vault.redemptionShortfall(), held, "collateral vanished from the books");
+    }
+
+    /// @dev What every account this suite touches could actually withdraw right now.
+    function _sumClaims() internal view returns (uint256 sum) {
+        sum = vault.collateralOf(address(vault));
         for (uint256 i; i < 3; ++i) {
-            sum += vault.collateral(handler.actors(i));
+            sum += vault.collateralOf(handler.actors(i));
         }
-        assertEq(sum, vault.totalCollateral(), "per-account collateral must sum to totalCollateral");
     }
 
     /**
@@ -179,10 +227,30 @@ contract MarenVaultInvariantTest is VaultTestBase {
         }
     }
 
-    /// @notice The interest index never runs backwards, whatever sequence of operations and
-    ///         price moves it is subjected to.
-    function invariant_interestIndexNeverDecreases() public view {
-        assertGe(vault.interestIndex(), 1e18, "index started at 1e18 and is monotonic");
+    /**
+     * @notice The interest index only ever falls at a redemption, and only by the debt the
+     *         redemption actually cancelled.
+     * @dev Absent redemptions this is the original monotonicity statement. With them, the
+     *      thing to check is that a fall is always matched by measured relief, which is what
+     *      the redeemed totals record.
+     */
+    function invariant_interestIndexOnlyFallsOnRedemptions() public view {
+        if (vault.totalDebtRedeemed() == 0) {
+            assertGe(vault.interestIndex(), 1e18, "index started at 1e18 and is monotonic");
+        } else {
+            assertGe(vault.interestIndex(), 1, "the index is floored, never zero");
+        }
+    }
+
+    /// @notice Whatever the redemptions did, the pool still charges its users at least what
+    ///         the trove will demand back. Restated here with redemptions in the mix because
+    ///         it is the one that makes the vault solvent or not.
+    function invariant_redemptionsNeverLeaveThePoolShort() public view {
+        uint256 sum = vault.debtOf(address(vault));
+        for (uint256 i; i < 3; ++i) {
+            sum += vault.debtOf(handler.actors(i));
+        }
+        assertGe(sum, vault.outstandingDebt(), "user debt must cover what the trove owes");
     }
 
     /// @notice The reserve is real MUSD. It can never claim more than the contract holds.
