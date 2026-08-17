@@ -70,7 +70,7 @@ export function HealthScale({
           <span
             key={mark.label}
             aria-hidden
-            className="absolute top-0 h-1.5 w-px bg-white/20"
+            className="bg-text/25 absolute top-0 h-1.5 w-px"
             style={{ left: `${percentOf(mark.at)}%` }}
           />
         ))}

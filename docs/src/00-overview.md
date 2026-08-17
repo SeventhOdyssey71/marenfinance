@@ -42,6 +42,19 @@ registered through commit-reveal. 236 contract tests plus 8 forked against real 
 MUSD; 214 on the relayer. Web and iOS read these contracts live; the write path is
 wired and exercised on testnet.
 
+## The product, as it runs today
+
+Screenshots below are unretouched captures of the web app in a read-only session
+against live matsnet, taken 17 August 2026. Every figure in them is a contract read;
+the borrow offer shown is the preflighted maximum the deployed vault would actually
+accept at that moment.
+
+![Portfolio. A funded account with no debt: 0.001 BTC deposited, and the interface states plainly that nothing can be liquidated while debt is zero.](assets/app-portfolio.png)
+
+![Vault. Borrowing live against the pooled trove: the slider is bounded by the same computation the contract enforces, with the recommended 250% marked.](assets/app-vault.png)
+
+![Pay. MUSD moves against @handles or raw addresses, with an on-chain memo. An empty wallet is told where MUSD comes from rather than just refused.](assets/app-pay.png)
+
 ## Not done, stated plainly
 
 No mainnet deployment: gated on audit, deliberately. No audit yet: it is the real

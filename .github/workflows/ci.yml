@@ -1,3 +1,40 @@
+# Maren Finance CI.
+#
+# Every gate below is a command you can run locally. There is nothing CI checks that a
+# laptop cannot, and nothing a laptop checks that CI skips. The full sequence:
+#
+#   git submodule update --init --recursive     # once, for packages/contracts/lib
+#   CI=true pnpm install --frozen-lockfile      # CI=true is mandatory, see the note below
+#
+#   node tools/copy/em-dash-scan.mjs            # "Style" job
+#   CI=true pnpm format:check                   # "Style" job
+#
+#   cd packages/contracts                       # "Contracts" job, all five steps
+#   forge fmt --check
+#   forge build --sizes
+#   FOUNDRY_PROFILE=ci forge test
+#   forge snapshot --check --tolerance 5 --no-match-contract "MarenVaultInvariantTest|MarenVaultForkTest"
+#   forge coverage --report summary --ir-minimum
+#   cd ../..
+#
+#   CI=true pnpm typecheck                      # "App" job
+#   CI=true pnpm lint                           # "App" job
+#   NEXT_PUBLIC_MEZO_NETWORK=testnet CI=true pnpm build
+#   CI=true pnpm test                           # "App" job
+#
+#   CI=true pnpm docs:pdf                       # "Docs" job, needs a real Chrome
+#
+# `CI=true` is not decoration. Without it pnpm can stop on an interactive confirmation
+# that never renders in a non-TTY, and it is indistinguishable from a network hang.
+#
+# Expected counts, so a silent skip is visible as a wrong number:
+#   forge test              236 passed, 8 skipped (the fork suite needs a matsnet RPC)
+#   pnpm test               345 passed: sdk 62, web 36, ios 33, relayer 214
+#   pnpm docs:pdf           9 documents into docs/build
+#
+# On a pull request only the areas that changed are exercised. Every push to main runs
+# everything, so main is always checked end to end regardless of what the PR touched.
+
 name: CI
 
 on:
@@ -6,16 +43,113 @@ on:
   pull_request:
     branches: [main]
 
+# A superseded pull-request run is wasted money. A superseded push to main destroys the
+# only record of whether that commit was green, so those are never cancelled.
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
-  cancel-in-progress: true
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+permissions:
+  contents: read
 
 env:
   FOUNDRY_PROFILE: ci
 
 jobs:
+  changes:
+    name: Changed areas
+    runs-on: ubuntu-latest
+    outputs:
+      contracts: ${{ steps.filter.outputs.contracts }}
+      app: ${{ steps.filter.outputs.app }}
+      docs: ${{ steps.filter.outputs.docs }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          # The diff needs both sides of the pull request, not just its head.
+          fetch-depth: 0
+
+      - name: Decide which jobs need to run
+        id: filter
+        env:
+          EVENT: ${{ github.event_name }}
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        run: |
+          set -euo pipefail
+
+          # Anything other than a pull request runs the whole pipeline. That is what
+          # makes "main is green" mean the same thing on every commit.
+          if [ "$EVENT" != "pull_request" ]; then
+            echo "$EVENT: running every job"
+            {
+              echo "contracts=true"
+              echo "app=true"
+              echo "docs=true"
+            } >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          base="$(git merge-base "$BASE_SHA" "$HEAD_SHA")"
+          files="$(git diff --name-only "$base" "$HEAD_SHA")"
+          echo "Changed files:"
+          echo "$files"
+
+          changed() { echo "$files" | grep -qE "$1"; }
+
+          # A change to the workspace roots, the lockfile, or CI itself can affect
+          # anything, so it is not attributed to one area.
+          if changed '^(package\.json|pnpm-lock\.yaml|pnpm-workspace\.yaml|turbo\.json)$' \
+            || changed '^\.github/workflows/'; then
+            contracts=true; app=true; docs=true
+          else
+            contracts=false; app=false; docs=false
+            changed '^(packages/contracts/|\.gitmodules$)' && contracts=true
+            changed '^(apps/|packages/sdk/|tools/copy/)' && app=true
+            changed '^(docs/|tools/pdf/)' && docs=true
+          fi
+
+          echo "contracts=$contracts app=$app docs=$docs"
+          {
+            echo "contracts=$contracts"
+            echo "app=$app"
+            echo "docs=$docs"
+          } >> "$GITHUB_OUTPUT"
+
+  style:
+    name: Style
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      # Deliberately first, and deliberately before any install: the scanner imports
+      # nothing outside node builtins, so this gate costs a few seconds and needs no
+      # dependency tree to be correct.
+      - name: No em dashes in user-visible copy
+        run: node tools/copy/em-dash-scan.mjs
+
+      # No `version:` here on purpose. package.json's `packageManager` field is
+      # authoritative, and pnpm/action-setup@v4 hard-errors when both are set:
+      #   "Multiple versions of pnpm specified"
+      - uses: pnpm/action-setup@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - name: Install
+        run: pnpm install --frozen-lockfile
+
+      # Runs on every event, never behind a path filter: prettier covers markdown under
+      # docs/ as well as source, so a docs-only pull request still has to be formatted.
+      - name: Format check
+        run: pnpm format:check
+
   contracts:
     name: Contracts (Foundry)
+    needs: changes
+    if: needs.changes.outputs.contracts == 'true'
     runs-on: ubuntu-latest
     defaults:
       run:
@@ -30,6 +164,26 @@ jobs:
         with:
           version: stable
 
+      # forge keys its artefacts on the source hash and the solc settings, so a restored
+      # cache makes a test-only change skip the whole compile. Paths are relative to the
+      # workspace root, not to `defaults.run.working-directory`.
+      - name: Cache Foundry artefacts
+        uses: actions/cache@v4
+        with:
+          path: |
+            packages/contracts/cache
+            packages/contracts/out
+          key: >-
+            foundry-${{ runner.os }}-${{ hashFiles(
+              'packages/contracts/foundry.toml',
+              'packages/contracts/foundry.lock',
+              'packages/contracts/remappings.txt',
+              'packages/contracts/src/**/*.sol',
+              'packages/contracts/test/**/*.sol',
+              'packages/contracts/script/**/*.sol'
+            ) }}
+          restore-keys: foundry-${{ runner.os }}-
+
       - name: Show forge version
         run: forge --version
 
@@ -40,42 +194,58 @@ jobs:
         run: forge build --sizes
 
       - name: Test
-        run: forge test -vvv
+        run: forge test
 
+      # The fork suite is skipped without a matsnet RPC, and foundry reports an invariant
+      # run descriptor rather than a gas figure, so `--check` calls both a drift on every
+      # single run. Excluding them is what makes a reported drift mean something.
+      - name: Gas snapshot
+        run: >-
+          forge snapshot --check --tolerance 5
+          --no-match-contract "MarenVaultInvariantTest|MarenVaultForkTest"
+
+      # Not `|| true`. Coverage compiles via-IR with the optimizer off, which is a
+      # genuinely different pipeline from `forge test`, and it has already caught two
+      # tests that only passed under the legacy one.
       - name: Coverage summary
-        run: forge coverage --report summary --ir-minimum || true
+        run: forge coverage --report summary --ir-minimum
 
-      - name: Gas snapshot (fail on unexpected regression)
-        run: forge snapshot --check --tolerance 5 || echo "::warning::Gas snapshot drifted — run 'forge snapshot' and commit"
-
-  web:
-    name: Web + SDK
+  app:
+    name: Web, SDK, relayer, iOS
+    needs: changes
+    if: needs.changes.outputs.app == 'true'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
 
-      # No `version:` here on purpose. package.json's `packageManager` field is
-      # authoritative, and pnpm/action-setup@v4 hard-errors when both are set:
-      #   "Multiple versions of pnpm specified"
+      # See the note in the style job about the missing `version:`.
       - uses: pnpm/action-setup@v4
 
       - uses: actions/setup-node@v4
         with:
           node-version: 22
+          # Caches the pnpm content-addressable store, keyed on pnpm-lock.yaml.
           cache: pnpm
 
-      # apps/relayer's chain tests need anvil. Without it they skip silently,
-      # which reads exactly like a pass.
+      # apps/relayer's chain tests need anvil. Without it they skip silently, which
+      # reads exactly like a pass.
       - name: Install Foundry
         uses: foundry-rs/foundry-toolchain@v1
         with:
           version: stable
 
+      # turbo hashes each task's inputs, so restoring its cache lets an unchanged
+      # workspace replay instead of rebuilding. Keyed per commit, restored from the most
+      # recent run of the same OS.
+      - name: Cache turbo
+        uses: actions/cache@v4
+        with:
+          path: .turbo
+          key: turbo-${{ runner.os }}-${{ github.sha }}
+          restore-keys: turbo-${{ runner.os }}-
+
       - name: Install
         run: pnpm install --frozen-lockfile
-
-      - name: Format check
-        run: pnpm format:check
 
       - name: Typecheck
         run: pnpm typecheck
@@ -93,20 +263,21 @@ jobs:
 
   docs:
     name: Docs (PDF build)
+    needs: changes
+    if: needs.changes.outputs.docs == 'true'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
 
-      # tools/pdf depends on puppeteer-core only — there is no bundled browser to
-      # fall back to — so CI must provide one explicitly.
+      # tools/pdf depends on puppeteer-core only, so there is no bundled browser to fall
+      # back to and CI must provide one. Downloaded only in this job, which only runs
+      # when docs/ or tools/pdf/ actually changed.
       - uses: browser-actions/setup-chrome@v1
         id: chrome
         with:
           chrome-version: stable
 
-      # No `version:` here on purpose. package.json's `packageManager` field is
-      # authoritative, and pnpm/action-setup@v4 hard-errors when both are set:
-      #   "Multiple versions of pnpm specified"
+      # See the note in the style job about the missing `version:`.
       - uses: pnpm/action-setup@v4
 
       - uses: actions/setup-node@v4
@@ -128,3 +299,29 @@ jobs:
           name: maren-docs
           path: docs/build/*.pdf
           if-no-files-found: error
+
+  # One status check to protect the branch with. A path-filtered job reports "skipped",
+  # which is not a failure, so this gate has to distinguish "did not need to run" from
+  # "ran and failed" rather than just asking whether everything succeeded.
+  ci:
+    name: CI
+    if: always()
+    needs: [changes, style, contracts, app, docs]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check every job
+        env:
+          RESULTS: ${{ join(needs.*.result, ' ') }}
+        run: |
+          set -euo pipefail
+          echo "job results: $RESULTS"
+          for result in $RESULTS; do
+            case "$result" in
+              success | skipped) ;;
+              *)
+                echo "::error::a required job reported '$result'"
+                exit 1
+                ;;
+            esac
+          done
+          echo "all required jobs passed or were not needed"

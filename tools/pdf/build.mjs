@@ -257,7 +257,7 @@ async function buildDocument({ browser, server, file, fonts, footerCss, keepHtml
     return buildDeck({ browser, server, meta, body, fonts, keepHtml, base });
   }
 
-  const { html: content, toc, mermaid } = renderMarkdown(body);
+  const { html: content, toc, mermaid } = renderMarkdown(body, { baseDir: path.dirname(file) });
   log(`${toc.length} contents entries, ${mermaid.length} diagram(s)`);
 
   const { pdf: coverPdf, html: coverSource } = await printCover({

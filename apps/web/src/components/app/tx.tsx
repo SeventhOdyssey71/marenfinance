@@ -313,7 +313,7 @@ export function TxSheet({ runner }: { runner: TxRunner }) {
         aria-label="Close"
         tabIndex={-1}
         onClick={() => !busy && runner.close()}
-        className="bg-[#08080A]/78 absolute inset-0 cursor-default backdrop-blur-lg"
+        className="absolute inset-0 cursor-default bg-black/45 backdrop-blur-md"
       />
       {/* `card-modal`, not `card`: cards are border-only now, and a transparent dialog
           would show the screen it is interrupting straight through itself. */}

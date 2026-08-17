@@ -375,6 +375,28 @@ td strong { font-weight: 700; }
 
 /* ── Diagrams ──────────────────────────────────────────────────────────────── */
 
+/* App screenshots: framed like the product frames itself — a soft card. */
+figure.shot {
+  margin: 5mm 0 6mm;
+  break-inside: avoid;
+}
+figure.shot img {
+  display: block;
+  width: 100%;
+  border-radius: 3mm;
+  border: 0.4mm solid rgba(20, 18, 35, 0.1);
+}
+figure.shot figcaption {
+  margin-top: 2.4mm;
+  font-size: 7.6pt;
+  color: rgba(23, 23, 27, 0.55);
+  letter-spacing: 0.01em;
+}
+
+/* A 66-character transaction hash owns its table cell; if the measure is ever too
+   narrow it breaks cleanly mid-string rather than overflowing the page. */
+td code { word-break: break-all; }
+
 figure.diagram {
   width: ${CONTENT_WIDTH_MM}mm;
   margin: 6mm 0 7mm;
@@ -506,8 +528,11 @@ figure.diagram svg {
 }
 
 /**
- * The cover is printed on its own, at exact A4 with no margins, so the gradient can
- * run to the trim edge. Violet core falling into near-black, per BRAND.md §7.
+ * The cover is printed on its own, at exact A4 with no margins.
+ *
+ * Light and flat, matching the product itself: off-white page, dark ink, the brand
+ * mark, and one violet accent bar. The earlier cover was a violet-blur-on-black
+ * gradient; it read as crypto-formal, which is the opposite of what the app now is.
  */
 export function coverCss({ fontCss = '', satoshi = true, mono = true } = {}) {
   const grain = encodeURIComponent(
@@ -528,7 +553,7 @@ html, body {
   width: 210mm;
   height: 297mm;
   font-family: ${SANS(satoshi)};
-  color: #FAFAFA;
+  color: #17171B;
   -webkit-font-smoothing: antialiased;
 }
 
@@ -537,22 +562,12 @@ html, body {
   width: 210mm;
   height: 297mm;
   overflow: hidden;
-  background:
-    radial-gradient(88% 62% at 76% 8%, rgba(91, 61, 245, 0.92) 0%, rgba(91, 61, 245, 0) 58%),
-    radial-gradient(70% 52% at 6% 92%, rgba(27, 17, 64, 0.95) 0%, rgba(27, 17, 64, 0) 66%),
-    linear-gradient(168deg, #1B1140 0%, #0C0A18 46%, #08080A 100%);
+  background: #F7F6FB;
 }
 
 /* A single low-opacity grain pass kills gradient banding and gives the page a
    printed-paper quality (BRAND.md §5, GrainGradient in spirit). */
-.grain {
-  position: absolute;
-  inset: 0;
-  background-image: url("data:image/svg+xml,${grain}");
-  background-size: 60mm 60mm;
-  opacity: 0.055;
-  mix-blend-mode: overlay;
-}
+.grain { display: none; }
 
 .frame {
   position: relative;
@@ -567,19 +582,16 @@ html, body {
 .wordmark {
   display: flex;
   align-items: center;
-  gap: 3mm;
-  font-size: 11pt;
-  font-weight: 900;
-  letter-spacing: 0.34em;
-  text-transform: uppercase;
+  gap: 2.6mm;
+  font-size: 13pt;
+  font-weight: 700;
+  letter-spacing: -0.02em;
 }
 
 .mark {
-  width: 5.5mm;
-  height: 5.5mm;
-  border-radius: 999px;
-  background: #FAFAFA;
-  box-shadow: 0 0 0 1.6mm rgba(250, 250, 250, 0.12);
+  height: 6mm;
+  width: auto;
+  display: block;
 }
 
 .classification {
@@ -587,8 +599,8 @@ html, body {
   font-size: 7.4pt;
   letter-spacing: 0.16em;
   text-transform: uppercase;
-  color: rgba(250, 250, 250, 0.62);
-  border: 1px solid rgba(250, 250, 250, 0.22);
+  color: rgba(23, 23, 27, 0.6);
+  border: 1px solid rgba(20, 18, 35, 0.2);
   border-radius: 999px;
   padding: 1.6mm 4mm;
 }
@@ -598,7 +610,7 @@ html, body {
 .rule {
   width: 100%;
   height: 1px;
-  background: rgba(250, 250, 250, 0.16);
+  background: rgba(20, 18, 35, 0.14);
   margin-bottom: 9mm;
 }
 
@@ -611,13 +623,13 @@ html, body {
   max-width: 150mm;
 }
 
-.title .thin { font-weight: 400; color: rgba(250, 250, 250, 0.66); }
+.title .thin { font-weight: 400; color: rgba(23, 23, 27, 0.55); }
 
 .subtitle {
   font-size: 12.5pt;
   line-height: 1.5;
   font-weight: 400;
-  color: rgba(250, 250, 250, 0.72);
+  color: rgba(23, 23, 27, 0.66);
   max-width: 118mm;
   margin: 0 0 14mm;
 }
@@ -628,7 +640,7 @@ html, body {
   grid-auto-columns: max-content;
   column-gap: 16mm;
   padding-top: 6mm;
-  border-top: 1px solid rgba(250, 250, 250, 0.14);
+  border-top: 1px solid rgba(20, 18, 35, 0.12);
 }
 
 .meta .label {
@@ -637,7 +649,7 @@ html, body {
   font-weight: 500;
   letter-spacing: 0.16em;
   text-transform: uppercase;
-  color: rgba(250, 250, 250, 0.44);
+  color: rgba(23, 23, 27, 0.45);
   margin-bottom: 1.4mm;
 }
 
@@ -646,7 +658,7 @@ html, body {
   font-family: ${MONO(mono)};
   font-size: 8.6pt;
   font-variant-numeric: tabular-nums;
-  color: rgba(250, 250, 250, 0.9);
+  color: rgba(23, 23, 27, 0.9);
   white-space: nowrap;
 }
 
@@ -654,7 +666,7 @@ html, body {
   margin-top: 11mm;
   font-size: 8pt;
   letter-spacing: 0.02em;
-  color: rgba(250, 250, 250, 0.4);
+  color: rgba(23, 23, 27, 0.42);
 }
 
 .accent {

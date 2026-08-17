@@ -11,6 +11,9 @@
  *   - syntax highlighting, including a small Solidity mode highlight.js does not ship.
  */
 
+import { readFileSync } from 'node:fs';
+import path from 'node:path';
+
 import { Marked } from 'marked';
 import hljs from 'highlight.js';
 
@@ -110,12 +113,28 @@ function isHexCell(text) {
  * document before rendering any of it: which heading level its sections start at, and
  * whether it numbers them itself. See `readOutline`.
  */
-function createMarked(state, outline) {
+function createMarked(state, outline, baseDir) {
   const marked = new Marked({ gfm: true, breaks: false });
   const usedSlugs = new Set();
   const counters = [0, 0, 0];
 
   const renderer = {
+    /**
+     * Screenshots. Inlined as data URIs at render time, AFTER the typographic pass,
+     * because smart quotes applied to a src attribute produce a broken image with no
+     * error. A missing file throws and fails the build instead of printing a gap.
+     */
+    image(token) {
+      const file = path.resolve(baseDir, token.href);
+      const bytes = readFileSync(file);
+      const mime = /\.jpe?g$/i.test(token.href) ? 'image/jpeg' : 'image/png';
+      const caption = token.text ? `<figcaption>${token.text}</figcaption>` : '';
+      return (
+        `<figure class="shot"><img src="data:${mime};base64,${bytes.toString('base64')}" alt="">` +
+        caption +
+        `</figure>`
+      );
+    },
     heading(token) {
       const inline = this.parser.parseInline(token.tokens);
       const text = plain(token.text);
@@ -333,10 +352,10 @@ function readOutline(source) {
 /**
  * @returns {{ html: string, toc: Array, mermaid: string[] }}
  */
-export function renderMarkdown(source) {
+export function renderMarkdown(source, { baseDir = process.cwd() } = {}) {
   const state = { toc: [], mermaid: [] };
   const prepared = typographic(source);
-  const marked = createMarked(state, readOutline(prepared));
+  const marked = createMarked(state, readOutline(prepared), baseDir);
   const html = marked.parse(prepared);
   return { html, toc: state.toc, mermaid: state.mermaid };
 }

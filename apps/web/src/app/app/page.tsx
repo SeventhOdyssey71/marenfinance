@@ -1,7 +1,6 @@
 'use client';
 
 import Link from 'next/link';
-import type { ReactNode } from 'react';
 import {
   MAREN_POLICY,
   assessHealth,
@@ -39,11 +38,9 @@ import {
 import { ConnectPrompt } from '@/components/app/connect-prompt';
 import { ProtocolPanel } from '@/components/app/protocol-panel';
 import { LivePulseFrame } from '@/components/shaders/live-pulse';
-import { ArrowRight, EarnIcon, PayIcon, VaultIcon } from '@/components/ui/icons';
-import { activityTitle, statusLabel, timeAgo } from '@/lib/copy';
+import { ArrowRight, VaultIcon } from '@/components/ui/icons';
 import { healthTone, policyRatio, toneShaderColors } from '@/lib/health';
 import {
-  useActivity,
   useBalances,
   useDataSource,
   useEarn,
@@ -82,11 +79,9 @@ export default function PortfolioPage() {
   const { data: position } = usePosition();
   const { data: balances } = useBalances();
   const { data: earn } = useEarn();
-  const { data: activity } = useActivity();
   const { data: handle } = usePrimaryHandle();
 
   const livePrice = price.state === 'live' ? price.priceWei : null;
-  const recent = activity?.items ?? [];
 
   // Disconnected is a first-class state now, not a gap filled with demo data.
   if (!source.connected) return <NotConnected />;
@@ -235,8 +230,8 @@ export default function PortfolioPage() {
         </Panel>
       )}
 
-      {/* Read together, so laid out together. */}
-      <div className="grid grid-cols-1 items-start gap-4 lg:grid-cols-2">
+      {/* Read together, so laid out together, at equal height. */}
+      <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
         <Panel
           title="Balances"
           meta={
@@ -279,53 +274,6 @@ export default function PortfolioPage() {
 
         <BorrowingCapacity />
       </div>
-
-      <div className="grid grid-cols-1 items-start gap-4 lg:grid-cols-2">
-        {/* ----------------------------------------------------------- Activity */}
-        <Panel
-          title="Recent activity"
-          meta={
-            <Link
-              href="/app/activity"
-              className="text-text-muted hover:text-text text-xs transition-colors duration-[120ms] ease-out"
-            >
-              All activity
-            </Link>
-          }
-        >
-          <PanelBody>
-            {recent.slice(0, 5).map((item, index, list) => (
-              <StatRow
-                key={item.id}
-                label={activityTitle(item.kind, item.counterparty)}
-                hint={`${timeAgo(item.at)} · ${statusLabel(item.status)}`}
-                value={
-                  item.musdWei !== undefined ? (
-                    <Musd wei={item.musdWei} />
-                  ) : item.btcWei !== undefined ? (
-                    <Btc wei={item.btcWei} />
-                  ) : (
-                    <Dash />
-                  )
-                }
-                last={index === Math.min(4, list.length - 1)}
-              />
-            ))}
-            {activity && recent.length === 0 ? (
-              <p className="text-text-subtle py-3 text-sm">
-                {activity.complete
-                  ? 'Nothing yet. This account has never transacted with Maren.'
-                  : 'Nothing in the blocks we can scan. See Activity for the range.'}
-              </p>
-            ) : null}
-          </PanelBody>
-        </Panel>
-
-        <div className="flex flex-col gap-4">
-          <QuickLinks />
-          <GasCard />
-        </div>
-      </div>
     </div>
   );
 }
@@ -349,65 +297,6 @@ function AccountHeader({
       </div>
       {price.state === 'live' ? <PriceBanner feed={price} /> : null}
     </div>
-  );
-}
-
-/**
- * The three other surfaces, as rows rather than as three cards.
- *
- * Three equal cards with an icon, a title and a description line took a full band of the
- * screen to say "there are three other pages", which the navigation already says. As rows
- * they take a third of the height and carry the same information.
- */
-function QuickLinks() {
-  return (
-    <Panel title="Go to">
-      <PanelBody className="py-0">
-        <QuickLink
-          href="/app/vault"
-          label="Vault"
-          detail="Deposit, borrow, repay, withdraw"
-          icon={<VaultIcon className="size-4" />}
-        />
-        <QuickLink
-          href="/app/pay"
-          label="Pay"
-          detail="Send, request, or share a link"
-          icon={<PayIcon className="size-4" />}
-        />
-        <QuickLink
-          href="/app/earn"
-          label="Earn"
-          detail="Put idle MUSD to work"
-          icon={<EarnIcon className="size-4" />}
-          last
-        />
-      </PanelBody>
-    </Panel>
-  );
-}
-
-/**
- * The gas disclosure, as one line.
- *
- * It was three paragraphs and an `Info`: what the relayer would sponsor, what ERC-2771
- * means, why a deposit can never be relayed. Two of those are facts about the contracts,
- * not about what is going to happen when the user presses a button. What is left is what a
- * user needs before they press one, in the one sentence it takes.
- *
- * The exception outlives the relayer either way: `MarenVault.deposit()` is payable and
- * `MarenRelayHub` reverts with `ValueNotRelayable()` on any request carrying value, so a
- * deposit can never be sponsored no matter what is running. Hence "either way".
- */
-function GasCard() {
-  return (
-    <Panel title="Gas">
-      <p data-contrast="gas-copy" className="text-text-muted px-5 py-4 text-sm leading-relaxed">
-        You pay the Bitcoin gas. No relayer is running yet, and your{' '}
-        <strong className="text-text font-medium">first deposit costs gas</strong> either way,
-        because it carries Bitcoin with the call.
-      </p>
-    </Panel>
   );
 }
 
@@ -553,14 +442,6 @@ function NoPosition({
           Deposit Bitcoin and borrow MUSD against it. You keep the Bitcoin.
         </EmptyState>
       </AppCard>
-
-      <div className="grid grid-cols-1 items-start gap-4 lg:grid-cols-2">
-        <QuickLinks />
-        {/* The gas disclosure belongs on this screen more than any other: the first
-            deposit is the one action Maren can never sponsor, and this user is about to
-            make it. `data-contrast` is the hook verify-contrast measures. */}
-        <GasCard />
-      </div>
     </div>
   );
 }
@@ -588,44 +469,6 @@ function NotConnected() {
       </ConnectPrompt>
 
       <ProtocolPanel />
-
-      <div className="grid grid-cols-1 items-start gap-4 lg:grid-cols-2">
-        <QuickLinks />
-        <GasCard />
-      </div>
     </div>
-  );
-}
-
-/** One destination, one row. */
-function QuickLink({
-  href,
-  label,
-  detail,
-  icon,
-  last = false,
-}: {
-  href: string;
-  label: string;
-  detail: string;
-  icon: ReactNode;
-  last?: boolean;
-}) {
-  return (
-    <Link
-      href={href}
-      className={`group flex items-center gap-3.5 py-3 transition-colors duration-[120ms] ease-out ${
-        last ? '' : 'border-b border-[var(--border-hairline)]'
-      }`}
-    >
-      <span className="grid size-8 shrink-0 place-items-center rounded-[var(--radius-pill)] border border-[var(--border-hairline)] text-violet-400">
-        {icon}
-      </span>
-      <span className="min-w-0 flex-1">
-        <span className="text-text block text-sm">{label}</span>
-        <span className="text-text-subtle block truncate text-xs">{detail}</span>
-      </span>
-      <ArrowRight className="text-text-subtle size-4 shrink-0 transition-transform duration-[120ms] ease-out group-hover:translate-x-0.5" />
-    </Link>
   );
 }
