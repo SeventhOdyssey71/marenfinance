@@ -36,12 +36,14 @@ import { PriceBanner } from '@/components/app/price-banner';
 import {
   ActionButton,
   AppCard,
-  CardTitle,
   EmptyState,
   Info,
   Label,
   Metric,
+  MetricStrip,
   Note,
+  Panel,
+  PanelBody,
   StatRow,
 } from '@/components/app/primitives';
 import { TxSheet, useTxRunner, type TxIntent, type TxRunner } from '@/components/app/tx';
@@ -79,6 +81,21 @@ const MODES = [
 /**
  * Vault — deposit BTC, draw MUSD, repay, withdraw.
  *
+ * WHAT CHANGED IN THIS PASS. Every panel opened with an `h3` and a sentence describing
+ * what the panel was for: "Adds collateral and raises your ratio immediately", "Reduces
+ * your principal and raises your ratio", "The amount available is already capped at
+ * Maren's 180% floor". A user who has pressed the Deposit tab knows they are depositing.
+ * The panels now carry a `t-label` header bar, and the space those sentences occupied is
+ * occupied by the numbers the action changes, immediately next to the control that changes
+ * them.
+ *
+ * WHAT DID NOT CHANGE. The borrow slider is still bounded by the exact amount that lands
+ * the position on Maren's 180% floor, so the control cannot be dragged into a state we
+ * would refuse. Every figure in the live preview still comes from `@maren/sdk` —
+ * `borrowCeiling`, `recommendedBorrow`, `previewBorrow`, `maxWithdrawable` — and there is
+ * still no arithmetic in this file that touches a user's risk. Every gas and route
+ * disclosure is still here, at one sentence each.
+=======
  * EVERY CONTROL ON THIS SCREEN IS PREFLIGHTED. Before a button is enabled or a slider is
  * given a range, `lib/chain/preflight.ts` evaluates the same conditions `MarenVault.sol`
  * will evaluate, against state read from the chain: the pause flags, the deposit cap, the
@@ -119,21 +136,15 @@ export default function VaultPage() {
   /**
    * No wallet, no vault screen.
    *
-   * Everything below — the position card, the borrow slider, the withdrawal ceiling — is a
-   * function of an account. There used to be a demo account standing in for one, which
+   * Everything below — the position strip, the borrow slider, the withdrawal ceiling — is
+   * a function of an account. There used to be a demo account standing in for one, which
    * meant a visitor could drag a borrow slider that was attached to nothing. What they get
    * instead is the reason to connect, and the shared trove's real numbers underneath it.
    */
   if (!source.connected) {
     return (
-      <div className="flex flex-col gap-6">
-        <div>
-          <Label>Vault</Label>
-          <h1 className="t-h2 mt-2">Bitcoin credit</h1>
-          <p className="text-text-muted mt-3 max-w-[68ch] text-sm leading-relaxed">
-            Borrow MUSD against Bitcoin without selling it.
-          </p>
-        </div>
+      <div className="flex flex-col gap-4">
+        <Header />
 
         <ConnectPrompt icon={<VaultIcon className="size-6" />} title="Connect to open a position">
           {/* `data-contrast` is verify-contrast's hook for muted body copy on a card
@@ -141,8 +152,8 @@ export default function VaultPage() {
               actually on screen — here while disconnected, and on the borrow panel once
               a position exists — so the measurement never silently stops happening. */}
           <span data-contrast="route-body">
-            Deposit Bitcoin as collateral and draw MUSD against it at {formatApr(INTEREST_RATE_BPS)}
-            , fixed. The minimum deposit is {formatBtc(MAREN_VAULT.minDeposit)}.
+            Draw MUSD against Bitcoin at {formatApr(INTEREST_RATE_BPS)}, fixed. Minimum deposit{' '}
+            {formatBtc(MAREN_VAULT.minDeposit)}.
           </span>
         </ConnectPrompt>
 
@@ -161,69 +172,16 @@ export default function VaultPage() {
   const mode: Mode = chosen ?? (empty ? 'deposit' : 'borrow');
 
   return (
-    <div className="flex flex-col gap-6">
-      <div>
-        <Label>Vault</Label>
-        <h1 className="t-h2 mt-2">Bitcoin credit</h1>
-        <p className="text-text-muted mt-3 max-w-[68ch] text-sm leading-relaxed">
-          Borrow MUSD against Bitcoin without selling it.
-        </p>
-      </div>
+    <div className="flex flex-col gap-4">
+      <Header />
 
       {price.state !== 'live' ? <PriceBanner feed={price} /> : null}
 
-      <RouteCard />
+      {/* No position strip when there is no position. An empty account lands on the
+          Deposit tab, and the deposit form IS this screen's empty state. */}
+      {empty ? null : <PositionStrip livePrice={livePrice} />}
 
-      {/* No position card when there is no position. An empty account lands on the
-          Deposit tab, and the deposit form IS this screen's empty state — a card above
-          it repeating "Deposit Bitcoin" over a second identical button is the kind of
-          stacked redundancy this pass exists to remove. */}
-      {empty ? null : (
-        <AppCard>
-          <div className="flex flex-wrap items-center justify-between gap-4">
-            <CardTitle>Your position</CardTitle>
-            {/* Only when the route card above is not already carrying it. A pooled user
-                saw "POOLED" twice in two stacked cards. */}
-            {position && position.route !== 'pooled' ? (
-              <span className="t-label text-text-subtle">Direct</span>
-            ) : null}
-          </div>
-          <div className="mt-2">
-            <StatRow
-              label="Collateral"
-              value={position ? <Btc wei={position.collateralWei} size="lg" /> : <Dash size="lg" />}
-              sub={
-                position && livePrice ? (
-                  <Num size="sm" tone="subtle">
-                    {formatUsd((position.collateralWei * livePrice) / 10n ** 18n)}
-                  </Num>
-                ) : null
-              }
-            />
-            <StatRow
-              label="Total debt"
-              hint={
-                position?.route === 'direct'
-                  ? 'includes the 200 MUSD liquidation reserve'
-                  : 'no reserve on the pooled route'
-              }
-              value={position ? <Musd wei={position.debtWei} size="lg" /> : <Dash size="lg" />}
-            />
-            <StatRow
-              label="Borrow limit"
-              hint="fixed when this trove opened"
-              value={
-                position ? (
-                  <Musd wei={position.maxBorrowingCapacityWei} size="lg" />
-                ) : (
-                  <Dash size="lg" />
-                )
-              }
-              last
-            />
-          </div>
-        </AppCard>
-      )}
+      <RouteCard />
 
       <Segmented options={MODES} value={mode} onChange={setChosen} label="Vault action" />
 
@@ -236,6 +194,66 @@ export default function VaultPage() {
 
       <TxSheet runner={runner} />
     </div>
+  );
+}
+
+function Header() {
+  return (
+    <div>
+      <Label>Vault</Label>
+      <h1 className="t-h3 mt-1.5">Bitcoin credit</h1>
+    </div>
+  );
+}
+
+/** The position, as three readings on a rule rather than three stacked rows. */
+function PositionStrip({ livePrice }: { livePrice: bigint | null }) {
+  const { data: position } = usePosition();
+
+  return (
+    <Panel
+      title="Your position"
+      meta={
+        // Only when the route card below is not already carrying it. A pooled user saw
+        // "POOLED" twice in two stacked panels.
+        position && position.route !== 'pooled' ? (
+          <span className="t-label text-text-subtle">Direct trove</span>
+        ) : null
+      }
+    >
+      <MetricStrip>
+        <Metric
+          className="px-5 py-4"
+          label="Collateral"
+          value={position ? <Btc wei={position.collateralWei} size="lg" /> : <Dash size="lg" />}
+          caption={
+            position && livePrice
+              ? formatUsd((position.collateralWei * livePrice) / 10n ** 18n)
+              : 'needs a live price'
+          }
+        />
+        <Metric
+          className="px-5 py-4"
+          label="Total debt"
+          value={position ? <Musd wei={position.debtWei} size="lg" /> : <Dash size="lg" />}
+          caption={
+            position?.route === 'direct' ? 'includes the 200 MUSD reserve' : 'no reserve, pooled'
+          }
+        />
+        <Metric
+          className="px-5 py-4"
+          label="Borrow limit"
+          value={
+            position ? (
+              <Musd wei={position.maxBorrowingCapacityWei} size="lg" />
+            ) : (
+              <Dash size="lg" />
+            )
+          }
+          caption="fixed when this trove opened"
+        />
+      </MetricStrip>
+    </Panel>
   );
 }
 
@@ -261,21 +279,15 @@ function fieldError(pre: Preflight, amountWei: bigint): string | null {
 /**
  * Which route the user is on, and why.
  *
- * The interface prefers the direct route whenever it is available, even though pooled
- * volume is better for Maren. A user with enough collateral is told, in plain words, that
- * they do not need to accept pooling risk.
+ * Only the POOLED route gets a panel of its own, because only the pooled route has
+ * something a user must be told. "You hold your own trove and take no pooling risk" is
+ * good news and one line long; it rides as a tag on the position strip instead.
  */
 function RouteCard() {
   const { data: position } = usePosition();
   const price = usePrice();
   const livePrice = price.state === 'live' ? price.priceWei : null;
 
-  /**
-   * Only the POOLED route gets a card of its own, because only the pooled route has
-   * something a user must be told. "You hold your own trove and take no pooling risk"
-   * is good news and one line long; it was filling an entire card on the most important
-   * screen in the app, so it now rides as a chip on the position card's header instead.
-   */
   if (!position || position.route !== 'pooled') return null;
 
   const assessment = livePrice
@@ -284,34 +296,32 @@ function RouteCard() {
   const threshold = livePrice ? directTroveThreshold(livePrice) : null;
 
   return (
-    <AppCard>
-      <div className="flex flex-wrap items-center justify-between gap-4">
-        <CardTitle>Pooled position</CardTitle>
-        <span className="t-label text-text-subtle">Pooled</span>
-      </div>
-
-      {/* The pooled-risk statement stays, in one sentence. It is the single most
-          important thing a pooled user does not otherwise know, and shortening a
-          disclosure is not the same as removing it. */}
-      <p className="text-text-muted mt-4 max-w-[68ch] text-sm leading-relaxed">
-        Your deposit shares one trove with other users, segregated in{' '}
-        <em className="text-text not-italic">accounting, not custody</em>, so a drawdown faster than
-        the keeper could socialise losses.
-      </p>
-      <Info summary="How Maren limits that risk">
-        Maren liquidates a pooled position internally at{' '}
-        {policyRatio(MAREN_POLICY.vaultLiquidationCr)}, far above the protocol’s 110%, and backs
-        that with a 0.001 BTC floor, per-block keeper checks and an insurance buffer funded from
-        vault fees. These are mitigations, not a guarantee. You are here because a trove of your own
-        needs about {threshold ? formatBtc(threshold) : '0.079 BTC'}. MUSD will not open one below{' '}
-        {formatMusd(MIN_NET_DEBT)} of net debt.
-      </Info>
-      {assessment?.eligible && assessment.route === 'direct' ? (
-        <p className="text-text-muted mt-4 max-w-[68ch] text-sm leading-relaxed">
-          Your collateral now supports a trove of your own, which would remove this risk entirely.
+    <Panel
+      title="Pooled position"
+      meta={<span className="t-label text-text-subtle">Shared trove</span>}
+    >
+      <div className="px-5 py-4">
+        {/* The pooled-risk statement stays, in one sentence. It is the single most
+            important thing a pooled user does not otherwise know, and shortening a
+            disclosure is not the same as removing it. */}
+        <p className="text-text-muted max-w-[68ch] text-sm leading-relaxed">
+          Your deposit shares one trove with other users, segregated in{' '}
+          <em className="text-text not-italic">accounting, not custody</em>, so a drawdown faster
+          than the keeper could socialise losses.
+          {assessment?.eligible && assessment.route === 'direct'
+            ? ' Your collateral now supports a trove of your own, which would remove this risk.'
+            : ''}
         </p>
-      ) : null}
-    </AppCard>
+        <Info summary="How Maren limits that risk">
+          Maren liquidates a pooled position internally at{' '}
+          {policyRatio(MAREN_POLICY.vaultLiquidationCr)}, far above the protocol’s 110%, and backs
+          that with a 0.001 BTC floor, per-block keeper checks and an insurance buffer funded from
+          vault fees. These are mitigations, not a guarantee. You are here because a trove of your
+          own needs about {threshold ? formatBtc(threshold) : '0.079 BTC'}; MUSD will not open one
+          below {formatMusd(MIN_NET_DEBT)} of net debt.
+        </Info>
+      </div>
+    </Panel>
   );
 }
 
@@ -360,10 +370,9 @@ function BorrowPanel({
   );
 
   /**
-   * Below the 250% we recommend, the resulting ratio shifts from neutral to amber and
-   * the copy shifts from descriptive to a question. Above it, the figure is neutral like
-   * every other figure on the screen — BRAND.md §2's one-accent rule holds either way,
-   * because only ONE figure here ever takes a colour.
+   * Below the 250% we recommend, the resulting ratio shifts from neutral to amber. Above
+   * it, the figure is neutral like every other figure on the screen — BRAND.md §2's
+   * one-accent rule holds either way, because only ONE figure here ever takes a colour.
    */
   const belowRecommendation = preview !== null && preview.collateralRatio < MAREN_POLICY.targetCr;
   const ratioTone = !preview
@@ -468,7 +477,7 @@ function BorrowPanel({
    */
   if (position && position.collateralWei === 0n) {
     return (
-      <AppCard className="p-6 md:p-10">
+      <AppCard className="p-5">
         <EmptyState
           icon={<VaultIcon className="size-6" />}
           title="Deposit first"
@@ -490,210 +499,220 @@ function BorrowPanel({
   }
 
   return (
-    <AppCard className="p-6 md:p-8">
-      <CardTitle>Borrow MUSD</CardTitle>
-      {/* `data-contrast` is verify-contrast's hook for muted body copy on a card surface,
-          which is the worst case for this token. */}
-      <p
-        data-contrast="route-body"
-        className="text-text-muted mt-3 max-w-[68ch] text-sm leading-relaxed"
-      >
-        {formatApr(INTEREST_RATE_BPS)}, fixed for the life of this loan.
-      </p>
-
+    <Panel
+      title="Borrow MUSD"
+      meta={
+        <span data-contrast="route-body" className="text-text-muted text-xs">
+          {formatApr(INTEREST_RATE_BPS)}, fixed for the life of this loan
+        </span>
+      }
+    >
       {/*
         THE REFUSAL COMES FIRST WHEN NOTHING CAN SUCCEED.
 
         This copy used to live in a modal, after the user had paid for the revert that
-        produced it. When the whole range is unreachable it belongs here — above the
-        slider, before anything has been touched — because its entire content is "do not
+        produced it. When the whole range is unreachable it belongs here, above the
+        slider, before anything has been touched, because its entire content is "do not
         bother touching this, and here is why it is not your fault". `role="status"`
         rather than `alert`: it is present on first paint, and an alert that fires the
         instant a screen reader lands on the Vault is an interruption, not information.
       */}
       {range.blocker && range.rangeDead ? (
-        <div className="mt-6">
+        <div className="border-b border-[var(--border-hairline)] px-5 py-4">
           <BlockedNote blocker={range.blocker} id="borrow-blocked" />
         </div>
       ) : null}
 
-      <div className="mt-8">
-        <Label>You borrow</Label>
-        <div className="mt-3 flex items-baseline gap-3">
-          <Num size="xl" tone={range.rangeDead ? 'subtle' : 'default'}>
-            {formatMusd(value, { unit: false })}
-          </Num>
-          <span className="t-h3 text-text-muted">MUSD</span>
+      {/* The control, and the amount it sets, adjacent. */}
+      <div className="px-5 py-5">
+        <div className="flex flex-wrap items-baseline justify-between gap-x-6 gap-y-2">
+          <div className="flex items-baseline gap-3">
+            <Num size="xl" tone={range.rangeDead ? 'subtle' : 'default'}>
+              {formatMusd(value, { unit: false })}
+            </Num>
+            <span className="t-h3 text-text-muted">MUSD</span>
+          </div>
+          {preview ? <HealthChip status={preview.health.status} /> : null}
         </div>
-      </div>
 
-      <div className="mt-6">
-        <AmountSlider
-          value={value}
-          /* Zero, not the ratio headroom, when nothing can be borrowed. A track that can
-             be dragged to 35 MUSD while every value on it reverts is a control that lies
-             about what the product can do. */
-          max={range.rangeDead ? 0n : (ceiling?.amountWei ?? 0n)}
-          onChange={setAmount}
-          disabled={range.rangeDead}
-          describedBy={range.rangeDead ? 'borrow-blocked' : undefined}
-          label="Amount to borrow"
-          describeValue={(v) =>
-            range.rangeDead
-              ? `Borrowing is unavailable: ${range.blocker?.title ?? 'no amount can succeed'}`
-              : `${formatMusd(v)} of a maximum ${formatMusd(ceiling?.amountWei ?? 0n)}`
-          }
-          marker={
-            range.rangeDead
-              ? undefined
-              : {
-                  at: recommended,
-                  label: `Recommended · ${policyRatio(MAREN_POLICY.targetCr)}`,
-                  onSelect: () => setAmount(recommended),
-                }
-          }
-          endLabels={{
-            start: '0 MUSD',
-            end: range.rangeDead ? '0 MUSD' : formatMusd(ceiling?.amountWei ?? 0n, { unit: false }),
-          }}
-        />
-      </div>
+        <div className="mt-5">
+          <AmountSlider
+            value={value}
+            /* Zero, not the ratio headroom, when nothing can be borrowed. A track that can
+               be dragged to 35 MUSD while every value on it reverts is a control that lies
+               about what the product can do. */
+            max={range.rangeDead ? 0n : (ceiling?.amountWei ?? 0n)}
+            onChange={setAmount}
+            disabled={range.rangeDead}
+            describedBy={range.rangeDead ? 'borrow-blocked' : undefined}
+            label="Amount to borrow"
+            describeValue={(v) =>
+              range.rangeDead
+                ? `Borrowing is unavailable: ${range.blocker?.title ?? 'no amount can succeed'}`
+                : `${formatMusd(v)} of a maximum ${formatMusd(ceiling?.amountWei ?? 0n)}`
+            }
+            marker={
+              range.rangeDead
+                ? undefined
+                : {
+                    at: recommended,
+                    label: `Recommended · ${policyRatio(MAREN_POLICY.targetCr)}`,
+                    onSelect: () => setAmount(recommended),
+                  }
+            }
+            endLabels={{
+              start: '0 MUSD',
+              end: range.rangeDead
+                ? '0 MUSD'
+                : formatMusd(ceiling?.amountWei ?? 0n, { unit: false }),
+            }}
+          />
+        </div>
 
-      {ceiling && ceiling.amountWei > 0n && !range.rangeDead ? (
-        <p className="text-text-subtle mt-4 text-xs leading-relaxed">
-          {ceiling.binding === 'ceiling'
-            ? `Capped by Mezo’s per-trove ceiling, with ${formatMusd(ceiling.mezoHeadroomWei)} of it unused. Your ratio would allow ${formatMusd(ceiling.ratioHeadroomWei)}.`
-            : `Capped by Maren’s ${policyRatio(MAREN_POLICY.minHealthyCr)} floor. Mezo’s ceiling would allow ${formatMusd(ceiling.mezoHeadroomWei)}.`}
-        </p>
-      ) : null}
+        {ceiling && ceiling.amountWei > 0n && !range.rangeDead ? (
+          <p className="text-text-subtle mt-3 text-xs leading-relaxed">
+            {ceiling.binding === 'ceiling'
+              ? `Capped by Mezo’s per-trove ceiling. Your ratio would allow ${formatMusd(ceiling.ratioHeadroomWei)}.`
+              : `Capped by Maren’s ${policyRatio(MAREN_POLICY.minHealthyCr)} floor. Mezo’s ceiling would allow ${formatMusd(ceiling.mezoHeadroomWei)}.`}
+          </p>
+        ) : null}
+      </div>
 
       {/* The shared trove's own figure, stated beside the refusal it causes. Without it
           the explanation above is an assertion; with it, anyone can check it. */}
       {range.rangeDead && stats ? (
-        <div className="mt-6 grid grid-cols-1 gap-6 sm:grid-cols-3">
-          <Metric
-            label="Shared trove ratio"
-            value={
-              <Num size="lg" className="text-warning" tone="inherit">
-                {formatCollateralRatio(stats.troveIcrWei)}
-              </Num>
-            }
-            caption={`must be at or above ${policyRatio(MAREN_VAULT.minTroveCr)} for anyone to borrow`}
-          />
-          <Metric
-            label="Your collateral"
-            value={position ? <Btc wei={position.collateralWei} size="lg" /> : <Dash size="lg" />}
-            caption="untouched, and withdrawable"
-          />
-          <Metric
-            label="Your debt"
-            value={position ? <Musd wei={position.debtWei} size="lg" /> : <Dash size="lg" />}
-            caption="unaffected by the pool’s ratio"
-          />
+        <div className="border-t border-[var(--border-hairline)]">
+          <MetricStrip>
+            <Metric
+              className="px-5 py-4"
+              label="Shared trove ratio"
+              value={
+                <Num size="lg" className="text-warning" tone="inherit">
+                  {formatCollateralRatio(stats.troveIcrWei)}
+                </Num>
+              }
+              caption={`must be at or above ${policyRatio(MAREN_VAULT.minTroveCr)} for anyone to borrow`}
+            />
+            <Metric
+              className="px-5 py-4"
+              label="Your collateral"
+              value={position ? <Btc wei={position.collateralWei} size="lg" /> : <Dash size="lg" />}
+              caption="untouched, and withdrawable"
+            />
+            <Metric
+              className="px-5 py-4"
+              label="Your debt"
+              value={position ? <Musd wei={position.debtWei} size="lg" /> : <Dash size="lg" />}
+              caption="unaffected by the pool’s ratio"
+            />
+          </MetricStrip>
         </div>
       ) : null}
 
+      {/* Every figure here is derived from the debt this borrow WOULD create, so each one
+          dashes while that debt is still zero rather than quoting a liquidation price for
+          a loan nobody has taken. */}
       {preview ? (
-        <div className="mt-8 border-t border-[var(--border-hairline)] pt-6">
-          <div className="flex flex-wrap items-center justify-between gap-4">
-            <span className="t-label text-text-subtle">If you borrow this</span>
-            <HealthChip status={preview.health.status} />
+        <>
+          <div className="border-t border-[var(--border-hairline)]">
+            <MetricStrip>
+              <Metric
+                className="px-5 py-4"
+                label="Resulting ratio"
+                value={
+                  <RatioOrDash
+                    cr={preview.collateralRatio}
+                    debtWei={preview.debtWei}
+                    size="lg"
+                    tone={ratioTone ? 'inherit' : 'default'}
+                    className={ratioTone?.text ?? ''}
+                  />
+                }
+                caption={healthLabel[preview.health.status]}
+              />
+              <Metric
+                className="px-5 py-4"
+                label="Liquidation price"
+                value={
+                  <LiquidationPrice
+                    wei={preview.liquidationPriceWei}
+                    debtWei={preview.debtWei}
+                    size="lg"
+                  />
+                }
+                caption="protocol liquidates at 110%"
+              />
+              <Metric
+                className="px-5 py-4"
+                label="Bitcoin can fall"
+                value={
+                  <DropToLiquidation
+                    bps={preview.health.priceDropToLiquidationBps}
+                    debtWei={preview.debtWei}
+                    size="lg"
+                  />
+                }
+                caption="from today’s price"
+              />
+            </MetricStrip>
           </div>
 
-          {/* Every figure here is derived from the debt this borrow WOULD create, so
-              each one dashes while that debt is still zero rather than quoting a
-              liquidation price for a loan nobody has taken. */}
-          <div className="mt-5 grid grid-cols-1 gap-6 sm:grid-cols-3">
-            <Metric
-              label="Resulting ratio"
-              value={
-                <RatioOrDash
-                  cr={preview.collateralRatio}
-                  debtWei={preview.debtWei}
-                  size="lg"
-                  tone={ratioTone ? 'inherit' : 'default'}
-                  className={ratioTone?.text ?? ''}
-                />
-              }
-              caption={healthLabel[preview.health.status]}
-            />
-            <Metric
-              label="Liquidation price"
-              value={
-                <LiquidationPrice
-                  wei={preview.liquidationPriceWei}
-                  debtWei={preview.debtWei}
-                  size="lg"
-                />
-              }
-              caption="protocol liquidates at 110%"
-            />
-            <Metric
-              label="Bitcoin can fall"
-              value={
-                <DropToLiquidation
-                  bps={preview.health.priceDropToLiquidationBps}
-                  debtWei={preview.debtWei}
-                  size="lg"
-                />
-              }
-              caption="from today’s price"
-            />
+          <div className="border-t border-[var(--border-hairline)]">
+            <PanelBody>
+              <StatRow
+                label="Origination fee"
+                hint="0.1%"
+                value={<Musd wei={preview.originationFeeWei} />}
+              />
+              <StatRow
+                label="Liquidation reserve"
+                hint="refunded when the trove closes"
+                value={
+                  position?.route === 'direct' ? (
+                    <Musd wei={LIQUIDATION_RESERVE} />
+                  ) : (
+                    <span className="text-text-subtle text-sm">none on this route</span>
+                  )
+                }
+              />
+              <StatRow label="Total debt after" value={<Musd wei={preview.debtWei} />} last />
+            </PanelBody>
           </div>
-
-          <div className="mt-6">
-            <StatRow
-              label="Origination fee (0.1%)"
-              value={<Musd wei={preview.originationFeeWei} />}
-            />
-            <StatRow
-              label="Liquidation reserve"
-              hint="refunded when the trove closes"
-              value={
-                position?.route === 'direct' ? (
-                  <Musd wei={LIQUIDATION_RESERVE} />
-                ) : (
-                  <span className="text-text-subtle text-sm">none on this route</span>
-                )
-              }
-            />
-            <StatRow label="Total debt after" value={<Musd wei={preview.debtWei} />} last />
-          </div>
-
-          {belowRecommendation ? (
-            <p className="text-warning mt-5 max-w-[68ch] text-sm leading-relaxed" role="status">
-              Bitcoin would only need to fall {dropPercent}% to liquidate this, below the{' '}
-              {policyRatio(MAREN_POLICY.targetCr)} we recommend.
-            </p>
-          ) : null}
-        </div>
+        </>
       ) : null}
 
-      {/* The gas claim, kept true. Maren's relay hub is deployed but no relayer service
-          is running, so "no gas" would be a promise the product cannot currently keep. */}
-      <p className="text-text-subtle mt-6 text-xs leading-relaxed">
-        Costs BTC gas. Maren’s relayer is not running yet, so your own wallet submits this.
-      </p>
+      <div className="border-t border-[var(--border-hairline)] px-5 py-4">
+        {belowRecommendation ? (
+          <p className="text-warning max-w-[68ch] text-sm leading-relaxed" role="status">
+            Bitcoin would only need to fall {dropPercent}% to liquidate this, below the{' '}
+            {policyRatio(MAREN_POLICY.targetCr)} we recommend.
+          </p>
+        ) : null}
 
-      {/* A blocker that is about THIS amount rather than the whole range sits by the
-          button, which is where the user is looking when they find out. */}
-      {!range.rangeDead && worthStating(pre, value) && pre.blocker ? (
-        <div className="mt-5">
-          <BlockedNote blocker={pre.blocker} id="borrow-amount-blocked" role="alert" />
+        {/* A blocker that is about THIS amount rather than the whole range sits by the
+            button, which is where the user is looking when they find out. */}
+        {!range.rangeDead && worthStating(pre, value) && pre.blocker ? (
+          <div className={belowRecommendation ? 'mt-3' : ''}>
+            <BlockedNote blocker={pre.blocker} id="borrow-amount-blocked" role="alert" />
+          </div>
+        ) : null}
+
+        <div className="mt-3 flex flex-wrap items-center gap-x-5 gap-y-3">
+          <ActionButton
+            onClick={() => runner.request(intent())}
+            disabled={!pre.ok || !writes.ready}
+            aria-describedby={range.rangeDead ? 'borrow-blocked' : 'borrow-amount-blocked'}
+            icon={<ArrowRight className="size-4" />}
+          >
+            {value > 0n ? `Borrow ${formatMusd(value)}` : 'Borrow'}
+          </ActionButton>
+          {/* The gas claim, kept true and kept beside the button that incurs it. */}
+          <span className="text-text-subtle text-xs">
+            You pay the Bitcoin gas. No relayer is running yet.
+          </span>
         </div>
-      ) : null}
-
-      <div className="mt-7">
-        <ActionButton
-          onClick={() => runner.request(intent())}
-          disabled={!pre.ok || !writes.ready}
-          aria-describedby={range.rangeDead ? 'borrow-blocked' : 'borrow-amount-blocked'}
-          icon={<ArrowRight className="size-4" />}
-        >
-          {value > 0n ? `Borrow ${formatMusd(value)}` : 'Borrow'}
-        </ActionButton>
       </div>
-    </AppCard>
+    </Panel>
   );
 }
 
@@ -771,69 +790,79 @@ function DepositPanel({ runner, chain }: { runner: TxRunner; chain: VaultState }
   });
 
   return (
-    <AppCard className="p-6 md:p-8">
-      <CardTitle>Deposit Bitcoin</CardTitle>
-      <p className="text-text-muted mt-3 max-w-[68ch] text-sm leading-relaxed">
-        Adds collateral and raises your ratio immediately.
-      </p>
-
-      <div className="mt-8 max-w-md">
-        <AmountField
-          value={input}
-          onChange={setInput}
-          unit="BTC"
-          label="Amount"
-          max={pre.maxWei > 0n ? <Btc wei={pre.maxWei} size="sm" /> : undefined}
-          maxLabel="Most you can deposit"
-          onMax={() => setInput(formatBtc(pre.maxWei, { unit: false }).replace(/,/g, ''))}
-          presets={[
-            { label: '0.001 BTC', value: '0.001' },
-            { label: '0.01 BTC', value: '0.01' },
-            { label: '0.05 BTC', value: '0.05' },
-            { label: '0.1 BTC', value: '0.1' },
-          ]}
-          error={fieldError(pre, wei)}
-          hint={
-            routeAfter?.eligible === true ? (
-              <>
-                After this deposit you are on the{' '}
-                <span className="text-text-muted">
-                  {routeAfter.route === 'direct' ? 'direct trove' : 'pooled'}
-                </span>{' '}
-                route.
-              </>
-            ) : null
-          }
-        />
-      </div>
-
-      {/* The one action Maren cannot sponsor, said before the user signs it. */}
-      <p className="text-text-subtle mt-6 max-w-[68ch] text-xs leading-relaxed">
-        A deposit costs BTC gas. It carries value, and the relayer cannot sponsor that. Everything
-        after it is free.
-      </p>
-
-      {worthStating(pre, wei) && pre.blocker ? (
-        <div className="mt-5">
-          <BlockedNote
-            blocker={pre.blocker}
-            id="deposit-blocked"
-            role={pre.rangeDead ? 'status' : 'alert'}
+    <Panel
+      title="Deposit Bitcoin"
+      meta={
+        <span className="text-text-muted text-xs">Raises your ratio the moment it confirms</span>
+      }
+    >
+      <div className="px-5 py-5">
+        <div className="max-w-md">
+          <AmountField
+            value={input}
+            onChange={setInput}
+            unit="BTC"
+            label="Amount"
+            max={pre.maxWei > 0n ? <Btc wei={pre.maxWei} size="sm" /> : undefined}
+            maxLabel="Most you can deposit"
+            onMax={() => setInput(formatBtc(pre.maxWei, { unit: false }).replace(/,/g, ''))}
+            presets={[
+              { label: '0.001 BTC', value: '0.001' },
+              { label: '0.01 BTC', value: '0.01' },
+              { label: '0.05 BTC', value: '0.05' },
+              { label: '0.1 BTC', value: '0.1' },
+            ]}
+            error={fieldError(pre, wei)}
           />
         </div>
-      ) : null}
 
-      <div className="mt-7">
-        <ActionButton
-          onClick={() => runner.request(intent())}
-          disabled={!pre.ok || !writes.ready}
-          aria-describedby="deposit-blocked"
-          icon={<ArrowRight className="size-4" />}
-        >
-          Deposit {wei > 0n ? formatBtc(wei) : ''}
-        </ActionButton>
+        {position ? (
+          <div className="mt-6 max-w-md">
+            <StatRow label="Collateral after" value={<Btc wei={position.collateralWei + wei} />} />
+            <StatRow
+              label="Route after"
+              value={
+                routeAfter?.eligible === true ? (
+                  <span className="text-text text-sm">
+                    {routeAfter.route === 'direct' ? 'Direct trove' : 'Pooled'}
+                  </span>
+                ) : (
+                  <span className="text-text-subtle text-sm">needs a live price</span>
+                )
+              }
+              last
+            />
+          </div>
+        ) : null}
+
+        {worthStating(pre, wei) && pre.blocker ? (
+          <div className="mt-5 max-w-md">
+            <BlockedNote
+              blocker={pre.blocker}
+              id="deposit-blocked"
+              role={pre.rangeDead ? 'status' : 'alert'}
+            />
+          </div>
+        ) : null}
       </div>
-    </AppCard>
+
+      <div className="border-t border-[var(--border-hairline)] px-5 py-4">
+        <div className="flex flex-wrap items-center gap-x-5 gap-y-3">
+          <ActionButton
+            onClick={() => runner.request(intent())}
+            disabled={!pre.ok || !writes.ready}
+            aria-describedby="deposit-blocked"
+            icon={<ArrowRight className="size-4" />}
+          >
+            Deposit {wei > 0n ? formatBtc(wei) : ''}
+          </ActionButton>
+          {/* The one action Maren can never sponsor, said before the user signs it. */}
+          <span className="text-text-subtle max-w-[46ch] text-xs leading-relaxed">
+            A deposit costs Bitcoin gas and always will, because it carries value.
+          </span>
+        </div>
+      </div>
+    </Panel>
   );
 }
 
@@ -926,75 +955,81 @@ function RepayPanel({ runner, chain }: { runner: TxRunner; chain: VaultState }) 
   });
 
   return (
-    <AppCard className="p-6 md:p-8">
-      <CardTitle>Repay debt</CardTitle>
-      <p className="text-text-muted mt-3 max-w-[68ch] text-sm leading-relaxed">
-        Reduces your principal and raises your ratio. Interest is simple, never compounding.
-      </p>
-
-      <div className="mt-8 max-w-md">
-        <AmountField
-          value={input}
-          onChange={setInput}
-          unit="MUSD"
-          label="Amount"
-          max={<Musd wei={balance} size="sm" />}
-          maxLabel="Your MUSD balance"
-          onMax={() => setInput(formatMusd(balance, { unit: false }).replace(/,/g, ''))}
-          presets={[
-            { label: '500 MUSD', value: '500' },
-            { label: '1,000 MUSD', value: '1000' },
-          ]}
-          error={fieldError(pre, wei)}
-        />
-      </div>
-
-      <p className="text-text-subtle mt-6 text-xs leading-relaxed">
-        Repay needs no price, so it stays open when the oracle is stale.
-      </p>
-
-      {worthStating(pre, wei) && pre.blocker ? (
-        <div className="mt-5">
-          <BlockedNote
-            blocker={pre.blocker}
-            id="repay-blocked"
-            role={pre.rangeDead ? 'status' : 'alert'}
+    <Panel
+      title="Repay debt"
+      meta={<span className="text-text-muted text-xs">Interest is simple, never compounding</span>}
+    >
+      <div className="px-5 py-5">
+        <div className="max-w-md">
+          <AmountField
+            value={input}
+            onChange={setInput}
+            unit="MUSD"
+            label="Amount"
+            max={<Musd wei={balance} size="sm" />}
+            maxLabel="Your MUSD balance"
+            onMax={() => setInput(formatMusd(balance, { unit: false }).replace(/,/g, ''))}
+            presets={[
+              { label: '500 MUSD', value: '500' },
+              { label: '1,000 MUSD', value: '1000' },
+            ]}
+            error={fieldError(pre, wei)}
           />
         </div>
-      ) : null}
 
-      {pre.ok && needsApproval ? (
-        <div className="mt-6">
-          <Note>
-            The vault has to be allowed to take {formatMusd(wei)} of your MUSD before it can be
-            repaid. That is one approval transaction, and it is shown to you rather than slipped in
-            behind the repay.
-          </Note>
-        </div>
-      ) : null}
+        {position ? (
+          <div className="mt-6 max-w-md">
+            <StatRow label="Debt after" value={<Musd wei={debtAfter} />} last />
+          </div>
+        ) : null}
 
-      <div className="mt-7 flex flex-wrap gap-3">
-        {needsApproval ? (
+        {worthStating(pre, wei) && pre.blocker ? (
+          <div className="mt-5 max-w-md">
+            <BlockedNote
+              blocker={pre.blocker}
+              id="repay-blocked"
+              role={pre.rangeDead ? 'status' : 'alert'}
+            />
+          </div>
+        ) : null}
+
+        {pre.ok && needsApproval ? (
+          <div className="mt-5 max-w-md">
+            <Note>
+              The vault needs an allowance for {formatMusd(wei)} first. That is a separate
+              transaction, shown here rather than slipped in behind the repay.
+            </Note>
+          </div>
+        ) : null}
+      </div>
+
+      <div className="border-t border-[var(--border-hairline)] px-5 py-4">
+        <div className="flex flex-wrap items-center gap-x-5 gap-y-3">
+          {needsApproval ? (
+            <ActionButton
+              onClick={() => runner.request(approvalIntent())}
+              disabled={!pre.ok || !writes.ready}
+              aria-describedby="repay-blocked"
+              icon={<ArrowRight className="size-4" />}
+            >
+              Approve {formatMusd(wei)}
+            </ActionButton>
+          ) : null}
           <ActionButton
-            onClick={() => runner.request(approvalIntent())}
-            disabled={!pre.ok || !writes.ready}
+            variant={needsApproval ? 'secondary' : 'primary'}
+            onClick={() => runner.request(intent())}
+            disabled={!pre.ok || needsApproval || !writes.ready}
             aria-describedby="repay-blocked"
             icon={<ArrowRight className="size-4" />}
           >
-            Approve {formatMusd(wei)}
+            Repay {wei > 0n ? formatMusd(wei) : ''}
           </ActionButton>
-        ) : null}
-        <ActionButton
-          variant={needsApproval ? 'secondary' : 'primary'}
-          onClick={() => runner.request(intent())}
-          disabled={!pre.ok || needsApproval || !writes.ready}
-          aria-describedby="repay-blocked"
-          icon={<ArrowRight className="size-4" />}
-        >
-          Repay {wei > 0n ? formatMusd(wei) : ''}
-        </ActionButton>
+          <span className="text-text-subtle text-xs">
+            Repay stays open when the oracle is stale.
+          </span>
+        </div>
       </div>
-    </AppCard>
+    </Panel>
   );
 }
 
@@ -1049,50 +1084,60 @@ function WithdrawPanel({ runner, chain }: { runner: TxRunner; chain: VaultState 
   });
 
   return (
-    <AppCard className="p-6 md:p-8">
-      <CardTitle>Withdraw Bitcoin</CardTitle>
-      <p className="text-text-muted mt-3 max-w-[68ch] text-sm leading-relaxed">
-        The amount available is already capped at Maren’s {policyRatio(MAREN_POLICY.minHealthyCr)}{' '}
-        floor.
-      </p>
-
-      <div className="mt-8 max-w-md">
-        <AmountField
-          value={input}
-          onChange={setInput}
-          unit="BTC"
-          label="Amount"
-          max={<Btc wei={pre.maxWei} size="sm" />}
-          maxLabel="Available to withdraw"
-          onMax={() => setInput(formatBtc(pre.maxWei, { unit: false }).replace(/,/g, ''))}
-          error={fieldError(pre, wei)}
-        />
-      </div>
-
-      {worthStating(pre, wei) && pre.blocker ? (
-        <div className="mt-6">
-          <BlockedNote
-            blocker={pre.blocker}
-            id="withdraw-blocked"
-            role={pre.rangeDead ? 'status' : 'alert'}
+    <Panel
+      title="Withdraw Bitcoin"
+      meta={
+        <span className="text-text-muted text-xs">
+          Already capped at Maren’s {policyRatio(MAREN_POLICY.minHealthyCr)} floor
+        </span>
+      }
+    >
+      <div className="px-5 py-5">
+        <div className="max-w-md">
+          <AmountField
+            value={input}
+            onChange={setInput}
+            unit="BTC"
+            label="Amount"
+            max={<Btc wei={pre.maxWei} size="sm" />}
+            maxLabel="Available to withdraw"
+            onMax={() => setInput(formatBtc(pre.maxWei, { unit: false }).replace(/,/g, ''))}
+            error={fieldError(pre, wei)}
           />
         </div>
-      ) : (
-        <p className="text-text-subtle mt-6 text-xs leading-relaxed">
-          Withdrawal is never paused. If Maren halts the vault, exits stay open.
-        </p>
-      )}
 
-      <div className="mt-7">
-        <ActionButton
-          onClick={() => runner.request(intent())}
-          disabled={!pre.ok || !writes.ready}
-          aria-describedby="withdraw-blocked"
-          icon={<ArrowRight className="size-4" />}
-        >
-          Withdraw {wei > 0n ? formatBtc(wei) : ''}
-        </ActionButton>
+        {position ? (
+          <div className="mt-6 max-w-md">
+            <StatRow label="Collateral after" value={<Btc wei={collateralAfter} />} last />
+          </div>
+        ) : null}
+
+        {worthStating(pre, wei) && pre.blocker ? (
+          <div className="mt-5 max-w-md">
+            <BlockedNote
+              blocker={pre.blocker}
+              id="withdraw-blocked"
+              role={pre.rangeDead ? 'status' : 'alert'}
+            />
+          </div>
+        ) : null}
       </div>
-    </AppCard>
+
+      <div className="border-t border-[var(--border-hairline)] px-5 py-4">
+        <div className="flex flex-wrap items-center gap-x-5 gap-y-3">
+          <ActionButton
+            onClick={() => runner.request(intent())}
+            disabled={!pre.ok || !writes.ready}
+            aria-describedby="withdraw-blocked"
+            icon={<ArrowRight className="size-4" />}
+          >
+            Withdraw {wei > 0n ? formatBtc(wei) : ''}
+          </ActionButton>
+          <span className="text-text-subtle text-xs">
+            Withdrawal is never paused. If Maren halts the vault, exits stay open.
+          </span>
+        </div>
+      </div>
+    </Panel>
   );
 }
