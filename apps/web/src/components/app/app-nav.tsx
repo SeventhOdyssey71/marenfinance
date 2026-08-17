@@ -26,7 +26,7 @@ export function AppNav() {
   const pathname = usePathname();
 
   return (
-    <header className="sticky top-0 z-40 border-b border-[var(--border-hairline)] bg-[#08080A]/80 backdrop-blur-xl">
+    <header className="bg-bg/80 sticky top-0 z-40 border-b border-[var(--border-hairline)] backdrop-blur-xl">
       <div className="container-maren">
         <div className="flex h-[72px] items-center justify-between gap-4">
           <div className="flex min-w-0 items-center gap-6">

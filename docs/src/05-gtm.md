@@ -13,14 +13,14 @@ Maren's go-to-market rests on a single observation about Mezo:
 > **MUSD has roughly 29,360 holders. Mezo mainnet has 27 troves.**
 
 Tens of thousands of people already hold Mezo's stablecoin. Fewer than thirty can mint it.
-The distance between those two numbers is not a marketing problem — it is a **1,800 MUSD
+The distance between those two numbers is not a marketing problem, it is a **1,800 MUSD
 minimum debt**, which at a responsible collateral ratio means **0.079346 BTC ($5,004.50)**
 before anyone can open a position at all.
 
 That reframes the entire launch. We are not persuading people to want MUSD; they already
 hold it. We are removing the thing standing between them and being able to create it.
 
-This document covers who we go to, in what order, and what we would ask of Mezo — with an
+This document covers who we go to, in what order, and what we would ask of Mezo, with an
 explicit note on which channels we think are overrated.
 
 ---
@@ -29,7 +29,7 @@ explicit note on which channels we think are overrated.
 
 Three audiences, in the order we pursue them.
 
-## A. The 29,334 — MUSD holders who are not borrowers
+## A. The 29,334: MUSD holders who are not borrowers
 
 **The primary audience, and the reason to be optimistic.** They have already crossed
 every hard barrier: they found Mezo, bridged, acquired MUSD, and hold it. They are
@@ -43,7 +43,7 @@ They are reachable, because Mezo already knows where they are.
 
 ## B. Small Bitcoin holders outside Mezo
 
-Holders of 0.01–0.1 BTC — too small for a direct trove, exactly the size Maren's pooled
+Holders of 0.01–0.1 BTC, too small for a direct trove, exactly the size Maren's pooled
 vault is built for. Motivated by tax (selling is a taxable event in most jurisdictions)
 and by conviction (they do not want to sell).
 
@@ -52,7 +52,7 @@ Higher acquisition cost, larger pool. This is the growth audience, not the launc
 ## C. People who want to spend, not to farm
 
 MUSD holders with no consumer-grade way to use it. `@handle` payments, requests, splits,
-and payment links — all gasless. This is where retention comes from: borrowing is an
+and payment links, all gasless. This is where retention comes from: borrowing is an
 event, spending is a habit.
 
 **We are explicitly not chasing yield tourists.** MUSD's Stability Pool has no token
@@ -63,44 +63,44 @@ cannot sustain, and capital that arrives for a number leaves for a bigger one.
 
 # 2. Sequence
 
-## Phase 0 — Matsnet, weeks 4–5 (Sept)
+## Phase 0: Matsnet, weeks 4–5 (Sept)
 
 Public testnet, opened to the Mezo Discord.
 
 **The goal is not signups. It is to find what breaks with real users**, particularly
-around oracle staleness reverts and keeper behaviour under simulated drawdowns — failure
+around oracle staleness reverts and keeper behaviour under simulated drawdowns, failure
 modes that tests do not surface because tests do not behave like people.
 
 _Success:_ 50 testnet users, every core flow exercised, a written list of what broke.
 
-## Phase 1 — Mainnet launch, week 8 (10 Oct)
+## Phase 1: Mainnet launch, week 8 (10 Oct)
 
 Vault capped at 5 BTC. Direct troves uncapped.
 
 - Launch post: the troves-vs-holders gap, stated with numbers measured that morning.
 - Technical writeup of the seven ways MUSD diverges from Liquity and the three
-  doc/bytecode discrepancies — offered as a contribution to other Mezo builders, not as
+  doc/bytecode discrepancies, offered as a contribution to other Mezo builders, not as
   criticism. **This is the piece most likely to travel**, because it is genuinely useful
   and nobody else has written it.
 - Co-marketing with Mezo (Discord, @MezoNetwork, @SupernormalFDN).
 
 _Success:_ 50 funded positions, $50k borrowed, zero incidents.
 
-## Phase 2 — Audit and open the cap, weeks 9–14
+## Phase 2: Audit and open the cap, weeks 9–14
 
 Publish the audit in full, including findings. Raise the cap to 25 BTC. Apply for Mezo
 Market listing.
 
 _Success:_ audit published, cap raised, listed.
 
-## Phase 3 — Payments as the habit, weeks 15–22
+## Phase 3: Payments as the habit, weeks 15–22
 
 Shift the story from borrowing to spending. Handle registration drive; merchant pilot
 with 3–5 Mezo ecosystem projects accepting MUSD through `MarenPay`.
 
 _Success:_ 250 funded positions, $250k borrowed, 1,000 payments (the M3 milestone).
 
-## Phase 4 — iOS, weeks 23–28
+## Phase 4: iOS, weeks 23–28
 
 App Store launch. Mobile is where a payments product becomes a habit or does not.
 
@@ -114,7 +114,7 @@ Ranked by expected return, with the ones we are sceptical of named as such.
 
 **1. Mezo's own channels.** 180k-member Discord, @MezoNetwork, @SupernormalFDN. The
 highest-intent audience that exists for this product, and the offer on the table. We would
-rather use it **twice, well** — at mainnet launch and at iOS launch — than continuously
+rather use it **twice, well**: at mainnet launch and at iOS launch, than continuously
 and thinly.
 
 **2. Technical writing.** The MUSD integration findings, the pooled-vault design, the
@@ -127,13 +127,13 @@ useful, low cost, and it makes MUSD circulate rather than sit.
 
 **4. Bitcoin-native communities.** Nostr, Bitcoin Twitter, r/Bitcoin. High conviction,
 high scepticism, and rightly hostile to anything that smells like a token. Maren's lack of
-a token is an asset here — but this audience punishes overreach, so we enter with the
+a token is an asset here, but this audience punishes overreach, so we enter with the
 technical writing, not with marketing.
 
 **Explicitly deprioritised:** paid acquisition (wrong stage, wrong trust dynamics),
 influencer campaigns (actively counterproductive with a Bitcoin audience), airdrop
 farming (attracts precisely the users we do not want), and a token (we are not launching
-one — see below).
+one, see below).
 
 ---
 
@@ -147,7 +147,7 @@ Ranked by value to us, which is not the same as cost to them.
    valuable to us.
 3. **A technical contact for MUSD questions**, particularly the three doc/bytecode
    discrepancies.
-4. **Co-marketing at the two launches**, M1 and M4 — not continuously.
+4. **Co-marketing at the two launches**, M1 and M4, not continuously.
 5. **Mezo Market listing** once the audit is complete.
 6. **Introductions to 3–5 ecosystem projects** for the merchant pilot.
 
@@ -155,7 +155,7 @@ Ranked by value to us, which is not the same as cost to them.
 
 # 5. Positioning
 
-**Maren — Spend Bitcoin. Never sell it.**
+**Maren, Spend Bitcoin. Never sell it.**
 
 What we say:
 
@@ -168,7 +168,7 @@ What we deliberately do not say:
 
 - No fixed APY on Earn. The yield is lumpy liquidation gains and we show trailing
   realised returns, labelled as backward-looking.
-- No "100% Bitcoin-backed" claim about MUSD generally — true of the CDP portion, not of
+- No "100% Bitcoin-backed" claim about MUSD generally, true of the CDP portion, not of
   most circulating supply.
 - No "your funds are safe" about the pooled vault. It is a mechanism, and mechanisms fail.
 - No "audited" until it is.
@@ -191,7 +191,7 @@ Revenue instead comes from spread on real usage: a margin over the protocol's 1%
 rate on pooled positions, a fee on payment volume above the free tier, and a performance
 fee on Earn. At **$0.0092 per 100,000 gas** (1,462,500 wei at a $62,922 BTC price), the gas Maren
 sponsors is a rounding error
-against any of these — sponsorship is a customer-acquisition cost measured in cents.
+against any of these, sponsorship is a customer-acquisition cost measured in cents.
 
 ---
 
@@ -227,6 +227,6 @@ Not projections. Things that exist today.
   entry omits Multicall3, silently breaking batched reads for every wagmi user), a
   correction to the subgraph documentation's network slug (a manifest copied from the
   docs fails to deploy), and several dead RPC hosts in the developer docs.
-- **A verified integration map for MUSD** — the seven Liquity divergences and the three
-  doc/bytecode discrepancies — which is the document we wish had existed when we started,
+- **A verified integration map for MUSD**: the seven Liquity divergences and the three
+  doc/bytecode discrepancies, which is the document we wish had existed when we started,
   and which we intend to publish for the next builder.

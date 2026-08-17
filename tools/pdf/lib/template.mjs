@@ -7,7 +7,16 @@
  * compromising either.
  */
 
+import { readFileSync } from 'node:fs';
+import { fileURLToPath } from 'node:url';
+import path from 'node:path';
+
 import { documentCss, coverCss } from './styles.mjs';
+
+// The brand mark, inlined so the cover HTML stays self-contained for setContent().
+const MARK_URI = `data:image/png;base64,${readFileSync(
+  path.join(path.dirname(fileURLToPath(import.meta.url)), '../assets/maren-mark.png'),
+).toString('base64')}`;
 
 function esc(s) {
   return String(s ?? '')
@@ -44,7 +53,7 @@ export function coverHtml({ meta, fonts }) {
     <div class="grain"></div>
     <div class="frame">
       <div class="top">
-        <div class="wordmark"><span class="mark"></span>Maren</div>
+        <div class="wordmark"><img class="mark" src="${MARK_URI}" alt="">Maren</div>
         <div class="classification">${esc(meta.classification)}</div>
       </div>
       <div class="spacer"></div>

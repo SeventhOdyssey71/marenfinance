@@ -197,7 +197,7 @@ export function AmountSlider({
         {markerPercent !== null && markerPercent >= 0 && markerPercent <= 100 ? (
           <span
             aria-hidden
-            className="absolute top-1/2 h-4 w-px -translate-y-1/2 bg-white/25"
+            className="bg-text/25 absolute top-1/2 h-4 w-px -translate-y-1/2"
             style={{ left: `${markerPercent}%` }}
           />
         ) : null}

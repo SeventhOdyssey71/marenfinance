@@ -282,13 +282,13 @@ export function ActionLink({
   variant?: 'primary' | 'secondary';
 }) {
   const variants = {
-    primary: 'bg-white text-[#08080A] hover:bg-white/90',
+    primary: 'bg-text text-bg hover:bg-text/90',
     secondary:
       'bg-surface-raised text-text border border-[var(--border-hairline)] hover:border-[var(--border-strong)]',
   } as const;
   const badges = {
     primary: 'bg-violet-500 text-white',
-    secondary: 'bg-white/[0.06] text-text-muted',
+    secondary: 'bg-text/[0.06] text-text-muted',
   } as const;
 
   return (

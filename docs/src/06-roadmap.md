@@ -27,17 +27,17 @@ We think that is the right basis on which to ask.
 
 # Milestone schedule
 
-| #      | Milestone                                                               | Release  | Amount      | Target                |
-| ------ | ----------------------------------------------------------------------- | -------- | ----------- | --------------------- |
-| **M1** | Mainnet deployment                                                      | **40%**  | **$6,000**  | Week 8 — 10 Oct 2026  |
-| **M2** | Third-party audit complete, findings resolved                           | 25%      | $3,750      | Week 14 — 21 Nov 2026 |
-| **M3** | Traction: 250 funded positions and $250,000 MUSD borrowed through Maren | 20%      | $3,000      | Week 22 — 16 Jan 2027 |
-| **M4** | iOS app live on the App Store, sustained for 30 days                    | 15%      | $2,250      | Week 28 — 27 Feb 2027 |
-|        | **Total**                                                               | **100%** | **$15,000** |                       |
+| #      | Milestone                                                               | Release  | Amount      | Target               |
+| ------ | ----------------------------------------------------------------------- | -------- | ----------- | -------------------- |
+| **M1** | Mainnet deployment                                                      | **40%**  | **$6,000**  | Week 8, 10 Oct 2026  |
+| **M2** | Third-party audit complete, findings resolved                           | 25%      | $3,750      | Week 14, 21 Nov 2026 |
+| **M3** | Traction: 250 funded positions and $250,000 MUSD borrowed through Maren | 20%      | $3,000      | Week 22, 16 Jan 2027 |
+| **M4** | iOS app live on the App Store, sustained for 30 days                    | 15%      | $2,250      | Week 28, 27 Feb 2027 |
+|        | **Total**                                                               | **100%** | **$15,000** |                      |
 
 ---
 
-# M1 — Mainnet deployment · 40% · $6,000
+# M1: Mainnet deployment · 40% · $6,000
 
 **Target: 10 October 2026 (week 8).**
 
@@ -58,14 +58,14 @@ We think that is the right basis on which to ask.
   fork tests against matsnet exercising the real MUSD protocol; web and iOS applications
   feature-complete against testnet.
 - **Weeks 4–5 (5 – 19 Sep):** full matsnet deployment. Public testnet open to the Mezo
-  Discord — this is where we would most value the ecosystem team's help, because the
+  Discord, this is where we would most value the ecosystem team's help, because the
   failure modes we care about only appear with real users.
 - **Weeks 6–7 (19 Sep – 3 Oct):** fix what testnet finds. Freeze contracts.
 - **Week 8:** mainnet deployment, **with the vault capped** (see _Risk-managed launch_).
 
 ---
 
-# M2 — Audit complete · 25% · $3,750
+# M2: Audit complete · 25% · $3,750
 
 **Target: 21 November 2026 (week 14).**
 
@@ -104,13 +104,13 @@ pooled vault uncapped without a review. That is a commitment, not a caveat.
 
 ---
 
-# M3 — Traction · 20% · $3,000
+# M3: Traction · 20% · $3,000
 
 **Target: 16 January 2027 (week 22).**
 
 ## Acceptance criteria, all verifiable on-chain
 
-1. **250 funded positions** in `MarenVault` — distinct addresses with non-zero collateral.
+1. **250 funded positions** in `MarenVault`: distinct addresses with non-zero collateral.
 2. **$250,000 MUSD** cumulative borrowed through Maren.
 3. **1,000 MUSD payments** settled through `MarenPay`.
 
@@ -123,7 +123,7 @@ requires roughly **0.079 BTC (~$5,000)** of collateral at a responsible ratio.
 
 250 funded positions would be a **tenfold increase in the number of borrowing accounts on
 Mezo**. We have set the target where it is meaningful to Mezo rather than flattering to
-us — and we would rather commit to a number we might miss than to one we would certainly
+us, and we would rather commit to a number we might miss than to one we would certainly
 hit.
 
 The $250,000 borrowed figure is deliberately modest relative to the position count,
@@ -132,7 +132,7 @@ volume. The point is that the borrower base stops being a few dozen people.
 
 ---
 
-# M4 — iOS live · 15% · $2,250
+# M4: iOS live · 15% · $2,250
 
 **Target: 27 February 2027 (week 28).**
 
@@ -143,7 +143,7 @@ volume. The point is that the borrower base stops being a few dozen people.
 3. Full functionality: deposit, borrow, gasless pay, scan-to-pay, earn, portfolio.
 
 Mobile is where a payments product either becomes a habit or does not. App Review is also
-a genuine external gate — a crypto app that passes it has cleared a bar that is not
+a genuine external gate, a crypto app that passes it has cleared a bar that is not
 self-assessed. We have budgeted a month for review cycles because we have been through
 this before and it is never one submission.
 
@@ -161,7 +161,7 @@ launch it the way something with systemic risk should be launched.
 | Post-traction (M3) | **100 BTC** | 60 days of clean liquidation history |
 | Steady state       | Governed    | Multisig + timelock decision         |
 
-Direct troves — for users above the ~0.079 BTC threshold — are **uncapped from day one**,
+Direct troves, for users above the ~0.079 BTC threshold, are **uncapped from day one**,
 because they carry no pooling risk at all. The cap constrains only the novel mechanism.
 
 The interface routes any user with enough BTC for a direct trove _to a direct trove_, and
@@ -174,14 +174,14 @@ they did not need.
 
 Ranked by how much it would actually help.
 
-1. **An introduction to the MUSD auditors.** As above — worth more than the cash.
+1. **An introduction to the MUSD auditors.** As above, worth more than the cash.
 2. **Testnet users from the Discord**, in weeks 4–5. Fifty real people on matsnet will
    find things a hundred tests will not.
 3. **A technical contact for MUSD protocol questions.** We have found three places where
    the published documentation and the deployed bytecode disagree, and we would rather
    raise those directly than guess. They are documented in the Technical Feasibility
    paper and offered back as contributions.
-4. **Co-marketing at M1 and M4** — the launches, not the milestones in between.
+4. **Co-marketing at M1 and M4**: the launches, not the milestones in between.
 5. **Mezo Market listing** once M2 is complete and the listing requirements are met.
 
 ---
