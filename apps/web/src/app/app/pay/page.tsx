@@ -10,7 +10,7 @@ import { ConnectPrompt } from '@/components/app/connect-prompt';
 import { AmountField, Segmented } from '@/components/app/controls';
 import { HandleRegistration } from '@/components/app/handle-registration';
 import { Musd } from '@/components/app/money';
-import { ActionButton, AppCard, CardTitle, Info, Label, Note } from '@/components/app/primitives';
+import { ActionButton, Info, Label, Note, Panel } from '@/components/app/primitives';
 import { TxSheet, useTxRunner, type TxIntent, type TxRunner } from '@/components/app/tx';
 import { ArrowUpRight, LinkIcon, PayIcon } from '@/components/ui/icons';
 import { parseUnitsSafe, utf8Length } from '@/lib/copy';
@@ -57,7 +57,7 @@ export default function PayPage() {
 
   if (!source.connected) {
     return (
-      <div className="flex flex-col gap-6">
+      <div className="flex flex-col gap-4">
         <Header />
         <ConnectPrompt icon={<PayIcon className="size-6" />} title="Connect to send MUSD">
           Send MUSD to an @handle or a plain address, with an optional memo written on-chain.
@@ -68,7 +68,7 @@ export default function PayPage() {
   }
 
   return (
-    <div className="flex flex-col gap-6">
+    <div className="flex flex-col gap-4">
       <Header />
 
       <Segmented options={TABS} value={tab} onChange={setTab} label="Payment type" />
@@ -87,10 +87,7 @@ function Header() {
   return (
     <div>
       <Label>Pay</Label>
-      <h1 className="t-h2 mt-2">Move dollars</h1>
-      <p className="text-text-muted mt-3 max-w-[68ch] text-sm leading-relaxed">
-        Send MUSD to a handle or an address.
-      </p>
+      <h1 className="t-h3 mt-1.5">Move dollars</h1>
     </div>
   );
 }
@@ -226,122 +223,122 @@ function SendPanel({ runner }: { runner: TxRunner }) {
   });
 
   return (
-    <AppCard className="p-6 md:p-8">
-      <CardTitle>Send</CardTitle>
+    <Panel title="Send">
+      <div className="px-5 py-5">
+        <div className="mt-6 max-w-xl">
+          <label htmlFor="pay-to" className="t-label text-text-subtle block">
+            To
+          </label>
+          <input
+            id="pay-to"
+            value={to}
+            onChange={(event) => setTo(event.target.value)}
+            placeholder="@handle or 0x address"
+            autoComplete="off"
+            spellCheck={false}
+            aria-describedby="pay-to-status"
+            className="num text-text placeholder:text-text-subtle/60 mt-3 w-full border-b border-[var(--border-hairline)] bg-transparent pb-3 text-lg outline-none focus:border-[var(--border-strong)]"
+          />
 
-      <div className="mt-6 max-w-xl">
-        <label htmlFor="pay-to" className="t-label text-text-subtle block">
-          To
-        </label>
-        <input
-          id="pay-to"
-          value={to}
-          onChange={(event) => setTo(event.target.value)}
-          placeholder="@handle or 0x address"
-          autoComplete="off"
-          spellCheck={false}
-          aria-describedby="pay-to-status"
-          className="num text-text placeholder:text-text-subtle/60 mt-3 w-full border-b border-[var(--border-hairline)] bg-transparent pb-3 text-lg outline-none focus:border-[var(--border-strong)]"
-        />
-
-        {/* The resolved address, always, before anything is signed. */}
-        <div id="pay-to-status" className="mt-3 min-h-[1.25rem] text-sm" role="status">
-          {isHandle && isFetching ? (
-            <span className="text-text-subtle">Resolving handle…</span>
-          ) : isHandle && resolved ? (
-            <span className="flex flex-wrap items-center gap-2">
-              <span aria-hidden className="bg-success size-1.5 rounded-[var(--radius-pill)]" />
-              <span className="text-text-muted">{resolved.handle} resolves to</span>
-              <span className="num text-text text-[0.8125rem]">{resolved.address}</span>
-            </span>
-          ) : isHandle ? (
-            <span className="text-danger">No such handle on this network.</span>
-          ) : isAddress ? (
-            <span className="text-text-muted">Valid address.</span>
-          ) : trimmed.length > 0 ? (
-            <span className="text-text-subtle">Enter an @handle or a 0x address.</span>
-          ) : (
-            <span className="text-text-subtle">Enter an @handle or a 0x address.</span>
-          )}
+          {/* The resolved address, always, before anything is signed. */}
+          <div id="pay-to-status" className="mt-3 min-h-[1.25rem] text-sm" role="status">
+            {isHandle && isFetching ? (
+              <span className="text-text-subtle">Resolving handle…</span>
+            ) : isHandle && resolved ? (
+              <span className="flex flex-wrap items-center gap-2">
+                <span aria-hidden className="bg-success size-1.5 rounded-[var(--radius-pill)]" />
+                <span className="text-text-muted">{resolved.handle} resolves to</span>
+                <span className="num text-text text-[0.8125rem]">{resolved.address}</span>
+              </span>
+            ) : isHandle ? (
+              <span className="text-danger">No such handle on this network.</span>
+            ) : isAddress ? (
+              <span className="text-text-muted">Valid address.</span>
+            ) : trimmed.length > 0 ? (
+              <span className="text-text-subtle">Enter an @handle or a 0x address.</span>
+            ) : (
+              <span className="text-text-subtle">Enter an @handle or a 0x address.</span>
+            )}
+          </div>
         </div>
-      </div>
 
-      <div className="mt-8 max-w-xl">
-        <AmountField
-          value={amount}
-          onChange={setAmount}
-          unit="MUSD"
-          label="Amount"
-          max={<Musd wei={balance} size="sm" />}
-          maxLabel="Available"
-          onMax={() => setAmount(formatMusd(balance, { unit: false }).replace(/,/g, ''))}
-          error={
-            funds.blocker && funds.blocker.scope === 'wallet' && amountWei > 0n
-              ? funds.blocker.title
-              : null
-          }
-        />
-      </div>
+        <div className="mt-8 max-w-xl">
+          <AmountField
+            value={amount}
+            onChange={setAmount}
+            unit="MUSD"
+            label="Amount"
+            max={<Musd wei={balance} size="sm" />}
+            maxLabel="Available"
+            onMax={() => setAmount(formatMusd(balance, { unit: false }).replace(/,/g, ''))}
+            error={
+              funds.blocker && funds.blocker.scope === 'wallet' && amountWei > 0n
+                ? funds.blocker.title
+                : null
+            }
+          />
+        </div>
 
-      <div className="mt-8 max-w-xl">
-        <label htmlFor="pay-memo" className="t-label text-text-subtle block">
-          Memo (optional)
-        </label>
-        <input
-          id="pay-memo"
-          value={memo}
-          onChange={(event) => setMemo(event.target.value)}
-          placeholder="What is this for?"
-          aria-describedby="pay-memo-count"
-          className="text-text placeholder:text-text-subtle/60 mt-3 w-full border-b border-[var(--border-hairline)] bg-transparent pb-3 text-[0.9375rem] outline-none focus:border-[var(--border-strong)]"
-        />
-        <p id="pay-memo-count" className="text-text-subtle mt-2 text-xs">
-          <span className="num">{memoBytes}</span>/80 bytes · public on-chain
-          {memoBytes > 80 ? <span className="text-danger"> · too long</span> : null}
-        </p>
-      </div>
+        <div className="mt-8 max-w-xl">
+          <label htmlFor="pay-memo" className="t-label text-text-subtle block">
+            Memo (optional)
+          </label>
+          <input
+            id="pay-memo"
+            value={memo}
+            onChange={(event) => setMemo(event.target.value)}
+            placeholder="What is this for?"
+            aria-describedby="pay-memo-count"
+            className="text-text placeholder:text-text-subtle/60 mt-3 w-full border-b border-[var(--border-hairline)] bg-transparent pb-3 text-[0.9375rem] outline-none focus:border-[var(--border-strong)]"
+          />
+          <p id="pay-memo-count" className="text-text-subtle mt-2 text-xs">
+            <span className="num">{memoBytes}</span>/80 bytes · public on-chain
+            {memoBytes > 80 ? <span className="text-danger"> · too long</span> : null}
+          </p>
+        </div>
 
-      {funds.rangeDead && funds.blocker ? (
+        {funds.rangeDead && funds.blocker ? (
+          <div className="mt-8">
+            <BlockedNote blocker={funds.blocker} id="send-blocked" />
+          </div>
+        ) : null}
+
+        {funds.ok && needsApproval && amountWei > 0n ? (
+          <div className="mt-6">
+            <Note>
+              MarenPay needs an allowance for {formatMusd(amountWei)} first. That is a separate
+              transaction, shown here rather than slipped in behind the payment.
+            </Note>
+          </div>
+        ) : null}
+
         <div className="mt-8">
-          <BlockedNote blocker={funds.blocker} id="send-blocked" />
+          <GasLine />
         </div>
-      ) : null}
 
-      {funds.ok && needsApproval && amountWei > 0n ? (
-        <div className="mt-6">
-          <Note>
-            MarenPay needs an allowance for {formatMusd(amountWei)} first. That is a separate
-            transaction, shown here rather than slipped in behind the payment.
-          </Note>
-        </div>
-      ) : null}
-
-      <div className="mt-8">
-        <GasLine />
-      </div>
-
-      <div className="mt-4 flex flex-wrap gap-3">
-        {needsApproval && amountWei > 0n ? (
+        <div className="mt-4 flex flex-wrap gap-3">
+          {needsApproval && amountWei > 0n ? (
+            <ActionButton
+              onClick={() => runner.request(approvalIntent())}
+              disabled={!writes.ready || !funds.ok}
+              aria-describedby="send-blocked"
+              icon={<ArrowUpRight className="size-4" />}
+            >
+              Approve {formatMusd(amountWei)}
+            </ActionButton>
+          ) : null}
           <ActionButton
-            onClick={() => runner.request(approvalIntent())}
-            disabled={!writes.ready || !funds.ok}
+            variant={needsApproval && amountWei > 0n ? 'secondary' : 'primary'}
+            onClick={() => runner.request(intent())}
+            disabled={!canSend || (needsApproval && amountWei > 0n)}
             aria-describedby="send-blocked"
             icon={<ArrowUpRight className="size-4" />}
           >
-            Approve {formatMusd(amountWei)}
+            {amountWei > 0n ? `Send ${formatMusd(amountWei)}` : 'Send'}
           </ActionButton>
-        ) : null}
-        <ActionButton
-          variant={needsApproval && amountWei > 0n ? 'secondary' : 'primary'}
-          onClick={() => runner.request(intent())}
-          disabled={!canSend || (needsApproval && amountWei > 0n)}
-          aria-describedby="send-blocked"
-          icon={<ArrowUpRight className="size-4" />}
-        >
-          {amountWei > 0n ? `Send ${formatMusd(amountWei)}` : 'Send'}
-        </ActionButton>
+        </div>
       </div>
-    </AppCard>
+    </Panel>
   );
 }
 
@@ -392,77 +389,81 @@ function RequestPanel({ runner }: { runner: TxRunner }) {
   });
 
   return (
-    <AppCard className="p-6 md:p-8">
-      <CardTitle>Request payment</CardTitle>
-      <p className="text-text-muted mt-3 max-w-[68ch] text-sm leading-relaxed">
-        An ask, not an obligation. Nothing moves until the other side pays it.
-      </p>
+    <Panel
+      title="Request payment"
+      meta={
+        <span className="text-text-muted text-xs">
+          An ask, not an obligation. Nothing moves until the other side pays it.
+        </span>
+      }
+    >
+      <div className="px-5 py-5">
+        <div className="mt-8 max-w-xl">
+          <AmountField value={amount} onChange={setAmount} unit="MUSD" label="Amount" />
+        </div>
 
-      <div className="mt-8 max-w-xl">
-        <AmountField value={amount} onChange={setAmount} unit="MUSD" label="Amount" />
-      </div>
+        <div className="mt-8 max-w-xl">
+          <label htmlFor="request-from" className="t-label text-text-subtle block">
+            From (optional)
+          </label>
+          <input
+            id="request-from"
+            value={from}
+            onChange={(event) => setFrom(event.target.value)}
+            placeholder="@handle"
+            autoComplete="off"
+            spellCheck={false}
+            className="num text-text placeholder:text-text-subtle/60 mt-3 w-full border-b border-[var(--border-hairline)] bg-transparent pb-3 text-lg outline-none focus:border-[var(--border-strong)]"
+          />
+          <p className="mt-3 min-h-[1.25rem] text-sm" role="status">
+            {isHandle && resolved ? (
+              <span className="flex flex-wrap items-center gap-2">
+                <span className="text-text-muted">{resolved.handle} resolves to</span>
+                <span className="num text-text text-[0.8125rem]">{resolved.address}</span>
+              </span>
+            ) : isHandle ? (
+              <span className="text-danger">No such handle on this network.</span>
+            ) : (
+              <span className="text-text-subtle">Anyone may fulfil an unaddressed request.</span>
+            )}
+          </p>
+        </div>
 
-      <div className="mt-8 max-w-xl">
-        <label htmlFor="request-from" className="t-label text-text-subtle block">
-          From (optional)
-        </label>
-        <input
-          id="request-from"
-          value={from}
-          onChange={(event) => setFrom(event.target.value)}
-          placeholder="@handle"
-          autoComplete="off"
-          spellCheck={false}
-          className="num text-text placeholder:text-text-subtle/60 mt-3 w-full border-b border-[var(--border-hairline)] bg-transparent pb-3 text-lg outline-none focus:border-[var(--border-strong)]"
-        />
-        <p className="mt-3 min-h-[1.25rem] text-sm" role="status">
-          {isHandle && resolved ? (
-            <span className="flex flex-wrap items-center gap-2">
-              <span className="text-text-muted">{resolved.handle} resolves to</span>
-              <span className="num text-text text-[0.8125rem]">{resolved.address}</span>
-            </span>
-          ) : isHandle ? (
-            <span className="text-danger">No such handle on this network.</span>
-          ) : (
-            <span className="text-text-subtle">Anyone may fulfil an unaddressed request.</span>
-          )}
-        </p>
-      </div>
+        <div className="mt-8 max-w-xl">
+          <label htmlFor="request-memo" className="t-label text-text-subtle block">
+            Memo (optional)
+          </label>
+          <input
+            id="request-memo"
+            value={memo}
+            onChange={(event) => setMemo(event.target.value)}
+            placeholder="Invoice 0044"
+            className="text-text placeholder:text-text-subtle/60 mt-3 w-full border-b border-[var(--border-hairline)] bg-transparent pb-3 text-[0.9375rem] outline-none focus:border-[var(--border-strong)]"
+          />
+        </div>
 
-      <div className="mt-8 max-w-xl">
-        <label htmlFor="request-memo" className="t-label text-text-subtle block">
-          Memo (optional)
-        </label>
-        <input
-          id="request-memo"
-          value={memo}
-          onChange={(event) => setMemo(event.target.value)}
-          placeholder="Invoice 0044"
-          className="text-text placeholder:text-text-subtle/60 mt-3 w-full border-b border-[var(--border-hairline)] bg-transparent pb-3 text-[0.9375rem] outline-none focus:border-[var(--border-strong)]"
-        />
-      </div>
+        <div className="mt-8">
+          <GasLine />
+        </div>
 
-      <div className="mt-8">
-        <GasLine />
-      </div>
+        <div className="mt-4">
+          <ActionButton
+            onClick={() => runner.request(intent())}
+            disabled={amountWei === 0n || !writes.ready || (isHandle && !resolved)}
+            icon={<ArrowUpRight className="size-4" />}
+          >
+            Request {amountWei > 0n ? formatMusd(amountWei) : ''}
+          </ActionButton>
+        </div>
 
-      <div className="mt-4">
-        <ActionButton
-          onClick={() => runner.request(intent())}
-          disabled={amountWei === 0n || !writes.ready || (isHandle && !resolved)}
-          icon={<ArrowUpRight className="size-4" />}
-        >
-          Request {amountWei > 0n ? formatMusd(amountWei) : ''}
-        </ActionButton>
-      </div>
-
-      {/* No "open requests" list. There was one, and it was seeded. Requests this account
+        {/* No "open requests" list. There was one, and it was seeded. Requests this account
           creates appear in Activity, decoded from the contract's own RequestCreated
           events — a real list is better than a plausible one. */}
-      <p className="text-text-subtle mt-8 text-xs leading-relaxed">
-        Requests you create appear in Activity.
-      </p>
-    </AppCard>
+        <p className="text-text-subtle mt-8 text-xs leading-relaxed">
+          Requests you create appear in Activity.
+        </p>
+      </div>
+    </Panel>
   );
 }
 
@@ -571,137 +572,141 @@ function LinkPanel({ runner }: { runner: TxRunner }) {
   };
 
   return (
-    <AppCard className="p-6 md:p-8">
-      <CardTitle>Payment link</CardTitle>
-      <p className="text-text-muted mt-3 max-w-[68ch] text-sm leading-relaxed">
-        Escrows MUSD against a one-time key. Anyone with the link can claim it.
-      </p>
-
-      <div className="mt-8 grid max-w-2xl grid-cols-1 gap-8 sm:grid-cols-2">
-        <AmountField
-          value={amount}
-          onChange={setAmount}
-          unit="MUSD"
-          label="Amount"
-          max={<Musd wei={balance} size="sm" />}
-          maxLabel="Available"
-          error={
-            funds.blocker && funds.blocker.scope === 'wallet' && amountWei > 0n
-              ? funds.blocker.title
-              : null
-          }
-        />
-        <div>
-          <label htmlFor="link-expiry" className="t-label text-text-subtle block">
-            Expires in
-          </label>
-          <div className="mt-3 flex items-baseline gap-3 border-b border-[var(--border-hairline)] pb-3 focus-within:border-[var(--border-strong)]">
-            <input
-              id="link-expiry"
-              value={days}
-              onChange={(event) => setDays(event.target.value)}
-              inputMode="numeric"
-              className="num text-text min-w-0 flex-1 bg-transparent text-3xl outline-none"
-            />
-            <span className="t-h3 text-text-muted shrink-0">days</span>
+    <Panel
+      title="Payment link"
+      meta={
+        <span className="text-text-muted text-xs">
+          Escrows MUSD against a one-time key. Anyone with the link can claim it.
+        </span>
+      }
+    >
+      <div className="px-5 py-5">
+        <div className="mt-8 grid max-w-2xl grid-cols-1 gap-8 sm:grid-cols-2">
+          <AmountField
+            value={amount}
+            onChange={setAmount}
+            unit="MUSD"
+            label="Amount"
+            max={<Musd wei={balance} size="sm" />}
+            maxLabel="Available"
+            error={
+              funds.blocker && funds.blocker.scope === 'wallet' && amountWei > 0n
+                ? funds.blocker.title
+                : null
+            }
+          />
+          <div>
+            <label htmlFor="link-expiry" className="t-label text-text-subtle block">
+              Expires in
+            </label>
+            <div className="mt-3 flex items-baseline gap-3 border-b border-[var(--border-hairline)] pb-3 focus-within:border-[var(--border-strong)]">
+              <input
+                id="link-expiry"
+                value={days}
+                onChange={(event) => setDays(event.target.value)}
+                inputMode="numeric"
+                className="num text-text min-w-0 flex-1 bg-transparent text-3xl outline-none"
+              />
+              <span className="t-h3 text-text-muted shrink-0">days</span>
+            </div>
+            <p className="text-text-subtle mt-3 text-xs">Only you can reclaim it after that.</p>
           </div>
-          <p className="text-text-subtle mt-3 text-xs">Only you can reclaim it after that.</p>
         </div>
-      </div>
 
-      <div className="mt-8 max-w-xl">
-        <label htmlFor="link-memo" className="t-label text-text-subtle block">
-          Memo (optional)
-        </label>
-        <input
-          id="link-memo"
-          value={memo}
-          onChange={(event) => setMemo(event.target.value)}
-          placeholder="Coffee fund"
-          className="text-text placeholder:text-text-subtle/60 mt-3 w-full border-b border-[var(--border-hairline)] bg-transparent pb-3 text-[0.9375rem] outline-none focus:border-[var(--border-strong)]"
-        />
-      </div>
-
-      {funds.rangeDead && funds.blocker ? (
-        <div className="mt-6">
-          <BlockedNote blocker={funds.blocker} id="link-blocked" />
+        <div className="mt-8 max-w-xl">
+          <label htmlFor="link-memo" className="t-label text-text-subtle block">
+            Memo (optional)
+          </label>
+          <input
+            id="link-memo"
+            value={memo}
+            onChange={(event) => setMemo(event.target.value)}
+            placeholder="Coffee fund"
+            className="text-text placeholder:text-text-subtle/60 mt-3 w-full border-b border-[var(--border-hairline)] bg-transparent pb-3 text-[0.9375rem] outline-none focus:border-[var(--border-strong)]"
+          />
         </div>
-      ) : null}
 
-      {funds.ok && needsApproval && amountWei > 0n ? (
-        <div className="mt-6">
-          <Note>
-            MarenPay needs an allowance for {formatMusd(amountWei)} before it can escrow it.
-          </Note>
+        {funds.rangeDead && funds.blocker ? (
+          <div className="mt-6">
+            <BlockedNote blocker={funds.blocker} id="link-blocked" />
+          </div>
+        ) : null}
+
+        {funds.ok && needsApproval && amountWei > 0n ? (
+          <div className="mt-6">
+            <Note>
+              MarenPay needs an allowance for {formatMusd(amountWei)} before it can escrow it.
+            </Note>
+          </div>
+        ) : null}
+
+        <div className="mt-8">
+          <GasLine />
         </div>
-      ) : null}
 
-      <div className="mt-8">
-        <GasLine />
-      </div>
-
-      <div className="mt-4 flex flex-wrap gap-3">
-        {needsApproval && amountWei > 0n ? (
+        <div className="mt-4 flex flex-wrap gap-3">
+          {needsApproval && amountWei > 0n ? (
+            <ActionButton
+              onClick={() => runner.request(approvalIntent())}
+              disabled={!writes.ready || !funds.ok}
+              aria-describedby="link-blocked"
+              icon={<LinkIcon className="size-4" />}
+            >
+              Approve {formatMusd(amountWei)}
+            </ActionButton>
+          ) : null}
           <ActionButton
-            onClick={() => runner.request(approvalIntent())}
-            disabled={!writes.ready || !funds.ok}
+            variant={needsApproval && amountWei > 0n ? 'secondary' : 'primary'}
+            onClick={() => runner.request(intent())}
+            disabled={
+              !funds.ok || expiryDays <= 0 || !writes.ready || (needsApproval && amountWei > 0n)
+            }
             aria-describedby="link-blocked"
             icon={<LinkIcon className="size-4" />}
           >
-            Approve {formatMusd(amountWei)}
+            Create link
           </ActionButton>
-        ) : null}
-        <ActionButton
-          variant={needsApproval && amountWei > 0n ? 'secondary' : 'primary'}
-          onClick={() => runner.request(intent())}
-          disabled={
-            !funds.ok || expiryDays <= 0 || !writes.ready || (needsApproval && amountWei > 0n)
-          }
-          aria-describedby="link-blocked"
-          icon={<LinkIcon className="size-4" />}
-        >
-          Create link
-        </ActionButton>
-      </div>
-
-      {created ? (
-        <div className="mt-6">
-          <Note tone="warning">
-            <p className="text-text">Copy this now. It is shown once.</p>
-            <p className="num text-text-muted mt-2 break-all text-xs">
-              {typeof window !== 'undefined' ? window.location.origin : ''}/claim#{created.secret}
-            </p>
-            <p className="mt-2 text-xs">
-              The claim key after the <span className="num">#</span> never leaves your browser and
-              is not stored anywhere. Once you navigate away it is gone.
-            </p>
-            <div className="mt-4">
-              <ActionButton
-                variant="secondary"
-                onClick={() => {
-                  void navigator.clipboard?.writeText(
-                    `${window.location.origin}/claim#${created.secret}`,
-                  );
-                  setCopied(true);
-                }}
-              >
-                {copied ? 'Copied' : 'Copy link'}
-              </ActionButton>
-            </div>
-          </Note>
         </div>
-      ) : null}
 
-      {/* There is no "your links" list, and there cannot honestly be one that shows the
+        {created ? (
+          <div className="mt-6">
+            <Note tone="warning">
+              <p className="text-text">Copy this now. It is shown once.</p>
+              <p className="num text-text-muted mt-2 break-all text-xs">
+                {typeof window !== 'undefined' ? window.location.origin : ''}/claim#{created.secret}
+              </p>
+              <p className="mt-2 text-xs">
+                The claim key after the <span className="num">#</span> never leaves your browser and
+                is not stored anywhere. Once you navigate away it is gone.
+              </p>
+              <div className="mt-4">
+                <ActionButton
+                  variant="secondary"
+                  onClick={() => {
+                    void navigator.clipboard?.writeText(
+                      `${window.location.origin}/claim#${created.secret}`,
+                    );
+                    setCopied(true);
+                  }}
+                >
+                  {copied ? 'Copied' : 'Copy link'}
+                </ActionButton>
+              </div>
+            </Note>
+          </div>
+        ) : null}
+
+        {/* There is no "your links" list, and there cannot honestly be one that shows the
           secrets: a bearer key that could be re-displayed later is a bearer key that was
           stored, which is the opposite of what the design promises. The escrows themselves
           are visible in Activity, from MarenPay's LinkCreated events. */}
-      <Info summary="Why past links cannot be shown again">
-        The claim key exists only in the URL fragment you copy. Maren never receives it and never
-        writes it down, so a list of your old links could show that they exist and their amounts
-        (which Activity does, from the contract’s events), but never the keys needed to claim them.
-        That is the cost of the secret being genuinely secret.
-      </Info>
-    </AppCard>
+        <Info summary="Why past links cannot be shown again">
+          The claim key exists only in the URL fragment you copy. Maren never receives it and never
+          writes it down, so a list of your old links could show that they exist and their amounts
+          (which Activity does, from the contract’s events), but never the keys needed to claim
+          them. That is the cost of the secret being genuinely secret.
+        </Info>
+      </div>
+    </Panel>
   );
 }

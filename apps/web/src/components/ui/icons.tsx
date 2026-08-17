@@ -6,14 +6,14 @@ import {
   ArrowRight01Icon,
   ArrowUpRight01Icon,
   BitcoinSafeIcon,
-  ChartIncreaseIcon,
+  Coins01Icon,
   FlashIcon,
   GithubIcon,
   InformationCircleIcon,
   Link01Icon,
   MinusSignIcon,
-  MoneySend01Icon,
   NewTwitterIcon,
+  SentIcon,
   Shield01Icon,
 } from '@hugeicons/core-free-icons';
 import type { SVGProps } from 'react';
@@ -111,15 +111,24 @@ export function CopyIcon(props: SVGProps<SVGSVGElement>) {
 /** Vault — a safe holding Bitcoin, which is literally what MarenVault is. */
 export const VaultIcon = icon(BitcoinSafeIcon, 'VaultIcon');
 
-/** Pay — money leaving, the one direction this surface moves it. */
-export const PayIcon = icon(MoneySend01Icon, 'PayIcon');
+/**
+ * Pay — a paper plane. `MoneySend01Icon` was the first choice and it was wrong: a rounded
+ * banknote with a small arrow above it reads as a camera at 24px, which is where this icon
+ * actually lives. The plane is unambiguous at every size, and Maren's own pitch for this
+ * surface is "payments that feel like messaging".
+ */
+export const PayIcon = icon(SentIcon, 'PayIcon');
 
 /**
- * Earn — a rising line, matching the hand-rolled step line it replaces.
- * Deliberately not a piggy bank or a savings jar: the screen's own disclosure says this
- * is not a savings account, and the icon should not argue with the copy.
+ * Earn — stacked coins. Money set aside, which is what the screen does.
+ *
+ * Not a piggy bank and not a savings jar: the screen's own disclosure says this is not a
+ * savings account, and the icon must not argue with the copy. Not a rising chart either —
+ * `ChartIncreaseIcon` was tried first and is an axis with a small hook on it, unreadable
+ * at the 16px the navigation rows actually draw it at, and it promises growth from a
+ * return that can be zero for months.
  */
-export const EarnIcon = icon(ChartIncreaseIcon, 'EarnIcon');
+export const EarnIcon = icon(Coins01Icon, 'EarnIcon');
 
 /** Portfolio — the position overview, not a wallet and not a generic square. */
 export const PortfolioIcon = icon(Analytics01Icon, 'PortfolioIcon');
