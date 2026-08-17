@@ -67,7 +67,7 @@ export function ConnectButton() {
                 disconnect();
                 setOpen(false);
               }}
-              className="text-text-muted hover:text-text flex h-11 w-full items-center rounded-[var(--radius-pill)] px-4 text-sm transition-colors duration-[120ms] ease-out hover:bg-white/[0.04]"
+              className="text-text-muted hover:text-text hover:bg-text/[0.05] flex h-11 w-full items-center rounded-[var(--radius-pill)] px-4 text-sm transition-colors duration-[120ms] ease-out"
             >
               Disconnect
             </button>
@@ -84,7 +84,7 @@ export function ConnectButton() {
         onClick={() => setOpen((v) => !v)}
         aria-expanded={open}
         aria-haspopup="menu"
-        className="group inline-flex h-11 items-center gap-3 rounded-[var(--radius-pill)] bg-white pl-5 pr-2 text-sm font-medium text-[#08080A] transition-colors duration-[120ms] ease-out hover:bg-white/90"
+        className="bg-text text-bg hover:bg-text/90 group inline-flex h-11 items-center gap-3 rounded-[var(--radius-pill)] pl-5 pr-2 text-sm font-medium transition-colors duration-[120ms] ease-out"
       >
         {isPending ? 'Connecting…' : 'Connect wallet'}
         <span
@@ -118,7 +118,7 @@ export function ConnectButton() {
                 connect({ connector, chainId: targetChain.id });
                 setOpen(false);
               }}
-              className="text-text-muted hover:text-text flex h-11 w-full items-center rounded-[var(--radius-pill)] px-4 text-sm transition-colors duration-[120ms] ease-out hover:bg-white/[0.04]"
+              className="text-text-muted hover:text-text hover:bg-text/[0.05] flex h-11 w-full items-center rounded-[var(--radius-pill)] px-4 text-sm transition-colors duration-[120ms] ease-out"
             >
               {connector.name}
             </button>

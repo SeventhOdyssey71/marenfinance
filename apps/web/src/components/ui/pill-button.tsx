@@ -37,9 +37,9 @@ const badgeSizing: Record<Size, string> = {
 
 const variants: Record<Variant, string> = {
   primary:
-    'bg-white text-[#08080A] hover:bg-white/90 active:bg-white/80 font-medium border border-transparent',
+    'bg-text text-bg hover:bg-text/90 active:bg-text/80 font-medium border border-transparent',
   secondary:
-    'bg-white/[0.07] text-text border border-white/[0.09] backdrop-blur-md hover:bg-white/[0.11] hover:border-white/[0.14] font-medium',
+    'bg-text/[0.06] text-text border border-text/[0.10] backdrop-blur-md hover:bg-text/[0.10] hover:border-text/[0.15] font-medium',
   ghost: 'bg-transparent text-text-muted hover:text-text border border-transparent font-medium',
 };
 
