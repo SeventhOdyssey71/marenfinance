@@ -412,7 +412,34 @@ async function sceneVault(ctx) {
     log(`  borrow refused: ${seen.reason}`);
     break;
   }
-  if (!seen.reason) log('  ! no borrow-gate reason on screen — the 180% floor may have cleared');
+  if (!seen.reason) {
+    // Not a failure. The pooled trove is shared, so anyone topping it up lifts it back over
+    // the floor and the refusal legitimately stops existing — which is what happened on
+    // 17 August, when a 0.02 BTC deposit took the pool from 150.8% to healthy.
+    //
+    // Film the offer instead. A borrow that IS available, priced live against a real
+    // position, is a weaker demo than the refusal but it is the true screen, and the
+    // narration in docs/demo/SCRIPT.md carries a version for each. What is never acceptable
+    // is pointing the take at a different wallet until the better story comes back.
+    log('  no borrow gate — the pool is above its floor, filming the live offer instead');
+
+    const limit = page.getByText('Borrow limit', { exact: false }).first();
+    if ((await limit.count()) > 0) {
+      await centre(page, limit, { duration: 1_200, bias: 0.4 });
+      seen.borrowLimit = (await limit.locator('..').innerText()).replace(/\s+/g, ' ').trim();
+      log(`  borrow limit: ${seen.borrowLimit}`);
+      await sleep(BEATS.read);
+    }
+
+    const offered = page.getByText('YOU BORROW', { exact: false }).first();
+    if ((await offered.count()) > 0) {
+      await centre(page, offered, { duration: 1_100, bias: 0.38 });
+      await pointer.moveToElement(offered, { duration: 900, settle: 0 }).catch(() => {});
+      seen.offered = (await offered.locator('..').innerText()).replace(/\s+/g, ' ').trim();
+      log(`  offered: ${seen.offered}`);
+      await sleep(BEATS.dwell);
+    }
+  }
 
   // The disabled control itself, so the video shows the button as well as the sentence.
   const submit = page.getByRole('button', { name: /^Borrow/i }).last();

@@ -47,7 +47,16 @@ speeding up the delivery. `record.mjs` prints the real start time of every scene
 > Position health, collateral ratio, borrowing capacity, all read live. This account has no
 > debt, so there is no liquidation price. Maren leaves it blank rather than inventing one.
 
-### 1:02 Vault, and a refusal
+### 1:02 Vault
+
+**This beat has two versions, and which one you get is decided by the chain, not by you.**
+Maren's pooled trove is shared, so anyone topping it up or drawing on it moves the ratio.
+Read the recorder's run log before rehearsing: the `vault` line reports either a
+`reason=` and `borrowDisabled=true`, or `borrowDisabled=false`. Take the matching version.
+Do not read A over a screen showing B, and never re-point the demo at the wallet that
+happens to make A true.
+
+**Version A, the trove is under the floor** (what the 16 August take filmed, at 150.8%):
 
 > Now the part worth watching. The pooled trove is sitting at one hundred and fifty point
 > eight percent, under the one hundred and eighty percent floor Maren keeps for itself.
@@ -56,6 +65,20 @@ speeding up the delivery. `record.mjs` prints the real start time of every scene
 >
 > So borrowing is refused, before any gas is spent. It names the contract check that would
 > have reverted, and confirms your own collateral is untouched and still withdrawable.
+
+**Version B, the trove is healthy** (true from 17 August, after the pool was topped up):
+
+> Here is the position, and here is the borrow against it, priced live.
+>
+> _(pause)_
+>
+> The pool is above its floor today, so this is offered. When it is not, this control
+> switches off and says which contract check would have failed. Maren works the outcome out
+> before asking you to pay for it, either way.
+
+_Version A is the stronger demo and it is worth checking the log on the morning, in case the
+ratio has drifted back under. It is not worth engineering. Topping the pool down to force a
+refusal would be staging the exact thing this walkthrough refuses to stage._
 
 ### 1:22 Pay
 
