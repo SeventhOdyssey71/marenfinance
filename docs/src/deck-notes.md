@@ -30,8 +30,12 @@ Then move on. This slide is worth four seconds.
 Put the slide up. Say the two numbers, slowly, and then say nothing for a beat longer
 than is comfortable.
 
-"Twenty-seven troves open on Mezo mainnet. Twenty-nine thousand, three hundred and sixty
-people holding MUSD."
+"Fewer than thirty troves open on Mezo mainnet. More than twenty-nine thousand people
+holding MUSD."
+
+Both figures drift daily, so **say them as bounds, not as exact counts**. The slide shows
+the exact dated read (27 and 29,360, 16 August 2026); the sentence you say out loud is the
+one that is still true on the day.
 
 Let them do the arithmetic themselves. Do not explain it. The next slide explains it.
 
@@ -139,21 +143,36 @@ wallet, not the deployer's."
 The tx hash is on the footline. If anyone wants it, it is
 `0x3b34e664140c594c3b10f4b500e4ea2e582f00002086485b93c972f1695e8dd2`.
 
-**Be ready for: "can a user borrow yet?"** The answer is no, and you volunteer it:
-"Not yet, and the reason is interesting. Seeding the trove at the protocol minimum pins
-debt at 2,001.8 MUSD, and clearing our own 180% borrow floor against that debt needs
-about 0.057 BTC. We seeded with less. So the borrow reverted, correctly, with our own
-safety rail refusing it. It needs one more faucet drip. The general lesson is that
-**MUSD's minimum debt sets a minimum viable pooled vault that is larger than the minimum
-trove**, and that is worth writing down for you."
+**Be ready for: "can a user borrow yet?"** The answer is yes, and the route it took there
+is the useful part, so volunteer that too:
 
-That answer turns the weakest fact in the deck into the most useful thing you say.
+"Yes. It did not work at first, and the reason is the interesting bit. We seeded the trove
+at the protocol minimum, which pins debt at 2,001.8 MUSD, and clearing our own 180% borrow
+floor against that debt needs about 0.057 BTC. We had seeded with less, so the first
+borrow reverted, correctly, with our own safety rail refusing it rather than putting
+someone into a thin position. We resolved it by sizing the seed to Maren's policy instead
+of the protocol's: a protocol-owned top-up on 17 August took the trove to 220% collateral
+ratio. A 30 MUSD borrow now simulates clean from the test wallet, and 40 MUSD is still
+correctly refused at the 180% floor."
+
+Then give them the general lesson, which is the thing worth writing down: **MUSD's minimum
+debt sets a minimum viable pooled vault, and it is larger than the minimum trove.** Seeding
+any pooled vault at the protocol floor opens it into a state where deposits are accepted
+and borrowing is permanently refused.
+
+**Do not describe the trove as under its floor or borrowing as blocked.** That was true on
+16 August and it is not true now. If you are reading an older draft of anything, this
+paragraph is the correct state.
+
+That answer turns what looked like the weakest fact in the deck into the most useful thing
+you say.
 
 ---
 
 ## 9 · What we found in the chain
 
-Three numbers. Do not narrate all three; pick the room.
+Two figures on the slide and a third finding in the footline. Do not narrate all three;
+pick the room.
 
 - **Engineering room:** lead with the zero. "ERC-4337's EntryPoint is deployed on Mezo,
   byte-identical to L1, and has processed exactly zero UserOperations. The reason is one
@@ -164,8 +183,26 @@ Three numbers. Do not narrate all three; pick the room.
   thousand gas. Sponsoring a million user actions costs about nine thousand dollars.
   Gasless is affordable here in a way it is not anywhere else."
 
-Either way, close with 7702: "and EIP-7702 is live, so the upgrade path exists without
-4337."
+**Do not attach the words "base fee" to $0.0092.** They are two different numbers and our
+own documents paired the wrong label with the wrong figure for a while. The base fee is
+1,300,000 wei, which works out at about $0.0082. The $0.0092 comes from the gas *price*,
+1,462,500 wei. A sponsor pays gas price, so $0.0092 is the correct number for what
+relaying actually costs us; it is simply not the base fee. If someone asks for the base
+fee, give them 1.3 million wei and say the sponsor figure is the higher one.
+
+Either way, close with 7702: "and Mezo mainnet accepts EIP-7702 type-4 transactions, so
+the upgrade path exists without 4337."
+
+**Say it exactly that way.** What was verified is that the node accepts a type-4
+transaction: a signed one came back rejected for insufficient funds, not for an
+unsupported type. No fork marker is visible in the block header and no delegated account
+was found, so **do not say "live since block 9,275,000"** even though our earlier drafts
+did. The weaker claim is the one that survives being checked.
+
+Same discipline on the zero: it comes from the Mezo block explorer's index, not from an
+exhaustive sweep of 11.17 million blocks. Say "zero according to the explorer index". If
+challenged on whether the indexer simply misses them, the control is that MUSD shows
+104,681 transactions through the same endpoints, so the index is working.
 
 ---
 
@@ -277,31 +314,6 @@ Because it is the second attempt and it is informed by a specific list of what w
 wrong. The first one has a published audit that found 7 Critical and 13 High. That is a
 credibility asset, not a liability: we know exactly what to avoid, and the security
 lessons from it are written down as rules the new codebase is checked against.
-
-**"What went wrong in this build?"**
-Answer it fully; the list is short and it is a strength. Fabricated activity rows with
-invented tx hashes rendered as explorer links, since deleted. "Zero gas" copy we had
-explicitly forbidden. A lint gate cited as a quality signal for hours while no ESLint
-config existed. A contracts test command that ran zero tests and reported success. Two
-money bugs from duplicated borrow arithmetic, found by an independent audit and fixed in
-one shared module. **The pattern worth naming: every one was caught by verification, not
-by review of intent.**
-
-**"How long to mainnet?"**
-Gated on the audit, not on engineering. Which is why the introduction is the ask.
-
----
-
-## Before you walk on
-
-- Re-read slide 2's two numbers against the chain that morning. They move.
-- Have the explorer open on a second screen with the vault address already pasted.
-- Know the deposit tx hash, or have it one keystroke away.
-- Do not use the word "revolutionary". Do not use the word "just".
-  a specific list of what went
-  wrong. The first one has a published audit that found 7 Critical and 13 High. That is a
-  credibility asset, not a liability: we know exactly what to avoid, and the security
-  lessons from it are written down as rules the new codebase is checked against.
 
 **"What went wrong in this build?"**
 Answer it fully; the list is short and it is a strength. Fabricated activity rows with

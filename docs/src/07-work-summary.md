@@ -282,8 +282,12 @@ and Pay were captured and inspected rather than assumed from a clean build.
 CI=true pnpm docs:pdf
 ```
 
-**All seven documents build**, 93 pages in total. The six that existed before this one came
-to 75.
+**All eight documents build**, 101 pages in total.
+
+The same command also builds the demo-day deck, MRN-008. It is kept out of the table below
+because it is measured in slides rather than pages: 15 of them, one page each at 16:9. It
+takes a separate path through the build for the same reason, and the build refuses it if any
+slide overflows its frame.
 
 | Doc       | Document                             |   Pages |
 | --------- | ------------------------------------ | ------: |
