@@ -1,6 +1,6 @@
 import { getAddress, isAddress, type Address, type Hash } from 'viem';
 import { admitCall } from './calldata.js';
-import type { RelayerConfig } from './config.js';
+import type { KeySourceKind, RelayerConfig } from './config.js';
 import { bad, conflict, forbidden, isRelayError, unavailable, type RelayError } from './errors.js';
 import {
   parseForwardRequest,
@@ -92,10 +92,90 @@ export interface HealthView {
   readonly problems: readonly string[];
 }
 
+/**
+ * Runtime budget state, for `/healthz`.
+ *
+ * This exists because of a measured bug class, not for completeness. Adversarial
+ * round 2 found the daily cap being overshot 52x by concurrent requests, and the
+ * only reason anyone knew was that a test measured it: a running relayer would
+ * have shown `accepting: true` and a budget it believed was intact. Committed
+ * spend, reserved spend and the gap between them are now readable at any moment,
+ * so the same class of defect has a tripwire rather than a postmortem.
+ */
+export interface BudgetView {
+  /** The UTC day these counters belong to. Rolls at 00:00 UTC. */
+  readonly day: string;
+  readonly limitWei: string;
+  /** Broadcast and never refunded. The only thing that may latch the halt. */
+  readonly committedWei: string | null;
+  /** Reserved: in-flight plus committed. What the cap is enforced against. */
+  readonly reservedWei: string | null;
+  /** Reserved minus committed: budget held by requests still in the pipeline. */
+  readonly inFlightWei: string | null;
+  /** Limit minus reserved, clamped at zero. What a new request can still claim. */
+  readonly remainingWei: string | null;
+  /** Committed spend as a percentage of the limit, one decimal place. */
+  readonly committedPct: number | null;
+  /** Reserved spend as a percentage of the limit. Exceeds 100 during a burst. */
+  readonly reservedPct: number | null;
+  readonly halted: boolean;
+  /** Refunds the store refused. Each one inflates `reservedWei` until it drains. */
+  readonly pendingRefunds: number;
+}
+
+/**
+ * The deployment probe. Cheap, chain-free, and safe to poll every few seconds.
+ *
+ * `/health` reads the hot key balance and the chain nonce, so it costs two RPC
+ * round trips and fails when the RPC is having a bad minute. That is the right
+ * shape for an operator asking "what is wrong", and the wrong shape for a
+ * container healthcheck: a flaky public endpoint would restart-loop a relayer
+ * that is otherwise fine. `/healthz` reads only process state and two counters.
+ */
+export interface HealthzView {
+  readonly ok: boolean;
+  readonly accepting: boolean;
+  readonly relayer: Address | null;
+  readonly chainId: number;
+  readonly network: string;
+  /** How the hot key reached this process. `env` is a development-only mode. */
+  readonly keySource: KeySourceKind | null;
+  /**
+   * Always true, and stated rather than implied: the nonce queue and the
+   * (payer, nonce) duplicate guard are in-process, so exactly one instance may
+   * hold this key. See the header of `nonce.ts`.
+   */
+  readonly singleInstance: true;
+  readonly nonce: {
+    /** The next nonce this process will allocate, or null before its first sync. */
+    readonly next: number | null;
+    readonly inFlight: number;
+    /** Submissions waiting behind the one being broadcast. */
+    readonly queued: number;
+    /** Times a failed broadcast forced the cached nonce to be discarded. */
+    readonly resyncs: number;
+  };
+  readonly lastSubmitted: {
+    readonly hash: Hash;
+    readonly nonce: number;
+    readonly at: string;
+  } | null;
+  /** Block of the most recent transaction of ours that produced a receipt. */
+  readonly lastSubmittedBlock: string | null;
+  readonly budget: BudgetView;
+  readonly store: string;
+  readonly watching: number;
+  /** Allowed but not production-shaped. Does not stop the relayer. */
+  readonly warnings: readonly string[];
+  readonly problems: readonly string[];
+}
+
 export interface RelayerServiceDeps {
   readonly config: RelayerConfig;
   /** Configuration problems from `loadConfig`. Non-empty means: do not relay. */
   readonly problems: readonly string[];
+  /** Non-fatal posture warnings from `loadConfig`. Surfaced on `/healthz`. */
+  readonly warnings?: readonly string[];
   readonly store: RelayStore;
   readonly logger: Logger;
   /** Null when the config was too broken to build one. The service still boots. */
@@ -117,6 +197,8 @@ export class RelayerService {
   readonly #inFlightRequests = new Set<string>();
   /** Refunds the store refused. Retried rather than dropped — see `#refund`. */
   readonly #pendingRefunds: Array<{ key: string; amount: bigint }> = [];
+  /** Block number of the last transaction of ours that produced a receipt. */
+  #lastSettledBlock: bigint | null = null;
 
   constructor(deps: RelayerServiceDeps) {
     this.#deps = deps;
@@ -333,6 +415,23 @@ export class RelayerService {
     }
     const decision = confirmed.ok ? confirmed : preCheck;
 
+    // Only admitted requests count towards the "approaching the limit" signal.
+    // A rejected burst is refunded, so warning on it would mean an attacker
+    // could fill the log with limit warnings for traffic that consumed nothing,
+    // the same mistake in a smaller form as latching the budget halt on reserved
+    // rather than committed spend (see `#commitSpend`).
+    this.#warnNearLimit(
+      { kind: 'address', subject: payer, requestId: ctx.requestId },
+      Number(reserved.addressDay),
+      config.policy.maxActionsPerAddressPerDay,
+    );
+    this.#warnNearLimit(
+      { kind: 'ip', subject: ctx.ipHash, requestId: ctx.requestId },
+      Number(reserved.ipDay),
+      config.policy.maxActionsPerIpPerDay,
+    );
+    this.#warnBudgetNearLimit(reserved.spendDay, projectedGasCostWei, ctx.requestId);
+
     // Everything from here holds a reservation, so every failure path must give
     // it back or we leak budget on each error.
     //
@@ -519,6 +618,90 @@ export class RelayerService {
   }
 
   // -------------------------------------------------------------------------
+  // GET /healthz
+  // -------------------------------------------------------------------------
+
+  /**
+   * The deployment probe: process state plus the two budget counters, and NOT a
+   * single RPC call. Cheap enough to poll on a five-second container
+   * healthcheck, and it does not go unhealthy because a public Mezo endpoint had
+   * a bad minute.
+   *
+   * A store that cannot be read leaves the budget numbers null and adds a
+   * problem, which is the honest answer: "we cannot see the budget" is not the
+   * same as "the budget is fine", and reporting zero here is how a relayer ends
+   * up looking solvent while spending blind.
+   */
+  async healthz(): Promise<HealthzView> {
+    const { config, chain, nonces, watcher, store } = this.#deps;
+    const day = this.#day();
+    const problems = [...this.#deps.problems];
+
+    let reserved: bigint | null = null;
+    let committed: bigint | null = null;
+    try {
+      reserved = await store.get(keys.spendDay(day));
+      committed = await store.get(keys.committedDay(day));
+    } catch {
+      problems.push('quota store is unreachable');
+    }
+    if (this.#pendingRefunds.length > 0) {
+      problems.push(
+        `${this.#pendingRefunds.length} reservation refund(s) could not be written to the quota store`,
+      );
+    }
+    const halted = this.#budgetHaltedOn === day;
+    if (halted) {
+      problems.push('daily BTC sponsorship budget is exhausted');
+    }
+
+    const limit = config.policy.maxDailySpendWei;
+    const budget: BudgetView = {
+      day,
+      limitWei: limit.toString(),
+      committedWei: committed?.toString() ?? null,
+      reservedWei: reserved?.toString() ?? null,
+      inFlightWei:
+        reserved === null || committed === null
+          ? null
+          : (reserved - committed > 0n ? reserved - committed : 0n).toString(),
+      remainingWei:
+        reserved === null ? null : (limit - reserved > 0n ? limit - reserved : 0n).toString(),
+      committedPct: committed === null ? null : pctOf(committed, limit),
+      reservedPct: reserved === null ? null : pctOf(reserved, limit),
+      halted,
+      pendingRefunds: this.#pendingRefunds.length,
+    };
+
+    const last = nonces?.lastSubmission ?? null;
+    return {
+      ok: problems.length === 0,
+      accepting: this.accepting && problems.length === 0,
+      relayer: chain?.account ?? null,
+      chainId: config.chainId,
+      network: config.network,
+      keySource: config.key?.kind ?? null,
+      singleInstance: true,
+      nonce: {
+        next: nonces?.nextNonce ?? null,
+        inFlight: nonces?.inFlight ?? 0,
+        queued: nonces?.queued ?? 0,
+        resyncs: nonces?.resyncs ?? 0,
+      },
+      lastSubmitted:
+        last === null
+          ? null
+          : { hash: last.hash, nonce: last.nonce, at: new Date(last.at).toISOString() },
+      lastSubmittedBlock: this.#lastSettledBlock?.toString() ?? null,
+      budget,
+      store: store.kind,
+      watching: watcher?.size ?? 0,
+      warnings: this.#deps.warnings ?? [],
+      problems,
+    };
+  }
+
+  // -------------------------------------------------------------------------
   // lifecycle
   // -------------------------------------------------------------------------
 
@@ -553,6 +736,12 @@ export class RelayerService {
    *     drive the daily spend negative and hand an attacker free budget.
    */
   async reconcile(tx: PendingTx, settlement: Settlement): Promise<void> {
+    // Recorded before every early return below. A relayer whose transactions
+    // settle but cost exactly what was reserved would otherwise report no block
+    // at all, which reads identically to "nothing has ever landed".
+    if (settlement.blockNumber !== null) {
+      this.#lastSettledBlock = settlement.blockNumber;
+    }
     if (settlement.gasCostWei === null) return;
     const delta = settlement.gasCostWei - tx.reservedWei;
     if (delta === 0n) return;
@@ -633,6 +822,61 @@ export class RelayerService {
       store.incrBy(keys.spendDay(day), weigh, DAY_SECONDS),
     ]);
     return { lifetime, addressDay, ipDay, spendDay };
+  }
+
+  /**
+   * WARN once, on the request that crosses 80% of a per-day action cap.
+   *
+   * "Once" is the whole design. Logging on every request above the threshold
+   * turns the last 20% of a cap into a log flood, which is how a real signal
+   * gets filtered out by whoever is on call. The crossing is detected from the
+   * counter's own post-increment value: `used` is what this request made it, so
+   * `used - 1` is what it was before, and exactly one request can straddle the
+   * threshold. Same reason the limits themselves are decided on the increment's
+   * return value rather than a prior read.
+   *
+   * The IP subject is already a salted hash by the time it reaches this service;
+   * no raw client address is logged anywhere.
+   */
+  #warnNearLimit(
+    who: { kind: 'address' | 'ip'; subject: string; requestId: string },
+    used: number,
+    limit: number,
+  ): void {
+    if (limit <= 0) return;
+    const threshold = Math.ceil(limit * NEAR_LIMIT_FRACTION);
+    if (used < threshold || used - 1 >= threshold) return;
+    this.#deps.logger.warn(
+      {
+        event: 'quota.near_limit',
+        requestId: who.requestId,
+        kind: who.kind,
+        ...(who.kind === 'address' ? { payer: who.subject } : { ipHash: who.subject }),
+        used,
+        limit,
+        pct: Math.round((used / limit) * 1000) / 10,
+      },
+      `${who.kind} has used ${used} of its ${limit} daily relays`,
+    );
+  }
+
+  /** The same crossing signal for the global daily BTC budget. */
+  #warnBudgetNearLimit(reservedAfter: bigint, thisRequestWei: bigint, requestId: string): void {
+    const limit = this.#deps.config.policy.maxDailySpendWei;
+    if (limit <= 0n) return;
+    const threshold = (limit * BigInt(Math.round(NEAR_LIMIT_FRACTION * 100))) / 100n;
+    const before = reservedAfter - thisRequestWei;
+    if (reservedAfter < threshold || before >= threshold) return;
+    this.#deps.logger.warn(
+      {
+        event: 'budget.near_limit',
+        requestId,
+        reservedWei: reservedAfter,
+        limitWei: limit,
+        pct: pctOf(reservedAfter, limit),
+      },
+      'the daily BTC sponsorship budget is mostly reserved',
+    );
   }
 
   /**
@@ -807,8 +1051,17 @@ export class RelayerService {
 const REFUND_ATTEMPTS = 3;
 const REFUND_BACKOFF_MS = 25;
 
+/** Fraction of a limit at which crossing it is worth a WARN. */
+export const NEAR_LIMIT_FRACTION = 0.8;
+
 function formatBtc(wei: bigint): string {
   const whole = wei / 10n ** 18n;
   const frac = (wei % 10n ** 18n).toString().padStart(18, '0').slice(0, 8);
   return `${whole}.${frac}`;
+}
+
+/** Percentage to one decimal place, computed in bigint to keep wei exact. */
+function pctOf(value: bigint, total: bigint): number {
+  if (total <= 0n) return 0;
+  return Number((value * 1000n) / total) / 10;
 }

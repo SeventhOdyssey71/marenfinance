@@ -7,6 +7,7 @@ import { NonceManager, TxWatcher } from './nonce.js';
 import { RelayerService } from './service.js';
 import { MemoryStore, RedisStore, type RelayStore } from './store.js';
 import { preflightRpcs } from './rpc.js';
+import { secretFileModeWarning } from './keystore.js';
 import { privateKeyToAddress } from 'viem/accounts';
 
 /**
@@ -24,6 +25,8 @@ export interface Relayer {
   readonly service: RelayerService;
   readonly config: RelayerConfig;
   readonly problems: readonly string[];
+  /** Non-fatal posture warnings. The relayer still relays with these set. */
+  readonly warnings: readonly string[];
   readonly logger: Logger;
   readonly watcher: TxWatcher | null;
   readonly chain: ChainAdapter | null;
@@ -51,9 +54,38 @@ export interface CreateRelayerOptions {
 }
 
 export async function createRelayer(options: CreateRelayerOptions): Promise<Relayer> {
-  const { config, problems: configProblems } = loadConfig(options.env);
+  const { config, problems: configProblems, warnings: configWarnings } = loadConfig(options.env);
   const problems = [...configProblems];
+  const warnings = [...configWarnings];
   const logger = options.logger ?? createLogger(config.logLevel);
+
+  // The key posture is announced at every boot, not only when it is wrong.
+  // A relayer signing from a raw environment variable should never be something
+  // an operator has to go looking for, and a keystore-backed one is worth
+  // confirming out loud so a silent fallback would be visible.
+  if (config.key !== null) {
+    if (config.key.kind === 'env') {
+      logger.warn(
+        { event: 'key.dev_mode', keySource: 'env' },
+        'SIGNING FROM RELAYER_PRIVATE_KEY: a development-only key mode. The raw hot key is readable by anything that can read this process environment. Use RELAYER_KEYSTORE_PATH + RELAYER_KEYSTORE_PASSWORD_FILE for any key holding real BTC; see apps/relayer/DEPLOY.md',
+      );
+    } else {
+      logger.info(
+        { event: 'key.keystore', keySource: config.key.kind, keystore: config.key.path },
+        'signing from an encrypted keystore file',
+      );
+      // Secret files anyone on the box can read defeat the point of using them.
+      for (const [path, label] of [
+        [config.key.path, 'the keystore'],
+        ...(config.key.kind === 'keystore-file'
+          ? ([[config.key.passwordFile, 'the keystore passphrase file']] as const)
+          : []),
+      ] as ReadonlyArray<readonly [string, string]>) {
+        const warning = await secretFileModeWarning(path, label);
+        if (warning !== null) warnings.push(warning);
+      }
+    }
+  }
 
   const isMultiInstance = options.env['VERCEL'] !== undefined;
 
@@ -174,6 +206,7 @@ export async function createRelayer(options: CreateRelayerOptions): Promise<Rela
   const service = new RelayerService({
     config,
     problems,
+    warnings,
     store,
     logger,
     chain,
@@ -193,6 +226,10 @@ export async function createRelayer(options: CreateRelayerOptions): Promise<Rela
     logger,
     ...(options.socketIp === undefined ? {} : { socketIp: options.socketIp }),
   });
+
+  for (const warning of warnings) {
+    logger.warn({ event: 'relayer.warning' }, warning);
+  }
 
   if (problems.length > 0) {
     logger.error(
@@ -218,5 +255,5 @@ export async function createRelayer(options: CreateRelayerOptions): Promise<Rela
     watcher.start(config.sweepIntervalMs);
   }
 
-  return { app, service, config, problems, logger, watcher, chain };
+  return { app, service, config, problems, warnings, logger, watcher, chain };
 }

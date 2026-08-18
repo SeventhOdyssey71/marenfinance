@@ -8,7 +8,7 @@ import { settlementHttpStatus } from './receipt.js';
 import type { RelayerService } from './service.js';
 
 /**
- * HTTP surface. Four endpoints, no more.
+ * HTTP surface. Five endpoints, no more.
  *
  * Everything that decides anything lives in service.ts; this file only moves
  * values between HTTP and that service, and turns typed `RelayError`s into
@@ -138,6 +138,16 @@ export function buildApp(deps: AppDeps): Hono<{ Variables: Vars }> {
     const health = await service.health();
     // 503 when not accepting, so a load balancer takes us out rather than
     // sending traffic at a relayer that will refuse it.
+    return c.json(jsonSafe(health) as Record<string, unknown>, health.accepting ? 200 : 503);
+  });
+
+  // --- GET /healthz --------------------------------------------------------
+  // The deployment probe. Unlike `/health` it makes no RPC calls, so it is safe
+  // to poll every few seconds from a container healthcheck or a platform's
+  // machine check without a flaky public endpoint turning into a restart loop.
+  // 503 when not accepting, for the same reason `/health` does it.
+  app.get('/healthz', async (c) => {
+    const health = await service.healthz();
     return c.json(jsonSafe(health) as Record<string, unknown>, health.accepting ? 200 : 503);
   });
 

@@ -1,0 +1,94 @@
+# Maren relayer on Fly.io.
+#
+# Deploy FROM THE REPO ROOT so the build context contains the pnpm lockfile:
+#
+#   fly deploy . --config apps/relayer/fly.toml
+#
+# `app` below is a placeholder. `fly launch --no-deploy --config apps/relayer/fly.toml`
+# will rename it to whatever the owner registers; nothing here assumes the name.
+#
+# ONE MACHINE, ALWAYS RUNNING. Both properties are load-bearing:
+#
+#   - One machine, because the nonce queue and the (payer, nonce) duplicate
+#     guard are in-process (see the header of src/nonce.ts). Two machines with
+#     one hot key allocate the same nonce twice.
+#   - Always running, because the stuck-transaction sweeper is what reconciles a
+#     reservation against what a transaction actually cost, and what drains
+#     deferred refunds. A machine that suspends between requests has no process
+#     to run it in, and the budget then never converges on real spend.
+
+app = "maren-relayer"
+primary_region = "iad"
+
+[build]
+  dockerfile = "apps/relayer/Dockerfile"
+
+[deploy]
+  # "rolling" on a single machine stops it and starts the replacement, so the
+  # key is never held by two processes. Do NOT switch this to "bluegreen" or
+  # "canary": both run the old and new machines at once, which is exactly the
+  # two-writers-one-nonce case this service is not built for.
+  strategy = "rolling"
+
+[env]
+  PORT = "8787"
+  RELAYER_NETWORK = "testnet"
+  RELAYER_STORE = "memory"
+  LOG_LEVEL = "info"
+  # Fly's proxy sets `fly-client-ip` itself and a client cannot forge it, so it
+  # is a sound source for per-IP rate limiting. Without this every request
+  # resolves to the proxy address and shares one bucket.
+  RELAYER_CLIENT_IP_HEADER = "fly-client-ip"
+  # The keystore and passphrase live on the volume mounted below, not in the
+  # environment. `fly secrets` (env vars) is the demoted mode. See DEPLOY.md.
+  RELAYER_KEYSTORE_PATH = "/run/secrets/maren/keystore.json"
+  RELAYER_KEYSTORE_PASSWORD_FILE = "/run/secrets/maren/passphrase"
+
+# A 1 GB volume holding two files. It exists because the preferred key mode is a
+# file on disk, and Fly secrets are environment variables. Create it once:
+#   fly volumes create maren_secrets --size 1 --region iad --config apps/relayer/fly.toml
+# then upload the keystore with `fly ssh sftp shell`.
+[mounts]
+  source = "maren_secrets"
+  destination = "/run/secrets/maren"
+
+[http_service]
+  internal_port = 8787
+  force_https = true
+  # Never suspend or stop this machine. See the note at the top of this file.
+  auto_stop_machines = false
+  auto_start_machines = false
+  min_machines_running = 1
+  processes = ["app"]
+
+  [http_service.concurrency]
+    type = "requests"
+    # Submissions are serialised behind one nonce queue, so a high connection
+    # ceiling buys queue depth rather than throughput. Kept modest so a burst
+    # queues at the proxy instead of inside the process.
+    soft_limit = 40
+    hard_limit = 60
+
+# The deployment probe. Makes no RPC calls, and answers 503 while the relayer is
+# refusing to relay, so a first deploy with no key configured will fail its
+# health check, on purpose. Set the secrets before deploying.
+[[http_service.checks]]
+  interval = "15s"
+  timeout = "5s"
+  grace_period = "20s"
+  method = "GET"
+  path = "/healthz"
+
+[[vm]]
+  size = "shared-cpu-1x"
+  memory = "512mb"
+  cpus = 1
+  # A second machine is not a scaling decision here, it is a correctness bug.
+  # `fly scale count 1` is the only supported count.
+  processes = ["app"]
+
+# Longer than RELAYER_SHUTDOWN_DRAIN_MS (20s by default). A SIGKILL between
+# "nonce allocated" and "broadcast returned" leaves a nonce gap that stalls
+# every later transaction until it is filled.
+kill_signal = "SIGTERM"
+kill_timeout = "30s"
