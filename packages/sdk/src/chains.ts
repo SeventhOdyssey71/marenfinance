@@ -91,8 +91,27 @@ export const mezoTestnet = defineChain({
     decimals: 18,
   },
   rpcUrls: {
-    default: { http: ['https://rpc.test.mezo.org'] },
-    public: { http: ['https://rpc.test.mezo.org'] },
+    // Two endpoints, in this order, and the order is load-bearing for the same reason it
+    // is on mainnet: a client pinned to one URL has no answer for the hour that URL is
+    // degraded.
+    //
+    // rpc.test.mezo.org is primary and stays primary. It answered every method in a
+    // repeated sweep on 2026-08-18: eth_call, eth_blockNumber and a 10,000-block
+    // eth_getLogs, 5/5 each.
+    //
+    // mezo-testnet.drpc.org is second, VERIFIED 2026-08-18 rather than copied from a doc
+    // page: eth_chainId -> 0x7b7b (31611), and MUSD.symbol() at
+    // 0x118917a40FAF1CD7a13dB0Ef56C86De7973Ac503 returned a response byte-identical to the
+    // primary's, decoding to "MUSD". Its head tracked the primary's within one block.
+    //
+    // ONE MEASURED CAVEAT, recorded rather than hidden: on the free tier it answered a
+    // 10,000-block eth_getLogs only 3 times in 5, failing the other two with
+    // `Request timeout on the free plan, please upgrade`. Per this file's own rule that is
+    // not grounds to drop it — it serves every other method reliably, and a log scan that
+    // fails is reported to the user as unknown rather than as an empty history. It is
+    // second, never first, precisely because of this.
+    default: { http: ['https://rpc.test.mezo.org', 'https://mezo-testnet.drpc.org'] },
+    public: { http: ['https://rpc.test.mezo.org', 'https://mezo-testnet.drpc.org'] },
   },
   blockExplorers: {
     default: {

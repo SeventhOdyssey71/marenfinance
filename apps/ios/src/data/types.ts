@@ -101,6 +101,12 @@ export interface ActivityItem {
   /** On-chain memo, capped at 80 bytes by MarenPay. */
   memo?: string;
   hash?: Hash;
+  /**
+   * The block this row's log was in. See the web copy of this file — it is what lets the
+   * Activity cache resume a scan without duplicating or trusting rows a reorg may have
+   * rewritten. Mirrored here so the two type files do not drift.
+   */
+  blockNumber?: bigint;
   /** True when a Maren relayer paid the BTC gas. */
   sponsored: boolean;
   /** Gas the user actually paid, in wei of BTC. Zero for sponsored actions. */
