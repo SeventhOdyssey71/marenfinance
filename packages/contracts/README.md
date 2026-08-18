@@ -70,7 +70,9 @@ together or neither does.
 
 `executeBatch` is **disabled** — it reverts with `BatchExecutionDisabled()`. Value is never
 relayed: `RelayedCall` has no `value` field and `execute` rejects a non-zero one, which is why
-`MarenVault.deposit()` is not in the allowlist and every post-deposit action is.
+`MarenVault.deposit()` is not in the allowlist and every post-deposit action is. The same rule
+puts `depositAndBorrow()` outside it and `repayWithPermit()` inside it: the first is payable,
+the second is not.
 
 Property 4 is the one most likely to go wrong silently, so it is asserted against
 `test/mocks/SenderProbe.sol`, which records both `_msgSender()` and the raw `msg.sender` —
@@ -358,8 +360,9 @@ position, not to users.
 - [ ] Keeper bot running, with alerting on `MarenVault.isLiquidatable` and on the trove's own
       ICR — the protocol liquidates on the latter.
 - [ ] Relayer allowlist updated with the deployed addresses and the non-payable selectors
-      (`borrow`, `repay`, `withdraw`, `closePosition`, plus all of `MarenPay` and
-      `MarenRegistry`).
+      (`borrow`, `repay`, `repayWithPermit`, `withdraw`, `closePosition`, plus all of
+      `MarenPay` and `MarenRegistry`). Not `depositAndBorrow`, which is payable, so the hub
+      rejects it.
 - [ ] `packages/sdk/src/addresses.ts` updated from `deployments/<chainid>.json`.
 - [ ] Third-party audit before mainnet, per `docs/ARCHITECTURE.md` §7. **Audit scope is
       `MarenVault`, `MarenForwarder` AND `MarenRelayHub`** — the hub holds no funds, but it can
@@ -398,9 +401,16 @@ Four things the relayer needs to know:
 selector)` allowlist on both the fee path and `execute`. `Deploy.s.sol` seeds it; anything
    added later needs an explicit `setAllowedCalls` from `RELAY_ADMIN_ROLE`.
 4. **Value-bearing calls are not relayable** — the hub rejects them. The vault is built for it:
-   `deposit()` is the only payable entrypoint, and `borrow` / `repay` / `withdraw` /
-   `closePosition` are separate non-payable externals. A user pays for their first deposit and
-   everything afterwards can be sponsored.
+   `deposit()` and `depositAndBorrow()` are the only payable user entrypoints, and `borrow` /
+   `repay` / `repayWithPermit` / `withdraw` / `closePosition` are separate non-payable
+   externals. A user pays for their first deposit and everything afterwards can be sponsored.
+
+   `depositAndBorrow` is the deliberate exception and it costs nothing, because it is payable
+   for the same reason `deposit` is: BTC has to arrive as `msg.value`. A user who wants the
+   first transaction sponsored uses `deposit` then a relayed `borrow`, which is what they did
+   before; a user paying their own gas anyway saves a transaction with the composite. Neither
+   route is taken away. `repayWithPermit` is non-payable and therefore fully relayable, which
+   is the point of it: a user with MUSD and no BTC can repay with two signatures and no gas.
 
 Use `apps/relayer`'s allowlist as a second layer, not the only one. The hub's allowlist is the
 one that is on-chain and cannot be bypassed by a compromised relayer key.
