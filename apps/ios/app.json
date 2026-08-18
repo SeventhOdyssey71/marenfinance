@@ -6,13 +6,13 @@
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "scheme": "maren",
-    "userInterfaceStyle": "dark",
-    "backgroundColor": "#08080A",
+    "userInterfaceStyle": "light",
+    "backgroundColor": "#F7F6FB",
     "newArchEnabled": true,
     "splash": {
       "image": "./assets/splash-icon.png",
       "resizeMode": "contain",
-      "backgroundColor": "#08080A"
+      "backgroundColor": "#F7F6FB"
     },
     "ios": {
       "bundleIdentifier": "finance.maren.app",
@@ -60,7 +60,7 @@
         "expo-splash-screen",
         {
           "image": "./assets/splash-icon.png",
-          "backgroundColor": "#08080A",
+          "backgroundColor": "#F7F6FB",
           "imageWidth": 160
         }
       ]

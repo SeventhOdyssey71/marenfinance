@@ -124,7 +124,7 @@ const styles = StyleSheet.create({
     top: -2,
     width: 1,
     height: 12,
-    backgroundColor: 'rgba(255,255,255,0.22)',
+    backgroundColor: 'rgba(20,18,35,0.22)',
   },
   marker: {
     position: 'absolute',
@@ -132,7 +132,9 @@ const styles = StyleSheet.create({
     height: 14,
     borderRadius: radius.pill,
     borderWidth: 2.5,
-    backgroundColor: base.bg,
+    // White, not the page colour: the marker is a ring punched out of the inset track,
+    // and #F7F6FB against #EFEDF6 is not enough of a step to read as one.
+    backgroundColor: base.surface,
     marginLeft: -7,
   },
   legend: {

@@ -69,11 +69,14 @@ export default function RootLayout() {
     <QueryClientProvider client={queryClient}>
       <SafeAreaProvider>
         <View style={styles.canvas}>
-          <StatusBar style="light" />
+          {/* Dark glyphs: the app canvas is #F7F6FB. The marketing site stays dark, but
+              nothing in this bundle renders it. */}
+          <StatusBar style="dark" />
           <Stack
             screenOptions={{
               headerShown: false,
-              // BRAND.md §2: there is no light mode in the product UI.
+              // One canvas colour for the whole stack, so a push transition never
+              // reveals a white gap behind the incoming screen.
               contentStyle: { backgroundColor: base.bg },
               animation: 'slide_from_right',
             }}
@@ -86,6 +89,16 @@ export default function RootLayout() {
               options={{ presentation: 'card', animation: 'slide_from_bottom' }}
             />
             <Stack.Screen name="settings" options={{ presentation: 'card' }} />
+            {/*
+              The scanner needs a light status bar and every other screen needs a dark
+              one, but that is NOT expressed here as a `statusBarStyle` screen option.
+              react-native-screens implements that option by calling
+              `-[UIViewController setNeedsStatusBarAppearanceUpdate]`, which raises
+              unless the host app's Info.plist sets `UIViewControllerBasedStatusBarAppearance`
+              to YES. Ours does — but Expo Go is a different binary and its own plist
+              says NO, so the option red-screens the app in exactly the environment this
+              project is verified in. scan.tsx scopes the style to focus instead.
+            */}
             <Stack.Screen
               name="scan"
               options={{ presentation: 'fullScreenModal', animation: 'fade' }}

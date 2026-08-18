@@ -1,7 +1,7 @@
 import type { ReactNode } from 'react';
 import { Pressable, StyleSheet, View, type StyleProp, type ViewStyle } from 'react-native';
 
-import { base, hit, space } from '../design/tokens';
+import { base, hit, space, text } from '../design/tokens';
 import { Icon } from './Icon';
 import { Txt } from './Text';
 
@@ -52,7 +52,9 @@ export function StatRow({
         {value}
         {sub ? <View style={styles.sub}>{sub}</View> : null}
       </View>
-      {onPress ? <Icon name="chevronRight" size={16} color="#6B6B75" /> : null}
+      {/* A disclosure chevron is a graphical object, so 3:1 is the bar and `subtle`
+          clears it at 3.80 on a card. Nothing that reads as copy uses this tone. */}
+      {onPress ? <Icon name="chevronRight" size={16} color={text.subtle} /> : null}
     </View>
   );
 

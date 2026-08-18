@@ -8,16 +8,21 @@ import {
   type ViewStyle,
 } from 'react-native';
 
-import { base, brand, hit, radius, space } from '../design/tokens';
+import { base, brand, hit, radius, semanticText, space, text } from '../design/tokens';
 import { fonts, type } from '../design/type';
 import { Txt } from './Text';
 
 /**
  * BRAND.md §4: "Buttons are pills."
  *
- *   Primary   — white fill, near-black text, circular violet icon badge on the right.
- *   Secondary — surface-raised fill, hairline border, white text.
+ *   Primary   — near-black fill, page-coloured text, circular violet icon badge right.
+ *   Secondary — white fill, hairline border, near-black text.
  *   Both      — 44px min height for touch.
+ *
+ * The primary pill inverted with the theme rather than staying white, which is exactly
+ * what the web does: its class is `bg-text text-bg`, so the fill is whatever the text
+ * colour is and the label is whatever the page is. On dark that was a white pill with
+ * near-black text; on light it is a near-black pill on an off-white page, 16.62:1.
  *
  * `danger` is not in BRAND.md as a button style; destructive actions use `secondary`
  * with danger-toned label text, so that the only saturated fill on a screen stays the
@@ -86,7 +91,7 @@ export function PillButton({
         {loading ? (
           <ActivityIndicator
             size="small"
-            color={variant === 'primary' ? base.bg : '#FAFAFA'}
+            color={variant === 'primary' ? base.bg : text.primary}
             style={styles.spinner}
           />
         ) : null}
@@ -134,18 +139,20 @@ const styles = StyleSheet.create({
     flex: 1,
     paddingVertical: space.md,
   },
-  primary: { backgroundColor: '#FAFAFA', paddingRight: 6 },
-  primaryPressed: { backgroundColor: '#E4E4E7' },
+  primary: { backgroundColor: text.primary, paddingRight: 6 },
+  primaryPressed: { backgroundColor: '#2E2E36' },
   /**
-   * A disabled primary is NOT a dimmed white pill.
+   * A disabled primary is NOT a dimmed pill.
    *
-   * `opacity: 0.4` over a white fill produced a large mid-grey slab — the loudest object
-   * on the screen, in a colour that is in no palette, telling the user they cannot act.
-   * A disabled control should recede. This is the secondary surface with a hairline, so
-   * it reads as an outline of the button that will exist once the form is valid.
+   * `opacity: 0.4` over the fill produced a large mid-grey slab — the loudest object on
+   * the screen, in a colour that is in no palette, telling the user they cannot act. A
+   * disabled control should recede. This is the recessed surface with a hairline, so it
+   * reads as an outline of the button that will exist once the form is valid. It uses
+   * `surfaceInset` rather than `surfaceRaised` because a raised pill is now #FFFFFF and
+   * would vanish on the white card most of these sit on.
    */
   primaryInert: {
-    backgroundColor: base.surfaceRaised,
+    backgroundColor: base.surfaceInset,
     borderWidth: StyleSheet.hairlineWidth,
     borderColor: base.border,
     paddingRight: 6,
@@ -153,9 +160,9 @@ const styles = StyleSheet.create({
   secondary: {
     backgroundColor: base.surfaceRaised,
     borderWidth: StyleSheet.hairlineWidth,
-    borderColor: base.border,
+    borderColor: base.borderStrong,
   },
-  secondaryPressed: { backgroundColor: '#202026' },
+  secondaryPressed: { backgroundColor: base.surfaceInset },
   ghost: { backgroundColor: 'transparent' },
   inert: { opacity: 0.4 },
   label: {
@@ -163,17 +170,18 @@ const styles = StyleSheet.create({
     fontSize: type.small.fontSize,
     letterSpacing: 0,
   },
+  /** Named for the web class it mirrors, `text-bg`: the page colour on the text colour. */
   labelOnWhite: { color: base.bg },
-  labelInert: { color: '#A1A1AA' },
+  labelInert: { color: text.muted },
   /**
    * A ghost button is the quietest action on the screen and must read that way. At full
-   * #FAFAFA it had the same weight as the primary CTA sitting directly above it, so the
+   * strength it had the same weight as the primary CTA sitting directly above it, so the
    * onboarding footer offered two equally loud choices. The shipped web app renders its
    * ghost variant `text-text-muted`; this matches it.
    */
-  labelGhost: { color: '#A1A1AA' },
-  labelOnDark: { color: '#FAFAFA' },
-  labelDanger: { color: '#F87171' },
+  labelGhost: { color: text.muted },
+  labelOnDark: { color: text.primary },
+  labelDanger: { color: semanticText.danger },
   spinner: { marginRight: space.sm },
   /** The circular violet icon badge from the reference design. */
   badge: {
@@ -184,6 +192,13 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  /** The badge loses its saturation with the button — §2 keeps violet for live CTAs. */
-  badgeInert: { backgroundColor: 'rgba(255,255,255,0.06)' },
+  /**
+   * The badge loses its saturation with the button — §2 keeps violet for live CTAs.
+   *
+   * A translucent scrim was the dark theme's answer and does not survive the move: over
+   * an #EFEDF6 pill it lands on a near-white grey, and the white glyph inside it would
+   * disappear. `text-subtle` is the desaturated fill that still holds the glyph at
+   * 3.80:1, which is the bar for a graphical object.
+   */
+  badgeInert: { backgroundColor: text.subtle },
 });

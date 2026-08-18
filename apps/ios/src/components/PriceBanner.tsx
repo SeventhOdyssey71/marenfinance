@@ -2,7 +2,7 @@ import { StyleSheet, View } from 'react-native';
 import { formatUsd } from '@maren/sdk';
 
 import { STALE_AFTER_SECONDS, type PriceFeed } from '../chain/price';
-import { base, radius, semantic, space } from '../design/tokens';
+import { base, radius, semantic, semanticText, space } from '../design/tokens';
 import { Icon } from './Icon';
 import { Num, Txt } from './Text';
 
@@ -62,7 +62,7 @@ export function PriceBanner({ feed }: { feed: PriceFeed }) {
           : `Price feed unavailable. ${feed.reason}`
       }
     >
-      <Icon name="alert" size={18} color={semantic.warning} />
+      <Icon name="alert" size={18} color={semanticText.warning} />
       <View style={styles.alertBody}>
         <Txt variant="small" style={styles.alertTitle}>
           Price feed unavailable
@@ -126,11 +126,13 @@ const styles = StyleSheet.create({
     backgroundColor: base.surfaceInset,
     borderWidth: StyleSheet.hairlineWidth,
     // A warning border rather than a warning fill: §2 says a screen where everything is
-    // coloured is a screen where nothing is important.
-    borderColor: 'rgba(251,191,36,0.32)',
+    // coloured is a screen where nothing is important. The alpha rose from 0.32 to 0.55
+    // with the theme — a 32% amber hairline that read clearly against a near-black panel
+    // is nearly gone against #EFEDF6, and this is a degraded state that has to be seen.
+    borderColor: 'rgba(180,83,9,0.55)',
   },
   alertBody: { flex: 1 },
-  alertTitle: { color: semantic.warning },
+  alertTitle: { color: semanticText.warning },
   alertDetail: { marginTop: space.xs },
   lastKnown: {
     flexDirection: 'row',

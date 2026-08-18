@@ -1,7 +1,7 @@
 import { Pressable, StyleSheet, View } from 'react-native';
 import { useRouter } from 'expo-router';
 
-import { hit, radius, space, base } from '../design/tokens';
+import { hit, radius, space, base, cardShadow, text } from '../design/tokens';
 import { Icon } from './Icon';
 import { Label, Txt } from './Text';
 
@@ -28,7 +28,7 @@ export function BackHeader({
         hitSlop={10}
         style={({ pressed }) => [styles.back, pressed && styles.pressed]}
       >
-        <Icon name="chevronLeft" size={18} color="#FAFAFA" />
+        <Icon name="chevronLeft" size={18} color={text.primary} />
       </Pressable>
 
       <View style={styles.titles}>
@@ -57,10 +57,9 @@ const styles = StyleSheet.create({
     height: hit.min,
     borderRadius: radius.pill,
     backgroundColor: base.surface,
-    borderWidth: StyleSheet.hairlineWidth,
-    borderColor: base.border,
     alignItems: 'center',
     justifyContent: 'center',
+    ...cardShadow,
   },
   pressed: { opacity: 0.6 },
   titles: { flex: 1, gap: 2 },

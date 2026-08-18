@@ -13,7 +13,7 @@ import { PillButton } from '../../src/components/PillButton';
 import { Screen } from '../../src/components/Screen';
 import { Label, Num, Txt } from '../../src/components/Text';
 import { TxSheet, useTxRunner } from '../../src/components/TxSheet';
-import { base, brand, radius, semantic, space } from '../../src/design/tokens';
+import { base, brand, radius, semanticText, space, text } from '../../src/design/tokens';
 import { fonts } from '../../src/design/type';
 import { resolveHandle } from '../../src/data/mock';
 import type { Handle } from '../../src/data/types';
@@ -178,7 +178,7 @@ function SendPanel({
             value={to}
             onChangeText={setTo}
             placeholder="@handle or 0x address"
-            placeholderTextColor="#6B6B75"
+            placeholderTextColor={text.muted}
             autoCapitalize="none"
             autoCorrect={false}
             style={styles.recipientInput}
@@ -191,7 +191,7 @@ function SendPanel({
             accessibilityLabel="Scan a payment QR code"
             style={({ pressed }) => [styles.scanButton, pressed && styles.pressed]}
           >
-            <Icon name="scan" size={18} color="#FAFAFA" />
+            <Icon name="scan" size={18} color={text.primary} />
           </Pressable>
         </View>
 
@@ -205,18 +205,18 @@ function SendPanel({
             accessible
             accessibilityLabel={`${resolved.handle} resolves to ${resolved.address}`}
           >
-            <Icon name="check" size={14} color={semantic.success} />
+            <Icon name="check" size={14} color={semanticText.success} />
             <Num size="numericSm" tone="muted">
               {shortAddress(resolved.address)}
             </Num>
           </View>
         ) : to.trim().startsWith('@') && to.trim().length > 1 ? (
-          <Txt variant="small" style={[styles.resolveNote, { color: semantic.danger }]}>
+          <Txt variant="small" style={[styles.resolveNote, { color: semanticText.danger }]}>
             No such handle on this network.
           </Txt>
         ) : isAddress ? (
           <View style={styles.resolved}>
-            <Icon name="check" size={14} color={semantic.success} />
+            <Icon name="check" size={14} color={semanticText.success} />
             <Txt variant="small" tone="muted">
               Valid address
             </Txt>
@@ -231,7 +231,7 @@ function SendPanel({
             value={amount}
             onChangeText={setAmount}
             placeholder="0.00"
-            placeholderTextColor="#3F3F46"
+            placeholderTextColor={text.subtle}
             keyboardType="decimal-pad"
             style={styles.amountInput}
             accessibilityLabel="Amount in MUSD"
@@ -260,7 +260,7 @@ function SendPanel({
         {overBalance ? (
           <Txt
             variant="small"
-            style={[styles.resolveNote, { color: semantic.danger }]}
+            style={[styles.resolveNote, { color: semanticText.danger }]}
             accessibilityRole="alert"
           >
             More than your MUSD balance.
@@ -274,7 +274,7 @@ function SendPanel({
           value={memo}
           onChangeText={setMemo}
           placeholder="What is this for?"
-          placeholderTextColor="#6B6B75"
+          placeholderTextColor={text.muted}
           maxLength={80}
           style={styles.memoInput}
           accessibilityLabel="Memo"
@@ -294,7 +294,7 @@ function SendPanel({
           )
         }
         disabled={!canSend}
-        badge={<Icon name="arrowUpRight" size={15} color="#FAFAFA" />}
+        badge={<Icon name="arrowUpRight" size={15} color={base.onAccent} />}
         accessibilityHint="Requires Face ID, then waits for an on-chain receipt."
       />
 
@@ -333,8 +333,8 @@ function RequestPanel() {
           <QRCode
             value={payload}
             size={196}
-            backgroundColor="#FAFAFA"
-            color="#08080A"
+            backgroundColor={base.onAccent}
+            color={text.primary}
             quietZone={12}
           />
         </View>
@@ -361,7 +361,7 @@ function RequestPanel() {
             value={amount}
             onChangeText={setAmount}
             placeholder="0.00"
-            placeholderTextColor="#3F3F46"
+            placeholderTextColor={text.subtle}
             keyboardType="decimal-pad"
             style={styles.amountInput}
             accessibilityLabel="Requested amount in MUSD"
@@ -438,7 +438,7 @@ const styles = StyleSheet.create({
     backgroundColor: base.surfaceInset,
     borderWidth: StyleSheet.hairlineWidth,
     // Violet hairline to match the violet mark; §2 keeps green for health states.
-    borderColor: 'rgba(139,119,255,0.22)',
+    borderColor: 'rgba(91,61,245,0.28)',
     marginBottom: space.lg,
   },
   gasBannerBody: { flex: 1 },
@@ -448,7 +448,7 @@ const styles = StyleSheet.create({
   recipientInput: {
     flex: 1,
     minHeight: 44,
-    color: '#FAFAFA',
+    color: text.primary,
     fontFamily: fonts.mono,
     fontSize: 15,
   },
@@ -472,7 +472,7 @@ const styles = StyleSheet.create({
   amountRow: { flexDirection: 'row', alignItems: 'baseline', gap: space.sm, marginTop: space.sm },
   amountInput: {
     flex: 1,
-    color: '#FAFAFA',
+    color: text.primary,
     fontFamily: fonts.monoMedium,
     fontSize: 40,
     lineHeight: 46,
@@ -487,7 +487,7 @@ const styles = StyleSheet.create({
   },
   memoInput: {
     minHeight: 44,
-    color: '#FAFAFA',
+    color: text.primary,
     fontFamily: fonts.regular,
     fontSize: 15,
     marginTop: space.sm,
@@ -497,7 +497,7 @@ const styles = StyleSheet.create({
   qrFrame: {
     padding: space.md,
     borderRadius: radius.card,
-    backgroundColor: '#FAFAFA',
+    backgroundColor: base.onAccent,
   },
   qrHandle: { marginTop: space.xl },
   qrAddress: { marginTop: space.xs },

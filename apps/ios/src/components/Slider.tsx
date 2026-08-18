@@ -8,7 +8,7 @@ import {
 } from 'react-native';
 import * as Haptics from 'expo-haptics';
 
-import { base, brand, radius, space } from '../design/tokens';
+import { base, brand, radius, space, text } from '../design/tokens';
 import { useReducedMotion } from '../hooks/useReducedMotion';
 
 /**
@@ -214,7 +214,7 @@ const styles = StyleSheet.create({
     top: -3,
     width: 1.5,
     height: 14,
-    backgroundColor: 'rgba(255,255,255,0.32)',
+    backgroundColor: 'rgba(20,18,35,0.32)',
   },
   thumb: {
     position: 'absolute',
@@ -222,11 +222,11 @@ const styles = StyleSheet.create({
     height: 24,
     marginLeft: -12,
     borderRadius: radius.pill,
-    backgroundColor: '#FAFAFA',
+    backgroundColor: base.onAccent,
     borderWidth: 3,
     borderColor: brand.violet500,
   },
   thumbLift: {},
-  thumbDisabled: { borderColor: '#3F3F46' },
+  thumbDisabled: { borderColor: text.subtle },
   spacer: { height: space.sm },
 });

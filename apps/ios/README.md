@@ -338,24 +338,43 @@ everything since.
 
 ## Design
 
-`docs/BRAND.md`, transcribed into `src/design/tokens.ts` and `src/design/type.ts`.
+`docs/BRAND.md` for the type and the rules, and the `[data-app-theme='light']` block of
+`apps/web/src/app/globals.css` for the colour, transcribed into `src/design/tokens.ts`
+and `src/design/type.ts`.
 
-- Canvas `#08080A`, cards `#101013`, hairline `rgba(255,255,255,0.08)` borders, 16px card
-  radius, pill buttons, 44pt minimum touch targets.
-- Violet `#5B3DF5` is the only saturated colour on a default screen. BTC orange
-  `#F7931A` appears **only** on BTC-denominated values; MUSD green `#3ECF8E` only on
-  MUSD values. The colour is attached to the component that knows the denomination
-  (`src/components/Money.tsx`), so a BTC figure cannot be rendered green by accident.
+**The app is light.** The web app moved first and this followed it, token for token, so
+that the two read as one product. BRAND.md §2's near-black palette still describes the
+marketing site, which did not move.
+
+- Canvas `#F7F6FB`, cards `#FFFFFF`, recessed panels `#EFEDF6`, hairline
+  `rgba(20,18,35,0.08)`, 16px card radius, pill buttons, 44pt minimum touch targets.
+- Violet `#5B3DF5` is the only saturated colour on a default screen. Violet-400 collapses
+  onto it: the lighter `#8B77FF` existed only to survive a near-black page and is 2.6:1
+  on white. Violet-900 flips from a near-black plum to `#ECE8FF`, the selected-state fill.
+- BTC and MUSD colours appear **only** on values of that denomination, attached to the
+  component that knows it (`src/components/Money.tsx`), so a BTC figure cannot be rendered
+  green by accident.
 - Health colours appear only when they carry meaning. `caution` renders neutral, because
   a position between 180% and 250% is doing what it is supposed to.
+- Semantics ship in two sets. `semantic` is the web light value, used for fills, dots,
+  hairlines and glyphs, where 3:1 is the bar. `semanticText` is the same five pushed
+  until they clear 4.5:1 on all three surfaces, used wherever the colour lands on text
+  below 24px. On near-black one value did both jobs; on white it does not — `#0D9E70` is
+  a good status dot at 3.42:1 and an unreadable 13px "MUSD" at the same ratio.
 - Satoshi (400/500/700/900) for UI, Geist Mono for every numeral, address and hash, with
   `fontVariant: ['tabular-nums']` throughout. Fonts are bundled, not fetched. The
   fallback chain is Satoshi → Geist → system; Inter is never named, per BRAND.md §3.
 - **No shaders.** BRAND.md §5 forbids mounting one above the fold on iOS, so the hero and
-  CTA washes are static `expo-linear-gradient` ramps using the same violet → violet-900 →
-  bg stops the web `MeshGradient` uses.
-- Cards get their elevation from the hairline plus a 1px inner top highlight, never a
-  drop shadow — there is no `shadow*` or `elevation` prop in `Card.tsx`.
+  CTA washes are static `expo-linear-gradient` ramps. Their alphas dropped by roughly two
+  thirds with the theme: the dark-theme values reproduced on light put a visibly purple
+  slab across the top quarter of every screen.
+- Cards are a white surface with a soft drop, which is the web `.card` light rule
+  verbatim. The dark theme's hairline and 1px inner top highlight are both gone, and so
+  is `overflow: 'hidden'` — on iOS that sets `masksToBounds`, which clips the layer's own
+  shadow, so a card carrying both would have rendered with no drop at all.
+- One screen is deliberately not light. `app/scan.tsx` draws over a live camera feed, so
+  its canvas is near-black and its reticle is white — with a drop shadow, because the
+  commonest thing anyone points it at is a QR code on white paper.
 
 ### Accessibility
 
@@ -372,14 +391,28 @@ everything since.
   describing a shape.
 - Reduce Motion is read via `useReducedMotion()` and renders final state rather than
   shortening durations.
-- **Contrast.** `text-subtle` (`#6B6B75`) fails WCAG AA on all four Maren surfaces —
-  3.80:1 on `#08080A`, 3.60:1 on `#101013`, 3.71:1 on `#0C0C0F`, 3.39:1 on `#17171B`. The
-  palette is unchanged, but informational captions and `Label` default to `text-muted`
-  (`#A1A1AA`, 6.97–7.81:1), and `subtle` is reserved for text that is decorative or
-  duplicated by an adjacent accessible label. BRAND.md's preamble settles the conflict:
-  "legible before it is decorative." Worth a decision from whoever owns the palette —
-  either `text-subtle` is for non-text ornament, or its hex should rise to about
-  `#80808B`, which is the darkest grey that clears 4.5:1 on `#17171B`.
+- **Contrast.** `text-subtle` does not meet WCAG AA for small text, and the light theme
+  did not fix that on its own — it is the same shortfall, relocated:
+
+  |           | dark, `#6B6B75` |           | light, `#82828C` |
+  | --------- | --------------- | --------- | ---------------- |
+  | on-canvas | `#08080A` 3.80  | on-canvas | `#F7F6FB` 3.54   |
+  | on-card   | `#101013` 3.60  | on-card   | `#FFFFFF` 3.80   |
+  | on-inset  | `#0C0C0F` 3.71  | on-inset  | `#EFEDF6` 3.28   |
+  | on-raised | `#17171B` 3.39  | on-raised | `#FFFFFF` 3.80   |
+
+  So the token no longer carries information anywhere in this app. Every piece of text
+  that used it takes `text-muted` (`#55555E` — 6.86 on the canvas, 7.38 on a card, 6.36
+  on an inset panel): the strike-through amount on a failed Activity row, the inactive
+  tab-bar label, and the field placeholders. `subtle` survives for the two jobs where the
+  bar is 3:1 rather than 4.5:1 and it clears — non-text ornament (disclosure chevrons,
+  the external-link glyph, the desaturated CTA badge) and the 40px `0.00` amount
+  placeholder, which is large text. Nothing else may use it. BRAND.md's preamble settles
+  it: "legible before it is decorative."
+
+- Every colour in `semanticText` clears 4.5:1 on all three light surfaces, so a status
+  string is never the illegible part of a warning. `semantic`, which is the web light
+  value, is used only where the requirement is 3:1.
 - Errors and blocked states use `accessibilityRole="alert"`.
 
 ### Simulator verification
@@ -397,17 +430,31 @@ which is gitignored — they are verification evidence, not source.
 | `20`–`21` vault        | Collateral/debt/limit rows, borrow slider capped at the 180% floor                                                                                                                |
 | `30`–`31` pay          | Send with the relayed-payment banner and the 80-byte memo counter; request with QR                                                                                                |
 | `40` earn              | Trailing realised MUSD, backward-looking, no APY                                                                                                                                  |
-| `50`–`51` activity     | The failed send reading "Failed — no funds moved" with the amount struck through; one gas line in the whole ledger                                                                |
+| `50`–`51` activity     | The failed send reading "Failed, no funds moved" with the amount struck through; one gas line in the whole ledger                                                                 |
 | `60`–`61` settings     | Network, key state, the R12 and R13 disclosures, the stale-feed simulator                                                                                                         |
 | `70` home, stale feed  | The health block is **replaced** by "Price feed unavailable"; the USD valuation disappears rather than being computed from a stale price                                          |
 | `71` vault, stale feed | Borrow pinned to 0.00, slider disabled, CTA inert, with the reason: "Price feed is 90s old. Mezo's oracle rejects anything over 60s, so this would revert on-chain."              |
+| `80` scan              | Reticle, hint and close chip all legible; light status bar, restored to dark on dismissal                                                                                         |
 
 The blue gear floating over the right edge of every shot is **Expo Go's own dev-menu
 launcher**, not Maren UI. It disappears in a development or release build.
 
-Two things this does _not_ prove, and they are the same two the mocked table names: no
-screenshot here involved a chain read or a broadcast transaction, and no EAS build has
-been run.
+Two things the walk-through does _not_ prove, and they are the same two the mocked table
+names: no screenshot here involved a chain read or a broadcast transaction, and no EAS
+build has been run.
+
+Two more that the light theme pass added to the list, because both were found by looking
+at a screenshot rather than by reading the diff:
+
+- The scanner's reticle and hint were white over a camera feed, which is right, and the
+  simulator has no camera — so they were drawn on the `#F7F6FB` fallback and were
+  invisible. The same thing happens on a real device pointed at a QR code on white paper,
+  which is the ordinary case. Fixed with a near-black canvas, a shadow on the reticle and
+  a dark ground under the hint.
+- `statusBarStyle` as an expo-router screen option red-screens inside Expo Go: it calls
+  `setNeedsStatusBarAppearanceUpdate`, which raises unless the host binary's Info.plist
+  sets `UIViewControllerBasedStatusBarAppearance` to YES. Ours does; Expo Go's does not.
+  The scanner scopes the style with `useFocusEffect` + `setStatusBarStyle` instead.
 
 ---
 

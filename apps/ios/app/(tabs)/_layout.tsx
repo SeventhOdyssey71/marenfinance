@@ -10,8 +10,11 @@ import { fonts } from '../../src/design/type';
  * Activity is split out from Portfolio because a transaction history that lives inside
  * a scroll view is a history nobody reads.
  *
- * The bar is a hairline-topped near-black strip — no blur, no translucency. Violet marks
- * the active tab and is the only saturated colour on the chrome (§2).
+ * The bar is a hairline-topped white strip — no blur, no translucency. Violet marks the
+ * active tab and is the only saturated colour on the chrome (§2).
+ *
+ * The inactive tint is `text-muted`, not `text-subtle`. A tab label is 11px text, so
+ * 4.5:1 is the bar; #82828C on the white strip is 3.80:1 and does not clear it.
  */
 export default function TabsLayout() {
   return (
@@ -19,8 +22,8 @@ export default function TabsLayout() {
       screenOptions={{
         headerShown: false,
         tabBarStyle: styles.bar,
-        tabBarActiveTintColor: brand.violet400,
-        tabBarInactiveTintColor: text.subtle,
+        tabBarActiveTintColor: brand.violet500,
+        tabBarInactiveTintColor: text.muted,
         tabBarLabelStyle: styles.label,
         tabBarItemStyle: styles.item,
         sceneStyle: { backgroundColor: base.bg },
@@ -85,7 +88,9 @@ function icon(name: IconName) {
 
 const styles = StyleSheet.create({
   bar: {
-    backgroundColor: base.bg,
+    // White, not the page colour: the bar has to separate from the content scrolling
+    // under it, and #F7F6FB on #F7F6FB is one hairline holding the whole boundary.
+    backgroundColor: base.surface,
     borderTopWidth: StyleSheet.hairlineWidth,
     borderTopColor: base.border,
     height: 88,
