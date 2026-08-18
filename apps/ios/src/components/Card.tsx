@@ -1,17 +1,21 @@
 import type { ReactNode } from 'react';
 import { StyleSheet, View, type ViewProps, type ViewStyle } from 'react-native';
 
-import { base, cardHighlight, radius, space } from '../design/tokens';
+import { base, cardShadow, radius, space } from '../design/tokens';
 
 /**
- * BRAND.md §4 Card: surface fill, 1px hairline border, 16px radius, 24px padding.
+ * BRAND.md §4 Card, as the light app renders it: white fill, 16px radius, 24px padding,
+ * and a soft drop.
  *
- * "Elevation comes from the hairline and a barely-there inner top highlight
- * (inset 0 1px 0 rgba(255,255,255,0.04)), never from a heavy drop shadow."
+ * The web rule states the reason in one line: "On dark, a card is a hairline and nothing
+ * else. On light, the hairline alone reads as an unfinished wireframe — the card IS a
+ * white surface with a soft drop." So the dark theme's 1px inner top highlight is gone,
+ * the hairline goes with it on the two white tones, and elevation comes from
+ * `cardShadow`.
  *
- * React Native has no inset box-shadow, so the highlight is a 1px absolutely positioned
- * view pinned to the top edge, inside the border radius. There is no `shadow*` or
- * `elevation` prop anywhere in this component, deliberately.
+ * `overflow: 'hidden'` went with the highlight, and not only because nothing needs
+ * clipping now. On iOS it compiles to `layer.masksToBounds = true`, which clips the
+ * layer's own shadow — a card carrying both would render with no drop at all.
  */
 export interface CardProps extends ViewProps {
   children?: ReactNode;
@@ -29,12 +33,24 @@ const fill: Record<NonNullable<CardProps['tone']>, string> = {
 };
 
 export function Card({ children, tone = 'surface', padded = true, style, ...rest }: CardProps) {
+  /**
+   * The inset tone is a recessed panel, not a raised one — it is the page tint sitting
+   * inside a card. It keeps the hairline and takes no shadow, or it would read as
+   * floating above the surface it is supposed to be cut into.
+   */
+  const inset = tone === 'inset';
+
   return (
     <View
-      style={[styles.card, { backgroundColor: fill[tone] }, padded && styles.padded, style]}
+      style={[
+        styles.card,
+        { backgroundColor: fill[tone] },
+        inset ? styles.insetEdge : cardShadow,
+        padded && styles.padded,
+        style,
+      ]}
       {...rest}
     >
-      <View style={styles.topHighlight} pointerEvents="none" />
       {children}
     </View>
   );
@@ -43,19 +59,13 @@ export function Card({ children, tone = 'surface', padded = true, style, ...rest
 const styles = StyleSheet.create({
   card: {
     borderRadius: radius.card,
+  },
+  /** Only the recessed tone draws an edge; a white card is defined by its drop. */
+  insetEdge: {
     borderWidth: StyleSheet.hairlineWidth,
     borderColor: base.border,
-    overflow: 'hidden',
   },
   padded: {
     padding: space.xl,
-  },
-  topHighlight: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    height: 1,
-    backgroundColor: cardHighlight,
   },
 });

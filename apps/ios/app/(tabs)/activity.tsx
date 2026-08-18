@@ -8,7 +8,7 @@ import { Icon, type IconName } from '../../src/components/Icon';
 import { Sats } from '../../src/components/Money';
 import { Screen } from '../../src/components/Screen';
 import { Label, Num, Txt } from '../../src/components/Text';
-import { base, radius, semantic, space, text as textColors } from '../../src/design/tokens';
+import { base, radius, semanticText, space, text as textColors } from '../../src/design/tokens';
 import { activityTitle, statusLabel, timeAgo } from '../../src/lib/copy';
 import type { ActivityItem, ActivityKind, ActivityStatus } from '../../src/data/types';
 import { useActivity } from '../../src/hooks/useChainData';
@@ -90,7 +90,11 @@ function Row({ item, explorer, last }: { item: ActivityItem; explorer: string; l
       style={({ pressed }) => [styles.row, !last && styles.rowDivider, pressed && styles.pressed]}
     >
       <View style={[styles.rowIcon, failed && styles.rowIconFailed]}>
-        <Icon name={iconFor(item.kind)} size={17} color={failed ? semantic.danger : '#A1A1AA'} />
+        <Icon
+          name={iconFor(item.kind)}
+          size={17}
+          color={failed ? semanticText.danger : textColors.muted}
+        />
       </View>
 
       <View style={styles.rowBody}>
@@ -116,7 +120,7 @@ function Row({ item, explorer, last }: { item: ActivityItem; explorer: string; l
             <Num size="numericSm" tone="muted" style={styles.hash}>
               {shortHash(item.hash)}
             </Num>
-            <Icon name="external" size={11} color="#6B6B75" />
+            <Icon name="external" size={11} color={textColors.subtle} />
           </View>
         ) : null}
       </View>
@@ -125,7 +129,7 @@ function Row({ item, explorer, last }: { item: ActivityItem; explorer: string; l
         {/*
           Numeral and unit are separate runs, as everywhere else: the figure carries the
           value in plain text and the unit carries the asset colour (§2's "asset mark").
-          A failed row strikes the whole pair through and drops it to subtle, so it reads
+          A failed row strikes the whole pair through and drops it to muted, so it reads
           as withdrawn rather than as money that moved.
         */}
         <View style={styles.amountPair}>
@@ -194,8 +198,8 @@ function StatusChip({ status }: { status: ActivityStatus }) {
     status === 'confirmed'
       ? textColors.muted
       : status === 'failed'
-        ? semantic.danger
-        : semantic.warning;
+        ? semanticText.danger
+        : semanticText.warning;
 
   return (
     <View style={styles.chip}>
@@ -286,7 +290,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     marginTop: 2,
   },
-  rowIconFailed: { borderColor: 'rgba(248,113,113,0.32)' },
+  rowIconFailed: { borderColor: 'rgba(220,38,38,0.45)' },
   rowBody: { flex: 1, gap: 3 },
   rowTitle: { fontSize: 15 },
   rowMeta: { flexDirection: 'row', alignItems: 'center', gap: 4, flexWrap: 'wrap' },
@@ -299,9 +303,14 @@ const styles = StyleSheet.create({
   amount: { fontSize: 15 },
   amountPair: { flexDirection: 'row', alignItems: 'baseline', justifyContent: 'flex-end', gap: 6 },
   amountLive: { color: textColors.primary },
-  amountMusd: { color: semantic.musd },
-  amountBtc: { color: semantic.btc },
-  amountFailed: { color: textColors.subtle, textDecorationLine: 'line-through' },
+  amountMusd: { color: semanticText.musd },
+  amountBtc: { color: semanticText.btc },
+  /**
+   * `muted`, not `subtle`. This is a 15px figure a user reads to work out that a payment
+   * did not happen — the strike-through says withdrawn, the tone says quiet, and neither
+   * is allowed to say illegible. #82828C would be 3.80:1 on this card; #55555E is 7.38.
+   */
+  amountFailed: { color: textColors.muted, textDecorationLine: 'line-through' },
   gas: { fontSize: 11 },
   gasRow: { flexDirection: 'row', alignItems: 'center' },
   emptyBody: { marginTop: space.sm },

@@ -6,7 +6,7 @@ import { getChain, shortHash } from '@maren/sdk';
 
 import { describeOutcome, type TxOutcome } from '../chain/receipt';
 import { submitAction, type ActionKind } from '../chain/actions';
-import { base, brand, radius, semantic, space } from '../design/tokens';
+import { base, brand, modalShadow, radius, semantic, semanticText, space } from '../design/tokens';
 import { useAppStore } from '../state/store';
 import { Icon } from './Icon';
 import { PillButton } from './PillButton';
@@ -108,7 +108,7 @@ export function TxSheet({ runner }: { runner: TxRunner }) {
           {state.phase === 'declined' ? (
             <Result
               icon="lock"
-              colour={semantic.warning}
+              colour={semanticText.warning}
               title="Not signed"
               detail={state.reason}
               onDismiss={dismiss}
@@ -158,6 +158,8 @@ function Settled({
 }) {
   const described = describeOutcome(outcome);
   const delivered = outcome.kind === 'delivered';
+  // A 22px glyph and a hairline ring, so these are the fill values; the copy beneath
+  // them is `text-muted`, and the one coloured string below takes `semanticText`.
   const colour = delivered
     ? semantic.success
     : outcome.kind === 'reverted'
@@ -194,7 +196,7 @@ function Settled({
           <View style={styles.receiptRow}>
             <Label>Gas you paid</Label>
             {outcome.receipt.gasPaidByUser === 0n ? (
-              <Txt variant="small" style={{ color: semantic.success }}>
+              <Txt variant="small" style={{ color: semanticText.success }}>
                 None, relayer sponsored
               </Txt>
             ) : (
@@ -256,18 +258,20 @@ function Result({
 const styles = StyleSheet.create({
   backdrop: {
     flex: 1,
-    backgroundColor: 'rgba(8,8,10,0.82)',
+    // The scrim stays dark on the light theme. It is the one place near-black survives:
+    // its job is to push the page back, and a light scrim over a light page does not.
+    // Web's `.card-modal` makes the same call with a far heavier drop than `.card`.
+    backgroundColor: 'rgba(23,20,41,0.45)',
     justifyContent: 'flex-end',
   },
   sheet: {
     backgroundColor: base.surfaceRaised,
     borderTopLeftRadius: 28,
     borderTopRightRadius: 28,
-    borderTopWidth: StyleSheet.hairlineWidth,
-    borderColor: base.borderStrong,
     paddingHorizontal: space.xl,
     paddingTop: space.xxl,
     paddingBottom: space.xxxl,
+    ...modalShadow,
   },
   body: { alignItems: 'center' },
   pendingMark: {
@@ -275,7 +279,7 @@ const styles = StyleSheet.create({
     height: 52,
     borderRadius: radius.pill,
     borderWidth: StyleSheet.hairlineWidth,
-    borderColor: 'rgba(139,119,255,0.35)',
+    borderColor: 'rgba(91,61,245,0.35)',
     alignItems: 'center',
     justifyContent: 'center',
     marginBottom: space.lg,

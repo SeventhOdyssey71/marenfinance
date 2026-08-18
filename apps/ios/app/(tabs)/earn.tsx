@@ -10,7 +10,7 @@ import { StatRow } from '../../src/components/Row';
 import { Screen } from '../../src/components/Screen';
 import { Label, Num, Txt } from '../../src/components/Text';
 import { TxSheet, useTxRunner } from '../../src/components/TxSheet';
-import { base, radius, semantic, space } from '../../src/design/tokens';
+import { base, radius, semanticText, space, text } from '../../src/design/tokens';
 import { timeAgo } from '../../src/lib/copy';
 import { useBalances, useEarn } from '../../src/hooks/useChainData';
 
@@ -70,7 +70,7 @@ export default function Earn() {
         <View style={styles.yieldHead}>
           <Label>Realised over the last {earn?.trailing.windowDays ?? 90} days</Label>
           <View style={styles.backwardPill}>
-            <Icon name="clock" size={12} color="#A1A1AA" />
+            <Icon name="clock" size={12} color={text.muted} />
             <Txt variant="small" tone="muted" style={styles.backwardText}>
               Backward-looking
             </Txt>
@@ -172,7 +172,7 @@ export default function Earn() {
         </View>
 
         <View style={styles.gasRow}>
-          <Icon name="shield" size={14} color={semantic.success} />
+          <Icon name="shield" size={14} color={semanticText.success} />
           <Txt variant="small" tone="muted" style={styles.gasText}>
             Gasless. Maren’s relayer pays the BTC gas for Earn deposits and withdrawals.
           </Txt>
@@ -188,7 +188,7 @@ export default function Earn() {
               `${mode === 'deposit' ? 'Deposit' : 'Withdraw'} ${formatMusd(preset)}`,
             )
           }
-          badge={<Icon name="arrowRight" size={15} color="#FAFAFA" />}
+          badge={<Icon name="arrowRight" size={15} color={base.onAccent} />}
           accessibilityHint="Requires Face ID, then waits for an on-chain receipt."
           style={styles.cta}
         />

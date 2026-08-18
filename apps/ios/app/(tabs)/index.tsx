@@ -19,12 +19,14 @@ import { Label, Num, Txt } from '../../src/components/Text';
 import {
   base,
   brand,
+  cardShadow,
   healthHeroColor,
   healthLabel,
   healthTone,
   hit,
   radius,
   space,
+  text,
   toneColor,
 } from '../../src/design/tokens';
 import { usableTitle } from '../../src/lib/copy';
@@ -283,7 +285,7 @@ function IconButton({
       hitSlop={8}
       style={({ pressed }) => [styles.iconButton, pressed && styles.pressed]}
     >
-      <Icon name={name} size={18} color="#A1A1AA" />
+      <Icon name={name} size={18} color={text.muted} />
     </Pressable>
   );
 }
@@ -305,7 +307,7 @@ function QuickAction({
       style={({ pressed }) => [styles.quickAction, pressed && styles.pressed]}
     >
       <View style={styles.quickIcon}>
-        <Icon name={icon} size={19} color="#FAFAFA" />
+        <Icon name={icon} size={19} color={text.primary} />
       </View>
       <Txt variant="small" tone="muted">
         {label}
@@ -323,15 +325,15 @@ const styles = StyleSheet.create({
   },
   handle: { marginTop: 2 },
   headerActions: { flexDirection: 'row', gap: space.sm },
+  /** A white chip with the card's own drop, so the chrome and the cards agree. */
   iconButton: {
     width: hit.min,
     height: hit.min,
     borderRadius: radius.pill,
     backgroundColor: base.surface,
-    borderWidth: StyleSheet.hairlineWidth,
-    borderColor: base.border,
     alignItems: 'center',
     justifyContent: 'center',
+    ...cardShadow,
   },
   hero: { marginBottom: space.lg },
   heroTop: {
@@ -387,10 +389,9 @@ const styles = StyleSheet.create({
     height: 52,
     borderRadius: radius.pill,
     backgroundColor: base.surface,
-    borderWidth: StyleSheet.hairlineWidth,
-    borderColor: base.border,
     alignItems: 'center',
     justifyContent: 'center',
+    ...cardShadow,
   },
   gasNote: { marginBottom: space.xl },
   gasHead: { flexDirection: 'row', alignItems: 'center', gap: space.sm },
