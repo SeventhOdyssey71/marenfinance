@@ -6,7 +6,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { base, gradients, space } from '../design/tokens';
 
 /**
- * The page shell. Near-black canvas, safe-area aware, with an optional static gradient
+ * The page shell. Off-white canvas, safe-area aware, with an optional static gradient
  * wash at the top.
  *
  * BRAND.md §5 is explicit: "Never mount a shader above the fold on the iOS app — use a
@@ -59,7 +59,8 @@ export function Screen({
           contentContainerStyle={{ paddingBottom: insets.bottom + space.xxl + bottomInset }}
           showsVerticalScrollIndicator={false}
           keyboardShouldPersistTaps="handled"
-          // Keeps the rubber-band overscroll on the canvas colour rather than white.
+          // Keeps the rubber-band overscroll on the canvas colour rather than on the
+          // system default, which is white and reads a shade off against #F7F6FB.
           contentInsetAdjustmentBehavior="never"
         >
           {body}

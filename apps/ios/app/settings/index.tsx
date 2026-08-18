@@ -13,7 +13,7 @@ import { Screen } from '../../src/components/Screen';
 import { Label, Num, Txt } from '../../src/components/Text';
 import { AUTH_ORIGIN, AUTH_REDIRECT_URI } from '../../src/auth/webAuth';
 import { STALE_AFTER_SECONDS } from '../../src/chain/price';
-import { base, brand, radius, semantic, space } from '../../src/design/tokens';
+import { base, brand, radius, semanticText, space, text } from '../../src/design/tokens';
 import { useAppStore } from '../../src/state/store';
 import {
   biometricName,
@@ -113,7 +113,7 @@ export default function Settings() {
             <Icon
               name={copied ? 'check' : 'copy'}
               size={15}
-              color={copied ? semantic.success : '#6B6B75'}
+              color={copied ? semanticText.success : text.muted}
             />
           </Pressable>
         </View>
@@ -170,7 +170,9 @@ export default function Settings() {
                 variant="small"
                 style={{
                   color:
-                    protection?.mode === 'keychain-biometric' ? semantic.success : semantic.warning,
+                    protection?.mode === 'keychain-biometric'
+                      ? semanticText.success
+                      : semanticText.warning,
                 }}
               >
                 {protection?.mode === 'keychain-biometric' ? protection.label : 'Not persisted'}
@@ -216,8 +218,8 @@ export default function Settings() {
 
       <Card tone="inset" style={styles.authNote}>
         <View style={styles.authHead}>
-          <Icon name="shield" size={15} color={semantic.success} />
-          <Txt variant="small" style={{ color: semantic.success }}>
+          <Icon name="shield" size={15} color={semanticText.success} />
+          <Txt variant="small" style={{ color: semanticText.success }}>
             No custom URL scheme is used for authentication
           </Txt>
         </View>
@@ -243,9 +245,9 @@ export default function Settings() {
           <Switch
             value={forcedStale > 0}
             onValueChange={(on) => setForcedStale(on ? 90 : 0)}
-            trackColor={{ false: '#27272A', true: brand.violet500 }}
-            thumbColor="#FAFAFA"
-            ios_backgroundColor="#27272A"
+            trackColor={{ false: base.surfaceInset, true: brand.violet500 }}
+            thumbColor={base.onAccent}
+            ios_backgroundColor={base.surfaceInset}
             accessibilityLabel="Simulate a stale price feed"
           />
         </View>
@@ -302,7 +304,7 @@ const styles = StyleSheet.create({
     borderColor: base.border,
     minHeight: 44,
   },
-  networkCardActive: { borderColor: 'rgba(139,119,255,0.45)', backgroundColor: base.surfaceRaised },
+  networkCardActive: { borderColor: 'rgba(91,61,245,0.55)', backgroundColor: brand.violet900 },
   networkHead: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
   chainId: { marginTop: space.xs },
   networkNote: { marginTop: space.md },
