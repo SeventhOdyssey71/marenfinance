@@ -49,6 +49,11 @@ contract MarenVaultForkTest is Test {
 
     uint256 internal constant MEZO_TESTNET_CHAIN_ID = 31611;
 
+    /// @dev EIP-2612's own type hash, spelled out rather than imported, so a signature built
+    ///      here is built the way an off-chain signer builds one.
+    bytes32 internal constant PERMIT_TYPEHASH =
+        keccak256("Permit(address owner,address spender,uint256 value,uint256 nonce,uint256 deadline)");
+
     bool internal forked;
 
     /// @dev What alice borrows out of the pooled trove and hands to the redeemer. Her 0.8 BTC
@@ -581,5 +586,85 @@ contract MarenVaultForkTest is Test {
         vm.stopPrank();
 
         assertEq(vault.collateral(alice), 0, "alice exited fully with entries shut");
+    }
+
+    // ------------------------------------------------------------------ //
+    //                       The composed entrypoints                     //
+    // ------------------------------------------------------------------ //
+
+    /**
+     * @notice `depositAndBorrow` and `repayWithPermit` against the REAL BorrowerOperations and
+     *         the REAL MUSD token, in the shape a first-time user actually experiences: two
+     *         transactions from a standing start to a cleared loan, where it used to be four.
+     *
+     * @dev The permit half is the reason this test is here rather than only in the mock suite.
+     *      MarenVault now depends on MUSD implementing EIP-2612 exactly, and this repo's rule is
+     *      bytecode over documentation. The verification recorded in IMUSD.sol was done out of
+     *      band with `cast` (selector 0xd505accf present in the deployed runtime code, an
+     *      expired-deadline call reverting with OpenZeppelin's `ERC2612ExpiredSignature`), and
+     *      this test is the executable half of it: a signature built against the deployed
+     *      token's OWN `DOMAIN_SEPARATOR` and its OWN `nonces`, spent through
+     *      `repayWithPermit`, with no approval transaction anywhere.
+     *
+     *      The domain is asserted independently first. If Mezo ever redeploys MUSD under a
+     *      different name or version, every permit signature Maren's SDK builds becomes invalid
+     *      silently, and this is the test that says so before a user finds out.
+     */
+    function test_fork_composedEntrypointsAgainstTheRealContracts() public requiresFork {
+        (address user, uint256 userPk) = makeAddrAndKey("fork_permit_user");
+        _openPooledTrove(1 ether, 1800e18);
+
+        // 1. The EIP-712 domain, rebuilt from the fields a signer has to know, must match what
+        //    the deployed token reports. Name "Mezo USD", version "1", no salt.
+        bytes32 domain = keccak256(
+            abi.encode(
+                keccak256(
+                    "EIP712Domain(string name,string version,uint256 chainId,address verifyingContract)"
+                ),
+                keccak256(bytes("Mezo USD")),
+                keccak256(bytes("1")),
+                block.chainid,
+                MUSD
+            )
+        );
+        assertEq(domain, IMUSD(MUSD).DOMAIN_SEPARATOR(), "the live token's EIP-712 domain is what we sign");
+
+        // 2. Deposit and borrow in ONE call, against the real trove.
+        uint256 deposited = 0.02 ether;
+        uint256 borrowed = 150e18;
+        uint256 troveCollBefore = ITroveManager(TROVE_MANAGER).getTroveColl(address(vault));
+
+        vm.deal(user, deposited);
+        vm.prank(user);
+        vault.depositAndBorrow{value: deposited}(borrowed, address(0), address(0));
+
+        assertEq(vault.collateral(user), deposited, "the deposit leg landed");
+        assertEq(vault.debtOf(user), borrowed, "and so did the borrow leg");
+        assertEq(IMUSD(MUSD).balanceOf(user), borrowed, "holding real MUSD after one transaction");
+        assertEq(
+            ITroveManager(TROVE_MANAGER).getTroveColl(address(vault)),
+            troveCollBefore + deposited,
+            "the BTC went into the real trove"
+        );
+        assertGe(vault.collateralRatioOf(user), vault.MIN_BORROW_CR(), "above the 180% floor");
+
+        // 3. Repay it with a permit, against the real token, with zero prior allowance.
+        assertEq(IMUSD(MUSD).allowance(user, address(vault)), 0, "precondition: never approved");
+
+        uint256 deadline = block.timestamp + 1 hours;
+        bytes32 structHash = keccak256(
+            abi.encode(PERMIT_TYPEHASH, user, address(vault), borrowed, IMUSD(MUSD).nonces(user), deadline)
+        );
+        (uint8 v, bytes32 r, bytes32 s) =
+            vm.sign(userPk, keccak256(abi.encodePacked("\x19\x01", domain, structHash)));
+
+        vm.prank(user);
+        vault.repayWithPermit(borrowed, deadline, v, r, s, address(0), address(0));
+
+        assertEq(vault.debtOf(user), 0, "the loan is cleared");
+        assertEq(vault.debtShares(user), 0);
+        assertEq(IMUSD(MUSD).balanceOf(user), 0, "the real MUSD went back");
+        assertEq(IMUSD(MUSD).allowance(user, address(vault)), 0, "the permit allowance was fully spent");
+        assertEq(IMUSD(MUSD).nonces(user), 1, "the deployed token consumed exactly one nonce");
     }
 }
