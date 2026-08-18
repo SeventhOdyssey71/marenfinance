@@ -158,9 +158,28 @@ import {Math} from "@openzeppelin/contracts/utils/math/Math.sol";
  * about in advance.
  * ----------------------------------------------------------------------------
  *
- * DESIGN NOTE (EIP-7702): `deposit`, `borrow`, `repay` and `withdraw` are separate,
- * independently callable entrypoints rather than one monolithic `depositAndBorrow`, so a
- * 7702-delegated account can batch permit + deposit + borrow + pay in a single transaction.
+ * ---------------------------- COMPOSED ENTRYPOINTS --------------------------
+ * `deposit`, `borrow`, `repay` and `withdraw` are separate, independently callable
+ * entrypoints, so a 7702-delegated account can batch permit + deposit + borrow + pay in a
+ * single transaction. That covers the wallets that can batch. Most cannot, and asking a
+ * first-time user for two or three signed transactions to end up with MUSD in hand is where
+ * they leave. `depositAndBorrow` and `repayWithPermit` are the two composites that remove a
+ * transaction each, and they are composites in the literal sense: both call the SAME
+ * internals the single-step entrypoints call, so there is exactly one copy of the deposit
+ * arithmetic and exactly one copy of the borrow arithmetic in this file.
+ *
+ * That is not a style preference. This project has already shipped two money bugs from one
+ * piece of borrow arithmetic written out twice and then fixed in only one place
+ * (docs/research/CODEBASE-AUDIT.md §1). A composite that re-derives what it composes is the
+ * same mistake with a shorter fuse, because the second copy lives next to the first and looks
+ * right. `depositAndBorrow` therefore contains no arithmetic at all.
+ *
+ * ONE DELIBERATE DIFFERENCE FROM CALLING THE TWO IN SEQUENCE, and it is the reason to use it:
+ * the composite is ATOMIC. If the borrow leg fails, the deposit leg is rolled back with it, so
+ * a user who asked for "deposit 0.01 and draw 300" never ends up holding a deposit they did
+ * not want on its own. Two separate transactions would leave the deposit standing. The revert
+ * REASON is identical either way; the surviving state is not.
+ * ----------------------------------------------------------------------------
  */
 contract MarenVault is AccessControl, ERC2771Context, ReentrancyGuard {
     using SafeERC20 for IERC20;
@@ -449,9 +468,7 @@ contract MarenVault is AccessControl, ERC2771Context, ReentrancyGuard {
      *      additionally checks the trove's own ICR.
      */
     function deposit(address upperHint, address lowerHint) external payable nonReentrant {
-        if (depositsPaused) revert DepositsArePaused();
-        uint256 amount = msg.value;
-        if (amount < MIN_DEPOSIT) revert DepositBelowMinimum(amount, MIN_DEPOSIT);
+        _requireDepositAllowed(msg.value);
 
         address user = _msgSender();
         // Before anything else, and before the cap is measured: a redemption may have shrunk
@@ -459,15 +476,7 @@ contract MarenVault is AccessControl, ERC2771Context, ReentrancyGuard {
         _syncState();
         _settleRedemption(user);
 
-        uint256 newTotal = totalCollateral + amount;
-        if (newTotal > depositCap) revert DepositCapExceeded(newTotal, depositCap);
-
-        collateral[user] += amount;
-        totalCollateral = newTotal;
-        idleCollateral += amount;
-
-        bool pushed = _tryPushCollateral(amount, upperHint, lowerHint);
-        emit Deposited(user, amount, collateral[user], pushed);
+        _creditDeposit(user, msg.value, upperHint, lowerHint);
     }
 
     /**
@@ -476,37 +485,60 @@ contract MarenVault is AccessControl, ERC2771Context, ReentrancyGuard {
      *      possible against a protocol whose minimum is 1,800.
      */
     function borrow(uint256 amount, address upperHint, address lowerHint) external nonReentrant {
-        if (borrowingPaused) revert BorrowingIsPaused();
-        if (amount == 0) revert ZeroAmount();
-        if (!troveOpen) revert TroveNotOpen();
+        _requireBorrowAllowed(amount);
 
         address user = _msgSender();
         _syncState();
         _settleRedemption(user);
-        uint256 price = _price();
 
-        uint256 outstandingBefore = _outstandingDebt();
-        uint256 reserve = reserveMUSD;
-        bool fromReserve = reserve >= amount;
-        if (fromReserve) {
-            reserveMUSD = reserve - amount;
-        } else {
-            reserveMUSD = 0;
-            // Drawing more debt mints MUSD to this contract and adds amount + fee to the trove.
-            borrowerOperations.withdrawMUSD(amount - reserve, upperHint, lowerHint);
-        }
+        _borrow(user, amount, upperHint, lowerHint);
+    }
 
-        uint256 debtAdded = _mintDebtShares(user, outstandingBefore);
+    /**
+     * @notice Deposit BTC and draw MUSD against it in one transaction.
+     * @dev This is `deposit` followed by `borrow` and nothing else. It calls the same two
+     *      internals those entrypoints call, in the same order, with the same checks, so the
+     *      revert a caller gets from this is the revert they would have got from whichever of
+     *      the two single calls failed first:
+     *
+     *        `DepositsArePaused` / `DepositBelowMinimum`:  the deposit leg's own guards
+     *        `BorrowingIsPaused` / `ZeroAmount` / `TroveNotOpen`: the borrow leg's
+     *        `TroveNoLongerActive`:                        the shared state sync
+     *        `DepositCapExceeded`:                         measured after the sync
+     *        `PriceFeedUnavailable`:                       the borrow leg needs a price
+     *        `InsufficientCollateralRatio`:                the 180% per-user floor
+     *        `TroveCollateralRatioTooLow`:                 the 180% pooled-trove floor
+     *
+     *      The 180% floor is computed on the POST-deposit position, because `_creditDeposit`
+     *      has already run when `_borrow` reads `collateral[user]`. A user depositing 0.01 BTC
+     *      and drawing against it is measured on the 0.01 BTC, which is the only reading that
+     *      makes the call useful.
+     *
+     *      No new event. This emits `Deposited` then `Borrowed`, the same two an indexer
+     *      already parses, in the same transaction and in that order.
+     *
+     *      Both legs are atomic together. See the COMPOSED ENTRYPOINTS note at the top of this
+     *      file for why that is the point and what it costs.
+     */
+    function depositAndBorrow(uint256 amount, address upperHint, address lowerHint)
+        external
+        payable
+        nonReentrant
+    {
+        // Both guard sets run before either leg executes, and in the order the single calls run
+        // them. Checking the borrow's guards up front is what stops a doomed borrow from
+        // burning the caller's gas on an `addColl` the revert is about to undo.
+        _requireDepositAllowed(msg.value);
+        _requireBorrowAllowed(amount);
 
-        uint256 userDebt = debtOf(user);
-        uint256 cr = _collateralRatio(collateral[user], userDebt, price);
-        if (cr < MIN_BORROW_CR) revert InsufficientCollateralRatio(cr, MIN_BORROW_CR);
+        address user = _msgSender();
+        // One sync and one settlement for both legs. Running them twice would be harmless and
+        // wasteful: the second pass finds nothing, because the first cleared it.
+        _syncState();
+        _settleRedemption(user);
 
-        uint256 troveCr = troveManager.getCurrentICR(address(this), price);
-        if (troveCr < MIN_TROVE_CR) revert TroveCollateralRatioTooLow(troveCr, MIN_TROVE_CR);
-
-        IERC20(address(musd)).safeTransfer(user, amount);
-        emit Borrowed(user, amount, debtAdded, userDebt, fromReserve);
+        _creditDeposit(user, msg.value, upperHint, lowerHint);
+        _borrow(user, amount, upperHint, lowerHint);
     }
 
     /**
@@ -515,6 +547,64 @@ contract MarenVault is AccessControl, ERC2771Context, ReentrancyGuard {
      */
     function repay(uint256 amount, address upperHint, address lowerHint) external nonReentrant {
         address user = _msgSender();
+        _syncState();
+        _settleRedemption(user);
+        uint256 repaid = _repay(user, amount, upperHint, lowerHint);
+        emit Repaid(user, repaid, debtOf(user));
+    }
+
+    /**
+     * @notice Approve and repay in one call, so the separate approval transaction disappears.
+     * @dev MUSD is EIP-2612. Verified against the deployed matsnet token rather than against
+     *      Mezo's documentation, which this project does not trust on its own: the runtime
+     *      bytecode at 0x118917a40FAF1CD7a13dB0Ef56C86De7973Ac503 contains the selector
+     *      0xd505accf for the canonical
+     *      `permit(address,address,uint256,uint256,uint8,bytes32,bytes32)`, and a static call
+     *      to it with an expired deadline reverts with OpenZeppelin's
+     *      `ERC2612ExpiredSignature(uint256)` rather than falling through a fallback. See
+     *      IMUSD.sol for the full record. `test_fork_composedEntrypointsAgainstTheRealContracts`
+     *      signs against that token's own DOMAIN_SEPARATOR and repays through it.
+     *
+     *      THE PERMIT IS TRY/CATCHED ON PURPOSE, and this is the one part worth reading twice.
+     *      A permit signature sits in the public mempool, and anyone at all can lift it and
+     *      submit it straight to MUSD ahead of this transaction. That is not an attack on the
+     *      user's funds, because the permit only ever grants an allowance to THIS contract,
+     *      and submitting it does exactly what the user signed for. What it does is consume
+     *      the nonce, so the inner `permit` here reverts on a signature that has already done
+     *      its job, and a perfectly valid repayment would fail for a reason the user cannot
+     *      act on. Swallowing that failure and continuing is the standard mitigation.
+     *
+     *      It is not a way to repay on someone else's behalf without authorisation. The
+     *      allowance is the authorisation, and the `safeTransferFrom` inside `_repay` still
+     *      demands a real one; if the permit genuinely failed and no allowance exists, that
+     *      transfer reverts with MUSD's own `ERC20InsufficientAllowance`. Same shape and same
+     *      reasoning as `MarenPay.payWithPermit`; if you change one, change both.
+     *
+     *      The permit runs before the state sync only because that mirrors MarenPay. The order
+     *      cannot matter: `permit` touches nothing in this contract, and anything that reverts
+     *      afterwards unwinds it along with everything else.
+     *
+     *      ONE CAVEAT, stated rather than buried. The permit is signed for `amount`, so closing
+     *      out with `type(uint256).max` means signing a permit for `type(uint256).max`, and
+     *      MUSD, like every OpenZeppelin ERC-20, treats a maximum allowance as infinite and
+     *      never decrements it, leaving this contract permanently approved. `_repay` still
+     *      transfers only the debt, so nothing extra moves in this call, but the standing
+     *      approval outlives it. To close out without that, sign for the exact figure
+     *      `previewDebtOf` reports plus a small margin for the interest that accrues between
+     *      signing and landing, and pass that same figure as `amount`; repaying more than you
+     *      owe repays exactly what you owe.
+     */
+    function repayWithPermit(
+        uint256 amount,
+        uint256 deadline,
+        uint8 v,
+        bytes32 r,
+        bytes32 s,
+        address upperHint,
+        address lowerHint
+    ) external nonReentrant {
+        address user = _msgSender();
+        _applyPermit(user, amount, deadline, v, r, s);
         _syncState();
         _settleRedemption(user);
         uint256 repaid = _repay(user, amount, upperHint, lowerHint);
@@ -1307,6 +1397,91 @@ contract MarenVault is AccessControl, ERC2771Context, ReentrancyGuard {
     // ------------------------------------------------------------------ //
     //                       Internals — operations                       //
     // ------------------------------------------------------------------ //
+
+    /**
+     * @dev Everything `deposit` checks BEFORE the state sync, and it stays before it. On a pool
+     *      whose trove has left the active state `_syncState` reverts with
+     *      `TroveNoLongerActive`, so moving these two behind it would change a paused or
+     *      undersized deposit's revert reason in exactly the case a user most needs the honest
+     *      one. `depositAndBorrow` gets the same ordering by calling the same function.
+     */
+    function _requireDepositAllowed(uint256 amount) private view {
+        if (depositsPaused) revert DepositsArePaused();
+        if (amount < MIN_DEPOSIT) revert DepositBelowMinimum(amount, MIN_DEPOSIT);
+    }
+
+    /**
+     * @dev The deposit itself, after the sync. The cap is measured HERE and not alongside the
+     *      other two checks, because a redemption shrinks `totalCollateral`, and a deposit that
+     *      only fits once the reconciliation has landed has to be allowed to fit.
+     */
+    function _creditDeposit(address user, uint256 amount, address upperHint, address lowerHint) private {
+        uint256 newTotal = totalCollateral + amount;
+        if (newTotal > depositCap) revert DepositCapExceeded(newTotal, depositCap);
+
+        collateral[user] += amount;
+        totalCollateral = newTotal;
+        idleCollateral += amount;
+
+        bool pushed = _tryPushCollateral(amount, upperHint, lowerHint);
+        emit Deposited(user, amount, collateral[user], pushed);
+    }
+
+    /// @dev Everything `borrow` checks before the state sync, for the same reason as
+    ///      `_requireDepositAllowed`.
+    function _requireBorrowAllowed(uint256 amount) private view {
+        if (borrowingPaused) revert BorrowingIsPaused();
+        if (amount == 0) revert ZeroAmount();
+        if (!troveOpen) revert TroveNotOpen();
+    }
+
+    /**
+     * @dev The borrow itself, after the sync. THE ONLY COPY of this arithmetic in the contract:
+     *      `borrow` and `depositAndBorrow` both land here, so there is no second version to
+     *      drift out of step with the first.
+     *
+     *      It reads `collateral[user]` for the 180% check, which means whatever the caller
+     *      credited before calling it is counted. `borrow` credits nothing, so the check is on
+     *      the standing position; `depositAndBorrow` credits the deposit first, so the check is
+     *      on the post-deposit position. Both are correct and both are the same code.
+     */
+    function _borrow(address user, uint256 amount, address upperHint, address lowerHint) private {
+        uint256 price = _price();
+
+        uint256 outstandingBefore = _outstandingDebt();
+        uint256 reserve = reserveMUSD;
+        bool fromReserve = reserve >= amount;
+        if (fromReserve) {
+            reserveMUSD = reserve - amount;
+        } else {
+            reserveMUSD = 0;
+            // Drawing more debt mints MUSD to this contract and adds amount + fee to the trove.
+            borrowerOperations.withdrawMUSD(amount - reserve, upperHint, lowerHint);
+        }
+
+        uint256 debtAdded = _mintDebtShares(user, outstandingBefore);
+
+        uint256 userDebt = debtOf(user);
+        uint256 cr = _collateralRatio(collateral[user], userDebt, price);
+        if (cr < MIN_BORROW_CR) revert InsufficientCollateralRatio(cr, MIN_BORROW_CR);
+
+        uint256 troveCr = troveManager.getCurrentICR(address(this), price);
+        if (troveCr < MIN_TROVE_CR) revert TroveCollateralRatioTooLow(troveCr, MIN_TROVE_CR);
+
+        IERC20(address(musd)).safeTransfer(user, amount);
+        emit Borrowed(user, amount, debtAdded, userDebt, fromReserve);
+    }
+
+    /// @dev See `repayWithPermit` for why a failure here is swallowed rather than bubbled.
+    function _applyPermit(address owner, uint256 amount, uint256 deadline, uint8 v, bytes32 r, bytes32 s)
+        private
+    {
+        try musd.permit(owner, address(this), amount, deadline, v, r, s) {}
+            catch {
+            // Permit already consumed (front-run) or otherwise unusable. If the allowance is
+            // genuinely missing, the transferFrom inside `_repay` reverts, which is correct.
+        }
+    }
 
     function _repay(address user, uint256 amount, address upperHint, address lowerHint)
         private
