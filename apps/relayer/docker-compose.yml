@@ -1,0 +1,66 @@
+# Maren relayer: single-VM deployment.
+#
+#   cp .env.relayer.example .env.relayer     # then fill it in
+#   docker compose -f apps/relayer/docker-compose.yml up -d --build
+#   curl -s localhost:8787/healthz | jq
+#
+# Run from the repo root. `build.context: ../..` makes the build context the
+# workspace root, which the Dockerfile needs for the lockfile.
+#
+# ONE INSTANCE. The nonce queue and the (payer, nonce) duplicate guard are
+# in-process (see the header of src/nonce.ts). Two copies of this container
+# sharing one hot key will allocate the same nonce twice and the chain will keep
+# one of the transactions. Do not scale this service; run a second relayer with
+# its own key if you need more throughput.
+
+services:
+  relayer:
+    build:
+      context: ../..
+      dockerfile: apps/relayer/Dockerfile
+    image: maren-relayer:local
+    restart: unless-stopped
+    # See the note above. `--scale relayer=2` is a nonce collision, not capacity.
+    deploy:
+      replicas: 1
+    env_file:
+      - .env.relayer
+    environment:
+      PORT: 8787
+    ports:
+      # Bound to loopback on purpose. Put TLS in front of this (Caddy, nginx,
+      # Cloudflare Tunnel) rather than exposing the relayer directly: the web
+      # app calls it from a browser, so it needs a certificate and a stable
+      # hostname, and neither belongs in this process.
+      - '127.0.0.1:8787:8787'
+    volumes:
+      # The keystore and its passphrase file, read-only. Both files must be
+      # readable by uid 1000 (the image's `node` user) and by nobody else:
+      #   chown 1000:1000 secrets/* && chmod 600 secrets/*
+      # The relayer WARNs on /healthz if it finds either one group- or
+      # world-readable.
+      - ${MAREN_SECRETS_DIR:-./secrets}:/run/secrets/maren:ro
+    # Must exceed RELAYER_SHUTDOWN_DRAIN_MS (default 20s). A SIGKILL during the
+    # window between "nonce allocated" and "broadcast returned" leaves a nonce
+    # gap that stalls every later transaction until it is filled.
+    stop_grace_period: 30s
+    healthcheck:
+      # /healthz makes no RPC calls, so a flaky public Mezo endpoint cannot
+      # restart-loop a healthy relayer. It answers 503 while the relayer is
+      # refusing to relay, which is the correct state for a misconfigured one.
+      test:
+        [
+          'CMD',
+          'node',
+          '-e',
+          "fetch('http://127.0.0.1:8787/healthz').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))",
+        ]
+      interval: 15s
+      timeout: 5s
+      retries: 3
+      start_period: 20s
+    logging:
+      driver: json-file
+      options:
+        max-size: '10m'
+        max-file: '5'

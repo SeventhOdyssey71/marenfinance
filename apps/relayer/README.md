@@ -138,6 +138,54 @@ sending traffic at a relayer that will refuse.
 `problems` is the operator's first stop. A non-empty `problems` array means this
 relayer will not relay, and each entry says exactly why.
 
+### `GET /healthz`
+
+The **deployment probe**, and the runtime tripwire for the budget. Unlike
+`/health` it makes **no RPC calls**, so it is cheap enough to poll on a
+five-second container healthcheck and a flaky public Mezo endpoint cannot
+restart-loop a relayer that is otherwise fine. Same 503-when-refusing rule.
+
+```jsonc
+{
+  "ok": true,
+  "accepting": true,
+  "relayer": "0x…",
+  "chainId": 31611,
+  "network": "testnet",
+  "keySource": "keystore-file", // "keystore-file" | "keystore" | "env" | null
+  "singleInstance": true, // stated, not implied. See Known limitations
+  "nonce": { "next": 42, "inFlight": 0, "queued": 0, "resyncs": 0 },
+  "lastSubmitted": { "hash": "0x…", "nonce": 41, "at": "2026-08-18T22:00:00.000Z" },
+  "lastSubmittedBlock": "9275123", // last transaction of ours that got a receipt
+  "budget": {
+    "day": "2026-08-18",
+    "limitWei": "…",
+    "committedWei": "…", // broadcast and never refunded. Only this can halt the day
+    "reservedWei": "…", // committed plus in-flight. What the cap is enforced against
+    "inFlightWei": "…", // the gap. Non-zero with nothing in flight means a leak
+    "remainingWei": "…",
+    "committedPct": 12.5,
+    "reservedPct": 12.5,
+    "halted": false,
+    "pendingRefunds": 0,
+  },
+  "store": "memory",
+  "watching": 2,
+  "warnings": [], // allowed, but not production-shaped. Does not stop relaying
+  "problems": [],
+}
+```
+
+The budget block exists because of a measured defect: adversarial round 2 found
+concurrent requests overshooting the daily cap by 52×, and a running relayer in
+that state reported `accepting: true` and a budget it believed was intact. Three
+numbers rather than one, because collapsing them is how the overshoot hid.
+
+Two log lines pair with it, both WARN, both emitted once per crossing and only
+for requests that were actually admitted: `quota.near_limit` when an address or
+IP passes 80% of its daily cap, and `budget.near_limit` when reservations pass
+80% of the daily BTC budget.
+
 ---
 
 ## Threat model
@@ -166,7 +214,7 @@ many addresses and many IPs, and read every response we produce.
 | T6  | Replay a signed request                                                                        | Forwarder nonce must equal the on-chain nonce, and the deadline must be in the future and no further out than `RELAYER_MAX_DEADLINE_SECONDS`.                                                                                                                                                                                                                                                                           |
 | T7  | Replay across networks or forwarders                                                           | The EIP-712 domain binds chain id and the verifying contract. A mainnet signature does not verify on testnet, and a signature for another forwarder does not verify here.                                                                                                                                                                                                                                               |
 | T8  | Make us send BTC somewhere                                                                     | `value != 0` is refused unconditionally. There is no configuration that enables it.                                                                                                                                                                                                                                                                                                                                     |
-| T9  | Collide nonces with concurrent requests                                                        | Allocation and broadcast happen inside one serialised critical section per key. Failures invalidate the cached nonce and force a chain resync.                                                                                                                                                                                                                                                                          |
+| T9  | Collide nonces with concurrent requests                                                        | Allocation and broadcast happen inside one serialised critical section per key, proven by a test that fails if any two broadcasts overlap. Any failure invalidates the cached nonce; a rejection that names the nonce refetches the **pending** nonce and retries once, so a key stranded behind a consumed nonce recovers without a restart.                                                                           |
 | T10 | Get us to relay while misconfigured                                                            | Configuration parsing never guesses. Any unresolved gate puts the service into a refusing state where `POST /relay` returns 503 and nothing is signed.                                                                                                                                                                                                                                                                  |
 | T11 | Point us at an RPC that cannot simulate                                                        | A boot preflight asserts the endpoint serves `eth_call`, `eth_estimateGas`, `eth_getBlockByNumber` and friends, not merely that it answers. See [Known limitations](#known-limitations) for the real incident behind this.                                                                                                                                                                                              |
 | T12 | Read secrets out of logs                                                                       | Signatures, private keys, passwords and raw bodies are never passed to the logger, and `pino`'s redaction list is a second layer. Client IPs are logged as a salted hash.                                                                                                                                                                                                                                               |
@@ -299,9 +347,10 @@ Every rule below is a specific failure from the Talise audit (2026-07-24: 7 Crit
 
 | Variable                          | Example                          | Notes                                                                                                                                             |
 | --------------------------------- | -------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `RELAYER_PRIVATE_KEY`             | `0x…` (32 bytes)                 | **or** the keystore pair below. Exactly one.                                                                                                      |
-| `RELAYER_KEYSTORE_PATH`           | `~/.foundry/keystores/maren`     | A `cast wallet import` keystore.                                                                                                                  |
-| `RELAYER_KEYSTORE_PASSWORD`       |                                  | Required with the path.                                                                                                                           |
+| `RELAYER_KEYSTORE_PATH`           | `~/.foundry/keystores/maren`     | **Preferred.** A `cast wallet import` keystore.                                                                                                   |
+| `RELAYER_KEYSTORE_PASSWORD_FILE`  | `/run/secrets/maren/passphrase`  | **Preferred.** The passphrase, in a file. Exactly one trailing newline is stripped.                                                               |
+| `RELAYER_KEYSTORE_PASSWORD`       |                                  | The passphrase in the environment instead. Accepted, warned about.                                                                                |
+| `RELAYER_PRIVATE_KEY`             | `0x…` (32 bytes)                 | **Development only.** Warned about at every boot, and a boot _problem_ on mainnet.                                                                |
 | `RELAYER_FORWARDER_ADDRESS`       | `0x…`                            | Falls back to `MAREN_ADDRESSES` in `@maren/sdk` — a real `MarenRelayHub` address on matsnet since 15 Aug 2026, still the zero address on mainnet. |
 | `RELAYER_ALLOWED_TARGETS`         | `marenPay:0x…,marenRegistry:0x…` | `name:address` pairs. Unknown name ⇒ boot problem. Falls back to the non-zero SDK addresses.                                                      |
 | `RELAYER_MAX_DAILY_SPONSORED_BTC` | `0.01`                           | **No default.** Unset ⇒ nothing is sponsored.                                                                                                     |
@@ -408,6 +457,12 @@ is also per instance only.
 
 ### Deploying standalone — the only supported target
 
+**[`DEPLOY.md`](./DEPLOY.md) is the step-by-step version of this section**: a
+Dockerfile, a `docker-compose.yml`, a `fly.toml`, how to create and mount the
+keystore, how much BTC to fund, a curl smoke test, and the list of gates that
+mainnet is still behind. It also states plainly that **the relayer is not
+running anywhere yet**: nothing in this repository has been deployed.
+
 `pnpm --filter @maren/relayer start`. This is the shape that gets the stuck-transaction
 sweeper, and therefore the only one where settlement reconciliation and deferred refund
 draining actually run.
@@ -435,7 +490,10 @@ stalls every later transaction. Verified working:
 | `RELAYER_UNDERFUNDED`                                               | Hot key out of BTC                                        | Top up. Keep days of float, not months.                                                                                                                                                                                                                                                                                                                                                                       |
 | `problems` mentions "no configured RPC endpoint serves the methods" | Every RPC failed the capability preflight                 | Usually transient — Mezo endpoints can briefly answer `-32601` while a backend is degraded. Re-probe by hand before concluding an endpoint is broken, then restart. Add endpoints to `RELAYER_RPC_URLS` rather than removing them.                                                                                                                                                                            |
 | `tx.replaced` warnings                                              | Fees too low for current conditions                       | Normal, self-healing. Persistent ⇒ investigate the queue.                                                                                                                                                                                                                                                                                                                                                     |
-| Rising `inFlight` on `/health`                                      | Broadcasts are not completing                             | Check RPC health; the nonce queue is serialised, so one stuck broadcast blocks the rest.                                                                                                                                                                                                                                                                                                                      |
+| Rising `inFlight` on `/health`                                      | Broadcasts are not completing                             | Check RPC health; the nonce queue is serialised, so one stuck broadcast blocks the rest. `/healthz` reports `nonce.queued`, which is how many users are waiting behind it.                                                                                                                                                                                                                                    |
+| Rising `nonce.resyncs` on `/healthz`                                | Broadcasts keep failing, so the cached nonce is discarded | One or two is noise. A rising count is an RPC or mempool problem, or something else spending from the hot key.                                                                                                                                                                                                                                                                                                |
+| `quota.near_limit` / `budget.near_limit` WARN                       | An address, an IP, or the budget crossed 80%              | Informational by design: logged once per crossing, and only for requests that were admitted. A steady stream from one address is worth looking at before it becomes a 429.                                                                                                                                                                                                                                    |
+| `/healthz` `budget.inFlightWei` non-zero with nothing in flight     | Leaked reservations                                       | Compare with `pendingRefunds`. A persistent gap is budget the relayer believes is spent and is not, which is the shape the 52x overshoot took.                                                                                                                                                                                                                                                                |
 
 ### Rotating the hot key
 
@@ -514,10 +572,16 @@ document.
   provider's permanent capabilities. If every endpoint fails the preflight the
   relayer refuses to relay until restarted; on a chain this flaky that is a real
   availability trade, taken deliberately in favour of never burning BTC blind.
-- **Nonce serialisation is per instance.** Two Vercel instances can still race on
-  nonce allocation. The mitigation is that a failed broadcast invalidates the cached
-  nonce and forces a chain resync, but a shared nonce lease is the real fix if this
-  runs multi-instance under load.
+- **Nonce serialisation is per instance, and one instance is the design.** The queue
+  is in-process, so it serialises submissions within one relayer and not across two.
+  That is why `docker-compose.yml` pins `replicas: 1`, `fly.toml` pins one machine
+  with no autoscaling and no blue-green deploy, and `/healthz` reports
+  `singleInstance: true` rather than leaving the assumption in a comment. Run two
+  copies against one key and both allocate from their own cached counter. The
+  mitigations are that a failed broadcast invalidates the cached nonce and that a
+  "nonce too low" rejection refetches the pending nonce and retries once, but a
+  shared nonce lease is the real fix if this ever needs to scale horizontally, and
+  it is deliberately not built.
 - **The stuck-transaction sweeper does not run on serverless.** There is no process
   between requests. Run standalone, or drive replacement from an external cron.
 - **Redis counters are 64-bit signed.** Spend is tracked in wei, so the daily BTC cap

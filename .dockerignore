@@ -1,0 +1,28 @@
+# Build context for apps/relayer/Dockerfile. The build runs from the repo root,
+# so this file lives at the root too. A .dockerignore beside the Dockerfile is
+# not read for a root-context build, which is the usual way this goes wrong.
+node_modules
+**/node_modules
+.git
+.github
+.claude
+.next
+**/.next
+.turbo
+**/.turbo
+dist
+**/dist
+out
+**/out
+coverage
+**/coverage
+docs
+packages/contracts
+apps/web
+apps/ios
+tools
+_grant
+*.log
+.env
+.env.*
+!.env.example
