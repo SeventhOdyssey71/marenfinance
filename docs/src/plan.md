@@ -62,9 +62,9 @@ which is currently zero by construction.
 
 ## The app
 
-One product, two clients. The web app and the iOS app share the same SDK, the same
-contract reads, and the same rules, so a number shown on one is the number shown on
-the other.
+One product, two clients sharing one SDK, so a rule enforced on one is the rule on the
+other. The web app runs live against matsnet today; the iOS app runs the same screens
+on a mock layer with identical signatures, and goes live by replacing one file.
 
 ### Home
 

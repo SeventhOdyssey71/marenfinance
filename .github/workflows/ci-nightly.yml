@@ -4,7 +4,7 @@
 # reasons, and both runnable on a laptop:
 #
 #   cd packages/contracts
-#   MEZO_TESTNET_RPC_URL=https://rpc.test.mezo.org forge test --match-path 'test/fork/*' -vv
+#   MEZO_TESTNET_RPC_URL=https://rpc.test.mezo.org forge test --match-path 'test/fork/*' --threads 1 -vv
 #   forge coverage --report lcov --ir-minimum   # then read src/MarenVault.sol out of lcov.info
 #
 # WHY NIGHTLY AND NOT PER PULL REQUEST
@@ -104,7 +104,7 @@ jobs:
       - name: Fork tests against matsnet
         env:
           MEZO_TESTNET_RPC_URL: https://rpc.test.mezo.org
-        run: forge test --match-path 'test/fork/*' -vv
+        run: forge test --match-path 'test/fork/*' --threads 1 -vv
 
   coverage:
     name: Coverage floor (MarenVault)
