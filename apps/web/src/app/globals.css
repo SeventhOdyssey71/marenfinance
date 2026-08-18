@@ -69,6 +69,9 @@
     --color-text-subtle: #82828c;
     --color-violet-400: #5b3df5;
     --color-violet-900: #ece8ff;
+    /* BTC orange as TEXT fails on the light page (2.14:1); this is the darkened
+       text-safe value the iOS theme derived (5.41:1 on the worst surface). */
+    --color-btc: #9a5300;
     --color-success: #0f9d6a;
     --color-warning: #b45309;
     --color-danger: #dc2626;
