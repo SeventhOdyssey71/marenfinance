@@ -2,12 +2,12 @@
 title: Maren Finance — Grant Package Overview
 subtitle: What is built, what is verified, what is not done, and how to check every claim without trusting us.
 docId: MRN-000
-date: 2026-08-17
+date: 2026-08-19
 version: '1.0'
 classification: Confidential
 audience: Mezo Ecosystem
 colophon: |
-  Every number on this page was read live from Mezo RPCs on 17 August 2026. The counts
+  Every number on this page was read live from Mezo RPCs on 19 August 2026. The counts
   drift daily and are quoted to the precision at which they hold. Where this page and a
   longer document disagree, the chain wins, and the verification appendix in MRN-002
   shows how to ask it.
@@ -22,7 +22,7 @@ which is our answer to the separate-deployment and exclusivity questions.
 
 ## The thesis in three numbers
 
-| Measured 17 August 2026, Mezo mainnet |                           |
+| Measured 19 August 2026, Mezo mainnet |                           |
 | ------------------------------------- | ------------------------- |
 | Troves open                           | fewer than thirty         |
 | MUSD holders                          | more than 29,000          |
@@ -37,7 +37,7 @@ borrower.
 
 Five contracts, source-verified on Blockscout, led by MarenVault at
 `0x46252B00AB59384518d9dB6D1f210ffF1221645b`. The pooled trove is active inside MUSD's
-own TroveManager at **220% ICR** with borrowing enabled, and the `@sele` handle is
+own TroveManager at **223% ICR** with borrowing enabled, and the `@sele` handle is
 registered through commit-reveal. 302 contract tests plus 11 forked against real
 matsnet MUSD; 282 on the relayer. The web app reads and writes these contracts live,
 including a real user borrow; the iOS app runs the same screens on a mock layer with
@@ -46,7 +46,7 @@ identical signatures, pending live wiring.
 ## The product, as it runs today
 
 Screenshots below are unretouched captures of the web app in a read-only session
-against live matsnet, taken 17 August 2026. Every figure in them is a contract read;
+against live matsnet. Every figure in them is a contract read;
 the borrow offer shown is the preflighted maximum the deployed vault would actually
 accept at that moment.
 

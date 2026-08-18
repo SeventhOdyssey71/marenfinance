@@ -2,12 +2,12 @@
 title: Maren Finance — Progress & Evidence
 subtitle: What has been built so far, deployed where, proven how, and the exact commands and transaction hashes that let you check every claim without trusting us.
 docId: MRN-100
-date: 2026-08-17
+date: 2026-08-19
 version: '1.3'
 classification: Confidential
 audience: Mezo Ecosystem
 colophon: |
-  Every chain figure in this document was read live from Mezo RPCs on 17 August 2026,
+  Every chain figure in this document was read live from Mezo RPCs on 19 August 2026,
   and each one is paired with the command, address, or transaction hash that
   reproduces it. Counts that drift daily are quoted at the precision at which they
   hold. Where Mezo's published documentation and the deployed bytecode disagree, this
@@ -99,7 +99,7 @@ referenced in this section is listed here in full, and each resolves on
 ### The pooled trove is live inside Mezo's own TroveManager
 
 Opened with `openPooledTrove` at 762,931 gas. It currently holds 0.069 BTC of
-collateral against 2,001.9 MUSD of debt: an ICR of **220%**, with borrowing enabled.
+collateral against 2,002.0 MUSD of debt: an ICR of **223%**, with borrowing enabled.
 One call verifies it:
 
 ```bash
@@ -166,8 +166,7 @@ account nonce is read before and after as the final check.
 
 ## The product, as it runs today
 
-Unretouched captures of the web app in a read-only session against live matsnet,
-17 August 2026. Every figure shown is a contract read.
+Unretouched captures of the web app in a read-only session against live matsnet. Every figure shown is a contract read.
 
 ![Portfolio. A funded account with no debt: 0.001 BTC deposited, and the interface states plainly that nothing can be liquidated while debt is zero.](assets/app-portfolio.png)
 
