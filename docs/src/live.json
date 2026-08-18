@@ -1,0 +1,32 @@
+{
+  "readAt": "2026-08-18T21:40:20.459Z",
+  "source": "tools/docs/stamp-live.mjs",
+  "note": "Generated. Numbers in the documents are placed by hand; this file is what you check them against.",
+  "mainnet": {
+    "chainId": 31612,
+    "blockNumber": 11223333,
+    "troveCount": 25,
+    "troveOwnersCount": 25,
+    "troveCountAgrees": true,
+    "btcPriceUsd": "64546.56",
+    "btcPriceRaw": "64546567440000000000000",
+    "oracleUpdatedAt": "2026-08-18T21:40:14.000Z"
+  },
+  "matsnet": {
+    "chainId": 31611,
+    "blockNumber": 14970255,
+    "vault": "0x46252B00AB59384518d9dB6D1f210ffF1221645b",
+    "collateralBtc": "0.069061",
+    "debtMusd": "2001.97",
+    "icrPercent": "222.6",
+    "btcPriceUsd": "64545.74",
+    "oracleUpdatedAt": "2026-08-18T21:40:13.000Z"
+  },
+  "quotedIn": {
+    "mainnet.troveCount": ["docs/src/01-thesis.md", "docs/ARCHITECTURE.md"],
+    "mainnet.btcPriceUsd": ["docs/src/01-thesis.md", "docs/ARCHITECTURE.md"],
+    "matsnet.collateralBtc": ["docs/src/progress.md"],
+    "matsnet.debtMusd": ["docs/src/progress.md"],
+    "matsnet.icrPercent": ["docs/src/progress.md"]
+  }
+}

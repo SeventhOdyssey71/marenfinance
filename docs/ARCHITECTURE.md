@@ -48,6 +48,46 @@ Four surfaces, one account.
 
 Solidity `0.8.28`, Foundry, OpenZeppelin v5. All in `packages/contracts/src/`.
 
+The whole system on one page. Solid arrows are calls; dotted arrows are meta-transactions
+that reach a contract through the trusted forwarder, which is how a user with zero BTC
+gets a transaction on chain. Everything inside "Mezo MUSD" belongs to Mezo, not to us.
+
+```mermaid
+flowchart TD
+  WALLET["User wallets"]
+  WALLET --> WEB["Web"]
+  WALLET --> IOS["iOS"]
+  WEB --> SDK["@maren/sdk"]
+  IOS --> SDK
+
+  SDK --> HUB["MarenRelayHub"]
+  SDK --> VAULT["MarenVault"]
+  SDK --> PAY["MarenPay"]
+  SDK --> REG["MarenRegistry"]
+  SDK --> EARN["MarenEarn"]
+
+  RELAYER["Relayer"] --> HUB
+  HUB -.-> VAULT
+  HUB -.-> PAY
+  HUB -.-> REG
+  HUB -.-> EARN
+
+  KEEPER["Keeper"] --> VAULT
+
+  subgraph MEZO["Mezo MUSD"]
+    TROVES["Trove system"]
+    POOL["Stability Pool"]
+  end
+
+  VAULT --> TROVES
+  EARN --> POOL
+```
+
+What the picture cannot show: the single line from `MarenVault` into the trove system is
+one trove held on behalf of every depositor, which is where all of the pooling risk in
+section 3.4 lives. The keeper is the only thing standing between a fast BTC drawdown and
+that line.
+
 ### 3.1 `MarenForwarder` — gasless execution
 
 ERC-2771 trusted forwarder (OpenZeppelin `ERC2771Forwarder`). Users sign an EIP-712

@@ -51,6 +51,9 @@ DerivedData/
 # testing
 coverage/
 .nyc_output/
+# `forge coverage --report lcov` drops this in packages/contracts. The nightly reads it
+# for the MarenVault floor and uploads it as an artifact; it is never committed.
+lcov.info
 
 # logs
 *.log
