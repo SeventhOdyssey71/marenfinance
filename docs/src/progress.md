@@ -141,12 +141,12 @@ process that caught it is the same one behind every other number on this page.
 
 ## Test evidence
 
-| Suite                            | Count | Runs against                                  |
-| -------------------------------- | ----: | --------------------------------------------- |
-| Contract unit and property tests |   236 | Foundry                                       |
-| Fork tests                       |     8 | The real MUSD contracts on matsnet            |
-| Relayer                          |   214 | Four adversarial review rounds                |
-| Web behaviour suite              |    87 | The built app, live matsnet, read-only signer |
+| Suite                            | Count | Runs against                                                            |
+| -------------------------------- | ----: | ----------------------------------------------------------------------- |
+| Contract unit and property tests |   302 | Foundry, including the redemption splitter and the composed entrypoints |
+| Fork tests                       |    11 | The real MUSD contracts on matsnet, including a driven redemption       |
+| Relayer                          |   282 | Four adversarial review rounds, plus packaging and nonce serialisation  |
+| Web behaviour suite              |   103 | The built app, live matsnet, read-only signer                           |
 
 Three of these deserve a sentence each.
 
