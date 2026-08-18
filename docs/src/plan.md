@@ -2,7 +2,7 @@
 title: Maren Finance — Product Plan
 subtitle: A money app for Bitcoin. Spend it in the real world, never sell it. The product, the phases, the economics, and how it is measured.
 docId: MRN-200
-date: 2026-08-17
+date: 2026-08-19
 version: '1.2'
 classification: Confidential
 audience: Mezo Ecosystem
@@ -10,7 +10,7 @@ colophon: |
   This document plans forward, and it marks the boundary honestly: sections describing
   what exists are stated as fact and are verifiable on-chain; sections describing what
   comes next are plans and say so; revenue figures are illustrative worked examples,
-  labelled as such, not projections. Chain figures were read live on 17 August 2026.
+  labelled as such, not projections. Chain figures were read live on 19 August 2026.
 ---
 
 ## The goal
