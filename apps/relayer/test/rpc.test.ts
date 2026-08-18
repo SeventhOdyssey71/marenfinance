@@ -74,7 +74,12 @@ describe('endpoint list resolution', () => {
     RELAYER_FORWARDER_ADDRESS: '0x1111111111111111111111111111111111111111',
     RELAYER_ALLOWED_TARGETS: 'marenPay:0x2222222222222222222222222222222222222222',
     RELAYER_MAX_DAILY_SPONSORED_BTC: '0.01',
-    RELAYER_PRIVATE_KEY: `0x${'11'.repeat(32)}`,
+    // A keystore rather than RELAYER_PRIVATE_KEY, because these cases resolve
+    // config for MAINNET and a raw key in the environment is a boot problem
+    // there. `loadConfig` only records the paths; nothing is read from disk
+    // until a chain adapter is built, which these cases do not do.
+    RELAYER_KEYSTORE_PATH: '/keys/maren-relayer',
+    RELAYER_KEYSTORE_PASSWORD_FILE: '/keys/maren-relayer.pass',
   };
 
   it('takes every endpoint from the SDK chain definition, in its order', () => {

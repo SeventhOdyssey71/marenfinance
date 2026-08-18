@@ -14,6 +14,17 @@ import { settle, type ReceiptReader, type Settlement } from './receipt.js';
  *
  * The queue is a promise chain rather than a lock library so there is nothing to
  * leak: a rejected job still advances the chain (see `#enqueue`).
+ *
+ * SINGLE-INSTANCE ASSUMPTION. This is in-process, so it serialises submissions
+ * only within one running relayer. It is correct because this service is
+ * deployed as exactly ONE process holding exactly ONE key: `docker-compose.yml`
+ * pins `replicas: 1`, `fly.toml` pins one machine with no autoscaling, and the
+ * serverless target is refused outright in `create.ts`. Run two copies of this
+ * process against one key and both allocate from their own cached counter; the
+ * second transaction at a given nonce is dropped by the node. `/healthz` reports
+ * `singleInstance: true` so this assumption is visible at runtime rather than
+ * only in a comment. A shared nonce lease is the fix if this ever needs to scale
+ * horizontally, and it is deliberately not built here.
  */
 
 export interface GasFees {
@@ -49,11 +60,40 @@ export interface NonceManagerOptions {
   readonly logger: Logger;
 }
 
+/** What a submission looked like, for `/healthz`. Never carries a signature. */
+export interface LastSubmission {
+  readonly nonce: number;
+  readonly hash: Hash;
+  /** Epoch milliseconds. */
+  readonly at: number;
+  readonly requestId: string;
+}
+
+/**
+ * Errors that mean "the nonce you used is not the nonce the node wants".
+ *
+ * Matched on the message because there is no portable code for it: geth,
+ * erigon, reth and Mezo's own gateway all phrase it differently, and viem wraps
+ * whatever the node said into `shortMessage`. A miss here is not a correctness
+ * problem: it costs one lazy resync on the next allocation instead of an
+ * immediate retry.
+ */
+const NONCE_MISMATCH =
+  /nonce (?:too low|too high|has already been used)|invalid (?:transaction )?nonce/i;
+
+function looksLikeNonceMismatch(error: unknown): boolean {
+  const message = error instanceof Error ? error.message : String(error);
+  return NONCE_MISMATCH.test(message);
+}
+
 export class NonceManager {
   readonly #options: NonceManagerOptions;
   #queue: Promise<unknown> = Promise.resolve();
   #next: number | null = null;
   #inFlight = 0;
+  #queued = 0;
+  #resyncs = 0;
+  #lastSubmission: LastSubmission | null = null;
 
   constructor(options: NonceManagerOptions) {
     this.#options = options;
@@ -61,6 +101,24 @@ export class NonceManager {
 
   get inFlight(): number {
     return this.#inFlight;
+  }
+
+  /**
+   * Submissions accepted and not yet finished, including the one running.
+   * Because submission is serialised, anything above 1 is queue depth: the
+   * number of users waiting behind one slow broadcast.
+   */
+  get queued(): number {
+    return this.#queued;
+  }
+
+  /** How many times a failed broadcast forced a nonce refetch. */
+  get resyncs(): number {
+    return this.#resyncs;
+  }
+
+  get lastSubmission(): LastSubmission | null {
+    return this.#lastSubmission;
   }
 
   /** Last nonce we believe we have used, or null before the first sync. */
@@ -74,7 +132,10 @@ export class NonceManager {
   }
 
   #enqueue<T>(job: () => Promise<T>): Promise<T> {
-    const run = this.#queue.then(job, job);
+    this.#queued += 1;
+    const run = this.#queue.then(job, job).finally(() => {
+      this.#queued -= 1;
+    });
     // Swallow rejections on the CHAIN only — the caller still receives them via
     // `run`. Without this a single failure would poison every later job.
     this.#queue = run.then(
@@ -85,12 +146,64 @@ export class NonceManager {
   }
 
   /**
+   * Read the PENDING nonce from the chain, for stuck-nonce recovery.
+   *
+   * Called from inside the critical section, so no other submission can
+   * interleave with the read. `pending` (see `chain.ts`) counts transactions
+   * sitting in the mempool, so a nonce this process already broadcast is not
+   * handed out again after a transport error that lost the response.
+   *
+   * The result is deliberately NOT cached into `#next` by this method. It is
+   * used for the one immediate retry below, and only a retry that actually
+   * broadcasts is allowed to set the cached nonce, because a value read at failure time
+   * is stale the moment the transaction we thought had failed lands.
+   *
+   * Returns the refetched nonce, or null if the chain could not be read.
+   */
+  async #refetchPendingNonce(cause: unknown): Promise<number | null> {
+    try {
+      const chainNonce = await this.#options.getTransactionCount(this.#options.address);
+      this.#options.logger.warn(
+        {
+          event: 'nonce.refetched',
+          address: this.#options.address,
+          nonce: chainNonce,
+          resyncs: this.#resyncs,
+          err: cause,
+        },
+        'the node rejected our nonce; refetched the pending nonce from the chain',
+      );
+      return chainNonce;
+    } catch (error) {
+      this.#options.logger.error(
+        { event: 'nonce.refetch_failed', address: this.#options.address, err: error },
+        'could not refetch the pending nonce; the next allocation will read it from the chain',
+      );
+      return null;
+    }
+  }
+
+  /**
    * Allocate the next nonce and broadcast inside the critical section.
    *
    * On any error the cached nonce is invalidated rather than decremented: if the
    * transaction was in fact broadcast before the error surfaced, reusing its
-   * nonce would replace a transaction we already told a user about. A resync
-   * from the chain is the only safe recovery.
+   * nonce would replace a transaction we already told a user about. Refetching
+   * from the chain is the only safe recovery. Every invalidation is counted and
+   * reported on `/healthz` as `nonce.resyncs`, so a key whose nonce keeps
+   * slipping is visible before it becomes a stalled queue.
+   *
+   * STUCK-NONCE RECOVERY. When the node's rejection specifically says the nonce
+   * was wrong, the pending nonce is refetched immediately, inside this critical
+   * section, so nothing else can allocate against a number we already know is
+   * stale, and the broadcast is retried ONCE at the refetched nonce. Both
+   * conditions are required. A blanket retry on any broadcast error is how a
+   * transaction the node actually accepted gets sent twice; "nonce too low"
+   * specifically means this transaction was NOT accepted, because something else
+   * already occupies that slot. Only a retry that actually broadcasts is allowed
+   * to set the cached nonce; every other path leaves it null for the next
+   * allocation to resolve against the chain, because a number read at failure
+   * time is stale as soon as the transaction we thought had failed lands.
    *
    * KNOWN GAP — a throw here is treated by the caller as "not broadcast", and
    * that is not always true. If the RPC accepted the transaction but the
@@ -113,15 +226,50 @@ export class NonceManager {
         if (this.#next === null) {
           this.#next = await this.#options.getTransactionCount(this.#options.address);
         }
-        const nonce = this.#next;
+        let nonce = this.#next;
         let hash: Hash;
         try {
           hash = await submitter({ nonce, ...fees });
         } catch (error) {
+          // Invalidate FIRST and unconditionally. Everything after this line is
+          // recovery; if any of it throws, the next allocation still reads the
+          // nonce from the chain instead of reusing one we no longer trust.
           this.invalidate();
-          throw error;
+          this.#resyncs += 1;
+          if (!looksLikeNonceMismatch(error)) {
+            this.#options.logger.warn(
+              {
+                event: 'nonce.invalidated',
+                requestId: meta.requestId,
+                nonce,
+                resyncs: this.#resyncs,
+              },
+              'broadcast failed; the next allocation will refetch the pending nonce from the chain',
+            );
+            throw error;
+          }
+          const refetched = await this.#refetchPendingNonce(error);
+          if (refetched === null || refetched === nonce) throw error;
+          try {
+            hash = await submitter({ nonce: refetched, ...fees });
+          } catch (retryError) {
+            this.invalidate();
+            throw retryError;
+          }
+          this.#options.logger.warn(
+            {
+              event: 'nonce.recovered',
+              requestId: meta.requestId,
+              staleNonce: nonce,
+              nonce: refetched,
+              hash,
+            },
+            'broadcast rejected a stale nonce; resubmitted at the chain nonce',
+          );
+          nonce = refetched;
         }
         this.#next = nonce + 1;
+        this.#lastSubmission = { nonce, hash, at: Date.now(), requestId: meta.requestId };
         return {
           nonce,
           hash,

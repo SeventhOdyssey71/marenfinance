@@ -23,7 +23,7 @@ import {
 import type { ReceiptLike, ReceiptReader } from './receipt.js';
 import type { GasFees, SubmitContext } from './nonce.js';
 import type { RelayerConfig } from './config.js';
-import { loadKeystoreFile } from './keystore.js';
+import { loadKeystoreFile, readPassphraseFile } from './keystore.js';
 
 /**
  * Everything that talks to a Mezo node, behind one interface so the rest of the
@@ -55,12 +55,26 @@ function revertDetail(error: unknown): string {
   return 'unknown revert';
 }
 
+/**
+ * Resolve the hot key from whichever source config settled on.
+ *
+ * Nothing here logs, and no error raised below carries the key or the
+ * passphrase. `create.ts` puts the message straight into `problems`, which is
+ * served on `/health`.
+ */
 export async function resolvePrivateKey(config: RelayerConfig): Promise<Hex> {
-  if (config.key === null) {
+  const key = config.key;
+  if (key === null) {
     throw new Error('no signing key configured');
   }
-  if (config.key.kind === 'env') return config.key.privateKey;
-  return loadKeystoreFile(config.key.path, config.key.password);
+  switch (key.kind) {
+    case 'env':
+      return key.privateKey;
+    case 'keystore':
+      return loadKeystoreFile(key.path, key.password);
+    case 'keystore-file':
+      return loadKeystoreFile(key.path, await readPassphraseFile(key.passwordFile));
+  }
 }
 
 export interface ViemAdapterDeps {

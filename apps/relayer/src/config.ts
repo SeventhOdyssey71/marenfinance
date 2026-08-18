@@ -84,18 +84,47 @@ export interface RelayerConfig {
   readonly sweepIntervalMs: number;
 }
 
+/**
+ * How the hot key reaches this process, in descending order of preference.
+ *
+ * `keystore-file` is the intended production shape: an encrypted v3 keystore on
+ * disk plus a passphrase in a second file, which is the same pattern the rest of
+ * this repo uses for deploy keys (`cast wallet import` + `--password-file`).
+ * Neither secret is then readable from `/proc/<pid>/environ`, a `docker inspect`,
+ * a crash dump of the environment, or a shell history.
+ *
+ * `keystore` (passphrase in `RELAYER_KEYSTORE_PASSWORD`) is a middle ground: the
+ * key file is still encrypted at rest, but the passphrase is in the environment.
+ * Accepted, warned about.
+ *
+ * `env` (`RELAYER_PRIVATE_KEY`) is DEV ONLY. It is warned about loudly at every
+ * boot and is a hard boot problem on mainnet. See DEPLOY.md.
+ */
 export type KeySource =
   | { readonly kind: 'env'; readonly privateKey: `0x${string}` }
   | {
       readonly kind: 'keystore';
       readonly path: string;
       readonly password: string;
+    }
+  | {
+      readonly kind: 'keystore-file';
+      readonly path: string;
+      readonly passwordFile: string;
     };
+
+export type KeySourceKind = KeySource['kind'];
 
 export interface LoadedConfig {
   readonly config: RelayerConfig;
   /** Human-readable reasons this relayer will refuse to relay. Empty = healthy. */
   readonly problems: readonly string[];
+  /**
+   * Things that are allowed but should not be true in production. Unlike
+   * `problems` these do NOT stop the relayer; they are logged at boot and
+   * surfaced on `/healthz` so a degraded posture is visible rather than assumed.
+   */
+  readonly warnings: readonly string[];
 }
 
 export type Env = Record<string, string | undefined>;
@@ -321,39 +350,95 @@ function resolveRpcUrls(
 // key source
 // ---------------------------------------------------------------------------
 
-function buildKeySource(env: Env, problems: string[]): KeySource | null {
+/**
+ * Resolve the signing key source.
+ *
+ * The preference order is a security property, not a style choice, so it is
+ * enforced here rather than described in a README:
+ *
+ *   1. `RELAYER_KEYSTORE_PATH` + `RELAYER_KEYSTORE_PASSWORD_FILE`, preferred.
+ *   2. `RELAYER_KEYSTORE_PATH` + `RELAYER_KEYSTORE_PASSWORD`, warned.
+ *   3. `RELAYER_PRIVATE_KEY`, dev only,
+ *      warned loudly, and a boot PROBLEM on mainnet.
+ *
+ * Every ambiguous combination is a problem rather than a precedence rule. An
+ * operator who sets two of these has one belief about which key signs and we
+ * would be picking the other one silently.
+ */
+function buildKeySource(
+  env: Env,
+  network: MezoNetwork,
+  problems: string[],
+  warnings: string[],
+): KeySource | null {
   const privateKey = env['RELAYER_PRIVATE_KEY']?.trim();
   const keystorePath = env['RELAYER_KEYSTORE_PATH']?.trim();
   const keystorePassword = env['RELAYER_KEYSTORE_PASSWORD'];
+  const keystorePasswordFile = env['RELAYER_KEYSTORE_PASSWORD_FILE']?.trim();
 
-  if (
-    privateKey !== undefined &&
-    privateKey !== '' &&
-    keystorePath !== undefined &&
-    keystorePath !== ''
-  ) {
+  const hasPrivateKey = privateKey !== undefined && privateKey !== '';
+  const hasKeystorePath = keystorePath !== undefined && keystorePath !== '';
+  const hasPasswordFile = keystorePasswordFile !== undefined && keystorePasswordFile !== '';
+  const hasPassword = keystorePassword !== undefined;
+
+  if (hasPrivateKey && hasKeystorePath) {
     problems.push(
       'RELAYER_PRIVATE_KEY and RELAYER_KEYSTORE_PATH are both set; set exactly one so there is no ambiguity about which key signs',
     );
     return null;
   }
-  if (privateKey !== undefined && privateKey !== '') {
+  if (hasKeystorePath) {
+    if (hasPasswordFile && hasPassword) {
+      problems.push(
+        'RELAYER_KEYSTORE_PASSWORD_FILE and RELAYER_KEYSTORE_PASSWORD are both set; set exactly one so there is no ambiguity about which passphrase is tried',
+      );
+      return null;
+    }
+    if (hasPasswordFile) {
+      return { kind: 'keystore-file', path: keystorePath, passwordFile: keystorePasswordFile };
+    }
+    if (hasPassword) {
+      warnings.push(
+        'RELAYER_KEYSTORE_PASSWORD holds the keystore passphrase in the process environment, where anything that can read /proc/<pid>/environ or `docker inspect` can read it; RELAYER_KEYSTORE_PASSWORD_FILE is the preferred mode',
+      );
+      return { kind: 'keystore', path: keystorePath, password: keystorePassword };
+    }
+    problems.push(
+      'RELAYER_KEYSTORE_PATH is set but neither RELAYER_KEYSTORE_PASSWORD_FILE (preferred) nor RELAYER_KEYSTORE_PASSWORD is',
+    );
+    return null;
+  }
+  // A passphrase with no keystore is a typo with a misleading failure: without
+  // this, the operator is told "no signing key configured" while looking at a
+  // passphrase variable they can see they set.
+  if (hasPasswordFile || hasPassword) {
+    problems.push(
+      'a keystore passphrase is configured but RELAYER_KEYSTORE_PATH is not, so there is no keystore to unlock',
+    );
+    return null;
+  }
+  if (hasPrivateKey) {
     if (!/^0x[0-9a-fA-F]{64}$/.test(privateKey)) {
       // Deliberately does not echo the value.
       problems.push('RELAYER_PRIVATE_KEY is not a 32-byte 0x-prefixed hex string');
       return null;
     }
-    return { kind: 'env', privateKey: privateKey as `0x${string}` };
-  }
-  if (keystorePath !== undefined && keystorePath !== '') {
-    if (keystorePassword === undefined) {
-      problems.push('RELAYER_KEYSTORE_PATH is set but RELAYER_KEYSTORE_PASSWORD is not');
+    if (network === 'mainnet') {
+      // Not a warning. A raw key in the environment of a mainnet relayer is the
+      // shape where "it was only meant to be temporary" ends up holding real
+      // BTC, and there is no signal after boot that would ever surface it.
+      problems.push(
+        'RELAYER_PRIVATE_KEY is a development-only key mode and is not permitted on mainnet; use RELAYER_KEYSTORE_PATH + RELAYER_KEYSTORE_PASSWORD_FILE (a KMS/HSM signer is the documented mainnet prerequisite and is not implemented; see DEPLOY.md)',
+      );
       return null;
     }
-    return { kind: 'keystore', path: keystorePath, password: keystorePassword };
+    warnings.push(
+      'RELAYER_PRIVATE_KEY puts the raw hot key in the process environment. This is a DEVELOPMENT-ONLY mode: use RELAYER_KEYSTORE_PATH + RELAYER_KEYSTORE_PASSWORD_FILE for anything holding real BTC',
+    );
+    return { kind: 'env', privateKey: privateKey as `0x${string}` };
   }
   problems.push(
-    'no signing key configured: set RELAYER_PRIVATE_KEY, or RELAYER_KEYSTORE_PATH + RELAYER_KEYSTORE_PASSWORD for a `cast wallet` keystore',
+    'no signing key configured: set RELAYER_KEYSTORE_PATH + RELAYER_KEYSTORE_PASSWORD_FILE for a `cast wallet` keystore (preferred), or RELAYER_PRIVATE_KEY for local development',
   );
   return null;
 }
@@ -362,6 +447,7 @@ function buildKeySource(env: Env, problems: string[]): KeySource | null {
 
 export function loadConfig(env: Env): LoadedConfig {
   const problems: string[] = [];
+  const warnings: string[] = [];
 
   const network = resolveNetwork(env['RELAYER_NETWORK'] ?? env['NEXT_PUBLIC_MEZO_NETWORK']);
   const chain = getChain(network);
@@ -502,7 +588,7 @@ export function loadConfig(env: Env): LoadedConfig {
 
   const configuredIpSalt = env['RELAYER_IP_SALT']?.trim() || null;
 
-  const key = buildKeySource(env, problems);
+  const key = buildKeySource(env, network, problems, warnings);
 
   const config: RelayerConfig = {
     network,
@@ -526,5 +612,5 @@ export function loadConfig(env: Env): LoadedConfig {
     sweepIntervalMs: readInt(env, 'RELAYER_SWEEP_INTERVAL_MS', 10_000, problems, { min: 1000 }),
   };
 
-  return { config, problems };
+  return { config, problems, warnings };
 }

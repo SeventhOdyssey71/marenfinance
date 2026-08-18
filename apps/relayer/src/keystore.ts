@@ -1,4 +1,4 @@
-import { readFile } from 'node:fs/promises';
+import { readFile, stat } from 'node:fs/promises';
 import {
   createDecipheriv,
   pbkdf2 as pbkdf2Cb,
@@ -146,6 +146,56 @@ export async function decryptKeystore(document: unknown, password: string): Prom
     throw new KeystoreError(`decrypted key is ${plaintext.length} bytes, expected 32`);
   }
   return `0x${plaintext.toString('hex')}`;
+}
+
+/**
+ * Read a keystore passphrase from a file.
+ *
+ * This is the preferred way to give this service the passphrase, because a file
+ * is not visible in `/proc/<pid>/environ`, in `docker inspect`, in a process
+ * listing, or in whatever an error reporter decides to attach to a crash.
+ *
+ * EXACTLY ONE trailing newline is stripped, and nothing else. `echo secret >
+ * file` writes one, so not stripping it would fail every passphrase written the
+ * obvious way; stripping all trailing whitespace would silently mangle a
+ * passphrase that legitimately ends in a space, and the operator would see a MAC
+ * mismatch and go looking at the keystore instead of the file.
+ */
+export async function readPassphraseFile(path: string): Promise<string> {
+  let raw: string;
+  try {
+    raw = await readFile(path, 'utf8');
+  } catch {
+    throw new KeystoreError(`cannot read the keystore passphrase file at ${path}`);
+  }
+  const passphrase = raw.replace(/\r?\n$/, '');
+  if (passphrase.length === 0) {
+    // An empty file would otherwise be tried as an empty passphrase and fail at
+    // the MAC, which reads as "wrong password" rather than "the file is empty".
+    throw new KeystoreError(`the keystore passphrase file at ${path} is empty`);
+  }
+  return passphrase;
+}
+
+/**
+ * Warn about a secret file that anyone on the box can read.
+ *
+ * Returns a message or null; never throws, and never blocks boot. A keystore is
+ * encrypted and a passphrase file is one `chmod` away from correct, so refusing
+ * to start would be a worse trade than saying so out loud, but a 0644
+ * passphrase file beside a 0644 keystore is the whole protection gone, and that
+ * should not be something an operator has to notice for themselves.
+ */
+export async function secretFileModeWarning(path: string, label: string): Promise<string | null> {
+  try {
+    const info = await stat(path);
+    const mode = info.mode & 0o777;
+    if ((mode & 0o077) === 0) return null;
+    return `${label} at ${path} is mode ${mode.toString(8).padStart(3, '0')}; it is readable by other users on this host. \`chmod 600\` it.`;
+  } catch {
+    // A file we cannot stat is a problem the loader will report properly.
+    return null;
+  }
 }
 
 /** Read and decrypt a keystore file from disk. */
