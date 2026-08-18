@@ -139,16 +139,39 @@ MEZO_TESTNET_RPC_URL=https://rpc.test.mezo.org forge test --match-path 'test/for
 ### `tools/pdf` — the document builder
 
 ```bash
-CI=true pnpm docs:pdf                # docs/src/*.md -> docs/build/*.pdf (nine)
+CI=true pnpm docs:pdf                # docs/src/*.md -> docs/build/*.pdf (eleven)
 CI=true pnpm docs:preview
+CI=true pnpm docs:stamp              # refresh docs/src/live.json from both chains
 ```
 
-Needs a real Chrome. Set `MAREN_PDF_CHROME` if it is not on a standard path. The nine
+Needs a real Chrome. Set `MAREN_PDF_CHROME` if it is not on a standard path. The eleven
 PDFs are **committed intentionally** so reviewers can read them without a toolchain.
 
 The PDF build is deliberately _not_ wired into `turbo run build`. Its package scripts are
 named `docs:pdf` and `docs:preview` rather than `build`, so a root `pnpm build` never
-needs a browser and never rebuilds nine documents to check that TypeScript compiles.
+needs a browser and never rebuilds eleven documents to check that TypeScript compiles.
+
+### Numbers that rot
+
+Some documents quote live chain figures: the mainnet trove count and BTC price in
+`01-thesis.md`, the matsnet pooled trove's collateral, debt, and ICR in `progress.md`.
+`pnpm docs:stamp` reads all of them and writes `docs/src/live.json`, printing what moved
+since the last run.
+
+It does **not** rewrite prose, on purpose. "Mezo mainnet carries 27 troves. Not 27
+thousand. Twenty-seven." cannot be updated by a regular expression, and an argument built
+on a number deserves a human re-reading it when the number moves. The script exists so
+checking costs one command rather than six `cast` calls.
+
+Before sending documents to anyone who will verify the figures:
+
+```bash
+CI=true pnpm docs:stamp                      # read the chains, see what drifted
+# fix any prose the diff shows is now wrong, by hand
+DOCS_REQUIRE_FRESH=1 CI=true pnpm docs:pdf   # refuses if live.json is over 24h old
+```
+
+`DOCS_REQUIRE_FRESH` is off by default so an offline or air-gapped build never breaks.
 
 ---
 
@@ -166,7 +189,7 @@ CI=true pnpm lint
 CI=true pnpm build
 CI=true pnpm test              # expect 345 passing
 CI=true pnpm contracts:test    # expect 236 passing, 8 skipped
-CI=true pnpm docs:pdf          # expect nine PDFs
+CI=true pnpm docs:pdf          # expect eleven PDFs
 ```
 
 Inside `packages/contracts`, CI additionally runs the gas snapshot and coverage:
@@ -203,6 +226,32 @@ Be honest with yourself about the gaps rather than trusting a green run:
 - Without `anvil`, the relayer's chain tests skip rather than fail.
 - The eight fork tests skip without `MEZO_TESTNET_RPC_URL`. Run them before changing
   anything that touches the MUSD interfaces.
+
+### What the nightly checks instead
+
+Two gates live in `.github/workflows/ci-nightly.yml` rather than on the pull-request
+path, and both run on a laptop:
+
+```bash
+cd packages/contracts
+MEZO_TESTNET_RPC_URL=https://rpc.test.mezo.org forge test --match-path 'test/fork/*' -vv
+forge coverage --report lcov --ir-minimum   # then read src/MarenVault.sol out of lcov.info
+```
+
+The fork suite talks to a live public RPC, so putting it on the merge path would let a
+Mezo outage block a Maren merge. Not running it at all is worse: Mezo has shipped
+divergences between its documentation and its deployed bytecode before, and `MarenVault`
+is written against that bytecode. Nightly turns protocol drift into a failure waiting in
+the morning instead of a discovery made mid-deployment.
+
+The coverage floor is 88% of lines on `src/MarenVault.sol`, against a measured 90.9%
+(399/439). It is nightly because `--ir-minimum` is slow, and the floor sits below the
+real figure on purpose: a floor set at today's number goes red on the first refactor that
+adds a line, and a gate that fails for a non-reason gets switched off.
+
+A green nightly does **not** prove the fork suite ran. It skips every test when the RPC
+is unreachable, which is what stops a flaky night paging anyone. Read the pass/skip
+counts in the log before concluding anything from a green tick.
 
 ---
 

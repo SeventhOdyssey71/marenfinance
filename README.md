@@ -114,7 +114,7 @@ that never renders in a non-TTY, and it looks exactly like a network hang.
 | iOS        | `CI=true pnpm --filter @maren/ios start`, then `i` for Simulator |
 | Relayer    | `CI=true pnpm --filter @maren/relayer dev`                       |
 | Contracts  | `forge build --sizes` inside `packages/contracts`                |
-| Documents  | `CI=true pnpm docs:pdf` builds nine PDFs into `docs/build`       |
+| Documents  | `CI=true pnpm docs:pdf` builds eleven PDFs into `docs/build`     |
 
 The iOS app runs `start`, not `dev`, so a root `pnpm dev` does not launch Expo.
 
@@ -161,6 +161,12 @@ The full sequence CI runs, and how to run each gate locally, is documented in th
 of [`.github/workflows/ci.yml`](.github/workflows/ci.yml). On a pull request only the
 areas that changed are exercised; every push to `main` runs all of it.
 
+Two slower gates run nightly instead, in
+[`.github/workflows/ci-nightly.yml`](.github/workflows/ci-nightly.yml): the fork suite
+against live matsnet, so a change to Mezo's deployed bytecode surfaces as a morning
+failure rather than as a surprise during a deployment, and an 88% line-coverage floor on
+`MarenVault`.
+
 ## How this repository treats facts
 
 **Every number a user sees is read from the chain.** There is no mock mode in the web app
@@ -197,15 +203,15 @@ Do not add an address to this repository that you have not verified with `cast`.
 
 ## Documentation
 
-| Document                                                                 | What it covers                                      |
-| ------------------------------------------------------------------------ | --------------------------------------------------- |
-| [`CONTRIBUTING.md`](CONTRIBUTING.md)                                     | Each workspace, the full check sequence, deploying  |
-| [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md)                           | The technical case, contract by contract            |
-| [`docs/DEPLOYMENTS.md`](docs/DEPLOYMENTS.md)                             | Live addresses, tx hashes, findings from the run    |
-| [`docs/BRAND.md`](docs/BRAND.md)                                         | Design system, the source of truth for both apps    |
-| [`docs/research/SECURITY-LESSONS.md`](docs/research/SECURITY-LESSONS.md) | R1 to R17, the review criteria a PR must satisfy    |
-| [`docs/research/CODEBASE-AUDIT.md`](docs/research/CODEBASE-AUDIT.md)     | Structural audit: what is clean, what is not        |
-| `docs/src/*.md`                                                          | The nine documents that build to `docs/build/*.pdf` |
+| Document                                                                 | What it covers                                        |
+| ------------------------------------------------------------------------ | ----------------------------------------------------- |
+| [`CONTRIBUTING.md`](CONTRIBUTING.md)                                     | Each workspace, the full check sequence, deploying    |
+| [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md)                           | The technical case, contract by contract              |
+| [`docs/DEPLOYMENTS.md`](docs/DEPLOYMENTS.md)                             | Live addresses, tx hashes, findings from the run      |
+| [`docs/BRAND.md`](docs/BRAND.md)                                         | Design system, the source of truth for both apps      |
+| [`docs/research/SECURITY-LESSONS.md`](docs/research/SECURITY-LESSONS.md) | R1 to R17, the review criteria a PR must satisfy      |
+| [`docs/research/CODEBASE-AUDIT.md`](docs/research/CODEBASE-AUDIT.md)     | Structural audit: what is clean, what is not          |
+| `docs/src/*.md`                                                          | The eleven documents that build to `docs/build/*.pdf` |
 
 The PDFs in `docs/build` are committed so they can be read without a local toolchain.
 
@@ -218,9 +224,12 @@ or reorder Maren meta-transactions and can waste its own BTC. It cannot move use
 because every value transfer downstream is a `transferFrom` under the user's own
 authorisation.
 
-Report vulnerabilities privately to **security@maren.finance**, not through a public
-issue.
+Report vulnerabilities privately, not through a public issue. [`SECURITY.md`](SECURITY.md)
+has the contact address, what is in scope, and what response times to expect. It also
+states plainly which contracts hold user funds and are unaudited.
 
 ## Licence
 
-MIT. Copyright 2026 Maren Finance.
+Proprietary. Copyright 2026 Maren Finance / Sele, all rights reserved. No use without
+written permission. See [`LICENSE`](LICENSE); whether any part of this is released under
+an open source licence is an open question rather than a settled no.

@@ -30,10 +30,14 @@
 # Expected counts, so a silent skip is visible as a wrong number:
 #   forge test              236 passed, 8 skipped (the fork suite needs a matsnet RPC)
 #   pnpm test               345 passed: sdk 62, web 36, ios 33, relayer 214
-#   pnpm docs:pdf           9 documents into docs/build
+#   pnpm docs:pdf           11 documents into docs/build
 #
 # On a pull request only the areas that changed are exercised. Every push to main runs
 # everything, so main is always checked end to end regardless of what the PR touched.
+#
+# Two gates are deliberately NOT here, in `.github/workflows/ci-nightly.yml`: the fork
+# suite against live matsnet, and the MarenVault coverage floor. The first would put a
+# third-party RPC outage on the merge path; the second is slow. That file explains both.
 
 name: CI
 

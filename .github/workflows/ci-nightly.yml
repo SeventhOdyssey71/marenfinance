@@ -1,0 +1,195 @@
+# Maren Finance nightly.
+#
+# Two gates that are deliberately NOT on the pull-request path, for two different
+# reasons, and both runnable on a laptop:
+#
+#   cd packages/contracts
+#   MEZO_TESTNET_RPC_URL=https://rpc.test.mezo.org forge test --match-path 'test/fork/*' -vv
+#   forge coverage --report lcov --ir-minimum   # then read src/MarenVault.sol out of lcov.info
+#
+# WHY NIGHTLY AND NOT PER PULL REQUEST
+#
+# The fork suite talks to a live public RPC. Putting a third-party network on the
+# merge path means an outage at Mezo blocks a Maren merge, which is the wrong trade.
+# But not running it at all is worse: Mezo has shipped divergences between its docs
+# and its deployed bytecode before, and MarenVault is written against that bytecode.
+# Protocol drift that nobody notices is drift that reaches mainnet. Running it nightly
+# turns "Mezo changed something" into a failure waiting in the morning rather than a
+# discovery made during a deployment.
+#
+# Coverage needs `--ir-minimum`, which compiles the whole tree through a different
+# pipeline with the optimizer off. It is slow. `ci.yml` already runs
+# `forge coverage --report summary --ir-minimum` for its compile-path value; the
+# threshold check lives here so a slow numeric gate never sits between a change and a
+# merge.
+#
+# ON FLAKY NIGHTS
+#
+# `continue-on-error` is false on both jobs: a red night is meant to be red. That is
+# safe because MarenVaultForkTest skips every test in the file when
+# MEZO_TESTNET_RPC_URL is unset OR the RPC is unreachable, rather than failing. So an
+# unreachable matsnet produces a GREEN run full of skips, not a page. A red fork job
+# means the RPC answered and the answer was not what MarenVault expects, which is
+# exactly the signal this workflow exists to deliver. The skip logic is in
+# packages/contracts/test/fork/MarenVault.fork.t.sol; if that ever stops being true,
+# this comment is the thing that was wrong.
+#
+# The consequence to keep in mind: a green nightly does not prove the fork suite ran.
+# The step prints the pass/skip counts, so read them before concluding anything from
+# a green tick.
+
+name: Nightly
+
+on:
+  schedule:
+    # 05:17 UTC daily. Early enough to be waiting when the day starts, and off the hour
+    # because GitHub's scheduler queues on-the-hour crons behind everyone else's.
+    - cron: '17 5 * * *'
+  # So the same two gates can be run on demand without waiting for tomorrow.
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  fork:
+    name: Fork suite (live matsnet)
+    runs-on: ubuntu-latest
+    continue-on-error: false
+    defaults:
+      run:
+        working-directory: packages/contracts
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Install Foundry
+        uses: foundry-rs/foundry-toolchain@v1
+        with:
+          version: stable
+
+      # Same key as ci.yml, so a nightly can restore what a push to main already
+      # compiled. Paths are relative to the workspace root, not to
+      # `defaults.run.working-directory`.
+      - name: Cache Foundry artefacts
+        uses: actions/cache@v4
+        with:
+          path: |
+            packages/contracts/cache
+            packages/contracts/out
+          key: >-
+            foundry-${{ runner.os }}-${{ hashFiles(
+              'packages/contracts/foundry.toml',
+              'packages/contracts/foundry.lock',
+              'packages/contracts/remappings.txt',
+              'packages/contracts/src/**/*.sol',
+              'packages/contracts/test/**/*.sol',
+              'packages/contracts/script/**/*.sol'
+            ) }}
+          restore-keys: foundry-${{ runner.os }}-
+
+      - name: Show forge version
+        run: forge --version
+
+      # -vv so a revert reason is in the log. A fork failure is read once, at breakfast,
+      # by someone who does not want to re-run it locally to find out what happened.
+      #
+      # Read the summary line: "8 skipped" means matsnet was unreachable and this run
+      # proved nothing. Anything other than 0 failed is real protocol drift.
+      - name: Fork tests against matsnet
+        env:
+          MEZO_TESTNET_RPC_URL: https://rpc.test.mezo.org
+        run: forge test --match-path 'test/fork/*' -vv
+
+  coverage:
+    name: Coverage floor (MarenVault)
+    runs-on: ubuntu-latest
+    continue-on-error: false
+    defaults:
+      run:
+        working-directory: packages/contracts
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Install Foundry
+        uses: foundry-rs/foundry-toolchain@v1
+        with:
+          version: stable
+
+      - name: Cache Foundry artefacts
+        uses: actions/cache@v4
+        with:
+          path: |
+            packages/contracts/cache
+            packages/contracts/out
+          key: >-
+            foundry-${{ runner.os }}-${{ hashFiles(
+              'packages/contracts/foundry.toml',
+              'packages/contracts/foundry.lock',
+              'packages/contracts/remappings.txt',
+              'packages/contracts/src/**/*.sol',
+              'packages/contracts/test/**/*.sol',
+              'packages/contracts/script/**/*.sol'
+            ) }}
+          restore-keys: foundry-${{ runner.os }}-
+
+      # `--ir-minimum` is not optional: without it coverage compilation runs out of
+      # stack slots on MarenVault. It also turns the optimizer off, which is a
+      # different compilation from `forge test` and has already caught two tests that
+      # only passed under the legacy pipeline.
+      - name: Coverage report
+        run: forge coverage --report lcov --ir-minimum
+
+      # The floor is 88% against a measured 90.9%, so roughly two percentage points of
+      # headroom. That gap is deliberate: a floor set at the current number fails on the
+      # first refactor that adds a line, and a gate that fails for a non-reason gets
+      # switched off. Raise it when the real figure moves up, never lower it to make a
+      # red run green.
+      - name: Line coverage floor for src/MarenVault.sol
+        env:
+          FILE: src/MarenVault.sol
+          FLOOR: '88'
+        run: |
+          set -euo pipefail
+          test -f lcov.info || { echo "::error::forge coverage wrote no lcov.info"; exit 1; }
+
+          # lcov records are per source file: SF: opens one, LF/LH carry the line totals.
+          # An absent record is a failure, not a 0%. It means the file was renamed or
+          # excluded, and silently reporting "no coverage data" as a pass is exactly the
+          # hole this gate exists to close.
+          read -r found lf lh < <(awk -F: -v want="$FILE" '
+            $1 == "SF" { file = $2; next }
+            file == want && $1 == "LF" { lf = $2 }
+            file == want && $1 == "LH" { lh = $2; found = 1 }
+            END { print (found ? "1" : "0"), lf + 0, lh + 0 }
+          ' lcov.info)
+
+          if [ "$found" != "1" ] || [ "$lf" -eq 0 ]; then
+            echo "::error::no lcov record for $FILE. Was it renamed?"
+            grep '^SF:' lcov.info || true
+            exit 1
+          fi
+
+          pct=$(awk -v lh="$lh" -v lf="$lf" 'BEGIN { printf "%.2f", 100 * lh / lf }')
+          echo "$FILE: $lh/$lf lines covered ($pct%), floor $FLOOR%"
+
+          if awk -v pct="$pct" -v floor="$FLOOR" 'BEGIN { exit !(pct < floor) }'; then
+            echo "::error::$FILE line coverage $pct% is below the $FLOOR% floor"
+            exit 1
+          fi
+          echo "coverage floor met"
+
+      - name: Upload lcov
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: maren-coverage-lcov
+          path: packages/contracts/lcov.info
+          if-no-files-found: error

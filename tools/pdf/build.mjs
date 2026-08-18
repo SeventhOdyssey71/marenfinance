@@ -6,6 +6,12 @@
  *   pnpm docs:pdf -- --only 01    build only documents whose filename contains "01"
  *   pnpm docs:pdf -- --keep-html  leave the intermediate HTML in docs/.tmp for inspection
  *
+ *   DOCS_REQUIRE_FRESH=1 pnpm docs:pdf
+ *     Refuse to build when docs/src/live.json was stamped more than 24 hours ago.
+ *     Off by default so an offline build never breaks. Turn it on before sending
+ *     documents to anyone who will check the numbers against the chain. Refresh with
+ *     `node tools/docs/stamp-live.mjs`.
+ *
  * Markdown in docs/src/*.md, with YAML frontmatter, becomes a branded A4 PDF in
  * docs/build. Each document is printed in three parts and merged:
  *
@@ -31,6 +37,7 @@ import { launchBrowser, startServer, loadPage } from './lib/browser.mjs';
 import { extractPageNumbers } from './lib/pages.mjs';
 import { renderDeck } from './lib/deck.mjs';
 import { deckCss, SLIDE_W, SLIDE_H, SLIDE_W_IN, SLIDE_H_IN } from './lib/deck-styles.mjs';
+import { assertFreshIfRequired } from '../docs/stamp-live.mjs';
 
 const require = createRequire(import.meta.url);
 const HERE = path.dirname(fileURLToPath(import.meta.url));
@@ -321,6 +328,16 @@ async function main() {
   const args = parseArgs(process.argv.slice(2));
 
   console.log('\nMaren Finance · document build');
+
+  // Opt-in freshness gate. Off unless DOCS_REQUIRE_FRESH=1, so an offline build never
+  // breaks; on, it refuses to print documents whose live numbers were last checked more
+  // than 24 hours ago. Set it before sending anything to someone who will verify the
+  // figures against the chain. See tools/docs/stamp-live.mjs.
+  const freshness = await assertFreshIfRequired(process.env);
+  if (freshness.checked) {
+    const hours = (freshness.ageMs / 3_600_000).toFixed(1);
+    log(`live numbers stamped ${hours}h ago (${freshness.readAt})`);
+  }
 
   await fs.mkdir(OUT_DIR, { recursive: true });
   await fs.mkdir(TMP_DIR, { recursive: true });
