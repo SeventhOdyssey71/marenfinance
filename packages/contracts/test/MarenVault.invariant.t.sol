@@ -68,6 +68,25 @@ contract VaultHandler is CommonBase, StdCheats, StdUtils {
         callCount++;
     }
 
+    /**
+     * @dev The composed entrypoint, driven under exactly the same invariants as its two halves.
+     *      The ghost ledger is credited only when the WHOLE call landed, which is the invariant
+     *      statement of atomicity: a composite whose borrow leg failed must leave no deposit
+     *      behind, and `invariant_nobodyWithdrawsMoreThanTheyDeposited` would catch it if the
+     *      contract disagreed.
+     */
+    function depositAndBorrow(uint256 actorSeed, uint256 collAmount, uint256 debtAmount) external {
+        address a = _actor(actorSeed);
+        collAmount = bound(collAmount, vault.MIN_DEPOSIT(), 10 ether);
+        debtAmount = bound(debtAmount, 1e18, 5_000e18);
+        vm.deal(a, collAmount);
+        vm.prank(a);
+        try vault.depositAndBorrow{value: collAmount}(debtAmount, address(0), address(0)) {
+            ghostDeposited[a] += collAmount;
+        } catch {}
+        callCount++;
+    }
+
     function repay(uint256 actorSeed, uint256 amount) external {
         address a = _actor(actorSeed);
         amount = bound(amount, 1e18, 5_000e18);
