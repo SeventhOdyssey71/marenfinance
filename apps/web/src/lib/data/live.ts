@@ -82,24 +82,79 @@ export async function readPosition(ctx: LiveContext): Promise<Position> {
   const musd = getMusdAddresses(ctx.network);
   const maren = getMarenAddresses(ctx.network);
 
-  const [coll, principal, interest, pendingColl, pendingPrincipal, pendingInterest] =
-    await ctx.client.readContract({
-      address: musd.troveManager,
-      abi: troveManagerAbi,
-      functionName: 'getEntireDebtAndColl',
-      args: [ctx.account],
-    });
+  /**
+   * ONE ROUND TRIP, NOT TWO.
+   *
+   * This used to read the trove, look at the answer, and only then issue the reads the
+   * answer implied. That is a data dependency the chain does not actually have: both
+   * branches are `view` functions of the same block, and asking for all of them at once
+   * costs one extra staticcall inside a batch the client was sending anyway, while asking
+   * in sequence costs a whole second network round trip on the app's busiest screen.
+   *
+   * These are separate `readContract` calls rather than one `client.multicall`, and that
+   * is deliberate. The client coalesces same-window reads into a single aggregate3 itself
+   * (see `lib/wagmi.ts`), and it can only do that across FUNCTIONS — a hand-rolled
+   * `multicall` here would arrive as calldata the batcher must leave alone, so the
+   * portfolio would go back to five requests, one per hook, instead of one for all of them.
+   */
+  const [trove, directCapacity, vaultCollateral, vaultDebt, vaultBorrowable, troveCapacity] =
+    await Promise.all([
+      ctx.client.readContract({
+        address: musd.troveManager,
+        abi: troveManagerAbi,
+        functionName: 'getEntireDebtAndColl',
+        args: [ctx.account],
+      }),
+      /**
+       * Only meaningful when the account has a trove of its own. An account that does not
+       * is the common case, and MUSD is entitled to revert on it, so the failure is
+       * absorbed here and the DIRECT branch below insists on a real value rather than
+       * substituting a zero — a borrowing ceiling of "0" and "we could not read your
+       * borrowing ceiling" are different sentences and only one of them is true.
+       */
+      ctx.client
+        .readContract({
+          address: musd.troveManager,
+          abi: troveManagerAbi,
+          functionName: 'getTroveMaxBorrowingCapacity',
+          args: [ctx.account],
+        })
+        .then((value) => value as bigint | null)
+        .catch(() => null),
+      ctx.client.readContract({
+        address: maren.marenVault,
+        abi: marenVaultAbi,
+        functionName: 'collateral',
+        args: [ctx.account],
+      }),
+      ctx.client.readContract({
+        address: maren.marenVault,
+        abi: marenVaultAbi,
+        functionName: 'previewDebtOf',
+        args: [ctx.account],
+      }),
+      ctx.client.readContract({
+        address: maren.marenVault,
+        abi: marenVaultAbi,
+        functionName: 'maxBorrowable',
+        args: [ctx.account],
+      }),
+      ctx.client.readContract({
+        address: maren.marenVault,
+        abi: marenVaultAbi,
+        functionName: 'troveMaxBorrowingCapacity',
+      }),
+    ]);
+
+  const [coll, principal, interest, pendingColl, pendingPrincipal, pendingInterest] = trove;
 
   if (coll + pendingColl > 0n) {
+    if (directCapacity === null) {
+      throw new Error('Mezo did not report this trove’s borrowing capacity.');
+    }
+
     // `principal` from Mezo's TroveManager already includes the 200 MUSD gas
     // compensation, so it is not added again here.
-    const capacity = await ctx.client.readContract({
-      address: musd.troveManager,
-      abi: troveManagerAbi,
-      functionName: 'getTroveMaxBorrowingCapacity',
-      args: [ctx.account],
-    });
-
     const totalPrincipal = principal + pendingPrincipal;
     const totalInterest = interest + pendingInterest;
 
@@ -110,37 +165,11 @@ export async function readPosition(ctx: LiveContext): Promise<Position> {
         totalPrincipal > MUSD_GAS_COMPENSATION ? totalPrincipal - MUSD_GAS_COMPENSATION : 0n,
       interestWei: totalInterest,
       interestRateBps: INTEREST_RATE_BPS,
-      maxBorrowingCapacityWei: capacity,
+      maxBorrowingCapacityWei: directCapacity,
       route: 'direct',
       openedAt: 0,
     };
   }
-
-  const [vaultCollateral, vaultDebt, vaultBorrowable, troveCapacity] = await Promise.all([
-    ctx.client.readContract({
-      address: maren.marenVault,
-      abi: marenVaultAbi,
-      functionName: 'collateral',
-      args: [ctx.account],
-    }),
-    ctx.client.readContract({
-      address: maren.marenVault,
-      abi: marenVaultAbi,
-      functionName: 'previewDebtOf',
-      args: [ctx.account],
-    }),
-    ctx.client.readContract({
-      address: maren.marenVault,
-      abi: marenVaultAbi,
-      functionName: 'maxBorrowable',
-      args: [ctx.account],
-    }),
-    ctx.client.readContract({
-      address: maren.marenVault,
-      abi: marenVaultAbi,
-      functionName: 'troveMaxBorrowingCapacity',
-    }),
-  ]);
 
   return {
     collateralWei: vaultCollateral,
@@ -182,18 +211,36 @@ export async function readBalances(ctx: LiveContext): Promise<Balances> {
  */
 export async function readEarn(ctx: LiveContext): Promise<EarnPosition> {
   const maren = getMarenAddresses(ctx.network);
-  const shares = await ctx.client.readContract({
-    address: maren.marenEarn,
-    abi: marenEarnAbi,
-    functionName: 'balanceOf',
-    args: [ctx.account],
-  });
-  const assets = await ctx.client.readContract({
-    address: maren.marenEarn,
-    abi: marenEarnAbi,
-    functionName: 'convertToAssets',
-    args: [shares],
-  });
+
+  /**
+   * `maxWithdraw(owner)` INSTEAD OF `convertToAssets(balanceOf(owner))`.
+   *
+   * The old pair was two round trips because the second call needed the first call's
+   * answer as an argument, which meant the Earn screen could never be one request no
+   * matter how well the client batched.
+   *
+   * The substitution is exact rather than approximate, and that matters enough to state
+   * where it comes from. MarenEarn is OpenZeppelin's `ERC4626` and overrides `maxDeposit`
+   * and `maxMint` only — `maxWithdraw` is inherited untouched, and OZ defines it as
+   * `_convertToAssets(balanceOf(owner), Rounding.Floor)`, which is the same expression,
+   * the same rounding and the same block as the call it replaces. If MarenEarn ever
+   * overrides `maxWithdraw` to express a liquidity limit, this becomes a different number
+   * and must go back to the two reads.
+   */
+  const [shares, assets] = await Promise.all([
+    ctx.client.readContract({
+      address: maren.marenEarn,
+      abi: marenEarnAbi,
+      functionName: 'balanceOf',
+      args: [ctx.account],
+    }),
+    ctx.client.readContract({
+      address: maren.marenEarn,
+      abi: marenEarnAbi,
+      functionName: 'maxWithdraw',
+      args: [ctx.account],
+    }),
+  ]);
 
   return {
     sharesWei: shares,

@@ -116,6 +116,19 @@ export interface ActivityItem {
   /** On-chain memo, capped at 80 bytes by MarenPay. */
   memo?: string;
   hash?: Hash;
+  /**
+   * The block this row's log was in.
+   *
+   * Optional because a row can also come from a store that predates the field, never
+   * because it can be unknown for a decoded log — a log without a block is a pending log
+   * and pending logs do not reach here.
+   *
+   * It exists for the Activity cache, which resumes a scan from the last block it read and
+   * re-reads the most recent stretch in case of a reorg. Without the block number a cached
+   * row cannot be told from a row the rescan is about to supply again, and the choice is
+   * between duplicating rows and trusting a chain that may have rewritten them.
+   */
+  blockNumber?: bigint;
   /** True when a Maren relayer paid the BTC gas. */
   sponsored: boolean;
   /** Gas the user actually paid, in wei of BTC. Zero for sponsored actions. */
