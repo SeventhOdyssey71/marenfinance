@@ -26,13 +26,13 @@ nowhere else. Everything below is what exists today, with the evidence.
 The codebase is a single monorepo with five parts, sharing one SDK so that every
 number a user sees is computed in exactly one place.
 
-| Component | What it is                                                                                                                       |
-| --------- | -------------------------------------------------------------------------------------------------------------------------------- |
-| Contracts | Five Solidity contracts on matsnet: pooled vault, payments, name registry, ERC-4626 yield vault, ERC-2771 relay hub              |
-| SDK       | One TypeScript package holding every protocol constant, address, and piece of position math. iOS and web call the same functions |
-| Web app   | Portfolio, Vault, Pay, Earn, Activity. Live contract reads; the write path is wired and exercised on testnet                     |
-| iOS app   | Expo, 18 screens, verified in the simulator including the degraded states                                                        |
-| Relayer   | Gasless transaction service: verifies, simulates, submits, settles gas. Built and fully tested, not yet hosted                   |
+| Component | What it is                                                                                                                                                                      |
+| --------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Contracts | Five Solidity contracts on matsnet: pooled vault, payments, name registry, ERC-4626 yield vault, ERC-2771 relay hub                                                             |
+| SDK       | One TypeScript package holding every protocol constant, address, and piece of position math. iOS and web call the same functions                                                |
+| Web app   | Portfolio, Vault, Pay, Earn, Activity. Live contract reads; the write path is wired and exercised on testnet                                                                    |
+| iOS app   | Expo, 18 screens, verified in the simulator including the degraded states. Runs on a mock data layer whose functions carry the live signatures, so going live replaces one file |
+| Relayer   | Gasless transaction service: verifies, simulates, submits, settles gas. Built and fully tested, not yet hosted                                                                  |
 
 Two design decisions shape everything else.
 
