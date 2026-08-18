@@ -38,9 +38,10 @@ borrower.
 Five contracts, source-verified on Blockscout, led by MarenVault at
 `0x46252B00AB59384518d9dB6D1f210ffF1221645b`. The pooled trove is active inside MUSD's
 own TroveManager at **220% ICR** with borrowing enabled, and the `@sele` handle is
-registered through commit-reveal. 236 contract tests plus 8 forked against real matsnet
-MUSD; 214 on the relayer. Web and iOS read these contracts live; the write path is
-wired and exercised on testnet.
+registered through commit-reveal. 302 contract tests plus 11 forked against real
+matsnet MUSD; 282 on the relayer. The web app reads and writes these contracts live,
+including a real user borrow; the iOS app runs the same screens on a mock layer with
+identical signatures, pending live wiring.
 
 ## The product, as it runs today
 

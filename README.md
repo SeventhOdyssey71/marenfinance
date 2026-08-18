@@ -68,15 +68,15 @@ deployment block is `null`, which callers must handle as unavailable rather than
 
 ### What is not done
 
-- `apps/relayer` is not deployed to any host. `MarenRelayHub` is on matsnet and the other
-  contracts trust it, but no service is submitting for it, so every action in the web app
-  is paid for by the user's own wallet in BTC gas. The UI says so per action rather than
-  claiming a sponsorship that is not running.
-- No gasless meta-transaction has been sent through `MarenRelayHub` on chain.
-- No user borrow has succeeded. The seeded pooled trove sits at 154% against a 180%
-  floor, which is a parameter mistake in how it was seeded rather than a contract fault.
-  `docs/DEPLOYMENTS.md` has the arithmetic.
-- No `MarenEarn` Stability Pool deposit has been made.
+- `apps/relayer` is not deployed to any host (packaging and DEPLOY.md exist; going live
+  is one documented command plus funding the hot wallet). Until then every action in the
+  web app is paid by the user's own wallet in BTC gas, and the UI says so per action.
+- A real user borrow HAS succeeded on matsnet (25.7 MUSD through the app on 17 August,
+  after the pooled trove was topped up from its mis-sized seed to a 220%+ ICR).
+- No gasless meta-transaction has been sent through `MarenRelayHub` on chain, and no
+  code in `apps/web` posts to the relayer yet; wiring the web transaction path to it is
+  the follow-up to the deployment packaging.
+- `MarenEarn` has no Stability Pool deposit yet.
 - `apps/ios` is on mock data throughout.
 
 ## Networks
