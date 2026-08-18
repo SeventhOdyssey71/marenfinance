@@ -230,6 +230,6 @@ states plainly which contracts hold user funds and are unaudited.
 
 ## Licence
 
-Proprietary. Copyright 2026 Maren Finance / Sele, all rights reserved. No use without
-written permission. See [`LICENSE`](LICENSE); whether any part of this is released under
-an open source licence is an open question rather than a settled no.
+MIT, as it has been since the first commit. See [`LICENSE`](LICENSE). Every contract
+carries a matching `SPDX-License-Identifier: MIT` header, and the deployed sources are
+publicly verified on Blockscout under the same terms.
