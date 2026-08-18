@@ -7,6 +7,7 @@ import {
 import { parseAbiItem, type Address, type Hash, type Log, type PublicClient } from 'viem';
 
 import type { ActivityItem, ActivityKind } from '../data/types';
+import { mergeActivity, planResume } from './activity-cache';
 
 /**
  * Activity, read from the chain's own logs.
@@ -32,6 +33,15 @@ import type { ActivityItem, ActivityKind } from '../data/types';
  * result only means "nothing in the last few days" — a much weaker claim, and one the UI
  * must not round up. `ActivityWindow.complete` is that distinction, and the Activity
  * screen renders a different empty state for each.
+ *
+ * WHY IT DOES NOT READ THE SAME BLOCKS TWICE. A block that was mined last week will say
+ * the same thing next week, so re-scanning from the deployment block on every visit is
+ * work with a known answer. `readActivity` takes the window a previous visit produced and
+ * resumes from a reorg depth behind its end; `activity-cache.ts` holds the storage, the
+ * invalidation and the merge, and is where the rules that keep the coverage line TRUE are
+ * written down. The distinction above survives the cache intact, because the merged
+ * `fromBlock` is a block that really was read — by this browser, for this account, against
+ * these contract addresses — or the stored window is discarded rather than joined.
  */
 
 /**
@@ -119,6 +129,15 @@ export async function readActivity(
   client: PublicClient,
   network: MezoNetwork,
   account: Address,
+  /**
+   * A previously scanned window for this same account and deployment, if one is stored.
+   *
+   * Passing it makes this a RESUME: the scan starts a reorg depth behind where the stored
+   * one ended, and the caller merges the two. Passing `null` — or passing a window that
+   * cannot be honestly joined to this one — makes it a cold scan, which is what every call
+   * did before the cache existed and what every call still does the first time.
+   */
+  cached: ActivityWindow | null = null,
 ): Promise<ActivityWindow> {
   const deployedAt = getDeploymentBlock(network);
   if (deployedAt === null) {
@@ -129,7 +148,10 @@ export async function readActivity(
   const head = await client.getBlockNumber();
 
   const horizon = MAX_WINDOWS * MEZO_MAX_LOG_RANGE;
-  const floor = head > horizon && head - horizon > deployedAt ? head - horizon : deployedAt;
+  const coldFloor = head > horizon && head - horizon > deployedAt ? head - horizon : deployedAt;
+
+  const plan = planResume({ cached, coldFloor, head });
+  const floor = plan.fromBlock;
 
   const windows = splitRange(floor, head);
   const raw: DecodedLog[] = [];
@@ -186,7 +208,17 @@ export async function readActivity(
     if (item) items.push(item);
   }
 
-  return { items, fromBlock: floor, toBlock: head, complete: floor === deployedAt };
+  const fresh: ActivityWindow = {
+    items,
+    fromBlock: floor,
+    toBlock: head,
+    complete: floor === deployedAt,
+  };
+
+  // The merge decides for itself whether the two ranges can honestly be stated as one; it
+  // returns `fresh` untouched when they cannot. `plan.reuse` is passed rather than `cached`
+  // so a window the plan already rejected cannot sneak back in here.
+  return mergeActivity(plan.reuse, fresh, deployedAt);
 }
 
 // ── decoding ─────────────────────────────────────────────────────────────────
@@ -322,6 +354,9 @@ function toActivityItem(
     counterpartyAddress,
     memo,
     hash,
+    // Carried so a cached row can be told apart from one the next scan will re-read. It is
+    // the log's own block, never a guess: `blockNumber === null` was rejected above.
+    blockNumber,
     sponsored: receipt?.sponsored ?? false,
     gasPaidWei: receipt?.gasPaid ?? 0n,
     network,

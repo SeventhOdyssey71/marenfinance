@@ -5,6 +5,7 @@ import { useQuery, type UseQueryResult } from '@tanstack/react-query';
 import { useAccount, useChainId, usePublicClient } from 'wagmi';
 import {
   getChain,
+  getDeploymentBlock,
   getMarenAddresses,
   isDeployed,
   resolveNetwork,
@@ -12,8 +13,10 @@ import {
 } from '@maren/sdk';
 import type { Address } from 'viem';
 
+import { loadActivityCache, saveActivityCache } from '../chain/activity-cache';
 import { readActivity, type ActivityWindow } from '../chain/logs';
 import { classifyPrice, type PriceFeed } from '../chain/price';
+import { getLogClient } from '../chain/transport';
 import * as live from './live';
 import type { Balances, EarnPosition, Handle, Position, ProtocolStats } from './types';
 
@@ -189,7 +192,37 @@ export function useActivity(): UseQueryResult<ActivityWindow> {
     queryKey: key(['activity'], source),
     queryFn: async () => {
       if (!ctx) throw new Error('No connected account to read activity for.');
-      return readActivity(ctx.client, ctx.network, ctx.account);
+
+      const deployedAt = getDeploymentBlock(ctx.network);
+      if (deployedAt === null) {
+        throw new Error(`Maren is not deployed on Mezo ${ctx.network}, so there is no history.`);
+      }
+      const identity = {
+        chainId: getChain(ctx.network).id,
+        account: ctx.account,
+        network: ctx.network,
+      };
+
+      /**
+       * The scan runs on its own client, not the app's.
+       *
+       * A 10,000-block `eth_getLogs` takes about a second against a healthy matsnet node,
+       * and the interactive transport is deliberately impatient so a dead endpoint is
+       * abandoned in two. Sharing one budget would mean either failing over healthy log
+       * scans or letting a hung endpoint hold up a balance read. See `chain/transport.ts`.
+       */
+      const cached = loadActivityCache(identity, deployedAt);
+      const activity = await readActivity(
+        getLogClient(ctx.network),
+        ctx.network,
+        ctx.account,
+        cached,
+      );
+
+      // Stored only after a scan that returned. A failed scan throws before reaching here,
+      // which is what stops a transport error from being written down as history.
+      saveActivityCache(identity, activity);
+      return activity;
     },
     enabled: ctx !== null,
     // A log scan is many round trips. Nothing on this screen changes second to second,

@@ -58,16 +58,18 @@ and the vault's MUSD reserve. Those are public, real, and repeatable by anyone w
 It is a quieter first screen than the demo portfolio it replaces, and it is the only one
 that survives being checked.
 
-| File                         | Role                                                                                                                        |
-| ---------------------------- | --------------------------------------------------------------------------------------------------------------------------- |
-| `src/lib/data/source.ts`     | The hooks and their query keys. Live-only; `isDeployed()` now selects an honest unavailable state rather than a mock.       |
-| `src/lib/data/live.ts`       | Every contract read, against the verified addresses in `@maren/sdk`.                                                        |
-| `src/lib/chain/logs.ts`      | Activity, decoded from `eth_getLogs`.                                                                                       |
-| `src/lib/chain/write.ts`     | Every transaction the app can send. Chain-guarded, hinted off-chain, simulated before signing.                              |
-| `src/lib/chain/preflight.ts` | The contract's own preconditions, evaluated before a control is enabled. `preflight.test.ts` pins them to matsnet fixtures. |
-| `src/lib/chain/handle.ts`    | Commit-reveal handle registration and the secret's storage.                                                                 |
-| `src/lib/chain/errors.ts`    | Custom errors decoded into English. `errors.test.ts` asserts none can render as hex.                                        |
-| `src/lib/chain/abis.ts`      | ABIs transcribed from `packages/contracts/src/*.sol`. Nothing invented.                                                     |
+| File                              | Role                                                                                                                        |
+| --------------------------------- | --------------------------------------------------------------------------------------------------------------------------- |
+| `src/lib/data/source.ts`          | The hooks and their query keys. Live-only; `isDeployed()` now selects an honest unavailable state rather than a mock.       |
+| `src/lib/data/live.ts`            | Every contract read, against the verified addresses in `@maren/sdk`.                                                        |
+| `src/lib/chain/logs.ts`           | Activity, decoded from `eth_getLogs`.                                                                                       |
+| `src/lib/chain/activity-cache.ts` | Where a finished scan is stored, and the rules that keep the coverage line true when one is resumed.                        |
+| `src/lib/chain/transport.ts`      | The failover transport every client is built from, and the two measured timeouts.                                           |
+| `src/lib/chain/write.ts`          | Every transaction the app can send. Chain-guarded, hinted off-chain, simulated before signing.                              |
+| `src/lib/chain/preflight.ts`      | The contract's own preconditions, evaluated before a control is enabled. `preflight.test.ts` pins them to matsnet fixtures. |
+| `src/lib/chain/handle.ts`         | Commit-reveal handle registration and the secret's storage.                                                                 |
+| `src/lib/chain/errors.ts`         | Custom errors decoded into English. `errors.test.ts` asserts none can render as hex.                                        |
+| `src/lib/chain/abis.ts`           | ABIs transcribed from `packages/contracts/src/*.sol`. Nothing invented.                                                     |
 
 ### Activity, and the 10,000-block limit
 
@@ -94,6 +96,21 @@ ledger is on screen. As the chain moves on, older history will fall outside the 
 the app will say so rather than quietly truncating. The fix is an indexer
 (`docs/ARCHITECTURE.md` §4), not a larger number here — a page load that fans out to
 hundreds of RPC calls is its own kind of dishonesty about what the app can do.
+
+**The same blocks are not read twice.** A finished scan is stored per account in
+`localStorage` under a key carrying a format version, the chain id, the address and a
+fingerprint of the three contract addresses, so a redeploy invalidates rather than
+migrates. The next visit resumes 100 blocks behind where the last one ended and merges the
+two, which took a measured Activity load from 29 JSON-RPC calls to 4 while leaving the
+coverage line reading exactly the same range.
+
+The merge is in `src/lib/chain/activity-cache.ts` and is the part with tests
+(`activity-cache.test.ts`), because it is the part that could make the app lie. Two ranges
+are only stated as one when they touch: if the fresh scan starts after the stored range
+ends there is a hole between them, and the stored range is discarded rather than patched
+over. Rows inside the re-read span always come from the node rather than from the store, so
+a transaction a reorg removed disappears instead of being remembered by a browser that
+never asked again. The cache holds 200 rows; past that the answer is still an indexer.
 
 **Earn's trailing yield** has the same shape of limit: it needs `Harvested` event history
 to be meaningful, so the live path reports a zero-length window and the screen renders
@@ -204,7 +221,39 @@ node scripts/prove-preflight.mjs   # 36 checks: the disabled borrow, against the
 node scripts/capture-tx-states.mjs # screenshots of every transaction-sheet state
 node scripts/prove-onchain.mjs     # drives a real handle registration, prints the hashes
 node scripts/prove-activity.mjs    # renders real history, then diffs it against eth_getLogs
+node scripts/count-rpc.mjs         # what one page load costs the RPC, per method
 ```
+
+**`count-rpc.mjs` is how the read budget stays a number rather than an opinion.** It
+intercepts every POST the page makes to a Mezo RPC host, decodes any Multicall3
+`aggregate3` payload, and reports both the round trips and the contract reads inside them,
+because a change that repackages twenty reads into one request without reducing the work
+should not be able to look like a twenty-fold win. It counts until the page has been silent
+for four seconds rather than for a fixed interval, so the fifteen-second price poll cannot
+be charged to a page load.
+
+Measured against matsnet on 2026-08-18, with a wallet that has a real pooled position:
+
+| Load                        | Before | After |
+| --------------------------- | ------ | ----- |
+| `/app`                      | 2      | 1     |
+| `/app/vault`                | 2      | 1     |
+| `/app/earn`                 | 2      | 1     |
+| `/app/activity`, first ever | 29     | 29    |
+| `/app/activity`, revisit    | 29     | 4     |
+
+The single-request page loads come from removing data dependencies that were not real —
+the position read no longer waits for the trove read before asking about the vault, and
+Earn reads `maxWithdraw(owner)` rather than `convertToAssets(balanceOf(owner))`, which is
+the same expression with the same rounding in OpenZeppelin's ERC4626 and does not need the
+first answer to ask the second question.
+
+**Reads fail over, and it is measured too.** Every client is built from `fallback()` over
+the whole RPC list in `@maren/sdk` (`src/lib/chain/transport.ts`). Against a hung endpoint,
+the old single-URL `http()` took **41 seconds** to give up and never tried anywhere else;
+the current transport reaches a healthy endpoint in **2.3 seconds**, or 0.6 if the dead one
+refuses the connection outright. Timeouts are split because the workload is: 2s for
+interactive reads against a ~200ms observed latency, 8s for log scans against a ~1.2s one.
 
 **`verify-behaviour.mjs` runs three passes.** Once disconnected, asserting the empty
 states and that no invented handle, hash or counterparty has come back. Once with a real
