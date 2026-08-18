@@ -10,7 +10,7 @@ import { Icon } from '../../src/components/Icon';
 import { PillButton } from '../../src/components/PillButton';
 import { Screen } from '../../src/components/Screen';
 import { Label, Num, Txt } from '../../src/components/Text';
-import { base, radius, semantic, space } from '../../src/design/tokens';
+import { base, radius, semanticText, space } from '../../src/design/tokens';
 import { MOCK_HANDLE } from '../../src/data/mock';
 import { useAppStore } from '../../src/state/store';
 import {
@@ -94,7 +94,7 @@ export default function CreateWallet() {
         </Card>
       ) : error ? (
         <Card>
-          <Txt variant="body" style={{ color: semantic.danger }}>
+          <Txt variant="body" style={{ color: semanticText.danger }}>
             Key generation failed
           </Txt>
           <Txt variant="small" tone="muted" style={styles.body}>
@@ -123,9 +123,12 @@ export default function CreateWallet() {
               <Icon
                 name={stored ? 'lock' : 'alert'}
                 size={18}
-                color={stored ? semantic.success : semantic.warning}
+                color={stored ? semanticText.success : semanticText.warning}
               />
-              <Txt variant="small" style={{ color: stored ? semantic.success : semantic.warning }}>
+              <Txt
+                variant="small"
+                style={{ color: stored ? semanticText.success : semanticText.warning }}
+              >
                 {stored
                   ? `Stored in the Keychain, gated by ${protection?.mode === 'keychain-biometric' ? protection.label : 'biometrics'}`
                   : 'Held in memory for this session only'}
@@ -150,7 +153,7 @@ export default function CreateWallet() {
           <PillButton
             label="Open my account"
             onPress={finish}
-            badge={<Icon name="arrowRight" size={16} color="#FAFAFA" />}
+            badge={<Icon name="arrowRight" size={16} color={base.onAccent} />}
             disabled={!address}
           />
         </>

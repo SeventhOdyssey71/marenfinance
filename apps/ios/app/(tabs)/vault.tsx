@@ -29,7 +29,7 @@ import {
   healthLabel,
   healthTone,
   radius,
-  semantic,
+  semanticText,
   space,
   toneColor,
 } from '../../src/design/tokens';
@@ -389,7 +389,7 @@ function BorrowPanel({
 
       {gateReason ? (
         <View style={styles.blocked} accessibilityRole="alert">
-          <Txt variant="small" style={{ color: semantic.warning }}>
+          <Txt variant="small" style={{ color: semanticText.warning }}>
             {gateReason}
           </Txt>
         </View>
@@ -399,7 +399,7 @@ function BorrowPanel({
         label={value > 0n ? `Borrow ${formatMusd(value)}` : 'Borrow'}
         onPress={() => onSubmit(value)}
         disabled={disabled || value === 0n}
-        badge={<Icon name="arrowRight" size={15} color="#FAFAFA" />}
+        badge={<Icon name="arrowRight" size={15} color={base.onAccent} />}
         accessibilityHint="Requires Face ID, then waits for an on-chain receipt."
         style={styles.cta}
       />
@@ -484,7 +484,7 @@ function AmountPanel({
           <Num
             size="numericSm"
             tone={overMax ? 'inherit' : 'muted'}
-            style={overMax ? { color: semantic.danger } : undefined}
+            style={overMax ? { color: semanticText.danger } : undefined}
           >
             {format(max)}
           </Num>
@@ -495,7 +495,7 @@ function AmountPanel({
         <Icon
           name={sponsored ? 'shield' : 'alert'}
           size={14}
-          color={sponsored ? brand.violet400 : semantic.warning}
+          color={sponsored ? brand.violet400 : semanticText.warning}
         />
         <Txt variant="small" tone="muted" style={styles.gasText}>
           {sponsored ? gasCopy.sponsoredTitle + '.' : gasCopy.unsponsoredBody}
@@ -504,7 +504,7 @@ function AmountPanel({
 
       {disabledReason ? (
         <View style={styles.blocked} accessibilityRole="alert">
-          <Txt variant="small" style={{ color: semantic.warning }}>
+          <Txt variant="small" style={{ color: semanticText.warning }}>
             {disabledReason}
           </Txt>
         </View>
@@ -514,7 +514,7 @@ function AmountPanel({
         label={cta}
         onPress={() => onSubmit(selected)}
         disabled={disabled}
-        badge={<Icon name="arrowRight" size={15} color="#FAFAFA" />}
+        badge={<Icon name="arrowRight" size={15} color={base.onAccent} />}
         accessibilityHint="Requires Face ID, then waits for an on-chain receipt."
         style={styles.cta}
       />
@@ -591,7 +591,7 @@ const styles = StyleSheet.create({
     borderWidth: StyleSheet.hairlineWidth,
     borderColor: base.border,
   },
-  presetActive: { backgroundColor: base.surfaceRaised, borderColor: 'rgba(255,255,255,0.14)' },
+  presetActive: { backgroundColor: base.surfaceRaised, borderColor: base.borderStrong },
   maxRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
@@ -606,7 +606,7 @@ const styles = StyleSheet.create({
     borderRadius: radius.input,
     backgroundColor: base.surfaceInset,
     borderWidth: StyleSheet.hairlineWidth,
-    borderColor: 'rgba(251,191,36,0.3)',
+    borderColor: 'rgba(180,83,9,0.5)',
   },
   cta: { marginTop: space.xl },
 });

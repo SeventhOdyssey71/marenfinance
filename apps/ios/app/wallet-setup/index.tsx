@@ -7,7 +7,7 @@ import { Card } from '../../src/components/Card';
 import { Icon } from '../../src/components/Icon';
 import { Screen } from '../../src/components/Screen';
 import { Label, Txt } from '../../src/components/Text';
-import { base, brand, radius, semantic, space } from '../../src/design/tokens';
+import { base, brand, radius, semanticText, space, text } from '../../src/design/tokens';
 import {
   biometricName,
   getBiometricCapability,
@@ -46,7 +46,7 @@ export default function WalletSetup() {
           <Icon
             name={protectedByBiometrics ? 'faceid' : 'alert'}
             size={20}
-            color={protectedByBiometrics ? semantic.success : semantic.warning}
+            color={protectedByBiometrics ? semanticText.success : semanticText.warning}
           />
           <Txt variant="small" style={styles.protectionTitle}>
             {cap === null
@@ -116,7 +116,7 @@ function Choice({
             {body}
           </Txt>
         </View>
-        <Icon name="chevronRight" size={16} color="#6B6B75" />
+        <Icon name="chevronRight" size={16} color={text.subtle} />
       </Card>
     </Pressable>
   );

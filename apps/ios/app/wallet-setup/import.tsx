@@ -10,7 +10,7 @@ import { Icon } from '../../src/components/Icon';
 import { PillButton } from '../../src/components/PillButton';
 import { Screen } from '../../src/components/Screen';
 import { Label, Num, Txt } from '../../src/components/Text';
-import { base, radius, semantic, space } from '../../src/design/tokens';
+import { base, radius, semanticText, space, text } from '../../src/design/tokens';
 import { fonts } from '../../src/design/type';
 import { MOCK_HANDLE } from '../../src/data/mock';
 import { useAppStore } from '../../src/state/store';
@@ -68,7 +68,7 @@ export default function ImportWallet() {
           value={raw}
           onChangeText={setRaw}
           placeholder="0x…"
-          placeholderTextColor="#6B6B75"
+          placeholderTextColor={text.muted}
           autoCapitalize="none"
           autoCorrect={false}
           spellCheck={false}
@@ -84,8 +84,8 @@ export default function ImportWallet() {
 
       {dirty && !normalised ? (
         <View style={styles.invalid} accessibilityRole="alert">
-          <Icon name="alert" size={16} color={semantic.danger} />
-          <Txt variant="small" style={{ color: semantic.danger, flex: 1 }}>
+          <Icon name="alert" size={16} color={semanticText.danger} />
+          <Txt variant="small" style={{ color: semanticText.danger, flex: 1 }}>
             Not a valid key. Expected exactly 64 hexadecimal characters, with or without a 0x
             prefix. Got {normaliseLength(raw)}.
           </Txt>
@@ -108,7 +108,7 @@ export default function ImportWallet() {
       ) : null}
 
       {error ? (
-        <Txt variant="small" style={[styles.error, { color: semantic.danger }]}>
+        <Txt variant="small" style={[styles.error, { color: semanticText.danger }]}>
           {error}
         </Txt>
       ) : null}
@@ -118,7 +118,7 @@ export default function ImportWallet() {
         onPress={submit}
         disabled={!normalised}
         loading={busy}
-        badge={<Icon name="lock" size={15} color="#FAFAFA" />}
+        badge={<Icon name="lock" size={15} color={base.onAccent} />}
         accessibilityHint="Stores the key in the Keychain behind a biometric check."
         style={styles.submit}
       />
@@ -135,7 +135,7 @@ const styles = StyleSheet.create({
   intro: { marginBottom: space.xl },
   field: { padding: space.lg },
   input: {
-    color: '#FAFAFA',
+    color: text.primary,
     fontFamily: fonts.mono,
     fontSize: 14,
     lineHeight: 22,
@@ -150,7 +150,7 @@ const styles = StyleSheet.create({
     padding: space.md,
     borderRadius: radius.input,
     borderWidth: StyleSheet.hairlineWidth,
-    borderColor: 'rgba(248,113,113,0.3)',
+    borderColor: 'rgba(220,38,38,0.45)',
     backgroundColor: base.surfaceInset,
   },
   previewCard: { marginTop: space.lg },

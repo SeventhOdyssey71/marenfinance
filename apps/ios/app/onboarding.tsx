@@ -14,7 +14,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Icon, type IconName } from '../src/components/Icon';
 import { PillButton } from '../src/components/PillButton';
 import { Label, Txt } from '../src/components/Text';
-import { base, brand, gradients, radius, semantic, space } from '../src/design/tokens';
+import { base, brand, gradients, radius, semanticText, space } from '../src/design/tokens';
 import { gasCopy } from '../src/lib/copy';
 
 const { width } = Dimensions.get('window');
@@ -50,14 +50,14 @@ const PANELS: Panel[] = [
     body: 'Your BTC becomes collateral on Mezo. It stays yours, it stays Bitcoin, and you keep every satoshi of the upside. Nothing is sold.',
     icon: 'vault',
     // BTC orange is permitted here: the panel is about a BTC-denominated position.
-    accent: semantic.btc,
+    accent: semanticText.btc,
   },
   {
     kicker: 'Two',
     title: 'Draw MUSD',
     body: 'Borrow dollars against your Bitcoin at 1.00% APR, fixed for the life of the loan. Maren targets a 250% collateral ratio and refuses to let you cross 180%.',
     icon: 'earn',
-    accent: semantic.musd,
+    accent: semanticText.musd,
   },
   {
     kicker: 'Three',
@@ -137,8 +137,8 @@ export default function Onboarding() {
                * statement must appear in the UI. Stated before setup, not after.
                */
               <View style={styles.riskNote}>
-                {/* `muted`, not `subtle`: this is the risk disclosure, and #6B6B75 on
-                    #0C0C0F falls under 4.5:1. Risk copy is never the dimmest text. */}
+                {/* `muted`, not `subtle`: this is the risk disclosure, and #82828C on
+                    #EFEDF6 is 3.28:1. Risk copy is never the dimmest text. */}
                 <Txt variant="small" tone="muted">
                   Small positions share one trove. Your collateral is segregated in accounting, not
                   in custody. A drawdown faster than the keeper can respond could socialise losses.
@@ -161,7 +161,7 @@ export default function Onboarding() {
         <PillButton
           label={isLast ? 'Set up your account' : 'Continue'}
           onPress={advance}
-          badge={<Icon name="arrowRight" size={16} color="#FAFAFA" />}
+          badge={<Icon name="arrowRight" size={16} color={base.onAccent} />}
           accessibilityHint={
             isLast
               ? 'Opens wallet setup, where you create or import a key.'
@@ -221,7 +221,7 @@ const styles = StyleSheet.create({
     width: 6,
     height: 6,
     borderRadius: radius.pill,
-    backgroundColor: 'rgba(255,255,255,0.18)',
+    backgroundColor: 'rgba(20,18,35,0.18)',
   },
   dotActive: { backgroundColor: brand.violet500, width: 20 },
   secondaryAction: { marginTop: -space.xs },

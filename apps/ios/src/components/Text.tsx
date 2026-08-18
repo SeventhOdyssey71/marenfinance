@@ -1,7 +1,7 @@
 import type { ReactNode } from 'react';
 import { StyleSheet, Text as RNText, type TextProps, type TextStyle } from 'react-native';
 
-import { colors, text as textColors } from '../design/tokens';
+import { brand, semanticText, text as textColors } from '../design/tokens';
 import { type } from '../design/type';
 
 /**
@@ -17,13 +17,18 @@ import { type } from '../design/type';
 type Variant = keyof typeof type;
 type Tone = 'primary' | 'muted' | 'subtle' | 'btc' | 'musd' | 'violet' | 'inherit';
 
+/**
+ * Every tone here paints TEXT, so the asset marks take their `semanticText` values
+ * rather than the fill values in `semantic`. On white, #0D9E70 is a perfectly good
+ * status dot at 3.42:1 and an unreadable 13px "MUSD" at the same ratio.
+ */
 const toneColor: Record<Exclude<Tone, 'inherit'>, string> = {
   primary: textColors.primary,
   muted: textColors.muted,
   subtle: textColors.subtle,
-  btc: colors.btc,
-  musd: colors.musd,
-  violet: colors.violet400,
+  btc: semanticText.btc,
+  musd: semanticText.musd,
+  violet: brand.violet500,
 };
 
 export interface MarenTextProps extends TextProps {
@@ -51,19 +56,24 @@ export function Txt({
  * §3 Label — uppercase, tracked, 12px. Used for every field and section caption.
  *
  * Defaults to `muted`, not `subtle`, and that is a deliberate deviation from the tone
- * BRAND.md's table implies for "tertiary" text. The palette is unchanged — `subtle` is
- * still exactly `#6B6B75` — but it is not used for text that carries information,
- * because at 12px it does not meet WCAG AA on any Maren surface:
+ * BRAND.md's table implies for "tertiary" text. The palette is the web light set,
+ * unchanged — `subtle` is exactly #82828C — but it is not used for text that carries
+ * information, because at 12px it does not meet WCAG AA on any Maren surface.
  *
- *     #6B6B75 on #08080A  3.80:1      #A1A1AA on #08080A  7.81:1
- *     #6B6B75 on #101013  3.60:1      #A1A1AA on #101013  7.41:1
- *     #6B6B75 on #0C0C0F  3.71:1      #A1A1AA on #0C0C0F  7.62:1
- *     #6B6B75 on #17171B  3.39:1      #A1A1AA on #17171B  6.97:1
+ * The theme move did not fix this on its own. It is the same shortfall, relocated:
  *
- * BRAND.md's own preamble settles the conflict: "dark, quiet, expensive, and legible
- * before it is decorative." A label a user cannot read is not quiet, it is broken. Pass
- * `tone="subtle"` explicitly for text that is genuinely decorative or duplicated by an
- * adjacent accessible label — the full address echoed under a truncated one, say.
+ *     was   #6B6B75 on #08080A  3.80:1     now   #82828C on #F7F6FB  3.54:1
+ *           #6B6B75 on #101013  3.60:1           #82828C on #FFFFFF  3.80:1
+ *           #6B6B75 on #0C0C0F  3.71:1           #82828C on #EFEDF6  3.28:1
+ *           #6B6B75 on #17171B  3.39:1
+ *
+ * `muted` clears it with room to spare on all three light surfaces — #55555E is 6.86 on
+ * the page, 7.38 on a card, 6.36 on an inset panel — so that is what informational text
+ * gets. BRAND.md's own preamble settles the conflict: "quiet, expensive, and legible
+ * before it is decorative." A label a user cannot read is not quiet, it is broken.
+ *
+ * `subtle` survives for the two jobs where 3:1 is the bar rather than 4.5:1: non-text
+ * ornament, and text at 24px and above. Both clear it. Nothing else may use it.
  */
 export function Label({ style, tone = 'muted', ...rest }: MarenTextProps) {
   return <Txt variant="label" tone={tone} style={style} {...rest} />;
