@@ -235,12 +235,14 @@ export async function buildTestRelayer(
   env: Env = makeEnv(),
   chainFake: FakeChain = new FakeChain(),
   store: MemoryStore = new MemoryStore(),
+  /** Silent unless a test is asserting on what was logged. */
+  logger: pino.Logger = SILENT_LOGGER,
 ): Promise<TestRelayer> {
   const relayer = await createRelayer({
     env,
     store,
     chain: chainFake,
-    logger: SILENT_LOGGER,
+    logger,
     // The fake chain replaces the transport entirely, so there is nothing to
     // preflight. The preflight itself is tested directly in rpc.test.ts.
     skipPreflight: true,

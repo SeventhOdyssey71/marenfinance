@@ -31,10 +31,17 @@ packages/contracts/lib/
 .env
 .env.*
 !.env.example
+# The relayer's deployment env is `.env.relayer`, which `.env.*` above ignores.
+# Its template carries no secrets and must be committed, so it is re-included by
+# name rather than by loosening the glob.
+!.env.relayer.example
 *.pem
 *.key
 *.keystore
 secrets.json
+# Keystore + passphrase bind-mounted into the relayer container. Never commit the
+# directory, whatever an operator happens to leave in it.
+apps/relayer/secrets/
 
 # docs build artifacts (PDFs are committed intentionally, see docs/build/.gitignore)
 docs/.tmp/
