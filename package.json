@@ -3,7 +3,7 @@
   "version": "0.1.0",
   "private": true,
   "description": "Maren Finance \u2014 Bitcoin liquidity, gasless spending, earn yield. Built on Mezo Chain.",
-  "license": "UNLICENSED",
+  "license": "MIT",
   "packageManager": "pnpm@10.19.0",
   "engines": {
     "node": ">=22"

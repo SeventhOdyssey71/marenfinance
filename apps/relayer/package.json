@@ -3,7 +3,7 @@
   "version": "0.1.0",
   "private": true,
   "description": "Gasless ERC-2771 meta-transaction relayer for Maren Finance on Mezo. Pays BTC gas so users can hold zero BTC.",
-  "license": "UNLICENSED",
+  "license": "MIT",
   "type": "module",
   "main": "./src/server.ts",
   "engines": {
