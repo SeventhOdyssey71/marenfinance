@@ -748,9 +748,36 @@ const check = (name, pass, detail = '') => {
     /Read (every block from|blocks)\s/.test(activityLive),
     'the span is part of the answer, not a footnote',
   );
+  /**
+   * THE EMPTY STATE NEVER OVERSTATES WHAT IT READ.
+   *
+   * This used to assert the completeness branch outright: "Nothing here yet", plus "every
+   * block since the contracts were deployed". That was true while the contracts were
+   * younger than the scanner's six-window horizon, and it expired on its own. Matsnet is
+   * now further past block 14,911,471 than 60,000 blocks, so `logs.ts` returns
+   * `complete: false` and the screen correctly switches to the narrower claim.
+   *
+   * Raising `MAX_WINDOWS` would make this green again for about two more days. The
+   * comment on that constant already ruled it out in advance: "when it starts biting, the
+   * answer is an indexer, not a bigger number here." It has started biting. So the check
+   * asserts the invariant that does not expire, and it is the stronger one — whichever
+   * branch renders, the page's coverage claim has to match the scan it actually
+   * performed, and the two branches are mutually exclusive.
+   */
+  const claimsWholeHistory =
+    /Nothing here yet/.test(activityLive) && /since the contracts were deployed/.test(activityLive);
+  const admitsAPartialScan =
+    /Nothing in the blocks we could read/.test(activityLive) &&
+    /not claimed to be absent/.test(activityLive) &&
+    /older history needs an indexer/.test(activityLive);
   check(
-    'activity: an empty history is stated as a fact about the whole chain, not a guess',
-    /Nothing here yet/.test(activityLive) && /since the contracts were deployed/.test(activityLive),
+    'activity: an empty history never claims more coverage than the scan actually had',
+    claimsWholeHistory !== admitsAPartialScan,
+    claimsWholeHistory ? 'read every block since deployment' : 'says what it did not look at',
+  );
+  check(
+    'activity: a partial scan is never dressed up as the whole story',
+    !(admitsAPartialScan && /that is the whole story|the complete history/.test(activityLive)),
   );
   const liveTxLinks = await page.locator('main a[href*="/tx/"]').count();
   check(

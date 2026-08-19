@@ -152,8 +152,9 @@ process that caught it is the same one behind every other number on this page.
 | -------------------------------- | ----: | ----------------------------------------------------------------------- |
 | Contract unit and property tests |   302 | Foundry, including the redemption splitter and the composed entrypoints |
 | Fork tests                       |    11 | The real MUSD contracts on matsnet, including a driven redemption       |
-| Relayer                          |   282 | Four adversarial review rounds, plus packaging and nonce serialisation  |
-| Web behaviour suite              |   103 | The built app, live matsnet, read-only signer                           |
+| Relayer                          |   286 | Four adversarial review rounds, plus packaging and nonce serialisation  |
+| Web behaviour suite              |   104 | The built app, live matsnet, read-only signer                           |
+| Web unit tests                   |   108 | Preflight, revert decoding, the relayer client and its routing          |
 
 Three of these deserve a sentence each.
 

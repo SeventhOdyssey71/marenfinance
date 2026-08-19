@@ -151,7 +151,7 @@ chain. They live in `apps/web/scripts` and are documented in
 [`apps/web/README.md`](apps/web/README.md):
 
 ```bash
-node scripts/verify-behaviour.mjs   # 87 checks: accessibility, empty states, preflight, 390px overflow
+node scripts/verify-behaviour.mjs   # 104 checks: accessibility, empty states, preflight, 390px overflow
 node scripts/prove-preflight.mjs    # 36 checks: the disabled borrow, against the live chain
 node scripts/verify-contrast.mjs    # worst-case contrast against what is actually painted
 ```

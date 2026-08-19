@@ -215,7 +215,7 @@ CI=true NEXT_PUBLIC_MEZO_NETWORK=testnet pnpm --filter @maren/web start &
 
 export PLAYWRIGHT_CORE=/path/to/node_modules/playwright-core/index.js
 
-node scripts/verify-behaviour.mjs  # 87 checks: a11y, the rules above, preflight, 390px overflow
+node scripts/verify-behaviour.mjs  # 104 checks: a11y, the rules above, preflight, 390px overflow
 node scripts/verify-contrast.mjs   # worst-case contrast against what is actually painted
 node scripts/prove-preflight.mjs   # 36 checks: the disabled borrow, against the live chain
 node scripts/capture-tx-states.mjs # screenshots of every transaction-sheet state
