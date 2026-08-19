@@ -47,10 +47,32 @@ import { ExplainedError, type RevertReason } from './errors';
  */
 export const RELAYER_URL: string | null = normaliseUrl(process.env.NEXT_PUBLIC_RELAYER_URL);
 
-/** Trailing slashes stripped, empty and whitespace-only treated as unset. */
+/**
+ * Trailing slashes stripped, empty and whitespace-only treated as unset, and ANYTHING
+ * THAT IS NOT A TRANSPORT WE WOULD SEND A SIGNATURE OVER treated as unset too.
+ *
+ * Three shapes are accepted and nothing else:
+ *
+ *   - a same-origin path (`/api/relayer`), which is what `DEPLOY.md` tells an operator to
+ *     configure, because the relayer sets no CORS headers and must be proxied;
+ *   - `https://…`;
+ *   - `http://localhost` or `http://127.0.0.1`, for `pnpm dev`.
+ *
+ * Plain `http://` to anything else is refused rather than trusted. What travels over that
+ * connection is a signed `ForwardRequest`: a network observer cannot alter it, because the
+ * signature covers every field, but they can read the user's address, the target, the
+ * amount and the memo, and they can replay it to the hub themselves within the deadline.
+ * A misconfiguration should not be the difference between those being private and not, and
+ * the failure direction is right either way — an unset URL means `shouldRelay` is false and
+ * the interface says the user pays before they press anything.
+ */
 export function normaliseUrl(raw: string | undefined | null): string | null {
   const trimmed = (raw ?? '').trim().replace(/\/+$/, '');
-  return trimmed === '' ? null : trimmed;
+  if (trimmed === '') return null;
+  if (trimmed.startsWith('/')) return trimmed;
+  if (/^https:\/\//i.test(trimmed)) return trimmed;
+  if (/^http:\/\/(localhost|127\.0\.0\.1|\[::1\])(:\d+)?(\/|$)/i.test(trimmed)) return trimmed;
+  return null;
 }
 
 /** True when a relayer URL is configured at all. Build-time, so it is SSR-safe. */
@@ -608,26 +630,59 @@ export function isStickyRefusal(code: string | null | undefined): boolean {
 /**
  * Read a `/relay` response.
  *
- * A 202 with a hash is the ONLY success. Anything else throws an `ExplainedError`
- * carrying copy `explainError` will hand straight back, so a relayer refusal reaches the
- * sheet through the same path a contract revert does and renders identically.
+ * A 202 that names OUR signer and carries a hash is the only success. Anything else throws
+ * an `ExplainedError` carrying copy `explainError` will hand straight back, so a relayer
+ * refusal reaches the sheet through the same path a contract revert does and renders
+ * identically.
+ *
+ * WHY `expectedPayer` IS CHECKED. The hash is where this client stops being sceptical and
+ * starts believing: `useTxRunner` hands it to `confirmTransaction`, which reads a receipt
+ * and reports what it finds. A 202 carrying somebody ELSE'S transaction hash — a real one,
+ * already confirmed — therefore renders as this action succeeding. It did not. Only the
+ * relayer's own `payer` field ties the answer back to the request that was signed, so it
+ * is checked against the `from` that went out rather than read for display. A relayer this
+ * app has been pointed at is trusted to spend its own BTC, not to tell the app what
+ * happened to the user's money.
+ *
+ * This is not the whole answer — a hostile relayer could still return the hash of a
+ * different transaction it sent for the same signer — but it removes the case that needs
+ * no relationship with the user at all, and it costs one comparison.
  */
 export function decodeRelayResponse(
   status: number,
   body: unknown,
+  expectedPayer?: string,
 ): RelayAccepted | { failure: RevertReason; code: string } {
-  if (status === 202 && isAccepted(body)) return body;
+  if (status === 202 && isAccepted(body, expectedPayer)) return body;
   const errorBody = isErrorBody(body) ? body : null;
+  if (status === 202) {
+    // A 202 we cannot tie to this request is not a refusal we have copy for, and it is
+    // certainly not a submission. Say what is actually known.
+    return {
+      failure: {
+        name: 'RELAYER_ANSWER_UNRECOGNISED',
+        title: 'Maren’s relayer answered with something unrecognisable',
+        detail:
+          'It accepted the request but did not return a broadcast this app can tie back ' +
+          'to what you signed, so nothing is being reported as sent. Check Activity ' +
+          'before retrying.',
+      },
+      code: 'RELAYER_ANSWER_UNRECOGNISED',
+    };
+  }
   return {
     failure: relayFailureReason(status, errorBody),
     code: errorBody?.error ?? 'UPSTREAM_ERROR',
   };
 }
 
-function isAccepted(body: unknown): body is RelayAccepted {
+function isAccepted(body: unknown, expectedPayer?: string): body is RelayAccepted {
   if (body === null || typeof body !== 'object') return false;
-  const hash = (body as { hash?: unknown }).hash;
-  return typeof hash === 'string' && /^0x[0-9a-fA-F]{64}$/.test(hash);
+  const { hash, state, payer } = body as { hash?: unknown; state?: unknown; payer?: unknown };
+  if (typeof hash !== 'string' || !/^0x[0-9a-fA-F]{64}$/.test(hash)) return false;
+  if (state !== 'submitted') return false;
+  if (expectedPayer === undefined) return true;
+  return typeof payer === 'string' && payer.toLowerCase() === expectedPayer.toLowerCase();
 }
 
 function isErrorBody(body: unknown): body is RelayErrorBody {
@@ -690,7 +745,9 @@ export async function postRelay(
     clearTimeout(timer);
   }
 
-  const decoded = decodeRelayResponse(status, parsed);
+  // `body.from` is the address that signed, taken from the same object that went on the
+  // wire, so the answer is held against the request rather than against a second copy.
+  const decoded = decodeRelayResponse(status, parsed, body['from']);
   if ('failure' in decoded) {
     if (isStickyRefusal(decoded.code)) noteRelayerRefusal(options.now?.() ?? Date.now());
     throw new ExplainedError(decoded.failure);

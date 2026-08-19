@@ -270,6 +270,35 @@ describe('the routing decision', () => {
     expect(normaliseUrl('https://relay.example.com/')).toBe('https://relay.example.com');
   });
 
+  /**
+   * A relayer URL that is not a transport worth signing over is the same as no relayer.
+   * What crosses that connection is a `ForwardRequest`: the signature covers every field,
+   * so nobody can alter it, but an observer on a plain-HTTP hop reads the user's address,
+   * the target, the amount and the memo, and can replay it to the hub inside the deadline.
+   * Refusing the URL means `shouldRelay` is false and the screen says the user pays,
+   * which is the honest end state for a misconfiguration.
+   */
+  it('treats a plaintext relayer URL as no relayer at all', () => {
+    expect(normaliseUrl('http://relay.example.com')).toBeNull();
+    expect(normaliseUrl('ftp://relay.example.com')).toBeNull();
+    expect(normaliseUrl('javascript:alert(1)')).toBeNull();
+    expect(
+      shouldRelay({
+        url: normaliseUrl('http://relay.example.com'),
+        health: accepting,
+        relayable: true,
+      }),
+    ).toBe(false);
+  });
+
+  it('keeps the two shapes DEPLOY.md actually tells an operator to use', () => {
+    // A same-origin path, because the relayer sets no CORS headers and must be proxied.
+    expect(normaliseUrl('/api/relayer/')).toBe('/api/relayer');
+    // And plain HTTP to localhost, for `pnpm dev`.
+    expect(normaliseUrl('http://localhost:8787')).toBe('http://localhost:8787');
+    expect(normaliseUrl('http://127.0.0.1:8787/')).toBe('http://127.0.0.1:8787');
+  });
+
   it('self-submits while the health probe has not answered', () => {
     expect(shouldRelay({ url: 'https://r.test', health: null, relayable: true })).toBe(false);
   });
@@ -511,6 +540,38 @@ describe('decoding a /relay response', () => {
     expect('failure' in decodeRelayResponse(202, { hash: 'not-a-hash' })).toBe(true);
     expect('failure' in decodeRelayResponse(202, null)).toBe(true);
   });
+
+  /**
+   * THE HASH IS WHERE SCEPTICISM STOPS, SO IT HAS TO BE OUR HASH.
+   *
+   * `useTxRunner` hands whatever comes back to `confirmTransaction`, which reads a receipt
+   * and reports what it finds. So a relayer answering 202 with SOMEBODY ELSE'S already
+   * confirmed transaction hash renders as this action succeeding, on a screen that also
+   * says Maren paid for it. Neither is true. `payer` is the only field tying the answer to
+   * the request, and it is now checked rather than displayed.
+   */
+  it('refuses a 202 that names a different payer than the one who signed', () => {
+    const someoneElse = {
+      ...accepted,
+      payer: '0x000000000000000000000000000000000000dEaD',
+    };
+    const decoded = decodeRelayResponse(202, someoneElse, USER);
+    expect('failure' in decoded).toBe(true);
+    expect((decoded as { code: string }).code).toBe('RELAYER_ANSWER_UNRECOGNISED');
+  });
+
+  it('accepts a 202 that names the signer, whatever the case', () => {
+    const decoded = decodeRelayResponse(202, { ...accepted, payer: USER.toLowerCase() }, USER);
+    expect('failure' in decoded).toBe(false);
+  });
+
+  it('refuses a 202 whose state is not the relayer word for broadcast', () => {
+    // `state` is `'submitted'` and nothing else. A body claiming `'confirmed'` is not the
+    // relayer, which never makes that judgement — see `receipt.ts` and R15.
+    expect('failure' in decodeRelayResponse(202, { ...accepted, state: 'confirmed' }, USER)).toBe(
+      true,
+    );
+  });
 });
 
 describe('postRelay', () => {
@@ -527,7 +588,14 @@ describe('postRelay', () => {
         seenUrl = url;
         seenBody = JSON.parse(String(init.body));
         return new Response(
-          JSON.stringify({ hash, state: 'submitted', success: false, sponsorship: 'free-tier' }),
+          JSON.stringify({
+            hash,
+            state: 'submitted',
+            success: false,
+            // The real service always names the payer it recovered from the signature.
+            payer: body.from,
+            sponsorship: 'free-tier',
+          }),
           { status: 202, headers: { 'content-type': 'application/json' } },
         );
       }) as unknown as typeof fetch,
