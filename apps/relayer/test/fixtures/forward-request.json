@@ -1,0 +1,63 @@
+{
+  "$comment": "Shared EIP-712 fixture for the ERC-2771 ForwardRequest that POST /relay accepts. apps/relayer and apps/web each rebuild this digest from THEIR OWN domain and type constants and assert it matches. If either side drifts the other notices here, in a unit test, rather than in production on the first sponsored transaction. Regenerate only when the contract changes: packages/contracts/src/MarenForwarder.sol.",
+  "domain": {
+    "name": "Maren Forwarder",
+    "version": "1",
+    "chainId": 31611,
+    "verifyingContract": "0x22cC1Adfb0C91D9359746dE3F7E8cB7F2B8eA98C"
+  },
+  "types": {
+    "ForwardRequest": [
+      {
+        "name": "from",
+        "type": "address"
+      },
+      {
+        "name": "to",
+        "type": "address"
+      },
+      {
+        "name": "value",
+        "type": "uint256"
+      },
+      {
+        "name": "gas",
+        "type": "uint256"
+      },
+      {
+        "name": "nonce",
+        "type": "uint256"
+      },
+      {
+        "name": "deadline",
+        "type": "uint48"
+      },
+      {
+        "name": "data",
+        "type": "bytes"
+      }
+    ]
+  },
+  "primaryType": "ForwardRequest",
+  "message": {
+    "from": "0x70997970C51812dc3A010C7d01b50e0d17dc79C8",
+    "to": "0xe475Ff919D54E055809f516E3bed8a5c7a101836",
+    "value": "0",
+    "gas": "250000",
+    "nonce": "3",
+    "deadline": "1770000000",
+    "data": "0x4a4bdb3000000000000000000000000055555555555555555555555555555555555555550000000000000000000000000000000000000000000000008ac7230489e80000000000000000000000000000000000000000000000000000000000000000006000000000000000000000000000000000000000000000000000000000000000056c756e6368000000000000000000000000000000000000000000000000000000"
+  },
+  "digest": "0x182d0894579aad57ea1c5388f075d3e6abac85d03ad5c7269e8947cd3a803cbf",
+  "signature": "0xf4261dce56782a817b9116800e74babdcaba8be53c493618f5a80f2541bba1b66f25773c392e6e1f6b8608620157f4d838b1d60290b24bdbca78794d28f71f791b",
+  "body": {
+    "from": "0x70997970C51812dc3A010C7d01b50e0d17dc79C8",
+    "to": "0xe475Ff919D54E055809f516E3bed8a5c7a101836",
+    "value": "0",
+    "gas": "250000",
+    "nonce": "3",
+    "deadline": "1770000000",
+    "data": "0x4a4bdb3000000000000000000000000055555555555555555555555555555555555555550000000000000000000000000000000000000000000000008ac7230489e80000000000000000000000000000000000000000000000000000000000000000006000000000000000000000000000000000000000000000000000000000000000056c756e6368000000000000000000000000000000000000000000000000000000",
+    "signature": "0xf4261dce56782a817b9116800e74babdcaba8be53c493618f5a80f2541bba1b66f25773c392e6e1f6b8608620157f4d838b1d60290b24bdbca78794d28f71f791b"
+  }
+}
