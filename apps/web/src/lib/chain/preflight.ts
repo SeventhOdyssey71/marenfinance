@@ -137,6 +137,39 @@ const reading = (what: string): Blocker =>
  */
 export const GAS_HEADROOM_WEI = 10_000_000_000_000n;
 
+/**
+ * MUSD's Recovery Mode, stated as a refusal rather than left to the chain to discover.
+ *
+ * This is the one blocker in the module that is not about Maren at all. When MUSD's
+ * system-wide TCR falls under the 150% CCR, `BorrowerOperations` starts refusing whole
+ * classes of operation with bare `require` strings, and Maren's contracts cannot see it
+ * coming: `MarenVault` never calls `checkRecoveryMode`, so its own preflight arithmetic
+ * says the borrow is fine right up until MUSD refuses it. Read out of the deployed
+ * BorrowerOperations runtime bytecode on 2026-08-19:
+ *
+ *   "BorrowerOps: Collateral withdrawal not permitted Recovery Mode"
+ *       every withdrawColl, at any ratio, however overcollateralised the trove is
+ *   "BorrowerOps: Cannot decrease your Trove's ICR in Recovery Mode"
+ *       every bare withdrawMUSD, because taking on debt without adding collateral
+ *       always lowers ICR
+ *   "BorrowerOps: Operation not permitted during Recovery Mode"
+ *       closeTrove and refinance, both keeper-only
+ *
+ * Note what is NOT on that list: `addColl` and `repayMUSD` both RAISE the trove's ratio, so
+ * deposit and repay stay open. Blocking them too would be the more damaging error, because
+ * they are the two actions that get the protocol out of Recovery Mode.
+ */
+const recoveryModeBlocker = (what: string, stats: ProtocolStats): Blocker =>
+  local(
+    'pool',
+    'MUSD is in Recovery Mode',
+    `The whole MUSD protocol is under its 150% system-wide ratio` +
+      `${stats.systemTcrWei === null ? '' : `, at ${formatCollateralRatio(stats.systemTcrWei)}`}` +
+      `, and while it is, Mezo refuses ${what} from every trove on the chain. This is not ` +
+      `about your position or about Maren. Depositing and repaying are still open, and both ` +
+      `help lift the protocol back over the line.`,
+  );
+
 export interface VaultState {
   price: PriceFeed;
   position: Position | undefined;
@@ -269,6 +302,15 @@ export function preflightBorrow(state: VaultState, amountWei: bigint): Preflight
   }
   if (!stats.troveOpen) {
     return blocked(fromContract('pool', 'TroveNotOpen'), { rangeDead: true });
+  }
+
+  // Checked before the price gate, and before Maren's own floors, because it outranks both:
+  // no amount and no collateral ratio gets a borrow through Recovery Mode, so this is a dead
+  // range rather than a slider to drag back. A `null` here means the price read that
+  // `checkRecoveryMode` needs failed, and the gate immediately below refuses for that same
+  // reason, so falling through on null cannot open a door.
+  if (stats.recoveryMode === true) {
+    return blocked(recoveryModeBlocker('any new borrowing', stats), { rangeDead: true });
   }
 
   const gate = priceGate(price);
@@ -450,6 +492,21 @@ export function preflightWithdraw(state: VaultState, amountWei: bigint): Preflig
     );
   }
 
+  /**
+   * Recovery Mode kills `withdrawColl` outright, at any ratio. But it kills only that call,
+   * and `_sendCollateral` reaches for BorrowerOperations only when the vault's IDLE balance
+   * is short: BTC credited to a user but not yet pushed into the trove leaves the vault
+   * directly and never touches MUSD. So the honest cap is the idle balance, not zero, and
+   * getting that distinction wrong would tell someone whose Bitcoin is sitting untroved
+   * that they cannot have it back.
+   *
+   * `null` when we are not in Recovery Mode or cannot tell, and null must not clamp.
+   */
+  const recoveryCapWei = stats.recoveryMode === true ? stats.idleCollateralWei : null;
+  if (recoveryCapWei === 0n) {
+    return blocked(recoveryModeBlocker('every collateral withdrawal', stats), { rangeDead: true });
+  }
+
   // Priced only where the contract prices it.
   if (!gate.allowed && hasDebt) {
     return blocked(
@@ -479,9 +536,11 @@ export function preflightWithdraw(state: VaultState, amountWei: bigint): Preflig
     }
   }
 
-  const available = hasDebt ? maxWithdrawable(position, priceWei) : position.collateralWei;
+  const availableByRatio = hasDebt ? maxWithdrawable(position, priceWei) : position.collateralWei;
+  const available =
+    recoveryCapWei !== null && recoveryCapWei < availableByRatio ? recoveryCapWei : availableByRatio;
 
-  if (hasDebt && available === 0n) {
+  if (hasDebt && availableByRatio === 0n) {
     return blocked(
       fromContract('position', 'InsufficientCollateralRatio', [
         collateralRatio(position.collateralWei, position.debtWei, priceWei),
@@ -500,14 +559,27 @@ export function preflightWithdraw(state: VaultState, amountWei: bigint): Preflig
     );
   }
   if (amountWei > available) {
+    // Two different refusals wear the same shape here, and saying the wrong one sends the
+    // user to fix something that is not broken. If Recovery Mode is what is binding, their
+    // ratio is irrelevant and repaying more will not help; only the idle balance moves.
+    const boundByRecovery = recoveryCapWei !== null && recoveryCapWei < availableByRatio;
     return blocked(
-      local(
-        'input',
-        'More than your ratio can release',
-        `Taking that much out would leave you under Maren’s ` +
-          `${formatCollateralRatio(MAREN_POLICY.minHealthyCr)} floor. ` +
-          `${formatBtc(available)} can leave and keep you above it.`,
-      ),
+      boundByRecovery
+        ? local(
+            'pool',
+            'MUSD is in Recovery Mode',
+            `While the MUSD protocol sits under its 150% system-wide ratio, Mezo refuses every ` +
+              `withdrawal from a trove. ${formatBtc(recoveryCapWei)} of your Bitcoin has not been ` +
+              `pushed into the shared trove yet and can still leave; the rest has to wait for the ` +
+              `protocol to recover. Repaying is open and helps get it there.`,
+          )
+        : local(
+            'input',
+            'More than your ratio can release',
+            `Taking that much out would leave you under Maren’s ` +
+              `${formatCollateralRatio(MAREN_POLICY.minHealthyCr)} floor. ` +
+              `${formatBtc(available)} can leave and keep you above it.`,
+          ),
       { maxWei: available },
     );
   }

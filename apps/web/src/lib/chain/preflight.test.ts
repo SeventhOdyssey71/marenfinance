@@ -77,10 +77,24 @@ const MATSNET: ProtocolStats = {
   idleCollateralWei: btc('0.001'),
   depositsPaused: false,
   borrowingPaused: false,
+  // MUSD's own TCR, which is a different number from the pooled trove's ICR and moves
+  // independently of it. 190.5% on matsnet on 2026-08-19, comfortably over the 150% CCR.
+  systemTcrWei: 1_905_253_389_925_169_356n,
+  recoveryMode: false,
 };
 
 /** The same trove, recapitalised past the floor. Only `troveIcrWei` moves. */
 const HEALTHY_POOL: ProtocolStats = { ...MATSNET, troveIcrWei: 2_400_000_000_000_000_000n };
+
+/**
+ * A healthy Maren pool inside an UNHEALTHY MUSD. The combination is the whole point: every
+ * Maren-side number says go, and Mezo refuses anyway. 148% is under the 150% CCR.
+ */
+const RECOVERY_MODE: ProtocolStats = {
+  ...HEALTHY_POOL,
+  systemTcrWei: 1_480_000_000_000_000_000n,
+  recoveryMode: true,
+};
 
 const POSITION: Position = {
   collateralWei: btc('0.001'),
@@ -295,6 +309,106 @@ describe('withdraw', () => {
     // And the figure it quotes really does hold the floor.
     const remaining = POSITION.collateralWei - result.maxWei;
     expect((remaining * PRICE_WEI) / musd('20')).toBeGreaterThanOrEqual(MAREN_VAULT.minBorrowCr);
+  });
+});
+
+/**
+ * MUSD's Recovery Mode, which is the one refusal in this module that is not Maren's.
+ *
+ * Every fixture here uses HEALTHY_POOL, so Maren's own arithmetic says yes to all of it.
+ * That is the case worth testing: the pooled trove is over its floor, the user is over
+ * theirs, the oracle is fresh, and Mezo refuses anyway because the PROTOCOL is under its
+ * 150% CCR. Before these fields existed the controls stayed enabled and the user paid gas
+ * to be told, in Solidity, "BorrowerOps: Collateral withdrawal not permitted Recovery Mode".
+ *
+ * The three restrictions being modelled were read out of the deployed BorrowerOperations
+ * runtime bytecode on 2026-08-19, not from Mezo's docs, which describe only the third.
+ */
+describe('MUSD Recovery Mode', () => {
+  it('kills the entire borrow range even on a pool that is otherwise healthy', () => {
+    const result = preflightBorrow(state({ stats: RECOVERY_MODE }), musd('17.95'));
+
+    expect(result.ok).toBe(false);
+    expect(result.rangeDead).toBe(true);
+    expect(result.maxWei).toBe(0n);
+    // Not the user's doing, so it must not be coloured as their mistake.
+    expect(result.blocker?.scope).toBe('pool');
+    expect(result.blocker?.title).toBe('MUSD is in Recovery Mode');
+  });
+
+  it('names the protocol’s own ratio, not the pool’s', () => {
+    const { blocker } = preflightBorrow(state({ stats: RECOVERY_MODE }), musd('1'));
+    // 148% is MUSD's TCR. 240% is the pooled trove's ICR, and quoting that here would be
+    // both true and completely misleading about why this failed.
+    expect(blocker?.detail).toContain('148.0%');
+    expect(blocker?.detail).not.toContain('240.0%');
+    expect(blocker?.detail).toContain('Depositing and repaying are still open');
+  });
+
+  it('outranks the stale-oracle gate, because no fresher price would help', () => {
+    const result = preflightBorrow(
+      state({ stats: RECOVERY_MODE, price: stalePrice }),
+      musd('17.95'),
+    );
+    expect(result.blocker?.scope).toBe('pool');
+    expect(result.blocker?.title).toBe('MUSD is in Recovery Mode');
+  });
+
+  it('does not block on an UNKNOWN recovery mode, which the price gate already covers', () => {
+    // `recoveryMode: null` means the price read that answers it failed. Blocking twice for
+    // one cause would report a protocol emergency that may not exist.
+    const unknown = { ...HEALTHY_POOL, systemTcrWei: null, recoveryMode: null };
+    expect(preflightBorrow(state({ stats: unknown }), musd('17.95')).ok).toBe(true);
+  });
+
+  it('refuses every withdrawal when no collateral is sitting idle', () => {
+    // All of it is inside the trove, so `_sendCollateral` must call `withdrawColl`, and
+    // that is the call Mezo blocks outright.
+    const noIdle = { ...RECOVERY_MODE, idleCollateralWei: 0n };
+    const result = preflightWithdraw(state({ stats: noIdle }), btc('0.0001'));
+
+    expect(result.ok).toBe(false);
+    expect(result.rangeDead).toBe(true);
+    expect(result.maxWei).toBe(0n);
+    expect(result.blocker?.scope).toBe('pool');
+  });
+
+  it('still lets idle collateral leave, because it never touches BorrowerOperations', () => {
+    const partIdle = { ...RECOVERY_MODE, idleCollateralWei: btc('0.0004') };
+    const result = preflightWithdraw(state({ stats: partIdle }), btc('0.0004'));
+    expect(result.ok).toBe(true);
+  });
+
+  it('caps a withdrawal at the idle balance and says why it is not about the ratio', () => {
+    const partIdle = { ...RECOVERY_MODE, idleCollateralWei: btc('0.0004') };
+    // The account is debt-free, so its own ratio permits all 0.001 BTC. Recovery Mode is
+    // the only thing binding, and the copy has to say so or the user goes to repay a debt
+    // they do not have.
+    const result = preflightWithdraw(state({ stats: partIdle }), btc('0.001'));
+
+    expect(result.ok).toBe(false);
+    expect(result.maxWei).toBe(btc('0.0004'));
+    expect(result.blocker?.scope).toBe('pool');
+    expect(result.blocker?.title).toBe('MUSD is in Recovery Mode');
+    expect(result.blocker?.detail).not.toContain('floor');
+  });
+
+  it('leaves deposit and repay open, since both lift the protocol back out', () => {
+    const indebted: Position = { ...POSITION, debtWei: musd('20'), principalWei: musd('20') };
+    const funded: Balances = { ...BALANCES, musdWei: musd('20') };
+
+    expect(preflightDeposit(state({ stats: RECOVERY_MODE }), btc('0.01')).ok).toBe(true);
+    expect(
+      preflightRepay(state({ stats: RECOVERY_MODE, position: indebted, balances: funded }), musd('20')).ok,
+    ).toBe(true);
+  });
+
+  it('changes nothing at all when the protocol is not in Recovery Mode', () => {
+    // The regression guard for the clamp: HEALTHY_POOL has 0.001 BTC idle and the account
+    // holds 0.001 BTC, so a null cap must not silently become a binding one.
+    const result = preflightWithdraw(state({ stats: HEALTHY_POOL }), btc('0.001'));
+    expect(result.ok).toBe(true);
+    expect(result.maxWei).toBe(btc('0.001'));
   });
 });
 

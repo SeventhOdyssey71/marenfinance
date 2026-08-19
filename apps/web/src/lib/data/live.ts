@@ -288,6 +288,48 @@ export async function handleAvailable(ctx: LiveContext, handle: string): Promise
  * is — which, right now, is the single most decision-relevant fact on the screen, because
  * the trove sits under Maren's own borrow floor and every borrow therefore reverts.
  */
+/**
+ * MUSD's system-wide mode: the TCR, and whether the protocol is in Recovery Mode.
+ *
+ * Priced off the ORACLE PRECOMPILE, not `PriceFeed.fetchPrice()`, and the choice is
+ * load-bearing. `fetchPrice()` reverts above 60 seconds of staleness, so asking it would
+ * make "is the protocol in Recovery Mode" unanswerable in exactly the conditions where a
+ * user most needs to know. `checkRecoveryMode(uint256)` and `getTCR(uint256)` take the
+ * price as an argument and are plain views, so a slightly old price still yields a real
+ * answer about the protocol's mode.
+ *
+ * Never throws. This is one contract read on top of the ones that already gate the screen,
+ * and a failure here must degrade to "unknown" rather than blank the whole protocol panel.
+ * The nulls it returns are honest: `checkRecoveryMode` cannot be evaluated without a price,
+ * and a `false` invented in its place would be the specific lie that re-enables a borrow
+ * button the chain is going to refuse.
+ */
+async function readSystemMode(
+  ctx: LiveContext,
+): Promise<Pick<ProtocolStats, 'systemTcrWei' | 'recoveryMode'>> {
+  const musd = getMusdAddresses(ctx.network);
+  try {
+    const { priceWei } = await readPrice(ctx);
+    const [systemTcrWei, recoveryMode] = await Promise.all([
+      ctx.client.readContract({
+        address: musd.troveManager,
+        abi: troveManagerAbi,
+        functionName: 'getTCR',
+        args: [priceWei],
+      }),
+      ctx.client.readContract({
+        address: musd.troveManager,
+        abi: troveManagerAbi,
+        functionName: 'checkRecoveryMode',
+        args: [priceWei],
+      }),
+    ]);
+    return { systemTcrWei, recoveryMode };
+  } catch {
+    return { systemTcrWei: null, recoveryMode: null };
+  }
+}
+
 export async function readProtocolStats(ctx: LiveContext): Promise<ProtocolStats> {
   const maren = getMarenAddresses(ctx.network);
   const musd = getMusdAddresses(ctx.network);
@@ -352,8 +394,10 @@ export async function readProtocolStats(ctx: LiveContext): Promise<ProtocolStats
   ]);
 
   const [coll, netDebt, icr] = status;
+  const system = await readSystemMode(ctx);
 
   return {
+    ...system,
     totalCollateralWei: totalCollateral,
     troveCollateralWei: coll,
     troveNetDebtWei: netDebt,

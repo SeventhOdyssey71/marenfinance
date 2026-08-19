@@ -149,3 +149,89 @@ describe('the borrow refusal a user actually hits', () => {
     expect(reason.detail).toContain('Nothing was signed');
   });
 });
+
+/**
+ * MUSD's own refusals, which arrive as `Error(string)` rather than as a custom error.
+ *
+ * Mezo's `BorrowerOperations` predates custom errors, so every one of its refusals reaches
+ * the user as a Solidity require string. Left untranslated they render verbatim under a
+ * generic heading, which is better than hex and still not an explanation: a user reading
+ * "BorrowerOps: Collateral withdrawal not permitted Recovery Mode" has no way to know that
+ * their own position is fine, that nothing was lost, or that repaying still works.
+ *
+ * THE STRINGS BELOW ARE NOT PARAPHRASED. Each was extracted from the runtime bytecode of
+ * the deployed BorrowerOperations implementation on Mezo matsnet
+ * (0xc05bf344bd5b58825784326dd3112fb6cc160dcc, behind the proxy at
+ * 0xCdF7028ceAB81fA0C6971208e83fa7872994beE5) on 2026-08-19, by locating the ASCII literals
+ * in the constant pool. The mainnet implementation carries the same literals. Note the
+ * missing preposition in "not permitted Recovery Mode" and the straight apostrophe in
+ * "Trove's": both are the contract's, and copying them faithfully is the point, because a
+ * tidied-up string would not match at runtime.
+ */
+describe('MUSD’s own require strings', () => {
+  const musdRevert = (message: string) =>
+    revertWith(
+      encodeErrorResult({
+        abi: [{ type: 'error', name: 'Error', inputs: [{ name: 'message', type: 'string' }] }],
+        errorName: 'Error',
+        args: [message],
+      }),
+    );
+
+  it('explains the collateral-withdrawal block instead of quoting it', () => {
+    const reason = explainError(
+      musdRevert('BorrowerOps: Collateral withdrawal not permitted Recovery Mode'),
+    );
+
+    expect(reason.title).toBe('MUSD entered Recovery Mode');
+    expect(reason.detail).toContain('150%');
+    expect(reason.detail).toContain('Nothing moved');
+    // The raw string must not survive into the copy the user reads.
+    expect(reason.detail).not.toContain('BorrowerOps');
+  });
+
+  it('explains the ICR-decrease block, which is what a borrow hits', () => {
+    const reason = explainError(
+      musdRevert("BorrowerOps: Cannot decrease your Trove's ICR in Recovery Mode"),
+    );
+
+    expect(reason.title).toBe('MUSD entered Recovery Mode');
+    expect(reason.detail).toContain('no borrow can go through at any size');
+    expect(reason.detail).not.toContain('BorrowerOps');
+  });
+
+  it('explains the close/refinance block', () => {
+    const reason = explainError(
+      musdRevert('BorrowerOps: Operation not permitted during Recovery Mode'),
+    );
+    expect(reason.title).toBe('MUSD entered Recovery Mode');
+  });
+
+  it('explains Mezo’s per-trove ceiling, which no other chain has', () => {
+    const reason = explainError(
+      musdRevert('BorrowerOps: An operation that exceeds maxBorrowingCapacity is not permitted'),
+    );
+
+    expect(reason.title).toContain('per-trove ceiling');
+    // The non-obvious half: more collateral does NOT lift it.
+    expect(reason.detail).toContain('Adding collateral does not raise that ceiling');
+  });
+
+  it('explains a stale oracle as the protocol protecting itself, not as bad input', () => {
+    const reason = explainError(musdRevert('PriceFeed: Oracle is stale.'));
+
+    expect(reason.title).toBe('The price feed is stale');
+    expect(reason.detail).toContain('60-second');
+    expect(reason.detail).toContain('Nothing moved');
+  });
+
+  it('falls back to the raw string for a message it does not know', () => {
+    // Deliberate: these come from an UPGRADEABLE proxy. If Mezo rewords a string, this must
+    // degrade to the contract's own words, never to a confidently wrong explanation.
+    const reason = explainError(musdRevert('BorrowerOps: Some future rule nobody has mapped'));
+
+    expect(reason.name).toBe('Error(string)');
+    expect(reason.title).toBe('The contract refused this');
+    expect(reason.detail).toBe('BorrowerOps: Some future rule nobody has mapped');
+  });
+});
