@@ -76,7 +76,6 @@ deployment block is `null`, which callers must handle as unavailable rather than
 - No gasless meta-transaction has been sent through `MarenRelayHub` on chain, and no
   code in `apps/web` posts to the relayer yet; wiring the web transaction path to it is
   the follow-up to the deployment packaging.
-- `MarenEarn` has no Stability Pool deposit yet.
 - `apps/ios` is on mock data throughout.
 
 ## Networks

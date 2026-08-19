@@ -80,21 +80,24 @@ Deployment proves compilation. What follows proves operation. Every transaction
 referenced in this section is listed here in full, and each resolves on
 `explorer.test.mezo.org`.
 
-| Action                       | Transaction                                                          |
-| ---------------------------- | -------------------------------------------------------------------- |
-| Open the pooled trove        | `0x13ea27a7b5c9499640c48672028c96e3208aa9924fc5802578cc1044314e93f8` |
-| Register `@sele`, commit     | `0x91b7d9515e83792c16f173a695205399263afa061b957cc7652cd2bb915cad04` |
-| Register `@sele`, reveal     | `0x048451db7af36cf8a52da611906b256d54cd73f7923c8ad8f4070f88eb666581` |
-| Deposit, scripted            | `0xda9a536c732db989a7e6fb56d8676fed7e73f3e30fdc4106d20d37577472602b` |
-| Keeper top-up                | `0xb3b90cc57849ac659404802e36b496006e6f42ea57b8b3210f353dd0e101c7f2` |
-| Protocol collateral, 17 Aug  | `0x968dd8d9b849655e11cc908f9b8fcd3ef417ae414e5ac8e8a16668e9fd48a8c8` |
-| Keeper sweep, 17 Aug         | `0xdc0030b9b16b1fb24a3a329e5b113253ff4b0c1096b1c5712d8a44fe2c4d3cb8` |
-| User deposit, via the app    | `0x3b34e664140c594c3b10f4b500e4ea2e582f00002086485b93c972f1695e8dd2` |
-| User deposit, via the app    | `0xb9d2f965c3da71ec62e731c8366f8a97c6919cb597974a89675b313f4d70ce63` |
-| User withdrawal, via the app | `0x58798d759af23f9a9bf44d237577209f92f693cca618c68c05052540ea30cbb3` |
-| User borrow, via the app     | `0x28bb5ec1d065dc7bd1c1ab4c1997fb4eeb4a75af492bd38fd90442c888427ef2` |
-| Payment request, via the app | `0x059f329fda15d6eb430d514040f7060fe41b354eac478c2c9ad4e5dba490559a` |
-| Deleverage no-op             | `0x71adc0a5477cb64c95073360f6a984adb4a9c04f5a8fcc5b73d4249e5456c54d` |
+| Action                        | Transaction                                                          |
+| ----------------------------- | -------------------------------------------------------------------- |
+| Open the pooled trove         | `0x13ea27a7b5c9499640c48672028c96e3208aa9924fc5802578cc1044314e93f8` |
+| Register `@sele`, commit      | `0x91b7d9515e83792c16f173a695205399263afa061b957cc7652cd2bb915cad04` |
+| Register `@sele`, reveal      | `0x048451db7af36cf8a52da611906b256d54cd73f7923c8ad8f4070f88eb666581` |
+| Deposit, scripted             | `0xda9a536c732db989a7e6fb56d8676fed7e73f3e30fdc4106d20d37577472602b` |
+| Keeper top-up                 | `0xb3b90cc57849ac659404802e36b496006e6f42ea57b8b3210f353dd0e101c7f2` |
+| Protocol collateral, 17 Aug   | `0x968dd8d9b849655e11cc908f9b8fcd3ef417ae414e5ac8e8a16668e9fd48a8c8` |
+| Keeper sweep, 17 Aug          | `0xdc0030b9b16b1fb24a3a329e5b113253ff4b0c1096b1c5712d8a44fe2c4d3cb8` |
+| User deposit, via the app     | `0x3b34e664140c594c3b10f4b500e4ea2e582f00002086485b93c972f1695e8dd2` |
+| User deposit, via the app     | `0xb9d2f965c3da71ec62e731c8366f8a97c6919cb597974a89675b313f4d70ce63` |
+| User withdrawal, via the app  | `0x58798d759af23f9a9bf44d237577209f92f693cca618c68c05052540ea30cbb3` |
+| User borrow, via the app      | `0x28bb5ec1d065dc7bd1c1ab4c1997fb4eeb4a75af492bd38fd90442c888427ef2` |
+| Payment request, via the app  | `0x059f329fda15d6eb430d514040f7060fe41b354eac478c2c9ad4e5dba490559a` |
+| Earn: vault deposit, 19 Aug   | `0xa481b09539ea9143c87c347b5de3cdaa7194ac7547caa2378632dc09ca8d8927` |
+| Earn: borrow 40 MUSD, 19 Aug  | `0x0c91368e53c1858796bc657844c156b162baf415477f8d757676fa803f97caa4` |
+| Earn: deposit 25 MUSD, 19 Aug | `0xf6010449f994290a1f9959e7443910553b83cb989ef068825f7100685a1239ac` |
+| Deleverage no-op              | `0x71adc0a5477cb64c95073360f6a984adb4a9c04f5a8fcc5b73d4249e5456c54d` |
 
 ### The pooled trove is live inside Mezo's own TroveManager
 
@@ -126,8 +129,12 @@ exists so a name cannot be sniped from the mempool.
 
 ### Real user flows, on the real chain
 
-Deposits, a withdrawal, keeper collateral top-ups, the borrow above, and an on-chain
-payment request of 0.50 MUSD, all in the log. Each is a row in the app's Activity
+Deposits, a withdrawal, keeper collateral top-ups, the borrow above, an on-chain
+payment request of 0.50 MUSD, and a full Earn cycle, all in the log. The Earn cycle is
+the whole product path in three transactions: Bitcoin deposited, 40 MUSD borrowed
+against it, 25 MUSD placed into MarenEarn, and MUSD's own Stability Pool now reports a
+25 MUSD deposit for the Earn vault (`getCompoundedMUSDDeposit`). Every layer of the
+stack touched the real protocol. Each is a row in the app's Activity
 screen with its hash linked to the explorer.
 
 ### One honest failure, kept on the record

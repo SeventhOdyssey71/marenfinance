@@ -105,7 +105,12 @@ case, since one is an error and the other is a legitimate boundary.
   transactions below) and a 30 MUSD borrow from the test wallet now simulates clean,
   with 40 MUSD correctly refused at the user's own 180% floor. The borrow itself has
   not been broadcast yet.
-- **`MarenEarn` deposit into the Stability Pool.**
+- ~~`MarenEarn` deposit into the Stability Pool~~ **Done, 19 August**: 0.01 BTC deposited
+  (`0xa481b09539ea9143c87c347b5de3cdaa7194ac7547caa2378632dc09ca8d8927`), 40 MUSD
+  borrowed (`0x0c91368e53c1858796bc657844c156b162baf415477f8d757676fa803f97caa4`),
+  25 MUSD into MarenEarn
+  (`0xf6010449f994290a1f9959e7443910553b83cb989ef068825f7100685a1239ac`), and the
+  Stability Pool's `getCompoundedMUSDDeposit(MarenEarn)` reads 25 MUSD.
 
 ### The top-up, 17 August 2026
 
