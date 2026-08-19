@@ -60,11 +60,11 @@ RPC endpoints used: `https://rpc.test.mezo.org` primary,
 
 73 integration points were given an explicit verdict.
 
-| Verdict | Count | Where |
-| --- | --- | --- |
-| PASS | 64 | selectors 39, divergences 6, doc discrepancies 1, hints 6, oracle 5, precompiles 7 |
-| DRIFTED | 6 | Recovery Mode (1), `PaidToHandle` topic0 (1), `isUsingStalePrice` unused (1), byte counts (3) |
-| UNPROVEN | 3 | refinance-fee arithmetic, circulating-vs-backed ratio, MEZO token precompile |
+| Verdict  | Count | Where                                                                                         |
+| -------- | ----- | --------------------------------------------------------------------------------------------- |
+| PASS     | 64    | selectors 39, divergences 6, doc discrepancies 1, hints 6, oracle 5, precompiles 7            |
+| DRIFTED  | 6     | Recovery Mode (1), `PaidToHandle` topic0 (1), `isUsingStalePrice` unused (1), byte counts (3) |
+| UNPROVEN | 3     | refinance-fee arithmetic, circulating-vs-backed ratio, MEZO token precompile                  |
 
 Every one of the 44 function selectors Maren declares exists on the deployed contract with
 the argument types Maren encodes, on both networks. No type mismatch was found anywhere,
@@ -88,26 +88,26 @@ Proxy matsnet `0xCdF7028ceAB81fA0C6971208e83fa7872994beE5` (impl
 `0x501670bbbe2ec8c11449c28c0c9e6677d5ea9b61`, 24,552 bytes). Declared in
 `packages/contracts/src/interfaces/IBorrowerOperations.sol`.
 
-| Function | Selector | Maren assumes | Chain says | Verdict |
-| --- | --- | --- | --- | --- |
-| `openTrove(uint256,address,address)` | `0x2f3a6d98` | payable, no fee cap | present both nets; `eth_call` with `value:1` reached `"BorrowerOps: Trove is active"`, so it accepts value | PASS |
-| `addColl(address,address)` | `0x68647db1` | payable | present both; `eth_call` with `value:1` succeeded | PASS |
-| `withdrawColl(uint256,address,address)` | `0x5530273c` | non-payable | present both | PASS |
-| `withdrawMUSD(uint256,address,address)` | `0xaf8b4fd0` | non-payable | present both; call with no value reached protocol logic | PASS |
-| `repayMUSD(uint256,address,address)` | `0xdc283bb3` | non-payable | present both | PASS |
-| `closeTrove()` | `0x0e704d50` | no arguments | present both; reverts `"Caller doesnt have enough mUSD to make repayment"` | PASS |
-| `refinance(address,address)` | `0xdc1cdb2c` | hints only | present both | PASS |
-| `claimCollateral()` | `0x6f0b0c1c` | no arguments | present both | PASS |
-| `adjustTrove(uint256,uint256,bool,address,address)` | `0x45c842e6` | declared, never called | present both | PASS |
-| `minNetDebt()` | `0x969c2452` | 1.8e21 | 1800000000000000000000 both | PASS |
+| Function                                            | Selector     | Maren assumes          | Chain says                                                                                                 | Verdict |
+| --------------------------------------------------- | ------------ | ---------------------- | ---------------------------------------------------------------------------------------------------------- | ------- |
+| `openTrove(uint256,address,address)`                | `0x2f3a6d98` | payable, no fee cap    | present both nets; `eth_call` with `value:1` reached `"BorrowerOps: Trove is active"`, so it accepts value | PASS    |
+| `addColl(address,address)`                          | `0x68647db1` | payable                | present both; `eth_call` with `value:1` succeeded                                                          | PASS    |
+| `withdrawColl(uint256,address,address)`             | `0x5530273c` | non-payable            | present both                                                                                               | PASS    |
+| `withdrawMUSD(uint256,address,address)`             | `0xaf8b4fd0` | non-payable            | present both; call with no value reached protocol logic                                                    | PASS    |
+| `repayMUSD(uint256,address,address)`                | `0xdc283bb3` | non-payable            | present both                                                                                               | PASS    |
+| `closeTrove()`                                      | `0x0e704d50` | no arguments           | present both; reverts `"Caller doesnt have enough mUSD to make repayment"`                                 | PASS    |
+| `refinance(address,address)`                        | `0xdc1cdb2c` | hints only             | present both                                                                                               | PASS    |
+| `claimCollateral()`                                 | `0x6f0b0c1c` | no arguments           | present both                                                                                               | PASS    |
+| `adjustTrove(uint256,uint256,bool,address,address)` | `0x45c842e6` | declared, never called | present both                                                                                               | PASS    |
+| `minNetDebt()`                                      | `0x969c2452` | 1.8e21                 | 1800000000000000000000 both                                                                                | PASS    |
 
 Negative controls, all four ABSENT on both networks, which is the point:
 
-| Liquity form | Selector | Verdict |
-| --- | --- | --- |
-| `openTrove(uint256,uint256,address,address)` | `0x860665b3` | absent (PASS) |
-| `openTrove(uint256,uint256,uint256,address,address)` | `0x8f09162b` | absent (PASS) |
-| `withdrawMUSD(uint256,uint256,address,address)` | `0x5f705f69` | absent (PASS) |
+| Liquity form                                                | Selector     | Verdict       |
+| ----------------------------------------------------------- | ------------ | ------------- |
+| `openTrove(uint256,uint256,address,address)`                | `0x860665b3` | absent (PASS) |
+| `openTrove(uint256,uint256,uint256,address,address)`        | `0x8f09162b` | absent (PASS) |
+| `withdrawMUSD(uint256,uint256,address,address)`             | `0x5f705f69` | absent (PASS) |
 | `adjustTrove(uint256,uint256,uint256,bool,address,address)` | `0xc6a6cf20` | absent (PASS) |
 
 No `maxFeePercentage` appears anywhere in Maren, and no fee-cap require string
@@ -119,29 +119,29 @@ Proxy matsnet `0xE47c80e8c23f6B4A1aE41c34837a0599D5D16bb0` (impl
 `0x9aab567966983e95536fc460c12266fb0cc10b07`, 19,997 bytes); mainnet impl
 `0xdcfdab0dea52e5efc8400283d46fd0d122a519e9`, same size.
 
-| Function | Selector | Verdict | Note |
-| --- | --- | --- | --- |
-| `getTroveColl(address)` | `0x480cd578` | PASS | |
-| `getTroveStatus(address)` | `0x21e37801` | PASS | returned `1` for the vault's own trove |
-| `getTroveDebt(address)` | `0xd66a2553` | PASS | |
-| `getTroveMaxBorrowingCapacity(address)` | `0xe07fdf03` | PASS | |
-| `getCurrentICR(address,uint256)` | `0xd293c710` | PASS | |
-| `getTCR(uint256)` | `0xb82f263d` | PASS | 1.905e18 matsnet, 2.467e18 mainnet |
-| `checkRecoveryMode(uint256)` | `0x4e443d9e` | PASS | `false` on both, so Recovery Mode was NOT live during the audit |
-| `getEntireDebtAndColl(address)` | `0xb91af97c` | PASS | see the arity check below |
-| `redeemCollateral(uint256,address,address,address,uint256,uint256)` | `0x3db23605` | PASS | |
-| `MCR()` | `0x794e5724` | PASS | 1.1e18 both |
-| `CCR()` | `0x5733d58f` | PASS | 1.5e18 both |
+| Function                                                            | Selector     | Verdict | Note                                                            |
+| ------------------------------------------------------------------- | ------------ | ------- | --------------------------------------------------------------- |
+| `getTroveColl(address)`                                             | `0x480cd578` | PASS    |                                                                 |
+| `getTroveStatus(address)`                                           | `0x21e37801` | PASS    | returned `1` for the vault's own trove                          |
+| `getTroveDebt(address)`                                             | `0xd66a2553` | PASS    |                                                                 |
+| `getTroveMaxBorrowingCapacity(address)`                             | `0xe07fdf03` | PASS    |                                                                 |
+| `getCurrentICR(address,uint256)`                                    | `0xd293c710` | PASS    |                                                                 |
+| `getTCR(uint256)`                                                   | `0xb82f263d` | PASS    | 1.905e18 matsnet, 2.467e18 mainnet                              |
+| `checkRecoveryMode(uint256)`                                        | `0x4e443d9e` | PASS    | `false` on both, so Recovery Mode was NOT live during the audit |
+| `getEntireDebtAndColl(address)`                                     | `0xb91af97c` | PASS    | see the arity check below                                       |
+| `redeemCollateral(uint256,address,address,address,uint256,uint256)` | `0x3db23605` | PASS    |                                                                 |
+| `MCR()`                                                             | `0x794e5724` | PASS    | 1.1e18 both                                                     |
+| `CCR()`                                                             | `0x5733d58f` | PASS    | 1.5e18 both                                                     |
 
 Absences, all confirmed on both networks:
 
-| Function | Selector | Verdict |
-| --- | --- | --- |
+| Function                                           | Selector     | Verdict                                                |
+| -------------------------------------------------- | ------------ | ------------------------------------------------------ |
 | `redeemCollateral(...,uint256)` 7-arg Liquity form | `0xbcd37526` | absent (PASS); live call reverts with empty returndata |
-| `baseRate()` | `0x1f68f20a` | absent (PASS) |
-| `getRedemptionRateWithDecay()` | `0xc52861f2` | absent (PASS) |
-| `REDEMPTION_FEE_FLOOR()` | `0x28d28b5b` | absent (PASS) |
-| `isAccountFeeExempt(address)` | `0x2cbc5804` | absent (PASS); present on BorrowerOperations |
+| `baseRate()`                                       | `0x1f68f20a` | absent (PASS)                                          |
+| `getRedemptionRateWithDecay()`                     | `0xc52861f2` | absent (PASS)                                          |
+| `REDEMPTION_FEE_FLOOR()`                           | `0x28d28b5b` | absent (PASS)                                          |
+| `isAccountFeeExempt(address)`                      | `0x2cbc5804` | absent (PASS); present on BorrowerOperations           |
 
 The 6-return arity was checked at the byte level rather than by trusting a decoder:
 
@@ -154,41 +154,41 @@ cast call 0xE47c80e8c23f6B4A1aE41c34837a0599D5D16bb0 \
 
 ### SortedTroves, HintHelpers, PriceFeed, StabilityPool, MUSD
 
-| Contract | Members declared | Result |
-| --- | --- | --- |
-| SortedTroves impl `0x9177df58...` | `findInsertPosition(uint256,address,address)`, `getSize()`, `getFirst()`, `getLast()`, `getNext(address)`, `getPrev(address)`, `contains(address)` | 7/7 PASS. `getSize()` -> 230 matsnet, 25 mainnet, matching `getTroveOwnersCount()` on each |
-| HintHelpers impl `0x8adf3f35...` | `computeNominalCR(uint256,uint256)`, `getApproxHint(uint256,uint256,uint256)`, `getRedemptionHints(uint256,uint256,uint256)` | 3/3 PASS. `computeNominalCR(1e18, 2000e18)` -> 5e16, confirming the 1e20 scaling Maren's comment records |
-| PriceFeed impl `0xec42b37c...` | `fetchPrice()` | PASS. `lastGoodPrice()` (`0x0490be83`) ABSENT, as recorded |
-| StabilityPool impl `0x8f0ca419...` | `provideToSP(uint256)`, `withdrawFromSP(uint256)`, `getCompoundedMUSDDeposit(address)`, `getDepositorCollateralGain(address)`, `getTotalMUSDDeposits()` | 5/5 PASS |
-| MUSD `0x118917a4...` (NOT a proxy: impl slot reads zero, 6,437 bytes of direct runtime) | `permit`, `nonces`, `DOMAIN_SEPARATOR`, `eip712Domain`, `decimals`, `transferFrom`, `approve`, `balanceOf`, `allowance` | 9/9 PASS. The full canonical EIP-2612 surface, not a near-miss variant |
+| Contract                                                                                | Members declared                                                                                                                                        | Result                                                                                                   |
+| --------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------- |
+| SortedTroves impl `0x9177df58...`                                                       | `findInsertPosition(uint256,address,address)`, `getSize()`, `getFirst()`, `getLast()`, `getNext(address)`, `getPrev(address)`, `contains(address)`      | 7/7 PASS. `getSize()` -> 230 matsnet, 25 mainnet, matching `getTroveOwnersCount()` on each               |
+| HintHelpers impl `0x8adf3f35...`                                                        | `computeNominalCR(uint256,uint256)`, `getApproxHint(uint256,uint256,uint256)`, `getRedemptionHints(uint256,uint256,uint256)`                            | 3/3 PASS. `computeNominalCR(1e18, 2000e18)` -> 5e16, confirming the 1e20 scaling Maren's comment records |
+| PriceFeed impl `0xec42b37c...`                                                          | `fetchPrice()`                                                                                                                                          | PASS. `lastGoodPrice()` (`0x0490be83`) ABSENT, as recorded                                               |
+| StabilityPool impl `0x8f0ca419...`                                                      | `provideToSP(uint256)`, `withdrawFromSP(uint256)`, `getCompoundedMUSDDeposit(address)`, `getDepositorCollateralGain(address)`, `getTotalMUSDDeposits()` | 5/5 PASS                                                                                                 |
+| MUSD `0x118917a4...` (NOT a proxy: impl slot reads zero, 6,437 bytes of direct runtime) | `permit`, `nonces`, `DOMAIN_SEPARATOR`, `eip712Domain`, `decimals`, `transferFrom`, `approve`, `balanceOf`, `allowance`                                 | 9/9 PASS. The full canonical EIP-2612 surface, not a near-miss variant                                   |
 
 ### Maren's own SDK ABI fragments
 
 `packages/sdk/src/abis.ts`. Function fragments all match. One EVENT fragment did not, and
 event fragments fail differently from function fragments: see Finding 2.
 
-| Fragment | Verdict |
-| --- | --- |
-| `troveManagerAbi` (6 members, now 7 with `getTCR`) | PASS |
-| `priceFeedAbi`, `priceOracleAbi` | PASS |
-| `marenVaultAbi`, `marenRegistryAbi`, `marenEarnAbi` | PASS |
+| Fragment                                                                     | Verdict                                            |
+| ---------------------------------------------------------------------------- | -------------------------------------------------- |
+| `troveManagerAbi` (6 members, now 7 with `getTCR`)                           | PASS                                               |
+| `priceFeedAbi`, `priceOracleAbi`                                             | PASS                                               |
+| `marenVaultAbi`, `marenRegistryAbi`, `marenEarnAbi`                          | PASS                                               |
 | `MAREN_PAY_EVENTS` -> `Paid`, `RequestCreated`, `LinkCreated`, `LinkClaimed` | PASS, topic0 located in deployed MarenPay bytecode |
-| `MAREN_PAY_EVENTS` -> `PaidToHandle` | **DRIFTED**, now fixed. Finding 2 |
+| `MAREN_PAY_EVENTS` -> `PaidToHandle`                                         | **DRIFTED**, now fixed. Finding 2                  |
 
 ## 2. The seven Liquity divergences
 
 Re-checked against current bytecode, and then checked that Maren's code actually respects
 each one.
 
-| # | Recorded divergence | Chain says | Does Maren respect it | Verdict |
-| --- | --- | --- | --- | --- |
-| 1 | No `_maxFeePercentage` on openTrove/adjustTrove/withdrawMUSD | Confirmed. Four Liquity variants absent on both networks; no fee-cap require string in the bytecode | Yes. No `maxFeePercentage` token exists anywhere in the repo; `IBorrowerOperations.sol` and the SDK both encode the 3-argument forms | PASS |
-| 2 | `fetchPrice()` reverts above 60s staleness, no `lastGoodPrice()` | Confirmed twice over. `lastGoodPrice()` absent; the PriceFeed constant pool contains `"PriceFeed: Oracle is stale."`, `"Oracle returns 0 for price"` and `"Invalid Decimals from Oracle"` | Yes, and well. `MarenVault._price()` try/catches into `PriceFeedUnavailable()`; both clients read the precompile's `updatedAt` instead so they can say HOW stale. `forge test test_fork_staleOracleSurfacesAsNamedError` passes against live matsnet | PASS |
-| 3 | `maxBorrowingCapacity` is fixed at the opening price; only `refinance()` raises it | Confirmed. Getter present both nets, and the BorrowerOperations constant pool contains `"BorrowerOps: An operation that exceeds maxBorrowingCapacity is not permitted"` | Yes. The UI quotes `troveMaxBorrowingCapacity()` rather than an ICR-derived number, and `preflightBorrow` distinguishes "at Mezo's ceiling" from "past Maren's floor". `forge test test_fork_maxBorrowingCapacityIsFrozenUntilRefinance` passes against live matsnet | PASS |
-| 4 | No baseRate accumulator, no redemption-fee decay | Confirmed. `baseRate()`, `getRedemptionRateWithDecay()`, `REDEMPTION_FEE_FLOOR()` all absent on both networks | Yes. Nothing reads them | PASS |
-| 5 | Recovery Mode "only forces new loans to open at >=150% and blocks refinance()" | **Narrower than the chain.** Three distinct require strings, two of which close user-facing doors the recorded text does not mention | No, it did not. Finding 1 | **DRIFTED** |
-| 6 | Collateral is native BTC via msg.value, no approve step | Confirmed by payability probe: `openTrove` and `addColl` accept `value` and reach their logic; no `_collAmount` argument on any signature | Yes. `MarenVault.deposit` is the one payable entrypoint; there is no ERC-20 approve on the collateral path | PASS |
-| 7 | `getEntireDebtAndColl` returns 6 values, not 4 | Confirmed at the byte level: 192 bytes of returndata | Yes, in all three places. `ITroveManager.sol`, `packages/sdk/src/abis.ts`, and `apps/web/src/lib/chain/hints.ts:129` destructures all six and sums pending into the total | PASS |
+| #   | Recorded divergence                                                                | Chain says                                                                                                                                                                                | Does Maren respect it                                                                                                                                                                                                                                                | Verdict     |
+| --- | ---------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------- |
+| 1   | No `_maxFeePercentage` on openTrove/adjustTrove/withdrawMUSD                       | Confirmed. Four Liquity variants absent on both networks; no fee-cap require string in the bytecode                                                                                       | Yes. No `maxFeePercentage` token exists anywhere in the repo; `IBorrowerOperations.sol` and the SDK both encode the 3-argument forms                                                                                                                                 | PASS        |
+| 2   | `fetchPrice()` reverts above 60s staleness, no `lastGoodPrice()`                   | Confirmed twice over. `lastGoodPrice()` absent; the PriceFeed constant pool contains `"PriceFeed: Oracle is stale."`, `"Oracle returns 0 for price"` and `"Invalid Decimals from Oracle"` | Yes, and well. `MarenVault._price()` try/catches into `PriceFeedUnavailable()`; both clients read the precompile's `updatedAt` instead so they can say HOW stale. `forge test test_fork_staleOracleSurfacesAsNamedError` passes against live matsnet                 | PASS        |
+| 3   | `maxBorrowingCapacity` is fixed at the opening price; only `refinance()` raises it | Confirmed. Getter present both nets, and the BorrowerOperations constant pool contains `"BorrowerOps: An operation that exceeds maxBorrowingCapacity is not permitted"`                   | Yes. The UI quotes `troveMaxBorrowingCapacity()` rather than an ICR-derived number, and `preflightBorrow` distinguishes "at Mezo's ceiling" from "past Maren's floor". `forge test test_fork_maxBorrowingCapacityIsFrozenUntilRefinance` passes against live matsnet | PASS        |
+| 4   | No baseRate accumulator, no redemption-fee decay                                   | Confirmed. `baseRate()`, `getRedemptionRateWithDecay()`, `REDEMPTION_FEE_FLOOR()` all absent on both networks                                                                             | Yes. Nothing reads them                                                                                                                                                                                                                                              | PASS        |
+| 5   | Recovery Mode "only forces new loans to open at >=150% and blocks refinance()"     | **Narrower than the chain.** Three distinct require strings, two of which close user-facing doors the recorded text does not mention                                                      | No, it did not. Finding 1                                                                                                                                                                                                                                            | **DRIFTED** |
+| 6   | Collateral is native BTC via msg.value, no approve step                            | Confirmed by payability probe: `openTrove` and `addColl` accept `value` and reach their logic; no `_collAmount` argument on any signature                                                 | Yes. `MarenVault.deposit` is the one payable entrypoint; there is no ERC-20 approve on the collateral path                                                                                                                                                           | PASS        |
+| 7   | `getEntireDebtAndColl` returns 6 values, not 4                                     | Confirmed at the byte level: 192 bytes of returndata                                                                                                                                      | Yes, in all three places. `ITroveManager.sol`, `packages/sdk/src/abis.ts`, and `apps/web/src/lib/chain/hints.ts:129` destructures all six and sums pending into the total                                                                                            | PASS        |
 
 Divergence 5's FIRST clause, that the liquidation threshold stays at 110% in both modes, is
 consistent with everything observed: the TroveManager constant pool contains no Recovery
@@ -198,11 +198,11 @@ because neither network was in Recovery Mode during the audit.
 
 ## 3. The three doc discrepancies
 
-| # | Recorded discrepancy | Re-check | Verdict |
-| --- | --- | --- | --- |
-| 1 | Docs promise borrowers a zero redemption fee; the code does not | Substantively confirmed, and by stronger evidence than before: `isAccountFeeExempt(address)` (`0x2cbc5804`) is present on BorrowerOperations and ABSENT from TroveManager on both networks, so the exemption cannot be consulted on the redemption path at all. The recorded wording said TroveManager "applies `getRedemptionRate()`", which implies a public getter; `getRedemptionRate()` (`0x2b11551a`) has no selector on TroveManager either, so it is internal. Comment corrected; the conclusion stands | PASS (wording tightened) |
-| 2 | Docs say the refinance fee is 0.1%; the code computes 20% of old net debt then 0.1% of that | Partially confirmed. `refinancingFeePercentage()` (`0x6246d497`) is present on BorrowerOperations, and `"BorrowerOps: Refinancing fee percentage..."` appears in its constant pool, so the mechanism is where the note says. The 20%-then-0.1% arithmetic was not re-derived live: the getter is on BorrowerOperations rather than on GovernableVariables, and reading it was not attempted because no Maren code path depends on the number | **UNPROVEN** (arithmetic only) |
-| 3 | Circulating MUSD materially exceeds trove-backed debt | Directionally confirmed. Mainnet `totalSupply()` = 30,944,988.63 MUSD against 25 troves; matsnet = 1,375,934,819 MUSD. Mainnet StabilityPool holds 14,175,086 MUSD. The full trove-backed-debt total was not summed across all 25 troves, so the precise ratio in the note is not re-derived | **UNPROVEN** (precise ratio only) |
+| #   | Recorded discrepancy                                                                        | Re-check                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                        | Verdict                           |
+| --- | ------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------- |
+| 1   | Docs promise borrowers a zero redemption fee; the code does not                             | Substantively confirmed, and by stronger evidence than before: `isAccountFeeExempt(address)` (`0x2cbc5804`) is present on BorrowerOperations and ABSENT from TroveManager on both networks, so the exemption cannot be consulted on the redemption path at all. The recorded wording said TroveManager "applies `getRedemptionRate()`", which implies a public getter; `getRedemptionRate()` (`0x2b11551a`) has no selector on TroveManager either, so it is internal. Comment corrected; the conclusion stands | PASS (wording tightened)          |
+| 2   | Docs say the refinance fee is 0.1%; the code computes 20% of old net debt then 0.1% of that | Partially confirmed. `refinancingFeePercentage()` (`0x6246d497`) is present on BorrowerOperations, and `"BorrowerOps: Refinancing fee percentage..."` appears in its constant pool, so the mechanism is where the note says. The 20%-then-0.1% arithmetic was not re-derived live: the getter is on BorrowerOperations rather than on GovernableVariables, and reading it was not attempted because no Maren code path depends on the number                                                                    | **UNPROVEN** (arithmetic only)    |
+| 3   | Circulating MUSD materially exceeds trove-backed debt                                       | Directionally confirmed. Mainnet `totalSupply()` = 30,944,988.63 MUSD against 25 troves; matsnet = 1,375,934,819 MUSD. Mainnet StabilityPool holds 14,175,086 MUSD. The full trove-backed-debt total was not summed across all 25 troves, so the precise ratio in the note is not re-derived                                                                                                                                                                                                                    | **UNPROVEN** (precise ratio only) |
 
 ## 4. Hint computation
 
@@ -224,14 +224,14 @@ cast call 0x722E4D24FD6Ff8b0AC679450F3D91294607268fA \
 # -> (0x123694886DBf5Ac94DDA07135349534536D14cAf, 0x50F10d257a8E5A6edEA2a3ca5A2Cf8B8Ab63Bb77)
 ```
 
-| Question | Answer | Verdict |
-| --- | --- | --- |
-| Is `getApproxHint` / `findInsertPosition` used per Mezo's SortedTroves | Yes. `computeNominalCR` -> `getApproxHint(nicr, 15*sqrt(size), seed)` -> `findInsertPosition(nicr, approx, approx)`. All three live-verified above | PASS |
-| Are hints read-only | Yes. Every function in `hints.ts` is an `eth_call`; none is ever put in a transaction, which is correct because `getApproxHint` walks up to `numTrials` nodes | PASS |
-| Is the NICR computed off the right debt | Yes, and this is the subtle one. It uses `getEntireDebtAndColl` (TOTAL debt, including the 200 MUSD gas compensation and accrued interest) rather than `MarenVault.troveStatus()` (NET debt). The sorted list ranks on total; feeding it net would put the hint on the wrong side of the insertion point | PASS |
-| Does any BorrowerOperations call site pass `address(0), address(0)` where a real hint is needed | **No.** All 8 `IBorrowerOperations` call sites in `MarenVault.sol` (lines 755, 777, 858, 1459, 1528, 1543, 1590, plus `closeTrove` at 917 which takes none) forward caller-supplied parameters. There is no `address(0)` literal in the file | PASS |
-| Do the web call sites derive real hints | Yes, all four. `write.ts:462` deposit `(+coll, 0)`, `:497` borrow `(0, +debt)`, `:516` repay `(0, -debt)`, `:535` withdraw `(-coll, 0)`. The sign convention matches `hintsForDelta`'s `collAfter = current + delta` | PASS |
-| Is `NO_HINTS` a legitimate fallback | Yes. `findInsertPosition` is re-run on-chain from the hint and self-corrects, so a wrong hint costs gas and never corrupts ordering. Using it when a hint READ fails is correct: a failed RPC must not block a withdrawal | PASS |
+| Question                                                                                        | Answer                                                                                                                                                                                                                                                                                                   | Verdict |
+| ----------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------- |
+| Is `getApproxHint` / `findInsertPosition` used per Mezo's SortedTroves                          | Yes. `computeNominalCR` -> `getApproxHint(nicr, 15*sqrt(size), seed)` -> `findInsertPosition(nicr, approx, approx)`. All three live-verified above                                                                                                                                                       | PASS    |
+| Are hints read-only                                                                             | Yes. Every function in `hints.ts` is an `eth_call`; none is ever put in a transaction, which is correct because `getApproxHint` walks up to `numTrials` nodes                                                                                                                                            | PASS    |
+| Is the NICR computed off the right debt                                                         | Yes, and this is the subtle one. It uses `getEntireDebtAndColl` (TOTAL debt, including the 200 MUSD gas compensation and accrued interest) rather than `MarenVault.troveStatus()` (NET debt). The sorted list ranks on total; feeding it net would put the hint on the wrong side of the insertion point | PASS    |
+| Does any BorrowerOperations call site pass `address(0), address(0)` where a real hint is needed | **No.** All 8 `IBorrowerOperations` call sites in `MarenVault.sol` (lines 755, 777, 858, 1459, 1528, 1543, 1590, plus `closeTrove` at 917 which takes none) forward caller-supplied parameters. There is no `address(0)` literal in the file                                                             | PASS    |
+| Do the web call sites derive real hints                                                         | Yes, all four. `write.ts:462` deposit `(+coll, 0)`, `:497` borrow `(0, +debt)`, `:516` repay `(0, -debt)`, `:535` withdraw `(-coll, 0)`. The sign convention matches `hintsForDelta`'s `collAfter = current + delta`                                                                                     | PASS    |
+| Is `NO_HINTS` a legitimate fallback                                                             | Yes. `findInsertPosition` is re-run on-chain from the hint and self-corrects, so a wrong hint costs gas and never corrupts ordering. Using it when a hint READ fails is correct: a failed RPC must not block a withdrawal                                                                                | PASS    |
 
 Three observations that are gas-only and are recorded rather than changed, in Finding 4.
 
@@ -239,25 +239,25 @@ Three observations that are gas-only and are recorded rather than changed, in Fi
 
 The headline finding. See Finding 1.
 
-| Path | Behaviour in Recovery Mode | Before this audit | After |
-| --- | --- | --- | --- |
-| `deposit` -> `addColl` | Allowed. Raises ICR | enabled (correct) | enabled |
-| `repay` -> `repayMUSD` | Allowed. Raises ICR | enabled (correct) | enabled |
-| `borrow` -> `withdrawMUSD` | **Blocked.** Adding debt without collateral always lowers ICR | enabled, reverted after gas | blocked with an explanation |
-| `withdraw` -> `withdrawColl` | **Blocked** outright, at any ratio | enabled, reverted after gas | capped at idle collateral, explained |
-| `closePooledTrove` -> `closeTrove` | Blocked (keeper-only) | documented in a comment only | unchanged, still keeper-only |
-| `refinancePooledTrove` -> `refinance` | Blocked (keeper-only) | documented in a comment only | unchanged, still keeper-only |
+| Path                                  | Behaviour in Recovery Mode                                    | Before this audit            | After                                |
+| ------------------------------------- | ------------------------------------------------------------- | ---------------------------- | ------------------------------------ |
+| `deposit` -> `addColl`                | Allowed. Raises ICR                                           | enabled (correct)            | enabled                              |
+| `repay` -> `repayMUSD`                | Allowed. Raises ICR                                           | enabled (correct)            | enabled                              |
+| `borrow` -> `withdrawMUSD`            | **Blocked.** Adding debt without collateral always lowers ICR | enabled, reverted after gas  | blocked with an explanation          |
+| `withdraw` -> `withdrawColl`          | **Blocked** outright, at any ratio                            | enabled, reverted after gas  | capped at idle collateral, explained |
+| `closePooledTrove` -> `closeTrove`    | Blocked (keeper-only)                                         | documented in a comment only | unchanged, still keeper-only         |
+| `refinancePooledTrove` -> `refinance` | Blocked (keeper-only)                                         | documented in a comment only | unchanged, still keeper-only         |
 
 ## 6. Oracle
 
-| Site | Behaviour | Verdict |
-| --- | --- | --- |
-| `MarenVault._price()` (`MarenVault.sol:1607`) | try/catch on `fetchPrice()`, reverts `PriceFeedUnavailable()`; also treats a zero price as unavailable | PASS |
-| `MarenVault._tryPushCollateral()` (`:1536`) | Catches, holds BTC idle, emits `CollateralPushFailed` with the revert selector so a keeper can tell a stale oracle from an unexpected revert | PASS |
-| `apps/web/src/lib/chain/price.ts` and `apps/ios/src/chain/price.ts` | A discriminated union over `live`, `stale` and `unavailable`, where only `live` carries `priceWei`. A stale number is structurally unrenderable as a live one | PASS |
-| `apps/web/src/lib/data/live.ts:readPrice` and the iOS equivalent | Read the precompile's `latestRoundData().updatedAt` rather than `fetchPrice()`, precisely because a revert cannot say HOW old. Throws on a non-positive answer; never returns 0 | PASS |
-| `preflightBorrow` / `preflightWithdraw` | Gate on the feed where the contract prices, and only there. Repay and debt-free idle withdrawal stay open with the oracle down | PASS |
-| `MarenEarn.isUsingStalePrice()` | Exposed on-chain and in the SDK ABI, **zero consumers** in web, iOS or SDK. Earn can price shares off a cached BTC value with nothing in the UI saying so | **DRIFTED**, Finding 3 |
+| Site                                                                | Behaviour                                                                                                                                                                       | Verdict                |
+| ------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------- |
+| `MarenVault._price()` (`MarenVault.sol:1607`)                       | try/catch on `fetchPrice()`, reverts `PriceFeedUnavailable()`; also treats a zero price as unavailable                                                                          | PASS                   |
+| `MarenVault._tryPushCollateral()` (`:1536`)                         | Catches, holds BTC idle, emits `CollateralPushFailed` with the revert selector so a keeper can tell a stale oracle from an unexpected revert                                    | PASS                   |
+| `apps/web/src/lib/chain/price.ts` and `apps/ios/src/chain/price.ts` | A discriminated union over `live`, `stale` and `unavailable`, where only `live` carries `priceWei`. A stale number is structurally unrenderable as a live one                   | PASS                   |
+| `apps/web/src/lib/data/live.ts:readPrice` and the iOS equivalent    | Read the precompile's `latestRoundData().updatedAt` rather than `fetchPrice()`, precisely because a revert cannot say HOW old. Throws on a non-positive answer; never returns 0 | PASS                   |
+| `preflightBorrow` / `preflightWithdraw`                             | Gate on the feed where the contract prices, and only there. Repay and debt-free idle withdrawal stay open with the oracle down                                                  | PASS                   |
+| `MarenEarn.isUsingStalePrice()`                                     | Exposed on-chain and in the SDK ABI, **zero consumers** in web, iOS or SDK. Earn can price shares off a cached BTC value with nothing in the UI saying so                       | **DRIFTED**, Finding 3 |
 
 `fetchPrice()` cannot return zero: the deployed PriceFeed reverts with
 `"Oracle returns 0 for price"` first. `MarenVault._price()`'s zero check is therefore
@@ -265,37 +265,37 @@ belt-and-braces rather than load-bearing, which is the right way round.
 
 ## 7. Precompiles and gas
 
-| Claim | `cast` used | Result | Verdict |
-| --- | --- | --- | --- |
-| Oracle precompile at `0x7b7c...0015` | `cast call 0x7b7c...0015 'latestRoundData()(uint80,int256,uint256,uint256,uint80)'` | Answers on both networks. matsnet 65,004.67, mainnet 64,960.04, `updatedAt` within seconds of wall clock | PASS |
-| It implements only two AggregatorV3 members | `cast call 0x7b7c...0015 'decimals()(uint8)'` -> 18; `'description()(string)'` | `description()` fails with `method not found in ABI: no method with id 0x7284e416`, exactly as recorded. This is a NATIVE precompile error, not an EVM revert, which is itself confirmation it is not a deployed contract | PASS |
-| Oracle reports 18 decimals | `cast call ... 'decimals()(uint8)'` | 18 on both, so the app's `10 ** (18 - decimals)` rescale is a no-op today and still correct if it ever changes | PASS |
-| Native gas token is BTC, 18 decimals | Native currency in `chains.ts`; oracle answers scale to 1e18; `PriceFeed.fetchPrice()` -> 64,975.80e18 matsnet | Consistent throughout. `MarenVault.deposit` takes `msg.value` in native BTC and no ERC-20 collateral path exists | PASS |
-| BTC precompile `0x7b7C...0000` | `cast code` | 2,463 bytes | PASS |
-| MEZO token precompile `0x7B7c...0001` | not probed this pass | nothing in Maren reads it | **UNPROVEN** (unused) |
-| Multicall3 canonical address | `cast code 0xcA11...CA11` | 3,808 bytes on both networks, the canonical size. Recorded as 7,619; see Finding 5 | **DRIFTED** (byte count) |
-| Permit2 canonical address | `cast code 0x0000...8BA3` | 9,152 bytes on both | PASS |
-| x402 settlement `0x402085c2...` | `cast code` mainnet | 2,913 bytes. Recorded as 5,829 | **DRIFTED** (byte count) |
-| EntryPoint v0.7 deployed but inert | `cast code 0x0000...a032` mainnet | 16,035 bytes, consistent with the L1 EntryPoint. Recorded as 32,073 | **DRIFTED** (byte count) |
-| Chain IDs | `cast chain-id` | 31611 matsnet, 31612 mainnet, as recorded | PASS |
+| Claim                                       | `cast` used                                                                                                    | Result                                                                                                                                                                                                                    | Verdict                  |
+| ------------------------------------------- | -------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------ |
+| Oracle precompile at `0x7b7c...0015`        | `cast call 0x7b7c...0015 'latestRoundData()(uint80,int256,uint256,uint256,uint80)'`                            | Answers on both networks. matsnet 65,004.67, mainnet 64,960.04, `updatedAt` within seconds of wall clock                                                                                                                  | PASS                     |
+| It implements only two AggregatorV3 members | `cast call 0x7b7c...0015 'decimals()(uint8)'` -> 18; `'description()(string)'`                                 | `description()` fails with `method not found in ABI: no method with id 0x7284e416`, exactly as recorded. This is a NATIVE precompile error, not an EVM revert, which is itself confirmation it is not a deployed contract | PASS                     |
+| Oracle reports 18 decimals                  | `cast call ... 'decimals()(uint8)'`                                                                            | 18 on both, so the app's `10 ** (18 - decimals)` rescale is a no-op today and still correct if it ever changes                                                                                                            | PASS                     |
+| Native gas token is BTC, 18 decimals        | Native currency in `chains.ts`; oracle answers scale to 1e18; `PriceFeed.fetchPrice()` -> 64,975.80e18 matsnet | Consistent throughout. `MarenVault.deposit` takes `msg.value` in native BTC and no ERC-20 collateral path exists                                                                                                          | PASS                     |
+| BTC precompile `0x7b7C...0000`              | `cast code`                                                                                                    | 2,463 bytes                                                                                                                                                                                                               | PASS                     |
+| MEZO token precompile `0x7B7c...0001`       | not probed this pass                                                                                           | nothing in Maren reads it                                                                                                                                                                                                 | **UNPROVEN** (unused)    |
+| Multicall3 canonical address                | `cast code 0xcA11...CA11`                                                                                      | 3,808 bytes on both networks, the canonical size. Recorded as 7,619; see Finding 5                                                                                                                                        | **DRIFTED** (byte count) |
+| Permit2 canonical address                   | `cast code 0x0000...8BA3`                                                                                      | 9,152 bytes on both                                                                                                                                                                                                       | PASS                     |
+| x402 settlement `0x402085c2...`             | `cast code` mainnet                                                                                            | 2,913 bytes. Recorded as 5,829                                                                                                                                                                                            | **DRIFTED** (byte count) |
+| EntryPoint v0.7 deployed but inert          | `cast code 0x0000...a032` mainnet                                                                              | 16,035 bytes, consistent with the L1 EntryPoint. Recorded as 32,073                                                                                                                                                       | **DRIFTED** (byte count) |
+| Chain IDs                                   | `cast chain-id`                                                                                                | 31611 matsnet, 31612 mainnet, as recorded                                                                                                                                                                                 | PASS                     |
 
 ## 8. Live protocol state at the time of audit
 
 Recorded so a future reader can tell a protocol change from a measurement error.
 
-| Reading | matsnet (31611) | mainnet (31612) |
-| --- | --- | --- |
-| `PriceFeed.fetchPrice()` | 64,975.80 | 64,949.44 |
-| `TroveManager.MCR()` | 1.1e18 | 1.1e18 |
-| `TroveManager.CCR()` | 1.5e18 | 1.5e18 |
-| `BorrowerOperations.minNetDebt()` | 1.8e21 | 1.8e21 |
-| `InterestRateManager.interestRate()` | 100 (1.00% APR) | not read |
-| `SortedTroves.getSize()` | 230 | 25 |
-| `TroveManager.getTCR(price)` | 1.905e18 | 2.467e18 |
-| `TroveManager.checkRecoveryMode(price)` | false | false |
-| `MUSD.totalSupply()` | 1,375,934,819 | 30,944,988.63 |
-| `StabilityPool.getTotalMUSDDeposits()` | 86,231,976 | 14,175,086 |
-| Maren pooled trove status | 1 (active), coll 0.0690 BTC, principal 2,001.8 MUSD, interest 0.2118 MUSD | not deployed |
+| Reading                                 | matsnet (31611)                                                           | mainnet (31612) |
+| --------------------------------------- | ------------------------------------------------------------------------- | --------------- |
+| `PriceFeed.fetchPrice()`                | 64,975.80                                                                 | 64,949.44       |
+| `TroveManager.MCR()`                    | 1.1e18                                                                    | 1.1e18          |
+| `TroveManager.CCR()`                    | 1.5e18                                                                    | 1.5e18          |
+| `BorrowerOperations.minNetDebt()`       | 1.8e21                                                                    | 1.8e21          |
+| `InterestRateManager.interestRate()`    | 100 (1.00% APR)                                                           | not read        |
+| `SortedTroves.getSize()`                | 230                                                                       | 25              |
+| `TroveManager.getTCR(price)`            | 1.905e18                                                                  | 2.467e18        |
+| `TroveManager.checkRecoveryMode(price)` | false                                                                     | false           |
+| `MUSD.totalSupply()`                    | 1,375,934,819                                                             | 30,944,988.63   |
+| `StabilityPool.getTotalMUSDDeposits()`  | 86,231,976                                                                | 14,175,086      |
+| Maren pooled trove status               | 1 (active), coll 0.0690 BTC, principal 2,001.8 MUSD, interest 0.2118 MUSD | not deployed    |
 
 Every risk parameter in `packages/sdk/src/constants.ts` that is readable on-chain matches:
 MCR, CCR, `MIN_NET_DEBT`, `INTEREST_RATE_BPS`. `MAREN_VAULT`'s mirrored constants were
@@ -308,8 +308,9 @@ re-confirmed by the fork suite rather than re-read here.
 FIXED in this branch.
 
 `LIQUITY_DIVERGENCES[4]` recorded that Recovery Mode "only forces new loans to open at
->=150% and blocks `refinance()`". Extracting the ASCII literals from the deployed
-BorrowerOperations constant pool shows THREE distinct require strings, not one:
+
+> =150% and blocks `refinance()`". Extracting the ASCII literals from the deployed
+> BorrowerOperations constant pool shows THREE distinct require strings, not one:
 
 ```
 BorrowerOps: Operation not permitted during Recovery Mode
