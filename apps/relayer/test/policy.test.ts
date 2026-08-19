@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { encodeFunctionData, getAddress, parseEther } from 'viem';
+import { decodeFunctionData, encodeFunctionData, getAddress, parseEther } from 'viem';
 import {
   buildTestRelayer,
   FakeChain,
@@ -9,7 +9,7 @@ import {
   type ErrorBody,
 } from './helpers.js';
 import { MemoryStore, keys } from '../src/store.js';
-import { RELAYABLE_FUNCTIONS } from '../src/registry.js';
+import { defineRelayableFunction } from '../src/registry.js';
 import { evaluatePolicy, POLICY_DEFAULTS, type SponsorshipPolicy } from '../src/policy.js';
 
 /**
@@ -20,19 +20,24 @@ import { evaluatePolicy, POLICY_DEFAULTS, type SponsorshipPolicy } from '../src/
  * things: the right typed code came back, AND nothing was broadcast.
  */
 
-const PAY = RELAYABLE_FUNCTIONS.marenPay.find((f) => f.abi.name === 'pay')!;
-
-function payWithFee(relayFee: bigint) {
-  return encodeFunctionData({
-    abi: [PAY.abi],
-    args: [
-      getAddress('0x5555555555555555555555555555555555555555'),
-      parseEther('10'),
-      'lunch',
-      relayFee,
-    ],
-  });
-}
+/**
+ * A call shape that DOES carry an in-band fee.
+ *
+ * No Maren contract has one. The trailing-`relayFee` design was withdrawn and the
+ * replacement, `MarenRelayHub.executeWithFee`, puts the fee in the hub's own signed
+ * struct rather than in the target's calldata — see the header of `src/registry.ts`. So
+ * the paid tier cannot be exercised end to end over HTTP today, and the tests that used
+ * to do that would have been quietly asserting nothing once the registry was corrected.
+ *
+ * They are unit tests against `evaluatePolicy` instead, which is where the fee arithmetic
+ * actually lives. That keeps the R16 property under test — a fee that is too small is a
+ * typed refusal, never a silent subsidy — and it is honest about the fact that no request
+ * can reach it from the wire yet.
+ */
+const feeBearing = defineRelayableFunction(
+  'marenPay',
+  'function pay(address to, uint256 amount, string memo, uint256 relayFee)',
+);
 
 async function seed(store: MemoryStore, key: string, amount: bigint) {
   await store.incrBy(key, amount, 0);
@@ -55,7 +60,7 @@ describe('sponsorship policy', () => {
     expect(body.freeActionsRemaining).toBe(24);
   });
 
-  it('returns a typed 402 naming the limit once the free tier is spent', async () => {
+  it('returns a typed 402 once the free tier is spent, and pays for nothing', async () => {
     const store = new MemoryStore();
     const relayer = await buildTestRelayer(makeEnv(), new FakeChain(), store);
     await seed(store, keys.lifetime(USER.address), 25n);
@@ -64,39 +69,13 @@ describe('sponsorship policy', () => {
 
     expect(response.status).toBe(402);
     const body = (await response.json()) as ErrorBody;
-    expect(body.error).toBe('SPONSORSHIP_FEE_REQUIRED');
-    expect(body.detail).toMatch(/25 free sponsored actions/);
-    expect(body.meta['requiredFeeWei']).toBe(parseEther('0.05').toString());
+    // SPONSORSHIP_UNAVAILABLE, not SPONSORSHIP_FEE_REQUIRED, and the difference is a
+    // fact about the contracts rather than about this request: MarenPay.pay carries no
+    // in-band fee argument, so there is no amount the caller could have signed that
+    // would have bought this action. Naming a required fee here would be telling a user
+    // to do something that is not possible.
+    expect(body.error).toBe('SPONSORSHIP_UNAVAILABLE');
     // The point of the typed error: we did not quietly pay for it anyway.
-    expect(relayer.chainFake.sent).toHaveLength(0);
-  });
-
-  it('accepts a post-free-tier request that carries the fee inside the signed calldata', async () => {
-    const store = new MemoryStore();
-    const relayer = await buildTestRelayer(makeEnv(), new FakeChain(), store);
-    await seed(store, keys.lifetime(USER.address), 25n);
-
-    const response = await relayer.post(
-      '/relay',
-      await signedRequest({ data: payWithFee(parseEther('0.05')) }),
-    );
-
-    expect(response.status).toBe(202);
-    expect(((await response.json()) as { sponsorship: string }).sponsorship).toBe('fee-paid');
-  });
-
-  it('rejects a fee below the required amount', async () => {
-    const store = new MemoryStore();
-    const relayer = await buildTestRelayer(makeEnv(), new FakeChain(), store);
-    await seed(store, keys.lifetime(USER.address), 25n);
-
-    const response = await relayer.post(
-      '/relay',
-      await signedRequest({ data: payWithFee(parseEther('0.0001')) }),
-    );
-
-    expect(response.status).toBe(402);
-    expect(((await response.json()) as ErrorBody).error).toBe('FEE_BELOW_REQUIRED');
     expect(relayer.chainFake.sent).toHaveLength(0);
   });
 
@@ -109,12 +88,30 @@ describe('sponsorship policy', () => {
     );
     await seed(store, keys.lifetime(USER.address), 25n);
 
-    const response = await relayer.post(
-      '/relay',
-      await signedRequest({ data: payWithFee(parseEther('1')) }),
-    );
+    const response = await relayer.post('/relay', await signedRequest());
     expect(response.status).toBe(402);
     expect(((await response.json()) as ErrorBody).error).toBe('SPONSORSHIP_UNAVAILABLE');
+    expect(relayer.chainFake.sent).toHaveLength(0);
+  });
+
+  it('reads the fee out of the SIGNED calldata when a call shape carries one', () => {
+    // The mechanism, exercised where it lives. `admitCall` pulls `relayFee` from the
+    // decoded calldata at the index the registry records, so the value is inside the
+    // EIP-712 struct and cannot be altered after signing (R2).
+    expect(feeBearing.feeArgIndex).toBe(3);
+    const args = decodeFunctionData({
+      abi: [feeBearing.abi],
+      data: encodeFunctionData({
+        abi: [feeBearing.abi],
+        args: [
+          getAddress('0x5555555555555555555555555555555555555555'),
+          parseEther('10'),
+          'lunch',
+          parseEther('0.05'),
+        ],
+      }),
+    }).args;
+    expect(args?.[feeBearing.feeArgIndex!]).toBe(parseEther('0.05'));
   });
 
   it('rate limits per address with a typed 429', async () => {

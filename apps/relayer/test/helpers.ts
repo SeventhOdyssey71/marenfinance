@@ -32,7 +32,9 @@ export const MAREN_PAY: Address = getAddress('0x22222222222222222222222222222222
 /** A second MarenPay deployment, so a `to` tamper can clear the allowlist and
  *  still be caught by signature verification rather than by R4. */
 export const MAREN_PAY_2: Address = getAddress('0x7777777777777777777777777777777777777777');
-export const MAREN_EARN: Address = getAddress('0x3333333333333333333333333333333333333333');
+/** A second, DIFFERENT Maren contract, so selector scoping can be tested across two
+ *  targets that both have relayable functions of their own. */
+export const MAREN_VAULT: Address = getAddress('0x3333333333333333333333333333333333333333');
 export const NOT_ALLOWLISTED: Address = getAddress('0x9999999999999999999999999999999999999999');
 
 export const TEST_CHAIN_ID = 31611;
@@ -43,7 +45,7 @@ export function makeEnv(overrides: Env = {}): Env {
     RELAYER_NETWORK: 'testnet',
     RELAYER_RPC_URLS: 'https://rpc.test.mezo.org',
     RELAYER_FORWARDER_ADDRESS: FORWARDER,
-    RELAYER_ALLOWED_TARGETS: `marenPay:${MAREN_PAY},marenPay:${MAREN_PAY_2},marenEarn:${MAREN_EARN}`,
+    RELAYER_ALLOWED_TARGETS: `marenPay:${MAREN_PAY},marenPay:${MAREN_PAY_2},marenVault:${MAREN_VAULT}`,
     RELAYER_MAX_DAILY_SPONSORED_BTC: '0.01',
     RELAYER_FEE_MUSD: '0.05',
     RELAYER_PRIVATE_KEY: RELAYER_KEY,
@@ -151,13 +153,19 @@ function mustFind(name: string) {
 }
 const PAY = mustFind('pay');
 
+/**
+ * `MarenPay.pay(address,uint256,string)`, exactly as the Solidity declares it.
+ *
+ * There is no `relayFee` argument any more, on this or any other Maren function: the
+ * trailing-fee design was withdrawn in favour of `MarenRelayHub.executeWithFee`, which
+ * puts the fee in the hub's own signed struct. See the header of `src/registry.ts`.
+ */
 export function payCalldata(
   to: Address = getAddress('0x5555555555555555555555555555555555555555'),
   amount = parseEther('10'),
   memo = 'lunch',
-  relayFee = 0n,
 ): Hex {
-  return encodeFunctionData({ abi: [PAY.abi], args: [to, amount, memo, relayFee] });
+  return encodeFunctionData({ abi: [PAY.abi], args: [to, amount, memo] });
 }
 
 export interface BuildRequestOptions {
