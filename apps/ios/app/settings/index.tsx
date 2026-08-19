@@ -40,6 +40,8 @@ export default function Settings() {
   const setNetwork = useAppStore((s) => s.setNetwork);
   const forcedStale = useAppStore((s) => s.forcedStaleSeconds);
   const setForcedStale = useAppStore((s) => s.setForcedStale);
+  const dataSource = useAppStore((s) => s.dataSource);
+  const setDataSourceKind = useAppStore((s) => s.setDataSourceKind);
   const signOut = useAppStore((s) => s.signOut);
 
   const [cap, setCap] = useState<BiometricCapability | null>(null);
@@ -238,8 +240,16 @@ export default function Settings() {
           <View style={styles.switchBody}>
             <Txt variant="small">Simulate a stale price feed</Txt>
             <Txt variant="small" tone="muted" style={styles.switchCaption}>
-              Backdates the oracle observation past Mezo’s {STALE_AFTER_SECONDS}s limit so the
-              price-unavailable state and the borrow gate can be exercised.
+              {/*
+                The wording is precise because the mechanism is. Nothing here invents a
+                price: the oracle is read for real and only the observation timestamp is
+                moved back, which is what the app measures age against. The result is the
+                same code path a genuinely lagging oracle produces, rather than a picture
+                of it.
+              */}
+              Backdates the observation timestamp past Mezo’s {STALE_AFTER_SECONDS}s limit so the
+              price-unavailable state and the borrow gate can be exercised. The price itself is
+              still read from the chain and is not altered.
             </Txt>
           </View>
           <Switch
@@ -252,6 +262,46 @@ export default function Settings() {
           />
         </View>
       </Card>
+
+      <Card style={styles.section}>
+        <View style={styles.switchRow}>
+          <View style={styles.switchBody}>
+            <Txt variant="small">Use demo data</Txt>
+            <Txt variant="small" tone="muted" style={styles.switchCaption}>
+              Replaces every figure in the app with an invented position, for walking the flows
+              without a network. Off by default. While it is on, every screen it feeds says so on
+              its face, and the transaction hashes it shows are not real.
+            </Txt>
+          </View>
+          <Switch
+            value={dataSource === 'mock'}
+            onValueChange={(on) => setDataSourceKind(on ? 'mock' : 'live')}
+            trackColor={{ false: base.surfaceInset, true: brand.violet500 }}
+            thumbColor={base.onAccent}
+            ios_backgroundColor={base.surfaceInset}
+            accessibilityLabel="Use demo data instead of reading Mezo"
+          />
+        </View>
+      </Card>
+
+      <StatRow
+        label="Reading from"
+        hint={
+          dataSource === 'live'
+            ? `${chain.name}, chain ${chain.id}`
+            : 'nothing, the figures are invented'
+        }
+        value={
+          <Txt
+            variant="small"
+            style={{
+              color: dataSource === 'live' ? semanticText.success : semanticText.warning,
+            }}
+          >
+            {dataSource === 'live' ? 'Live chain' : 'Demo data'}
+          </Txt>
+        }
+      />
 
       {/* Explorer */}
       <StatRow

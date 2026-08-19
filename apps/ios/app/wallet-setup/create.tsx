@@ -11,7 +11,6 @@ import { PillButton } from '../../src/components/PillButton';
 import { Screen } from '../../src/components/Screen';
 import { Label, Num, Txt } from '../../src/components/Text';
 import { base, radius, semanticText, space } from '../../src/design/tokens';
-import { MOCK_HANDLE } from '../../src/data/mock';
 import { useAppStore } from '../../src/state/store';
 import {
   createPrivateKey,
@@ -76,7 +75,15 @@ export default function CreateWallet() {
 
   const finish = () => {
     if (!address || !protection) return;
-    setAccount({ address, handle: MOCK_HANDLE, protection });
+    /**
+     * No handle, because a brand new address does not have one.
+     *
+     * This used to write a fixed `@sele` into the store, which meant the first thing a
+     * new user saw was somebody else's name over their own balances. The handle is read
+     * from MarenRegistry by `usePrimaryHandle()` once the account exists; an unregistered
+     * address resolves to null and the header shows the product name instead.
+     */
+    setAccount({ address, handle: null, protection });
     router.replace('/(tabs)');
   };
 

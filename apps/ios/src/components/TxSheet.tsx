@@ -1,4 +1,5 @@
 import { useCallback, useState } from 'react';
+import { useQueryClient } from '@tanstack/react-query';
 import { Modal, Pressable, StyleSheet, View } from 'react-native';
 import * as Haptics from 'expo-haptics';
 import * as Linking from 'expo-linking';
@@ -39,6 +40,7 @@ export interface TxRunner {
 
 export function useTxRunner(onDelivered?: () => void): TxRunner {
   const [state, setState] = useState<TxPhase>({ phase: 'idle' });
+  const queryClient = useQueryClient();
 
   const run = useCallback(
     async (action: ActionKind, title: string) => {
@@ -69,12 +71,21 @@ export function useTxRunner(onDelivered?: () => void): TxRunner {
 
       if (result.kind === 'ok') {
         Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
+        /**
+         * Re-read rather than patch.
+         *
+         * The chain is the record, so after a delivered receipt the correct next step is
+         * to ask it again, not to adjust a local copy of what we think it now says. Only
+         * on 'ok': a reverted or timed-out transaction must leave the screen showing the
+         * figures from before it, which is the whole ordering argument in `actions.ts`.
+         */
+        queryClient.invalidateQueries();
         onDelivered?.();
       } else {
         Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error).catch(() => {});
       }
     },
-    [onDelivered],
+    [onDelivered, queryClient],
   );
 
   const dismiss = useCallback(() => setState({ phase: 'idle' }), []);

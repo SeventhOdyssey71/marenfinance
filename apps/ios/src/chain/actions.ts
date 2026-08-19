@@ -1,6 +1,6 @@
 import type { Hash, TransactionReceipt } from 'viem';
 
-import { mutate } from '../data/mock';
+import { getDataSource, mutate } from '../data/source';
 import { isSponsoredKind as isSponsoredKindImpl } from './sponsorship';
 import { accessKey } from '../wallet/keystore';
 import { confirmTransaction, type TxOutcome } from './receipt';
@@ -48,7 +48,31 @@ export function isSponsored(action: ActionKind): boolean {
   return isSponsoredKindImpl(action.type);
 }
 
+/**
+ * The sentence this build is allowed to say about writes.
+ *
+ * The READ path now goes to matsnet: Home, Vault, Earn, Pay and Activity are contract
+ * reads. The WRITE path below is still the simulated one, and the two must not be mixed.
+ * `submitMock` returns a hash derived from a clock, and the transaction sheet renders a
+ * hash as a tappable explorer link — so letting it run while the app is showing live
+ * figures would put a link to a transaction that does not exist next to a set of numbers
+ * that do. A reviewer taps it, finds nothing on chain, and is then right to disbelieve
+ * the real figures beside it. That is the single most expensive thing a chain app can do,
+ * and it is why the guard below is a refusal rather than a warning banner.
+ *
+ * So writes are available in demo mode, where every figure on screen is already labelled
+ * as invented and the simulated hash is consistent with everything around it, and they
+ * are declined in live mode with the reason stated plainly. The user sees an honest "not
+ * in this build" rather than a fabricated success.
+ */
+const LIVE_WRITES_UNAVAILABLE =
+  'This build reads Mezo but does not yet sign to it. Signing is wired to a simulator, so submitting here would produce a receipt and a transaction hash that do not exist on chain. Switch to demo data in Settings to walk the flow.';
+
 export async function submitAction(action: ActionKind): Promise<ActionResult> {
+  if (getDataSource() === 'live') {
+    return { kind: 'declined', reason: LIVE_WRITES_UNAVAILABLE };
+  }
+
   // 1 — Face ID on every signing action, without exception.
   const key = await accessKey();
   if (key.kind === 'denied') return { kind: 'declined', reason: key.reason };
