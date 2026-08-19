@@ -11,6 +11,7 @@ import { ArrowUpRight } from '@/components/ui/icons';
 import { activityDirection, activityTitle, statusLabel, timeAgo } from '@/lib/copy';
 import { NETWORK, useActivity, useDataSource } from '@/lib/data/source';
 import type { ActivityItem, ActivityKind } from '@/lib/data/types';
+import { RELAYER_CONFIGURED } from '@/lib/chain/relay';
 
 type Filter = 'all' | 'payments' | 'vault' | 'earn';
 
@@ -187,7 +188,10 @@ function Body({
               </li>
               <li>
                 <span className="text-text">Gas</span>: what you actually paid in BTC, from the
-                receipt. No relayer is deployed, so no row is sponsored today.
+                receipt.{' '}
+                {RELAYER_CONFIGURED
+                  ? 'A row reads as sponsored when the transaction was sent by Maren’s relayer rather than by you.'
+                  : 'No relayer is deployed, so no row is sponsored today.'}
               </li>
             </ul>
           </Info>

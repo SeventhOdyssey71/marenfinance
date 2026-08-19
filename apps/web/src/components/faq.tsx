@@ -4,6 +4,7 @@ import { useId, useState, type ReactNode } from 'react';
 import { Section, Eyebrow } from './ui/section';
 import { Reveal } from './ui/reveal';
 import { Plus, Minus } from './ui/icons';
+import { RELAYER_CONFIGURED } from '@/lib/chain/relay';
 
 type Item = { q: string; a: ReactNode };
 
@@ -59,19 +60,38 @@ const items: readonly Item[] = [
     q: 'What does "gasless" actually mean?',
     a: (
       <>
+        {/* CONDITIONAL, NOT DELETED. `RELAYER_CONFIGURED` is read from
+            NEXT_PUBLIC_RELAYER_URL at build time, so it is the same value on the server
+            and in the browser and this paragraph cannot flicker between them. It says
+            what is true of THIS deployment: with no relayer configured the original
+            paragraph stands word for word, and a deployment that has one stops claiming
+            otherwise. Neither version promises that the relayer is accepting work right
+            now — the app answers that per action, at the point of signing, from a live
+            health probe. */}
+        {RELAYER_CONFIGURED ? (
+          <p>
+            <strong className="text-text font-medium">
+              It means Maren pays the Bitcoin fee, not that the fee stopped existing.
+            </strong>{' '}
+            This deployment has a relayer. Whether it is taking work is a question the app answers
+            per action, on the screen, before you sign anything. Trust that line and not this page.
+          </p>
+        ) : (
+          <p>
+            <strong className="text-text font-medium">
+              Today it means nothing: you pay your own gas.
+            </strong>{' '}
+            Maren is built so that it will not stay that way, but the service that would pay for you
+            is not running anywhere, and the app says so on every screen rather than quoting this
+            page back at you.
+          </p>
+        )}
         <p>
-          <strong className="text-text font-medium">
-            Today it means nothing: you pay your own gas.
-          </strong>{' '}
-          Maren is built so that it will not stay that way, but the service that would pay for you
-          is not running anywhere, and the app says so on every screen rather than quoting this page
-          back at you.
-        </p>
-        <p>
-          When it does run, it means Maren pays the Bitcoin fee rather than that the fee stopped
-          existing. You sign; Maren checks what you signed, tries the call, and pays. Whatever
-          submits for you can only ever touch Maren&rsquo;s own contracts, and can never move your
-          Bitcoin.
+          {RELAYER_CONFIGURED
+            ? 'It works like this: y'
+            : 'When it does run, it means Maren pays the Bitcoin fee rather than that the fee stopped existing. Y'}
+          ou sign; Maren checks what you signed, tries the call, and pays. Whatever submits for you
+          can only ever touch Maren&rsquo;s own contracts, and can never move your Bitcoin.
         </p>
         <p>
           One thing is exempt permanently, and it is the first thing you will do: depositing Bitcoin{' '}

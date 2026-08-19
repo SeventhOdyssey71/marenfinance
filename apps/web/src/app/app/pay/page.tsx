@@ -15,7 +15,15 @@ import { TxSheet, useTxRunner, type TxIntent, type TxRunner } from '@/components
 import { ArrowUpRight, LinkIcon, PayIcon } from '@/components/ui/icons';
 import { parseUnitsSafe, utf8Length } from '@/lib/copy';
 import { preflightMusdSpend } from '@/lib/chain/preflight';
-import { gasNote, SPENDERS, useMarenWrites, useMusdAllowance } from '@/lib/chain/write';
+import { actionIsRelayable } from '@/lib/chain/relay';
+import {
+  gasLine,
+  gasNote,
+  SPENDERS,
+  useMarenWrites,
+  useMusdAllowance,
+  useRelayerStatus,
+} from '@/lib/chain/write';
 import { useBalances, useDataSource, useResolvedHandle } from '@/lib/data/source';
 
 type Tab = 'send' | 'request' | 'link' | 'handle';
@@ -102,9 +110,12 @@ function Header() {
  * are paying, and that is the whole line now. The mechanism lives in the FAQ.
  */
 function GasLine() {
+  // Conditional, not deleted. With no relayer configured this is the same sentence it has
+  // always been; with one accepting work it says Maren pays, which is by then true.
+  const relayer = useRelayerStatus();
   return (
     <p className="text-text-subtle text-xs leading-relaxed">
-      You pay the Bitcoin gas. No relayer is running yet.
+      {gasLine(actionIsRelayable('payAddress'), relayer)}
     </p>
   );
 }
@@ -114,6 +125,7 @@ const ADDRESS_RE = /^0x[0-9a-fA-F]{40}$/;
 function SendPanel({ runner }: { runner: TxRunner }) {
   const { data: balances } = useBalances();
   const writes = useMarenWrites({ onSimulated: runner.onSimulated });
+  const relayer = useRelayerStatus();
   const [to, setTo] = useState('');
   const [amount, setAmount] = useState('');
   const [memo, setMemo] = useState('');
@@ -205,7 +217,11 @@ function SendPanel({ runner }: { runner: TxRunner }) {
       },
       ...(memo ? [{ label: 'Memo', value: <span className="text-text-muted">{memo}</span> }] : []),
     ],
-    gas: gasNote(true, 'The memo is written on-chain and is publicly readable by anyone, forever.'),
+    gas: gasNote(
+      actionIsRelayable(isHandle ? 'payHandle' : 'payAddress'),
+      'The memo is written on-chain and is publicly readable by anyone, forever.',
+      relayer,
+    ),
     confirmLabel: 'Send',
     /**
      * A handle is paid through `payToHandle`, which re-resolves it INSIDE the transaction,
@@ -349,6 +365,7 @@ function SendPanel({ runner }: { runner: TxRunner }) {
  */
 function RequestPanel({ runner }: { runner: TxRunner }) {
   const writes = useMarenWrites({ onSimulated: runner.onSimulated });
+  const relayer = useRelayerStatus();
   const [amount, setAmount] = useState('');
   const [from, setFrom] = useState('');
   const [memo, setMemo] = useState('');
@@ -381,8 +398,9 @@ function RequestPanel({ runner }: { runner: TxRunner }) {
       ...(memo ? [{ label: 'Memo', value: <span className="text-text-muted">{memo}</span> }] : []),
     ],
     gas: gasNote(
-      true,
+      actionIsRelayable('createRequest'),
       'A request creates no obligation and moves no funds. It is an ask the other side fulfils in one action.',
+      relayer,
     ),
     confirmLabel: 'Create request',
     submit: writes.ready ? () => writes.createRequest(payer, amountWei, memo) : undefined,
@@ -478,6 +496,7 @@ function RequestPanel({ runner }: { runner: TxRunner }) {
 function LinkPanel({ runner }: { runner: TxRunner }) {
   const { data: balances } = useBalances();
   const writes = useMarenWrites({ onSimulated: runner.onSimulated });
+  const relayer = useRelayerStatus();
   const [amount, setAmount] = useState('');
   const [days, setDays] = useState('7');
   const [memo, setMemo] = useState('');
@@ -555,7 +574,11 @@ function LinkPanel({ runner }: { runner: TxRunner }) {
           value: <span className="num text-text-subtle break-all text-xs">{linkKey}</span>,
         },
       ],
-      gas: gasNote(true, 'Escrows the MUSD against a one-time key until someone claims it.'),
+      gas: gasNote(
+        actionIsRelayable('createLink'),
+        'Escrows the MUSD against a one-time key until someone claims it.',
+        relayer,
+      ),
       caution:
         'Anyone holding the full link can claim it. Send it the way you would send cash, and reclaim it if it goes astray.',
       confirmLabel: 'Create link',

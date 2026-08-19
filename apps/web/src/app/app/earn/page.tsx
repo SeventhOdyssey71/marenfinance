@@ -24,7 +24,15 @@ import { EarnIcon } from '@/components/ui/icons';
 import { BlockedNote } from '@/components/app/blocked';
 import { parseUnitsSafe, timeAgo } from '@/lib/copy';
 import { preflightEarnWithdraw, preflightMusdSpend } from '@/lib/chain/preflight';
-import { gasNote, SPENDERS, useMarenWrites, useMusdAllowance } from '@/lib/chain/write';
+import { actionIsRelayable } from '@/lib/chain/relay';
+import {
+  gasLine,
+  gasNote,
+  SPENDERS,
+  useMarenWrites,
+  useMusdAllowance,
+  useRelayerStatus,
+} from '@/lib/chain/write';
 import { useBalances, useDataSource, useEarn } from '@/lib/data/source';
 
 /**
@@ -46,6 +54,7 @@ export default function EarnPage() {
   const { data: balances } = useBalances();
   const runner = useTxRunner();
   const writes = useMarenWrites({ onSimulated: runner.onSimulated });
+  const relayer = useRelayerStatus();
   const [mode, setMode] = useState<'deposit' | 'withdraw'>('deposit');
   const [amount, setAmount] = useState('500');
 
@@ -144,7 +153,11 @@ export default function EarnPage() {
         value: <span className="text-text-muted">liquidation gains only, no fixed rate</span>,
       },
     ],
-    gas: gasNote(true, 'Moves MUSD between your wallet and the Stability Pool.'),
+    gas: gasNote(
+      actionIsRelayable(mode === 'deposit' ? 'earnDeposit' : 'earnWithdraw'),
+      'Moves MUSD between your wallet and the Stability Pool.',
+      relayer,
+    ),
     confirmLabel: mode === 'deposit' ? 'Deposit' : 'Withdraw',
     submit: writes.ready
       ? () => (mode === 'deposit' ? writes.earnDeposit(wei) : writes.earnWithdraw(wei))
@@ -366,8 +379,14 @@ export default function EarnPage() {
             >
               {mode === 'deposit' ? 'Deposit into Earn' : 'Withdraw from Earn'}
             </ActionButton>
+            {/* MarenEarn is not on MarenRelayHub's allowlist, so this line does not
+                change when a relayer comes up. Said in those words rather than borrowed
+                from the "no relayer yet" sentence, which would imply it will. */}
             <span className="text-text-subtle text-xs">
-              You pay the Bitcoin gas. No relayer is running yet.
+              {gasLine(
+                actionIsRelayable(mode === 'deposit' ? 'earnDeposit' : 'earnWithdraw'),
+                relayer,
+              )}
             </span>
           </div>
         </div>
