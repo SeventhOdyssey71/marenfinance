@@ -162,6 +162,18 @@ contract MarenRelayHub is MarenForwarder, AccessControl {
      *      try/catch for the standard reason: a permit sitting in the mempool can be submitted
      *      by anyone, which consumes the nonce and would otherwise brick a valid relay. If the
      *      allowance is genuinely missing, the `transferFrom` below still reverts.
+     *
+     *      THE REQUEST IS VALIDATED BEFORE THE PERMIT, and the order is the security property.
+     *      `req.feeToken` is an arbitrary address and the permit is an outward call to it made
+     *      by this contract with errors swallowed. Doing that first meant ANY caller, holding
+     *      no signature at all, could make the hub call any address on Mezo with the
+     *      `permit(address,address,uint256,uint256,uint8,bytes32,bytes32)` selector and
+     *      largely chosen arguments. The frame reverted afterwards on the bad signature, so
+     *      nothing persisted — but "the state change is undone" is not the same as "the call
+     *      did not happen", and a hub-originated call carries the authority every Maren
+     *      contract grants this address. `_validateRelayedCall` is a view, so the checks are
+     *      simply run twice; that costs one ecrecover and buys a hub that never calls out on
+     *      behalf of an unverified request.
      */
     function executeWithFeeAndPermit(
         RelayedCallData calldata req,
@@ -170,6 +182,7 @@ contract MarenRelayHub is MarenForwarder, AccessControl {
         bytes32 r,
         bytes32 s
     ) external {
+        _validateRelayedCall(req);
         if (req.feeAmount > 0) {
             try IERC20Permit(req.feeToken)
                 .permit(req.from, address(this), req.feeAmount, permitDeadline, v, r, s) {}
@@ -178,7 +191,11 @@ contract MarenRelayHub is MarenForwarder, AccessControl {
         _executeWithFee(req);
     }
 
-    function _executeWithFee(RelayedCallData calldata req) private {
+    /**
+     * @dev Every check that must hold before this contract does anything outward on a
+     *      request's behalf. Pure validation, no state change, so it is safe to run twice.
+     */
+    function _validateRelayedCall(RelayedCallData calldata req) private view returns (bytes4) {
         if (block.timestamp > req.deadline) revert RelayExpired(req.deadline);
 
         bytes4 selector = _selectorOf(req.data);
@@ -189,9 +206,15 @@ contract MarenRelayHub is MarenForwarder, AccessControl {
         // garbage — a confused-deputy hole with the hub's full authority behind it.
         if (!_isTrustedByTarget(req.target)) revert TargetDoesNotTrustHub(req.target);
 
-        uint256 nonce = nonces(req.from);
-        address signer = ECDSA.recover(_digestOf(req, nonce), req.signature);
+        address signer = ECDSA.recover(_digestOf(req, nonces(req.from)), req.signature);
         if (signer != req.from) revert InvalidRelaySignature(signer, req.from);
+
+        return selector;
+    }
+
+    function _executeWithFee(RelayedCallData calldata req) private {
+        bytes4 selector = _validateRelayedCall(req);
+        uint256 nonce = nonces(req.from);
 
         // Consume the nonce BEFORE the outward call, so a reentrant replay is impossible.
         // Shared with the inherited `execute` nonce sequence on purpose: one counter per user

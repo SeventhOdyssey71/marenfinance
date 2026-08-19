@@ -403,6 +403,76 @@ contract MarenRelayHubTest is Test {
         assertEq(fresh.balance, 0, "and no BTC was ever needed");
     }
 
+    /**
+     * @notice `executeWithFeeAndPermit` does not call `feeToken` on behalf of an unverified
+     *         request.
+     * @dev `req.feeToken` is an arbitrary address and the permit is an outward call this
+     *      contract makes to it with `catch {}` around it. When that ran before validation,
+     *      any caller holding no signature at all could make the HUB call any address on Mezo
+     *      with the `permit(...)` selector and largely chosen arguments. The frame reverted
+     *      afterwards on the bad signature so nothing persisted, but the call still left this
+     *      contract, carrying the authority every Maren contract grants this address.
+     *
+     *      ASSERTED WITH `expectCall`, NOT WITH A COUNTER ON THE PROBE. The frame reverts, so
+     *      any state the probe wrote is rolled back and a counter reads zero whether or not
+     *      the call happened — which is exactly the confusion this test exists to resolve.
+     *      `expectCall` is recorded by the cheatcode VM and survives the revert.
+     */
+    function test_permitIsNotCalledForAnUnverifiedRequest() public {
+        PermitProbe fakeToken = new PermitProbe();
+        uint256 permitDeadline = block.timestamp + 1 hours;
+
+        MarenRelayHub.RelayedCallData memory req = MarenRelayHub.RelayedCallData({
+            from: user,
+            target: address(probe),
+            gas: 1_000_000,
+            deadline: uint48(block.timestamp + 1 hours),
+            data: abi.encodeCall(SenderProbe.record, ()),
+            feeToken: address(fakeToken),
+            feeAmount: FEE,
+            feeRecipient: feeRecipient,
+            // Not a signature by anybody. The attacker signs nothing at all.
+            signature: abi.encodePacked(bytes32(uint256(1)), bytes32(uint256(2)), uint8(27))
+        });
+
+        vm.expectCall(
+            address(fakeToken),
+            abi.encodeCall(
+                PermitProbe.permit, (user, address(hub), FEE, permitDeadline, 27, bytes32(0), bytes32(0))
+            ),
+            0
+        );
+        vm.prank(attacker);
+        vm.expectRevert();
+        hub.executeWithFeeAndPermit(req, permitDeadline, 27, bytes32(0), bytes32(0));
+    }
+
+    /// @notice And a request that IS valid still gets its permit applied, before the fee moves.
+    function test_permitStillRunsForAVerifiedRequest() public {
+        PermitProbe feeToken = new PermitProbe();
+        uint256 permitDeadline = block.timestamp + 1 hours;
+
+        MarenRelayHub.RelayedCallData memory req = MarenRelayHub.RelayedCallData({
+            from: user,
+            target: address(probe),
+            gas: 1_000_000,
+            deadline: uint48(block.timestamp + 1 hours),
+            data: abi.encodeCall(SenderProbe.record, ()),
+            feeToken: address(feeToken),
+            feeAmount: FEE,
+            feeRecipient: feeRecipient,
+            signature: ""
+        });
+        req.signature = _sign(req);
+
+        vm.prank(relayer);
+        hub.executeWithFeeAndPermit(req, permitDeadline, 27, bytes32(0), bytes32(0));
+
+        assertEq(feeToken.calls(), 1, "the permit still runs for a request that verifies");
+        assertEq(feeToken.transfers(), 1, "and the fee still settles after it");
+        assertEq(probe.recordedSender(), user, "and the work still ran");
+    }
+
     /// @notice The digest helper the SDK and relayer are told to use agrees with a signature
     ///         built independently, so nobody has to transcribe the type string.
     function test_property2_relayedCallDigestMatchesAnIndependentBuild() public view {
@@ -612,5 +682,25 @@ contract MarenRelayHubTest is Test {
             data: data,
             signature: abi.encodePacked(r, s, v)
         });
+    }
+}
+
+/**
+ * @notice A stand-in for a fee token that RECORDS what the hub did to it.
+ * @dev Recording rather than reverting is the point: `executeWithFeeAndPermit` wraps the
+ *      permit in `catch {}`, so a probe that reverted would prove nothing about whether the
+ *      call was made. A counter survives the catch.
+ */
+contract PermitProbe {
+    uint256 public calls;
+    uint256 public transfers;
+
+    function permit(address, address, uint256, uint256, uint8, bytes32, bytes32) external {
+        calls += 1;
+    }
+
+    function transferFrom(address, address, uint256) external returns (bool) {
+        transfers += 1;
+        return true;
     }
 }
