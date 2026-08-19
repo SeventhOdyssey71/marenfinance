@@ -208,4 +208,25 @@ export interface ProtocolStats {
   depositsPaused: boolean;
   /** True when the vault has paused new borrowing. */
   borrowingPaused: boolean;
+  /**
+   * MUSD's system-wide Total Collateral Ratio, 1e18, and whether it has fallen under the
+   * 150% CCR. These are about the WHOLE PROTOCOL, not about Maren's pooled trove, and they
+   * are the only fields here that describe something no Maren contract can influence.
+   *
+   * They exist because Recovery Mode closes doors that Maren's own preflight otherwise
+   * reports as open. Read out of the deployed BorrowerOperations bytecode, three separate
+   * require strings fire once TCR < CCR, and two of them sit directly under user actions:
+   * "Collateral withdrawal not permitted Recovery Mode" kills every `withdrawColl`, and
+   * "Cannot decrease your Trove's ICR in Recovery Mode" kills every bare `withdrawMUSD`
+   * because adding debt without collateral always lowers ICR. Without these fields the
+   * borrow and withdraw controls stay enabled and the user pays gas to discover a refusal
+   * that was knowable for free.
+   *
+   * `null` means UNKNOWN rather than false. `checkRecoveryMode` needs a price argument, so
+   * when the oracle read fails there is no honest answer, and a `false` there would be a
+   * guess dressed as a fact. Callers must treat null as "cannot say" and lean on the price
+   * gate, which is failing for the same reason.
+   */
+  systemTcrWei: bigint | null;
+  recoveryMode: boolean | null;
 }
