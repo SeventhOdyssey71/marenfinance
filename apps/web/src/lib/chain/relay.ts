@@ -571,6 +571,7 @@ export function relayFailureReason(status: number, body: RelayErrorBody | null):
     case 'CALLDATA_UNDECODABLE':
     case 'VALUE_NOT_PERMITTED':
     case 'GAS_LIMIT_TOO_HIGH':
+    case 'CALLDATA_TOO_LARGE':
     case 'MALFORMED_REQUEST':
     case 'UNSUPPORTED_CHAIN':
       return {
@@ -621,6 +622,8 @@ const STICKY_REFUSALS = new Set([
   'TARGET_NOT_ALLOWED',
   'SELECTOR_NOT_ALLOWED',
   'VALUE_NOT_PERMITTED',
+  // Not sticky: a memo one character shorter is a different request the same
+  // relayer would take. This says nothing about the service.
 ]);
 
 export function isStickyRefusal(code: string | null | undefined): boolean {

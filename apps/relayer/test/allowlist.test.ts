@@ -12,6 +12,7 @@ import {
 } from './helpers.js';
 import { RELAYABLE_FUNCTIONS, allFunctionIds, defineRelayableFunction } from '../src/registry.js';
 import { loadConfig } from '../src/config.js';
+import { MAX_CALLDATA_BYTES } from '../src/calldata.js';
 
 /**
  * R4 — allowlist targets AND selectors.
@@ -85,6 +86,62 @@ describe('target and selector allowlist', () => {
     const response = await relayer.post('/relay', await signedRequest({ data: '0xdead' }));
     expect(response.status).toBe(400);
     expect(((await response.json()) as ErrorBody).error).toBe('MALFORMED_REQUEST');
+  });
+
+  /**
+   * A CALL THAT IS VALID, ALLOWLISTED, DECODABLE, AND STILL A BUDGET ATTACK.
+   *
+   * Calldata costs the relayer intrinsic gas at the TRANSACTION level, and
+   * `ForwardRequest.gas` is the gas handed to the INNER call. So neither
+   * `maxGasPerRequest` nor the reservation — which is `request.gas *
+   * maxFeePerGas` — bounds it. Measured: `MarenPay.pay` with a 100,000-character
+   * memo is about 1,600,000 gas of calldata before the target does anything, and
+   * the request carrying it signed 300,000 gas and reserved for that. Nothing
+   * rejected it, and reservations are the only thing stopping concurrent traffic
+   * from overrunning the daily cap before the first receipt lands.
+   */
+  it('refuses calldata larger than it will pay to publish', async () => {
+    const relayer = await buildTestRelayer();
+    const data = encodeFunctionData({
+      abi: [
+        defineRelayableFunction('marenPay', 'function pay(address to, uint256 amount, string memo)')
+          .abi,
+      ],
+      args: [
+        getAddress('0x5555555555555555555555555555555555555555'),
+        parseEther('1'),
+        'A'.repeat(100_000),
+      ],
+    });
+
+    const response = await relayer.post('/relay', await signedRequest({ data, gas: 300_000n }));
+
+    expect(response.status).toBe(403);
+    const body = (await response.json()) as ErrorBody;
+    expect(body.error).toBe('CALLDATA_TOO_LARGE');
+    expect(relayer.chainFake.sent).toHaveLength(0);
+    expect(relayer.chainFake.simulations).toBe(0);
+  });
+
+  it('still admits the widest call Maren actually has', async () => {
+    // `split` at the contract's maximum 64 recipients, with a memo. If the cap
+    // ever refuses this, it is refusing a real feature rather than an attack.
+    const relayer = await buildTestRelayer();
+    const split = defineRelayableFunction(
+      'marenPay',
+      'function split(address[] recipients, uint256[] amounts, string memo)',
+    );
+    const recipients = Array.from({ length: 64 }, (_, i) =>
+      getAddress(`0x${(i + 1).toString(16).padStart(40, '0')}`),
+    );
+    const data = encodeFunctionData({
+      abi: [split.abi],
+      args: [recipients, recipients.map(() => parseEther('1')), 'rent, november'],
+    });
+    expect((data.length - 2) / 2).toBeLessThan(MAX_CALLDATA_BYTES);
+
+    const response = await relayer.post('/relay', await signedRequest({ data }));
+    expect(response.status).toBe(202);
   });
 
   it('rejects a gas limit above the per-request cap', async () => {
