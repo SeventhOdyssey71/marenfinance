@@ -415,22 +415,15 @@ export class RelayerService {
     }
     const decision = confirmed.ok ? confirmed : preCheck;
 
-    // Only admitted requests count towards the "approaching the limit" signal.
-    // A rejected burst is refunded, so warning on it would mean an attacker
-    // could fill the log with limit warnings for traffic that consumed nothing,
-    // the same mistake in a smaller form as latching the budget halt on reserved
-    // rather than committed spend (see `#commitSpend`).
-    this.#warnNearLimit(
-      { kind: 'address', subject: payer, requestId: ctx.requestId },
-      Number(reserved.addressDay),
-      config.policy.maxActionsPerAddressPerDay,
-    );
-    this.#warnNearLimit(
-      { kind: 'ip', subject: ctx.ipHash, requestId: ctx.requestId },
-      Number(reserved.ipDay),
-      config.policy.maxActionsPerIpPerDay,
-    );
-    this.#warnBudgetNearLimit(reserved.spendDay, projectedGasCostWei, ctx.requestId);
+    // The near-limit warnings fire AFTER the broadcast, not here. Warning on a
+    // reservation means warning on traffic that is about to be refunded: a
+    // request that fails simulation still crosses the threshold on the way up
+    // and un-crosses it on the way back down, so the next one crosses again.
+    // Measured: six requests whose calls revert produced six `budget.near_limit`
+    // warnings for zero wei of spend, which is an unauthenticated way to fill an
+    // operator's log with the one signal they are meant to page on. Same mistake
+    // in a smaller form as latching the halt on reserved rather than committed
+    // spend (see `#commitSpend`).
 
     // Everything from here holds a reservation, so every failure path must give
     // it back or we leak budget on each error.
@@ -481,6 +474,19 @@ export class RelayerService {
     }
 
     this.#deps.watcher?.track(pending);
+
+    // Broadcast, therefore real, therefore worth a warning. See the note above
+    // the reservation for why this is not done where the counters are debited.
+    this.#warnNearLimit(
+      { kind: 'address', subject: payer, requestId: ctx.requestId },
+      Number(reserved.addressDay),
+      config.policy.maxActionsPerAddressPerDay,
+    );
+    this.#warnNearLimit(
+      { kind: 'ip', subject: ctx.ipHash, requestId: ctx.requestId },
+      Number(reserved.ipDay),
+      config.policy.maxActionsPerIpPerDay,
+    );
 
     logger.info(
       {
@@ -757,6 +763,7 @@ export class RelayerService {
       if (committed < 0n) {
         await this.#deps.store.incrBy(keys.committedDay(day), -committed, DAY_SECONDS);
       }
+      this.#reconsiderBudgetHalt(day, committed < 0n ? 0n : committed);
     } catch {
       // A reconciliation we cannot record leaves the budget OVER-counted, which
       // is the safe direction. Log, do not retry into a loop.
@@ -815,12 +822,49 @@ export class RelayerService {
     weigh: bigint,
   ): Promise<{ lifetime: bigint; addressDay: bigint; ipDay: bigint; spendDay: bigint }> {
     const { store } = this.#deps;
-    const [lifetime, addressDay, ipDay, spendDay] = await Promise.all([
+    // `allSettled`, not `all`. Four independent writes: `all` rejects on the
+    // first failure while the other three still land, and nothing above this
+    // frame knows a reservation was taken, so nothing gives it back. Measured
+    // with one counter forced to throw: the request answered 500 and left the
+    // signer's lifetime and daily action counters permanently debited for a
+    // relay that never happened. Two of those counters are a user's own free
+    // tier and one is the shared daily budget, so a store that flaps for a
+    // minute burns both. Upstash REST over the public internet is exactly that
+    // store.
+    const written: Array<{ key: string; amount: bigint }> = [];
+    const settled = await Promise.allSettled([
       store.incrBy(keys.lifetime(payer), 1n, NO_TTL),
       store.incrBy(keys.addressDay(payer, day), 1n, DAY_SECONDS),
       store.incrBy(keys.ipDay(ipHash, day), 1n, DAY_SECONDS),
       store.incrBy(keys.spendDay(day), weigh, DAY_SECONDS),
     ]);
+    const debits: Array<{ key: string; amount: bigint }> = [
+      { key: keys.lifetime(payer), amount: 1n },
+      { key: keys.addressDay(payer, day), amount: 1n },
+      { key: keys.ipDay(ipHash, day), amount: 1n },
+      { key: keys.spendDay(day), amount: weigh },
+    ];
+    let failure: unknown = null;
+    for (const [index, outcome] of settled.entries()) {
+      if (outcome.status === 'fulfilled') written.push(debits[index]!);
+      else failure ??= outcome.reason;
+    }
+    if (failure !== null) {
+      await Promise.all(written.map((entry) => this.#refund(entry.key, entry.amount)));
+      this.#deps.logger.error(
+        { event: 'relay.reservation_partial', payer, wrote: written.length, err: failure },
+        'the quota store failed mid-reservation; the counters that did land were given back',
+      );
+      // A typed 503, not the bare 500 an unhandled store error produced before.
+      // "We cannot count, so we will not spend" is the honest answer and it is
+      // the one clients already know how to read.
+      throw isRelayError(failure)
+        ? failure
+        : unavailable('STORE_UNAVAILABLE', 'the quota store could not record this request');
+    }
+    const [lifetime, addressDay, ipDay, spendDay] = settled.map((outcome) =>
+      outcome.status === 'fulfilled' ? outcome.value : 0n,
+    ) as [bigint, bigint, bigint, bigint];
     return { lifetime, addressDay, ipDay, spendDay };
   }
 
@@ -860,22 +904,31 @@ export class RelayerService {
     );
   }
 
-  /** The same crossing signal for the global daily BTC budget. */
-  #warnBudgetNearLimit(reservedAfter: bigint, thisRequestWei: bigint, requestId: string): void {
+  /**
+   * The same crossing signal for the global daily BTC budget, off COMMITTED
+   * spend.
+   *
+   * It used to read the reserved counter at reservation time, which made it an
+   * anonymous log-flood primitive: a request that fails simulation reserves,
+   * crosses 80%, warns, and is then refunded back under the threshold, so the
+   * next one crosses again. Six reverting requests produced six warnings against
+   * zero wei of real spend. Committed spend only moves when a transaction was
+   * broadcast, so a crossing here is a crossing an operator should act on.
+   */
+  #warnBudgetNearLimit(committedAfter: bigint, thisRequestWei: bigint): void {
     const limit = this.#deps.config.policy.maxDailySpendWei;
     if (limit <= 0n) return;
     const threshold = (limit * BigInt(Math.round(NEAR_LIMIT_FRACTION * 100))) / 100n;
-    const before = reservedAfter - thisRequestWei;
-    if (reservedAfter < threshold || before >= threshold) return;
+    const before = committedAfter - thisRequestWei;
+    if (committedAfter < threshold || before >= threshold) return;
     this.#deps.logger.warn(
       {
         event: 'budget.near_limit',
-        requestId,
-        reservedWei: reservedAfter,
+        committedWei: committedAfter,
         limitWei: limit,
-        pct: pctOf(reservedAfter, limit),
+        pct: pctOf(committedAfter, limit),
       },
-      'the daily BTC sponsorship budget is mostly reserved',
+      'the daily BTC sponsorship budget is mostly committed',
     );
   }
 
@@ -939,6 +992,43 @@ export class RelayerService {
         'daily BTC budget spent — relaying halted until 00:00 UTC',
       );
     }
+    // The number the halt was latched on is a CEILING, not a cost — see
+    // `#reconsiderBudgetHalt`. Warning here rather than at reservation time is
+    // the same distinction: only spend that was actually broadcast counts.
+    this.#warnBudgetNearLimit(committed, weiSpent);
+  }
+
+  /**
+   * LIFT a halt that reconciliation has just disproved.
+   *
+   * `#commitSpend` latches off `request.gas * maxFeePerGas`, which is a ceiling
+   * the SIGNER chose, not what the transaction cost. The web client alone signs
+   * 1.5x its own estimate plus 60k (`relayGasLimit`), and the per-request cap
+   * lets anyone sign 1,500,000 gas onto a 60,000-gas `commit()`. So the day's
+   * committed counter can reach the cap on a fraction of the real spend, and
+   * before this existed the latch was never re-read: `reconcile()` corrected
+   * `committed:<day>` downward and `#budgetHaltedOn` stayed set until 00:00 UTC.
+   *
+   * Measured: one request signing 1,000,000 gas against a budget sized for
+   * exactly that reservation halted the relayer, then settled at 120,000 gas —
+   * 6% of the budget genuinely spent, and every later request answered 503
+   * RELAYER_NOT_ACCEPTING for the rest of the day. Cheap to do on purpose and
+   * indistinguishable from ordinary traffic, because it IS ordinary traffic.
+   *
+   * Lifting is sound in the same way latching is: the halt means "the day's
+   * money is gone", and the only number that can say so is the reconciled one.
+   * A halt for a day that is no longer today is left alone — `accepting`
+   * already ignores it — so this only ever un-halts on evidence.
+   */
+  #reconsiderBudgetHalt(day: string, committed: bigint): void {
+    if (this.#budgetHaltedOn !== day) return;
+    const limit = this.#deps.config.policy.maxDailySpendWei;
+    if (committed >= limit) return;
+    this.#budgetHaltedOn = null;
+    this.#deps.logger.warn(
+      { event: 'relay.budget_halt_lifted', day, committedWei: committed, limitWei: limit },
+      'reconciled spend is below the daily budget; relaying resumed',
+    );
   }
 
   /**

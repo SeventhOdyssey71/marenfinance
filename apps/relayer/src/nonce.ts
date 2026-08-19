@@ -339,6 +339,8 @@ export class TxWatcher {
   readonly #options: TxWatcherOptions;
   readonly #pending = new Map<Hash, PendingTx>();
   #timer: NodeJS.Timeout | null = null;
+  /** True while a sweep is running. See `sweep`. */
+  #sweeping = false;
   #onSettled: TxWatcherOptions['onSettled'];
   #onSweep: TxWatcherOptions['onSweep'];
 
@@ -387,8 +389,31 @@ export class TxWatcher {
     }
   }
 
-  /** One pass. Exposed so tests can drive it deterministically. */
+  /**
+   * One pass. Exposed so tests can drive it deterministically.
+   *
+   * NON-REENTRANT. `start` fires this on an interval with `void`, and one pass
+   * does a receipt read per pending transaction plus, for the stuck ones, a
+   * broadcast — so a slow RPC makes a sweep outlast its own interval trivially.
+   * Two overlapping sweeps iterate the same snapshot and both replace the same
+   * stuck transaction at the same nonce, which puts two hashes in `#pending` for
+   * one slot. Only one can ever get a receipt; the other is watched forever, its
+   * `onSettled` never fires, and the reservation it carries is never reconciled,
+   * so the day's committed spend stays permanently above what was really paid.
+   * Skipping is the right answer rather than queueing: the next tick is a few
+   * seconds away and the work is idempotent.
+   */
   async sweep(): Promise<void> {
+    if (this.#sweeping) return;
+    this.#sweeping = true;
+    try {
+      await this.#runSweep();
+    } finally {
+      this.#sweeping = false;
+    }
+  }
+
+  async #runSweep(): Promise<void> {
     await this.#onSweep?.();
     const now = this.#options.now?.() ?? Date.now();
     for (const tx of [...this.#pending.values()]) {
