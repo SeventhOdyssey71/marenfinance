@@ -16,7 +16,7 @@ import type { Address } from 'viem';
 import { loadActivityCache, saveActivityCache } from '../chain/activity-cache';
 import { readActivity, type ActivityWindow } from '../chain/logs';
 import { classifyPrice, type PriceFeed } from '../chain/price';
-import { getLogClient } from '../chain/transport';
+import { getEndpointClients, getLogClient } from '../chain/transport';
 import * as live from './live';
 import type { Balances, EarnPosition, Handle, Position, ProtocolStats } from './types';
 
@@ -217,6 +217,10 @@ export function useActivity(): UseQueryResult<ActivityWindow> {
         ctx.network,
         ctx.account,
         cached,
+        // Receipts get the endpoint list rather than the failover client: an empty
+        // receipt is a successful response that `fallback()` cannot fail over on. See
+        // the note on `getEndpointClients`.
+        getEndpointClients(ctx.network),
       );
 
       // Stored only after a scan that returned. A failed scan throws before reaching here,

@@ -4,31 +4,49 @@ import * as Linking from 'expo-linking';
 import { formatBtc, formatMusd, getChain, shortHash } from '@maren/sdk';
 
 import { Card } from '../../src/components/Card';
+import { DemoNotice, ReadFailure } from '../../src/components/DataNotice';
 import { Icon, type IconName } from '../../src/components/Icon';
 import { Sats } from '../../src/components/Money';
 import { Screen } from '../../src/components/Screen';
 import { Label, Num, Txt } from '../../src/components/Text';
 import { base, radius, semanticText, space, text as textColors } from '../../src/design/tokens';
 import { activityTitle, statusLabel, timeAgo } from '../../src/lib/copy';
-import type { ActivityItem, ActivityKind, ActivityStatus } from '../../src/data/types';
+import type {
+  ActivityItem,
+  ActivityKind,
+  ActivityStatus,
+  ActivityWindow,
+} from '../../src/data/types';
 import { useActivity } from '../../src/hooks/useChainData';
 import { useAppStore } from '../../src/state/store';
 
 /**
  * Activity — history with status, memo, and a link to the explorer.
  *
+ * Every row here is decoded from a log Mezo returned for this address. The explorer
+ * links therefore resolve, which is the whole reason this screen is worth having: a
+ * ledger nobody can check against the chain is a picture of a ledger.
+ *
  * Status is rendered from the receipt-derived value and nothing else. A failed
  * transaction is shown as failed, in danger red, with the words "no funds moved" —
  * R15 in the one place a user will actually look for it. Talise's audit finding was
  * that a failure could reach the UI wearing a success's clothes; here the failure has
  * its own row treatment and cannot be mistaken for anything else.
+ *
+ * THE THREE EMPTY STATES ARE THREE DIFFERENT FACTS, and this screen refuses to collapse
+ * them. "We read every block since deployment and you have done nothing" is a complete
+ * answer. "We read the last 60,000 blocks and found nothing" is a much weaker one.
+ * "The RPC did not answer" is not an answer at all, and is the one that must never be
+ * rendered as an empty list, because that tells somebody their transactions are gone.
  */
 export default function Activity() {
-  const { data: items } = useActivity();
+  const { data: window, error, isPending, refetch } = useActivity();
   const network = useAppStore((s) => s.network);
+  const demo = useAppStore((s) => s.dataSource === 'mock');
   const explorer = getChain(network).blockExplorers?.default.url ?? 'https://explorer.mezo.org';
 
-  const groups = groupByDay(items ?? []);
+  const items = window?.items ?? [];
+  const groups = groupByDay(items);
 
   return (
     <Screen bottomInset={space.xxl}>
@@ -39,17 +57,31 @@ export default function Activity() {
         </Txt>
       </View>
 
-      {items === undefined ? (
+      {demo ? <DemoNotice /> : null}
+
+      {error ? (
+        <ReadFailure
+          what="your history"
+          detail={error instanceof Error ? error.message : String(error)}
+          onRetry={() => {
+            void refetch();
+          }}
+        />
+      ) : isPending ? (
         <Card>
           <Txt variant="small" tone="muted">
-            Reading history…
+            Reading your history from Maren’s contract logs…
           </Txt>
         </Card>
       ) : items.length === 0 ? (
         <Card>
-          <Txt variant="h3">Nothing yet</Txt>
+          <Txt variant="h3">
+            {window?.complete ? 'Nothing yet' : 'Nothing in the blocks we read'}
+          </Txt>
           <Txt variant="small" tone="muted" style={styles.emptyBody}>
-            Deposits, borrows and payments appear here the moment they have an on-chain receipt.
+            {window?.complete
+              ? 'This address has never transacted with Maren. Every block since the contracts were deployed was read, so that is the whole story rather than a recent slice. Deposits, borrows and payments appear here the moment they have an on-chain receipt.'
+              : 'Mezo’s RPC answers 10,000 blocks at a time, so this scan covered the most recent stretch rather than all of history. Anything older is not shown, and is not claimed to be absent.'}
           </Txt>
         </Card>
       ) : (
@@ -64,7 +96,29 @@ export default function Activity() {
           </Fragment>
         ))
       )}
+
+      {/* Coverage is a claim about a scan, so it is only shown when a scan happened. */}
+      {window && !error && !demo ? <Coverage window={window} /> : null}
     </Screen>
+  );
+}
+
+/**
+ * How far back this list actually looked.
+ *
+ * Stated in blocks, because blocks are exact and a converted date would not be. The only
+ * honest way to turn a block number into a wall-clock time is to fetch that block, and
+ * quoting "about three days" from an assumed block time is precisely the small invention
+ * this screen exists to be free of.
+ */
+function Coverage({ window }: { window: ActivityWindow }) {
+  const span = (window.toBlock - window.fromBlock + 1n).toString();
+  return (
+    <Txt variant="small" tone="muted" style={styles.coverage}>
+      {window.complete
+        ? `Read every block from ${window.fromBlock.toString()}, where Maren was deployed, to ${window.toBlock.toString()}. That is the complete history.`
+        : `Read blocks ${window.fromBlock.toString()} to ${window.toBlock.toString()} (${span} blocks). Mezo’s public RPC caps a log query at 10,000 blocks, so older history needs an indexer.`}
+    </Txt>
   );
 }
 
@@ -229,9 +283,24 @@ function iconFor(kind: ActivityKind): IconName {
       return 'earn';
     case 'earn-withdraw':
       return 'arrowDown';
+    case 'request-created':
+      return 'plus';
+    case 'link-created':
+      return 'arrowUpRight';
+    case 'link-claimed':
+      return 'arrowDown';
   }
 }
 
+/**
+ * Which way the money went, for the sign on the amount.
+ *
+ * The three payment-link and request kinds are deliberately absent from this list, so
+ * they render with a plus. None of them moves money at the moment they are emitted: a
+ * request is an ask, a created link is escrowed and reclaimable, and a claim is an
+ * inflow to whoever claimed it. Signing them as outgoing would put a minus against a
+ * balance that did not fall.
+ */
 function outflow(kind: ActivityKind): boolean {
   return kind === 'send' || kind === 'repay' || kind === 'deposit' || kind === 'earn-deposit';
 }
@@ -267,6 +336,7 @@ const styles = StyleSheet.create({
   header: { marginBottom: space.xl },
   title: { marginTop: space.xs },
   dayLabel: { marginBottom: space.md, marginTop: space.sm },
+  coverage: { marginTop: space.md },
   group: { paddingHorizontal: space.lg, marginBottom: space.lg },
   row: {
     flexDirection: 'row',

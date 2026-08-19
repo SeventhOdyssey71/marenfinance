@@ -1,8 +1,21 @@
-import { BORROWING_RATE, INTEREST_RATE_BPS, MUSD_GAS_COMPENSATION, WAD } from '@maren/sdk';
+import {
+  BORROWING_RATE,
+  INTEREST_RATE_BPS,
+  MUSD_GAS_COMPENSATION,
+  getDeploymentBlock,
+  WAD,
+} from '@maren/sdk';
 import type { Address, Hash } from 'viem';
 
 import type { PriceObservation } from '../chain/price';
-import type { ActivityItem, Balances, EarnPosition, Handle, Position } from './types';
+import type {
+  ActivityItem,
+  ActivityWindow,
+  Balances,
+  EarnPosition,
+  Handle,
+  Position,
+} from './types';
 
 /**
  * Mock chain state.
@@ -12,10 +25,25 @@ import type { ActivityItem, Balances, EarnPosition, Handle, Position } from './t
  * mocked — screens call the same `readPosition()` either way. Swapping to live data
  * means replacing the bodies in this file with contract reads, and nothing else.
  *
- * The numbers were chosen to exercise the interesting states rather than to flatter the
- * product: the position sits at a genuinely adequate CR rather than a comfortable one,
- * and the Earn window contains a long stretch with no gains at all, which is what the
- * Stability Pool actually looks like.
+ * THAT SWAP HAS HAPPENED. `./live.ts` is the replacement, it is what the app reads by
+ * default, and `./parity.test.ts` asserts the two modules export the same function names
+ * with the same arities, so the sentence above is now enforced by CI rather than merely
+ * promised in a comment.
+ *
+ * THIS FILE SURVIVES ON PURPOSE, AND UNDER TERMS. It is reachable only through
+ * Settings → Developer → "Use demo data", it is off by default, and every screen it
+ * feeds says on its face that the figures are demo data rather than chain state. That
+ * last condition is not decoration. The web app deleted its own mock because it was on
+ * by default and rendered invented transaction hashes as working explorer links under a
+ * header reading "Live from Mezo testnet"; a reviewer who tapped one would have found
+ * nothing on chain and been right to distrust every other number in the product. The
+ * defence against that is not deleting the file, it is never letting invented data be
+ * mistaken for read data. The default and the banner are what enforce it.
+ *
+ * What it buys: the app can be walked end to end with no network, and it holds states a
+ * testnet will not produce on demand — a position at a genuinely adequate CR rather than
+ * a comfortable one, a failed send, and an Earn window with a long stretch of no gains
+ * at all, which is what the Stability Pool actually looks like.
  */
 
 export const MOCK_ADDRESS: Address = '0x8F3a4C21B7dE05aE9c1f6b2E4D8a70915cC3B4d2';
@@ -230,9 +258,24 @@ export const MOCK_ACTIVITY: ActivityItem[] = [
   },
 ];
 
-export async function readActivity(): Promise<ActivityItem[]> {
+/**
+ * The demo ledger, in the same `ActivityWindow` shape the live reader produces.
+ *
+ * The window's block numbers are the deployment block on both ends, and they are never
+ * rendered: the Activity screen suppresses the coverage line entirely while the demo
+ * source is selected, because "read every block from X to Y" is a claim about a scan and
+ * no scan happened here. Returning the same TYPE as the live reader is what keeps the
+ * two interchangeable; returning the same SENTENCE would be a lie.
+ */
+export async function readActivity(): Promise<ActivityWindow> {
   await tick();
-  return [...MOCK_ACTIVITY].sort((a, b) => b.at - a.at);
+  const block = getDeploymentBlock('testnet') ?? 0n;
+  return {
+    items: [...MOCK_ACTIVITY].sort((a, b) => b.at - a.at),
+    fromBlock: block,
+    toBlock: block,
+    complete: true,
+  };
 }
 
 /** A small delay so loading states are real rather than theoretical. */

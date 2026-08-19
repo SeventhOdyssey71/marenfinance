@@ -110,6 +110,20 @@ export const mezoTestnet = defineChain({
     // not grounds to drop it — it serves every other method reliably, and a log scan that
     // fails is reported to the user as unknown rather than as an empty history. It is
     // second, never first, precisely because of this.
+    //
+    // A SECOND MEASURED CAVEAT, and this one cuts the other way. On 2026-08-19 the PRIMARY
+    // returned a MarenPay log from eth_getLogs and then `result: null` from
+    // eth_getTransactionReceipt for that same transaction hash
+    // (0x059f329fda15d6eb430d514040f7060fe41b354eac478c2c9ad4e5dba490559a), while the
+    // secondary returned the full receipt, including the very log the primary had just
+    // served. The two endpoints disagree about a mined transaction, and the primary is the
+    // one that was wrong.
+    //
+    // The consequence for readers, and it is not optional: A MISSING RECEIPT IS NOT A
+    // MISSING HISTORY. Both log readers (apps/web and apps/ios, chain/logs.ts) absorb a
+    // per-transaction receipt failure and mark that ROW as awaiting a receipt, rather than
+    // failing the whole scan. Failing the scan turned one inconsistent row into "we could
+    // not read your history", which is the worst available answer and was also a false one.
     default: { http: ['https://rpc.test.mezo.org', 'https://mezo-testnet.drpc.org'] },
     public: { http: ['https://rpc.test.mezo.org', 'https://mezo-testnet.drpc.org'] },
   },

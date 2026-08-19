@@ -15,6 +15,7 @@ import {
 
 import { Amount, Btc, Musd, Ratio } from '../../src/components/Money';
 import { Card } from '../../src/components/Card';
+import { DemoNotice, ReadFailure } from '../../src/components/DataNotice';
 import { Icon } from '../../src/components/Icon';
 import { PillButton } from '../../src/components/PillButton';
 import { PriceBanner } from '../../src/components/PriceBanner';
@@ -37,6 +38,7 @@ import { isSponsoredKind } from '../../src/chain/sponsorship';
 import { priceGate } from '../../src/chain/price';
 import { gasCopy } from '../../src/lib/copy';
 import { useBalances, usePosition, usePrice } from '../../src/hooks/useChainData';
+import { useAppStore } from '../../src/state/store';
 
 type Mode = 'deposit' | 'borrow' | 'repay' | 'withdraw';
 
@@ -62,9 +64,10 @@ const MODES: { key: Mode; label: string }[] = [
 export default function Vault() {
   const [mode, setMode] = useState<Mode>('borrow');
   const price = usePrice();
-  const { data: position } = usePosition();
+  const { data: position, error: positionError, refetch: refetchPosition } = usePosition();
   const { data: balances } = useBalances();
   const runner = useTxRunner();
+  const demo = useAppStore((s) => s.dataSource === 'mock');
 
   const gate = priceGate(price);
   const livePrice = price.state === 'live' ? price.priceWei : null;
@@ -77,6 +80,26 @@ export default function Vault() {
           Bitcoin credit
         </Txt>
       </View>
+
+      {demo ? <DemoNotice /> : null}
+
+      {/*
+        A read failure and a stale price are different problems and get different
+        notices. This one means the chain did not answer, so there is no position to
+        compute against; the price banner below means the oracle answered too long ago
+        for the protocol to accept its number.
+      */}
+      {positionError ? (
+        <View style={styles.banner}>
+          <ReadFailure
+            what="your position"
+            detail={positionError instanceof Error ? positionError.message : String(positionError)}
+            onRetry={() => {
+              void refetchPosition();
+            }}
+          />
+        </View>
+      ) : null}
 
       {/* The price gate is stated once, at the top, and disables everything below it. */}
       {price.state !== 'live' ? (
