@@ -285,6 +285,26 @@ export interface RevertReason {
 }
 
 /**
+ * A failure that already knows how to describe itself.
+ *
+ * Some refusals never touch the chain and therefore have no revert data to decode: a
+ * relayer answering `402 SPONSORSHIP_UNAVAILABLE`, or a fetch that never left the device.
+ * Throwing one of these carries the finished copy through the same `throw` that a
+ * contract revert travels along, so `explainError` hands it back unchanged and the sheet
+ * renders it identically. The alternative — a second error channel beside the one every
+ * screen already handles — is how one of the two paths ends up rendering a raw string.
+ */
+export class ExplainedError extends Error {
+  readonly reason: RevertReason;
+
+  constructor(reason: RevertReason) {
+    super(reason.detail);
+    this.name = 'ExplainedError';
+    this.reason = reason;
+  }
+}
+
+/**
  * A collateral ratio in these messages, rounded the safe way.
  *
  * This was `(Number(wad) / 1e16).toFixed(1)`, which ROUNDS TO NEAREST — so the pooled
@@ -732,6 +752,11 @@ function decodeRaw(data: Hex): RevertReason | null {
  * not a failure at all, so it is checked first and never reaches the revert decoder.
  */
 export function explainError(error: unknown): RevertReason {
+  // Already explained by whoever threw it — a relayer refusal, or a request that never
+  // reached one. Checked before the wallet-rejection test because these carry their own
+  // finished copy and there is nothing left to decide.
+  if (error instanceof ExplainedError) return error.reason;
+
   if (isUserRejection(error)) {
     return {
       name: null,
