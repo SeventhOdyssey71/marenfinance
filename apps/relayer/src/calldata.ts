@@ -32,6 +32,30 @@ export interface AdmittedCall {
   readonly signedFeeMusdWei: bigint | null;
 }
 
+/**
+ * Largest signed calldata this relayer will pay to put on Mezo, in bytes.
+ *
+ * THIS IS A BUDGET CONTROL, NOT A SANITY CHECK. Every byte of calldata costs the
+ * relayer intrinsic gas at the TRANSACTION level, and transaction-level gas is
+ * not `ForwardRequest.gas` — that field is the gas handed to the INNER call. So
+ * `maxGasPerRequest` bounds the wrong number, and the reservation, which is
+ * `request.gas * maxFeePerGas`, bounds it too.
+ *
+ * Measured: `MarenPay.pay` with a 100,000-character memo is a perfectly valid,
+ * fully decodable, allowlisted call. It costs about 1,600,000 gas in calldata
+ * alone before the target does anything, and the request that carried it signed
+ * `gas: 300000` and reserved for that. Nothing rejected it. The reservation was
+ * out by more than 6x on one request, and reservations are what stop concurrent
+ * traffic from overrunning the daily cap before the first receipt lands.
+ *
+ * 8 KiB is chosen from the widest call Maren actually has: `split` with the
+ * contract's maximum 64 recipients is about 4,300 bytes plus the memo. It bounds
+ * the unsigned share of the cost at roughly 131,000 gas, which is small beside
+ * the smallest sensible `request.gas`. It also bounds what a single request can
+ * make this process parse and hold.
+ */
+export const MAX_CALLDATA_BYTES = 8_192;
+
 export function admitCall(config: RelayerConfig, request: ForwardRequest): AdmittedCall {
   // --- value (R3) ----------------------------------------------------------
   // The relayer holds gas, never user funds. A non-zero `value` would make it
@@ -59,6 +83,18 @@ export function admitCall(config: RelayerConfig, request: ForwardRequest): Admit
     throw forbidden('TARGET_NOT_ALLOWED', 'the target contract is not on the relay allowlist', {
       target: request.to,
     });
+  }
+
+  // --- calldata bound ------------------------------------------------------
+  // Before the decode, because decoding is the expensive part and this is the
+  // cheap one. See MAX_CALLDATA_BYTES for why a gas cap does not cover it.
+  const calldataBytes = Math.ceil((request.data.length - 2) / 2);
+  if (calldataBytes > MAX_CALLDATA_BYTES) {
+    throw forbidden(
+      'CALLDATA_TOO_LARGE',
+      'the signed calldata is larger than this relayer will pay to publish',
+      { bytes: calldataBytes, cap: MAX_CALLDATA_BYTES },
+    );
   }
 
   // --- selector allowlist (R4) ---------------------------------------------

@@ -29,6 +29,7 @@ export type RelayErrorCode =
   // --- custody (R3) --------------------------------------------------------
   | 'VALUE_NOT_PERMITTED'
   | 'GAS_LIMIT_TOO_HIGH'
+  | 'CALLDATA_TOO_LARGE'
   // --- sponsorship economics (R16) ----------------------------------------
   | 'SPONSORSHIP_FEE_REQUIRED'
   | 'SPONSORSHIP_UNAVAILABLE'
