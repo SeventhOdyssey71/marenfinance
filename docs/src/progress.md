@@ -148,13 +148,13 @@ process that caught it is the same one behind every other number on this page.
 
 ## Test evidence
 
-| Suite                            | Count | Runs against                                                            |
-| -------------------------------- | ----: | ----------------------------------------------------------------------- |
-| Contract unit and property tests |   302 | Foundry, including the redemption splitter and the composed entrypoints |
-| Fork tests                       |    11 | The real MUSD contracts on matsnet, including a driven redemption       |
-| Relayer                          |   286 | Four adversarial review rounds, plus packaging and nonce serialisation  |
-| Web behaviour suite              |   104 | The built app, live matsnet, read-only signer                           |
-| Web unit tests                   |   108 | Preflight, revert decoding, the relayer client and its routing          |
+| Suite                            | Count | Runs against                                                                                |
+| -------------------------------- | ----: | ------------------------------------------------------------------------------------------- |
+| Contract unit and property tests |   311 | Foundry, including the redemption splitter, composed entrypoints, and the audit regressions |
+| Fork tests                       |    11 | The real MUSD contracts on matsnet, including a driven redemption                           |
+| Relayer                          |   286 | Four adversarial review rounds, plus packaging and nonce serialisation                      |
+| Web behaviour suite              |   104 | The built app, live matsnet, read-only signer                                               |
+| Web unit tests                   |   108 | Preflight, revert decoding, the relayer client and its routing                              |
 
 Three of these deserve a sentence each.
 
@@ -217,6 +217,27 @@ adding collateral does not raise) was read from the deployed contracts and recor
 in one SDK module with its verification date. Seven documented ways MUSD diverges
 from the Liquity v1 codebase it descends from live in the same place, because each
 one breaks a naively ported frontend.
+
+## Audited against the deployed bytecode
+
+Before any of this went out, three adversarial audits ran against Mezo's live
+contracts, recorded in `docs/audit/`. They found real bugs, which is the point:
+
+- **Contracts.** A redemption shortfall was being charged to solvent depositors twice,
+  permissionlessly and repeatably. Fixed, with a regression test proven to fail against
+  the old code. One High is documented not fixed (a reserve-heavy redemption edge where
+  the collateral debit is not capped like the debt relief); it is bounded and needs a
+  governance decision, so it is left for the paid audit with a test pinning it.
+- **Mezo conformance.** Every one of the 44 selectors Maren calls was checked to exist
+  on the deployed bytecode with the right types, by reading each proxy's implementation
+  at the EIP-1967 slot. Two bugs found and fixed: recovery mode blocks more than we had
+  recorded (Maren had no defence at any layer), and a payment event had a phantom
+  parameter that silently dropped every handle payment from Activity.
+- **Meta-transaction path.** A budget-halt denial of service reachable by an ordinary
+  signed request, fixed. One issue needs a contract redeploy and is documented.
+
+Every fix was verified to fail against the unfixed code. The audit reports name what was
+attacked and held, not only what broke.
 
 ## Not done, stated plainly
 

@@ -538,7 +538,9 @@ export function preflightWithdraw(state: VaultState, amountWei: bigint): Preflig
 
   const availableByRatio = hasDebt ? maxWithdrawable(position, priceWei) : position.collateralWei;
   const available =
-    recoveryCapWei !== null && recoveryCapWei < availableByRatio ? recoveryCapWei : availableByRatio;
+    recoveryCapWei !== null && recoveryCapWei < availableByRatio
+      ? recoveryCapWei
+      : availableByRatio;
 
   if (hasDebt && availableByRatio === 0n) {
     return blocked(

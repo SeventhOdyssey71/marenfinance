@@ -18,20 +18,20 @@ things that broke.
 
 ## Findings
 
-| ID | Severity | One line | Status |
-|----|----------|----------|--------|
-| H-1 | High | A recognised `redemptionShortfall` is re-read as a fresh redemption on the next sync and charged pro rata to every remaining debtor, repeatedly, until it is fully socialised | FIXED |
-| H-2 | High | Redemption relief is capped by `reserveMUSD` but the collateral debit is not, so users pay collateral for relief that lands in the reserve where nobody can claim it | DOCUMENTED |
-| M-1 | Medium | `withdrawProtocolCollateral` pays nobody: `_withdraw` sends to the account it debits, which here is `address(this)` | DOCUMENTED |
-| M-2 | Medium | There is no way to cover a `redemptionShortfall`, and `depositProtocolCollateral` is not one despite the natspec saying so | DOCUMENTED |
-| M-3 | Medium | A pooled trove that leaves the active state freezes idle BTC that never entered the trove, and no admin path out of that state exists | DOCUMENTED |
-| L-1 | Low | `interestIndex` was documented as monotonically non-decreasing; it falls on redemption | FIXED (comment) |
-| L-2 | Low | `_outstandingDebt()` clamps at zero silently; the clamp is the mechanism behind H-2 | DOCUMENTED |
-| I-1 | Info | `depositAndBorrow`'s revert reason is not the sequential pair's in two orderings, contrary to its docstring | FIXED (comment) + pinned |
-| I-2 | Info | `skim()` is the only unguarded mutation and the only one reading `address(this).balance`; attacked, not exploitable | Guard added + pinned |
-| I-3 | Info | `redemptionCollateralPerShare` grows without bound as `totalDebtShares` shrinks | DOCUMENTED |
-| I-4 | Info | `_pendingRedemptionCollateral` returns 0 for a non-active trove while `_reconcileRedemption` reverts, so views keep reporting pre-freeze numbers | DOCUMENTED |
-| I-5 | Info | `skim()` is the only mutation that does not `_syncState()` first, so its `_settleRedemption` can be a no-op | DOCUMENTED |
+| ID  | Severity | One line                                                                                                                                                                      | Status                   |
+| --- | -------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------ |
+| H-1 | High     | A recognised `redemptionShortfall` is re-read as a fresh redemption on the next sync and charged pro rata to every remaining debtor, repeatedly, until it is fully socialised | FIXED                    |
+| H-2 | High     | Redemption relief is capped by `reserveMUSD` but the collateral debit is not, so users pay collateral for relief that lands in the reserve where nobody can claim it          | DOCUMENTED               |
+| M-1 | Medium   | `withdrawProtocolCollateral` pays nobody: `_withdraw` sends to the account it debits, which here is `address(this)`                                                           | DOCUMENTED               |
+| M-2 | Medium   | There is no way to cover a `redemptionShortfall`, and `depositProtocolCollateral` is not one despite the natspec saying so                                                    | DOCUMENTED               |
+| M-3 | Medium   | A pooled trove that leaves the active state freezes idle BTC that never entered the trove, and no admin path out of that state exists                                         | DOCUMENTED               |
+| L-1 | Low      | `interestIndex` was documented as monotonically non-decreasing; it falls on redemption                                                                                        | FIXED (comment)          |
+| L-2 | Low      | `_outstandingDebt()` clamps at zero silently; the clamp is the mechanism behind H-2                                                                                           | DOCUMENTED               |
+| I-1 | Info     | `depositAndBorrow`'s revert reason is not the sequential pair's in two orderings, contrary to its docstring                                                                   | FIXED (comment) + pinned |
+| I-2 | Info     | `skim()` is the only unguarded mutation and the only one reading `address(this).balance`; attacked, not exploitable                                                           | Guard added + pinned     |
+| I-3 | Info     | `redemptionCollateralPerShare` grows without bound as `totalDebtShares` shrinks                                                                                               | DOCUMENTED               |
+| I-4 | Info     | `_pendingRedemptionCollateral` returns 0 for a non-active trove while `_reconcileRedemption` reverts, so views keep reporting pre-freeze numbers                              | DOCUMENTED               |
+| I-5 | Info     | `skim()` is the only mutation that does not `_syncState()` first, so its `_settleRedemption` can be a no-op                                                                   | DOCUMENTED               |
 
 Verified-correct results, each of which was attacked first, are in **Proofs of correctness**
 below. V-1 in particular is the answer to the ground-truth file's headline question about
@@ -93,7 +93,7 @@ drained from bob, no relief given        0.033639605076523973 BTC   (~$2,122 at 
 
 **Why the existing suite missed it.** `test_redemption_shortfallIsRecordedNotSocialised` asserts
 against carol, who is a pure depositor with zero debt shares. The phantom is charged by debt
-share, so carol is untouched by construction and the test passes while solvent *debtors* are
+share, so carol is untouched by construction and the test passes while solvent _debtors_ are
 being drained. The invariant suite missed it for the mirror-image reason: it asserts
 `sum(claims) <= held + redemptionShortfall`, and the phantom pushes claims DOWN, so it can only
 make that inequality more true.
@@ -139,7 +139,7 @@ out to be.
 So when a redemption cancels more trove debt than the pool's users owe, which needs
 `reserveMUSD > 0` and a large `mUSDLot`, users are charged collateral for relief they never
 received. The excess relief lands in `reserveMUSD`, which no user has a claim on: the only things
-that spend it are `_borrow` (serving *future* borrowers) and `deleverage`.
+that spend it are `_borrow` (serving _future_ borrowers) and `deleverage`.
 
 **Measured** (`test_redemption_reliefIsCappedByTheReserveWhileTheCollateralDebitIsNot`). Alice
 2 BTC / 30,000 MUSD, bob 2 BTC / 10,000 MUSD; the oracle goes stale, alice repays 25,000 which
@@ -225,7 +225,7 @@ L890.
 The natspec claimed "an admin makes it whole with `depositProtocolCollateral`". It does not.
 That function raises `totalCollateral` by `msg.value` at the same time as it adds `msg.value` to
 the trove, so the gap between books and reality is exactly what it was before. Covering a
-shortfall requires adding BTC that is credited to *nobody*, the opposite of what
+shortfall requires adding BTC that is credited to _nobody_, the opposite of what
 `depositProtocolCollateral` is for.
 
 With H-1 fixed the shortfall is a stable, permanent marker of "the books credit this much more
@@ -271,7 +271,7 @@ liquidate the pooled trove, and every route to it, user and admin alike, reverts
 building a wind-down means deciding how a shortfall is shared, which is governance. That argument
 is sound for trove collateral. It is much weaker for idle BTC, where there is no shortfall to
 share out: the BTC is present, unencumbered, and individually attributed. A minimal, defensible
-change is to let a *debt-free* account withdraw from `idleCollateral` while frozen. It is still a
+change is to let a _debt-free_ account withdraw from `idleCollateral` while frozen. It is still a
 policy decision, so it is written down rather than guessed at.
 
 ---
@@ -315,9 +315,9 @@ before either leg. That is deliberate, so a doomed borrow does not pay for an `a
 revert is about to undo, and it means a borrow-leg guard beats a deposit-leg failure that only surfaces at
 or after the state sync. Exactly two orderings differ, both verified against selectors:
 
-| situation | `deposit` alone | `depositAndBorrow` |
-|---|---|---|
-| over the cap, zero borrow | `DepositCapExceeded` (`0xb2aafb25`) | `ZeroAmount` (`0x1f2a2005`) |
+| situation                      | `deposit` alone                         | `depositAndBorrow`                 |
+| ------------------------------ | --------------------------------------- | ---------------------------------- |
+| over the cap, zero borrow      | `DepositCapExceeded` (`0xb2aafb25`)     | `ZeroAmount` (`0x1f2a2005`)        |
 | frozen trove, borrowing paused | `TroveNoLongerActive(3)` (`0x35b2ba3b`) | `BorrowingIsPaused` (`0xaa864f37`) |
 
 Nothing executes in either case, so what a caller loses is diagnosis, not state. Left as-is
@@ -426,7 +426,7 @@ A reduction of `mUSDLot` lowers `gross` by `mUSDLot` whichever component absorbs
 is then derived as `accountedDebt - outstandingDebt`, both of which are functions of `netDebt`
 alone. The interest/principal split is not an input to any arithmetic in this contract, so
 interest-first, principal-first and proportional are indistinguishable to it. The ordering does
-change *future* interest accrual on Mezo, since interest accrues on principal; that is also
+change _future_ interest accrual on Mezo, since interest accrues on principal; that is also
 invisible here, because `_accrue` re-measures the trove every time rather than modelling a rate.
 
 Sound for the same reason the ACCOUNTING header gives for measuring rather than modelling
@@ -461,20 +461,20 @@ not.
 
 Enumerated, with the direction of each and who absorbs it:
 
-| site | direction | absorbed by |
-|---|---|---|
-| `debtOf` / `previewDebtOf` | Ceil | the debtor |
-| `_mintDebtShares` | Ceil | the borrower |
-| `_burnDebtShares` | Floor | the repayer keeps the dust as debt |
-| `_accrue` candidate index | Ceil | debtors |
-| `_reconcileRedemption` new index | Ceil | debtors keep at least what the trove owes |
-| per-share redemption debit | Ceil | debits collectively exceed what left the trove |
-| `_settleRedemption` owed | Ceil | the account, not the pool |
-| `_collateralRatio` | Floor | the position looks less healthy than it is |
-| `collateralRequiredForDebt` | Ceil | quotes more collateral, not less |
-| `maxBorrowable` | Floor | quotes less headroom, not more |
-| `liquidationPriceOf` | Ceil | liquidation looks nearer than it is |
-| `_computeLiquidation` maxRepay / collForDebt / penalty | Floor | the liquidator |
+| site                                                   | direction | absorbed by                                    |
+| ------------------------------------------------------ | --------- | ---------------------------------------------- |
+| `debtOf` / `previewDebtOf`                             | Ceil      | the debtor                                     |
+| `_mintDebtShares`                                      | Ceil      | the borrower                                   |
+| `_burnDebtShares`                                      | Floor     | the repayer keeps the dust as debt             |
+| `_accrue` candidate index                              | Ceil      | debtors                                        |
+| `_reconcileRedemption` new index                       | Ceil      | debtors keep at least what the trove owes      |
+| per-share redemption debit                             | Ceil      | debits collectively exceed what left the trove |
+| `_settleRedemption` owed                               | Ceil      | the account, not the pool                      |
+| `_collateralRatio`                                     | Floor     | the position looks less healthy than it is     |
+| `collateralRequiredForDebt`                            | Ceil      | quotes more collateral, not less               |
+| `maxBorrowable`                                        | Floor     | quotes less headroom, not more                 |
+| `liquidationPriceOf`                                   | Ceil      | liquidation looks nearer than it is            |
+| `_computeLiquidation` maxRepay / collForDebt / penalty | Floor     | the liquidator                                 |
 
 The per-share debit rounding up is the one that determines whether `sum(collateralOf)` can exceed
 the trove's real collateral. It cannot: rounding up means the sum of debits is at or above
@@ -529,7 +529,7 @@ account's next transaction, and no mutation reads it inside that window.
 
 `_syncState` is `_reconcileRedemption` then `_accrue`. Between them they make exactly three
 external calls, `getTroveStatus` and `getEntireDebtAndColl` (twice, via
-  `_troveCollAndNetDebt`), and they are all `view`, all STATICCALL, none capable of re-entering. No MUSD or BorrowerOperations call
+`_troveCollAndNetDebt`), and they are all `view`, all STATICCALL, none capable of re-entering. No MUSD or BorrowerOperations call
 happens anywhere in the sync. Every state-changing external call in the contract
 (`addColl`, `withdrawColl`, `withdrawMUSD`, `repayMUSD`, `openTrove`, `closeTrove`, `refinance`,
 `transfer`, `transferFrom`, `sendValue`) sits after the effects of its own function and inside a
@@ -590,7 +590,7 @@ all user actions. The constructor grants only `DEFAULT_ADMIN_ROLE`.
 The structural claim the file makes, that no guardian key, compromised or not, can trap user
 collateral, holds: there is no modifier on `withdraw`, `repay`, `closePosition` or
 `liquidateUser`, and the two pause flags are read only by `_requireDepositAllowed` and
-`_requireBorrowAllowed`. The claim is about the *guardian*, and it survives. It is not a claim
+`_requireBorrowAllowed`. The claim is about the _guardian_, and it survives. It is not a claim
 about the trove leaving the active state, which traps everything (M-3).
 
 `settleRedemption(address)` being permissionless is safe on its own terms, since settling only moves
@@ -600,7 +600,7 @@ trigger only because of the phantom, which is fixed.
 ### V-11. `_tryPushCollateral`'s catch
 
 The catch is correct in the direction that matters: `idleCollateral` is incremented by the caller
-*before* the push is attempted and decremented only in the success branch, so a failed push
+_before_ the push is attempted and decremented only in the success branch, so a failed push
 leaves the BTC credited and idle rather than lost. The catch is broad, swallowing any revert and
 not just oracle staleness, but the mitigation is real rather than nominal: the revert selector
 goes out on `CollateralPushFailed` so a keeper can distinguish a stale oracle from something
@@ -639,15 +639,15 @@ Comments, all correcting claims that were false:
 
 Tests, 7 added, whole suite green at 309:
 
-| test | file | pins |
-|---|---|---|
-| `test_redemption_recognisedShortfallIsNotReReadAsAFreshRedemption` | redemption | H-1, fails pre-fix |
-| `test_redemption_afterAShortfallIsStillMeasuredExactly` | redemption | H-1, fails pre-fix |
-| `test_redemption_reliefIsCappedByTheReserveWhileTheCollateralDebitIsNot` | redemption | H-2 |
-| `test_withdrawProtocolCollateral_paysNobodyAndOnlySkimRecoversIt` | vault | M-1 |
-| `test_frozenTroveStrandsIdleBtcWithNoAdminPathOut` | vault | M-3 |
-| `test_skim_cannotBeReenteredFromAWithdrawal` | vault | I-2 |
-| `test_depositAndBorrow_revertParityBreaksInExactlyTwoOrderings` | composed | I-1 |
+| test                                                                     | file       | pins               |
+| ------------------------------------------------------------------------ | ---------- | ------------------ |
+| `test_redemption_recognisedShortfallIsNotReReadAsAFreshRedemption`       | redemption | H-1, fails pre-fix |
+| `test_redemption_afterAShortfallIsStillMeasuredExactly`                  | redemption | H-1, fails pre-fix |
+| `test_redemption_reliefIsCappedByTheReserveWhileTheCollateralDebitIsNot` | redemption | H-2                |
+| `test_withdrawProtocolCollateral_paysNobodyAndOnlySkimRecoversIt`        | vault      | M-1                |
+| `test_frozenTroveStrandsIdleBtcWithNoAdminPathOut`                       | vault      | M-3                |
+| `test_skim_cannotBeReenteredFromAWithdrawal`                             | vault      | I-2                |
+| `test_depositAndBorrow_revertParityBreaksInExactlyTwoOrderings`          | composed   | I-1                |
 
 The three that pin known limits assert the current behaviour including the part that is wrong,
 so that the day each is fixed the test inverts rather than silently continuing to pass.

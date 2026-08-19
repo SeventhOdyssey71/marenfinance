@@ -399,7 +399,10 @@ describe('MUSD Recovery Mode', () => {
 
     expect(preflightDeposit(state({ stats: RECOVERY_MODE }), btc('0.01')).ok).toBe(true);
     expect(
-      preflightRepay(state({ stats: RECOVERY_MODE, position: indebted, balances: funded }), musd('20')).ok,
+      preflightRepay(
+        state({ stats: RECOVERY_MODE, position: indebted, balances: funded }),
+        musd('20'),
+      ).ok,
     ).toBe(true);
   });
 
