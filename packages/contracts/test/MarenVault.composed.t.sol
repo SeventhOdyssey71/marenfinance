@@ -376,6 +376,49 @@ contract MarenVaultComposedTest is VaultTestBase {
     }
 
     /**
+     * @notice The two orderings where the composite's revert reason is NOT the one the two
+     *         separate calls would have produced (audit I-1).
+     * @dev `depositAndBorrow` runs BOTH guard sets before either leg, which is what stops a
+     *      doomed borrow from paying for an `addColl` the revert is about to undo. The price is
+     *      that a borrow-leg guard now beats a deposit-leg failure that only surfaces at or
+     *      after the state sync, and there are exactly two of those: `DepositCapExceeded`,
+     *      measured after the sync, and `TroveNoLongerActive`, raised inside it.
+     *
+     *      Nothing executes in either case, so what a caller loses is diagnosis, not state.
+     *      This is pinned rather than fixed because reordering the guards to restore parity
+     *      would reintroduce the wasted `addColl`, which is the worse trade.
+     */
+    function test_depositAndBorrow_revertParityBreaksInExactlyTwoOrderings() public {
+        // 1. Over the deposit cap AND a zero borrow. `deposit` alone reports the cap.
+        uint256 tightCap = vault.totalCollateral() + 0.5 ether;
+        vm.prank(admin);
+        vault.setDepositCap(tightCap);
+        vm.deal(alice, 1 ether);
+        vm.prank(alice);
+        vm.expectPartialRevert(MarenVault.DepositCapExceeded.selector);
+        vault.deposit{value: 1 ether}(address(0), address(0));
+
+        vm.prank(alice);
+        vm.expectRevert(MarenVault.ZeroAmount.selector);
+        vault.depositAndBorrow{value: 1 ether}(0, address(0), address(0));
+
+        // 2. A frozen pooled trove AND borrowing paused. `deposit` alone reports the freeze.
+        vm.prank(admin);
+        vault.setDepositCap(DEPOSIT_CAP);
+        vm.prank(guardian);
+        vault.setBorrowingPaused(true);
+        protocol.liquidateTrove(address(vault));
+
+        vm.prank(alice);
+        vm.expectPartialRevert(MarenVault.TroveNoLongerActive.selector);
+        vault.deposit{value: 1 ether}(address(0), address(0));
+
+        vm.prank(alice);
+        vm.expectRevert(MarenVault.BorrowingIsPaused.selector);
+        vault.depositAndBorrow{value: 1 ether}(1e18, address(0), address(0));
+    }
+
+    /**
      * @notice THE ONE DELIBERATE DIFFERENCE, asserted rather than left to be discovered.
      * @dev Sequentially, a failed borrow leaves the deposit standing: the user is now a
      *      depositor who did not want to be one. Composed, the deposit is rolled back with it.
