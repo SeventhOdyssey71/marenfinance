@@ -1,12 +1,35 @@
 'use client';
 
-import { useCallback, useMemo, useRef } from 'react';
-import { useAccount, useChainId, usePublicClient, useReadContract, useWriteContract } from 'wagmi';
-import { erc20Abi, type Address, type Hash, type Hex } from 'viem';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import {
+  useAccount,
+  useChainId,
+  usePublicClient,
+  useReadContract,
+  useSignTypedData,
+  useWriteContract,
+} from 'wagmi';
+import { encodeFunctionData, erc20Abi, type Abi, type Address, type Hash, type Hex } from 'viem';
 import { getChain, getMarenAddresses, getMusdAddresses } from '@maren/sdk';
 
 import { marenEarnAbi, marenPayAbi, marenRegistryAbi, marenVaultAbi } from './abis';
+import { ExplainedError } from './errors';
 import { hintsForDelta, NO_HINTS, type Hints } from './hints';
+import {
+  buildForwardRequest,
+  FORWARD_REQUEST_TYPES,
+  forwarderDomain,
+  isRelayableCall,
+  postRelay,
+  probeRelayer,
+  relayGasLimit,
+  RELAYER_CONFIGURED,
+  RELAYER_URL,
+  relayRequestBody,
+  shouldRelay,
+  type MarenTargetName,
+  type RelayerHealth,
+} from './relay';
 import { NETWORK } from '../data/source';
 
 /**
@@ -31,49 +54,107 @@ import { NETWORK } from '../data/source';
  *      is why, and you have not signed anything". It is the single highest-value line in
  *      this file.
  *
- * WHAT IS DELIBERATELY NOT HERE: anything routed through MarenRelayHub. The hub is
- * deployed, but no relayer service is running anywhere to submit for it, so a "gasless"
- * path would be a button that hangs. Sponsorship is reported honestly per-action in the
- * UI instead — see `gasNote` below.
+ * THE FOURTH THING, WHEN A RELAYER IS RUNNING: it routes. When
+ * `NEXT_PUBLIC_RELAYER_URL` is set, that relayer's `/healthz` says it is accepting, and
+ * `MarenRelayHub` will forward this exact call, the transaction is signed as an EIP-712
+ * `ForwardRequest` and POSTed to the relayer instead of broadcast from the wallet. All
+ * three conditions, every time — see `shouldRelay` in `./relay.ts`, which is the only
+ * place that decision is made. Anything else self-submits exactly as it did before.
  */
 
 const targetChain = getChain(NETWORK);
 const maren = getMarenAddresses(NETWORK);
 const musd = getMusdAddresses(NETWORK);
 
-/**
- * NO RELAYER IS RUNNING.
- *
- * `MarenRelayHub` exists on matsnet at the address in `@maren/sdk`, and the contracts
- * trust it — but `apps/relayer` is not deployed to any host. Until it is, every action in
- * this app is submitted by the user's own wallet and paid for in BTC gas, including the
- * ones the architecture intends to sponsor.
- *
- * This constant is the single place that fact is recorded, so that when a relayer does go
- * up the UI stops claiming "no gas" in exactly one edit rather than in nine strings.
- */
-export const RELAYER_AVAILABLE = false;
+/** `MarenRelayHub.nonces(owner)`. The only forwarder read this app performs. */
+const forwarderNoncesAbi = [
+  {
+    type: 'function',
+    name: 'nonces',
+    stateMutability: 'view',
+    inputs: [{ name: 'owner', type: 'address' }],
+    outputs: [{ name: '', type: 'uint256' }],
+  },
+] as const;
 
 /**
- * Honest gas copy for an action that WOULD be sponsored if a relayer were running.
+ * Whether a relayer is configured at all. Build-time, therefore identical on the server
+ * and in the browser, therefore safe for copy that renders in both.
  *
- * The disclosure used to be three sentences: what the relayer would normally do, that no
- * relayer is running, that the contracts are ready and the service is not deployed. In a
- * confirmation sheet that is four lines of infrastructure above the button the user is
- * about to press. The fact survives; the explanation of it does not. What a signer needs
- * to know is who is paying, and that is one clause.
+ * This replaces a hand-edited `RELAYER_AVAILABLE = false`. The flag was honest while
+ * nothing posted to a relayer, and became a hazard the moment something did: it recorded
+ * an intention, and `DEPLOY.md` had to warn an operator not to flip it. Configuration and
+ * a live health probe are facts, and neither can be set to the wrong value by editing
+ * a constant.
+ */
+export { RELAYER_CONFIGURED };
+
+/** What the app currently knows about the relayer. Drives copy and routing alike. */
+export interface RelayerStatus {
+  /** A relayer URL is configured. Known before the first render. */
+  readonly configured: boolean;
+  /** It answered `/healthz` and said it is accepting. Never true on first render. */
+  readonly live: boolean;
+  /** The last probe, or null before one has completed. */
+  readonly health: RelayerHealth | null;
+}
+
+const NOT_LIVE: RelayerStatus = { configured: RELAYER_CONFIGURED, live: false, health: null };
+
+/**
+ * Probe the relayer, once per cache window, and re-render when the answer changes.
+ *
+ * STARTS FALSE, ALWAYS. The first render happens before any probe can complete, and on
+ * the server there is no probe at all, so the honest initial state is "you pay". Copy
+ * that depends on this must be able to start at "you pay" and move — the other order
+ * would claim sponsorship the app has not yet confirmed, which is the exact thing the old
+ * `RELAYER_AVAILABLE` flag existed to prevent.
+ */
+export function useRelayerStatus(): RelayerStatus {
+  const [status, setStatus] = useState<RelayerStatus>(NOT_LIVE);
+
+  useEffect(() => {
+    if (!RELAYER_CONFIGURED) return;
+    let alive = true;
+    void probeRelayer(RELAYER_URL).then((health) => {
+      if (!alive) return;
+      setStatus({ configured: true, live: health.accepting, health });
+    });
+    return () => {
+      alive = false;
+    };
+  }, []);
+
+  return status;
+}
+
+/**
+ * Honest gas copy for one action.
+ *
+ * Three states, and the difference between the last two is the point. "No relayer is
+ * running yet" is true of this repository as it ships and false of a deployment that has
+ * one which is merely refusing work — telling an operator with a budget-exhausted relayer
+ * that none exists would send them looking for the wrong problem.
+ *
+ * The disclosure is one clause on purpose. It used to be three sentences of
+ * infrastructure above the button a user was about to press. What a signer needs to know
+ * is who is paying.
  */
 export function gasNote(
   sponsorable: boolean,
   detail: string,
+  relayer: Pick<RelayerStatus, 'configured' | 'live'> = NOT_LIVE,
 ): { sponsored: boolean; note: string } {
-  if (sponsorable && !RELAYER_AVAILABLE) {
-    return {
-      sponsored: false,
-      note: `${detail} You pay the Bitcoin gas. No relayer is running yet.`,
-    };
+  if (!sponsorable) return { sponsored: false, note: detail };
+  if (relayer.live) {
+    return { sponsored: true, note: `Maren pays the gas for this action. ${detail}` };
   }
-  return { sponsored: sponsorable && RELAYER_AVAILABLE, note: detail };
+  return {
+    sponsored: false,
+    note: relayer.configured
+      ? `${detail} You pay the Bitcoin gas. Maren’s relayer is not taking work right now.`
+      : `${detail} You pay the Bitcoin gas. No relayer is running yet.`,
+  };
 }
 
 export class WrongNetworkError extends Error {
@@ -136,6 +217,8 @@ export function useMarenWrites(options: MarenWriteOptions = {}): MarenWrites {
   const chainId = useChainId();
   const client = usePublicClient();
   const { writeContractAsync } = useWriteContract();
+  const { signTypedDataAsync } = useSignTypedData();
+  const relayer = useRelayerStatus();
 
   const onRightChain = chainId === targetChain.id;
   const ready = Boolean(isConnected && address && client) && onRightChain;
@@ -144,6 +227,12 @@ export function useMarenWrites(options: MarenWriteOptions = {}): MarenWrites {
   // rebuild every write function underneath an in-flight transaction.
   const onSimulated = useRef(options.onSimulated);
   onSimulated.current = options.onSimulated;
+
+  // Same reason: the write functions are memoised on `ready`, and a probe resolving must
+  // not rebuild all thirteen of them mid-transaction. The routing decision reads the
+  // freshest value at the moment of the press rather than the one captured at render.
+  const relayerRef = useRef(relayer);
+  relayerRef.current = relayer;
 
   /**
    * The guard every write goes through. Throws a NAMED error rather than returning null,
@@ -172,12 +261,91 @@ export function useMarenWrites(options: MarenWriteOptions = {}): MarenWrites {
     };
 
     /**
-     * SIMULATE, THEN SIGN. NEVER THE OTHER WAY, NEVER ONLY ONE.
+     * Sign the call as a `ForwardRequest` and hand it to the relayer.
+     *
+     * Reached only through `submitCall` below, and only when all three routing conditions
+     * hold. Everything it needs comes from the SAME `params` object the simulation ran
+     * against: the calldata is re-encoded from that object's abi, function name and args
+     * rather than rebuilt from a second list, so the bytes the user signs cannot drift
+     * from the bytes that were proved not to revert.
+     *
+     * WHAT IS READ FROM THE CHAIN, AND WHY EACH ONE:
+     *
+     *   - `MarenRelayHub.nonces(from)`. The relayer rejects any other value with a typed
+     *     NONCE_MISMATCH, and it is inside the signed struct, so it cannot be corrected
+     *     afterwards by anyone.
+     *   - A gas estimate for the direct call. If the node will not give one, we do NOT
+     *     sign a guess: an under-estimate is an out-of-gas revert that Maren pays for,
+     *     and a maximal one reserves an outsized slice of a shared daily budget. We fall
+     *     back to the user's own wallet, which is a worse deal for them and an honest
+     *     one.
+     */
+    const relayCall = async (
+      account: Address,
+      publicClient: NonNullable<typeof client>,
+      params: {
+        address: Address;
+        abi: readonly unknown[];
+        functionName: string;
+        args: readonly unknown[];
+      },
+    ): Promise<Hash> => {
+      if (RELAYER_URL === null) throw new Error('no relayer is configured');
+
+      const call = {
+        address: params.address,
+        abi: params.abi as Abi,
+        functionName: params.functionName,
+        args: params.args,
+      } as const;
+
+      // A gas limit we cannot estimate is a gas limit we will not sign. Under-estimating
+      // buys an out-of-gas revert that Maren pays for; signing the maximum reserves an
+      // outsized slice of a shared daily budget for one action. Neither is worth a guess,
+      // and this happens before anything is asked of the user.
+      const estimate = await publicClient.estimateContractGas({ ...call, account });
+
+      const nonce = await publicClient.readContract({
+        address: maren.marenForwarder,
+        abi: forwarderNoncesAbi,
+        functionName: 'nonces',
+        args: [account],
+      });
+
+      const message = buildForwardRequest({
+        from: account,
+        to: params.address,
+        data: encodeFunctionData(call),
+        gas: relayGasLimit(estimate),
+        nonce,
+        nowSeconds: Math.floor(Date.now() / 1000),
+      });
+
+      // The wallet opens HERE, not after the simulation: the nonce and gas reads above
+      // are still "checking", and telling a user their wallet is open while two RPC round
+      // trips are in flight is the kind of small lie the sheet's phases exist to avoid.
+      onSimulated.current?.();
+      const signature = await signTypedDataAsync({
+        domain: forwarderDomain(targetChain.id, maren.marenForwarder),
+        types: FORWARD_REQUEST_TYPES,
+        primaryType: 'ForwardRequest',
+        message,
+      });
+
+      const accepted = await postRelay(RELAYER_URL, relayRequestBody(message, signature));
+      // A hash, not an outcome. `useTxRunner` puts it through `confirmTransaction` exactly
+      // as it does a self-submitted one — the relayer answers 202 with `success: false`
+      // for precisely this reason.
+      return accepted.hash;
+    };
+
+    /**
+     * SIMULATE, THEN ROUTE, THEN SIGN. NEVER ANOTHER ORDER, NEVER ONLY ONE.
      *
      * Every write in this module goes through here, so the ordering is stated once and
      * cannot be forgotten in the thirteenth one. `simulate` is an `eth_call` against
      * current state: it reverts exactly as the real transaction would, for free, before
-     * the wallet ever opens. If it throws, `write` is never reached — no signature is
+     * the wallet ever opens. If it throws, nothing below is reached — no signature is
      * requested, no gas is spent, and the thrown error still carries the contract's own
      * revert data for `explainError` to decode.
      *
@@ -187,12 +355,81 @@ export function useMarenWrites(options: MarenWriteOptions = {}): MarenWrites {
      * as it is at the moment of the press — a price tick, somebody else's borrow, a
      * guardian pausing the vault between the render and the click. The preflight cannot
      * see those; this cannot explain itself in advance. Both, always.
+     *
+     * IT SIMULATES ON BOTH PATHS. A relayed call is simulated here from the user's own
+     * account before it is signed, and again by the relayer before it is broadcast. The
+     * second one protects Maren's gas; this one protects the user from signing something
+     * that was already doomed, and it is what puts the contract's decoded reason on the
+     * sheet rather than a relayer's SIMULATION_REVERTED.
+     *
+     * The routing decision is made after the simulation and before anything is asked of
+     * the user, which is the only point at which it can be both fresh and free. It is
+     * `shouldRelay` that decides, from three facts: a configured URL, a relayer that said
+     * it is accepting, and a call `MarenRelayHub` will actually forward.
+     *
+     * THERE IS NO SILENT FALLBACK, IN EITHER DIRECTION.
+     *
+     * If the relayer refuses a request we already routed to it, that refusal is reported.
+     * Quietly re-opening the wallet to self-submit would charge a user gas after the sheet
+     * told them Maren was paying, and they would have no way to know it had happened.
+     * `postRelay` marks the relayer unavailable on refusals that will still hold next
+     * time, so the retry the user makes goes through their own wallet and the copy says
+     * so before they press.
+     *
+     * And if the sheet claimed sponsorship but the relayer has since gone cold, this
+     * refuses rather than self-submitting. A silent switch to the user's wallet at that
+     * point is the same lie with the sign flipped, and it would also make the receipt
+     * wrong: `confirmTransaction` is told `sponsored` from the intent, so it would report
+     * gas paid of zero on a transaction the user paid for.
      */
-    const simulateThenSign = async (
+    const submitCall = async (
+      account: Address,
+      publicClient: NonNullable<typeof client>,
+      params: {
+        address: Address;
+        abi: readonly unknown[];
+        functionName: string;
+        args: readonly unknown[];
+      },
+      relayTarget: MarenTargetName | null,
       simulate: () => Promise<unknown>,
       write: () => Promise<Hash>,
     ): Promise<Hash> => {
       await simulate();
+
+      const relayable =
+        relayTarget !== null &&
+        isRelayableCall({
+          target: relayTarget,
+          functionName: params.functionName,
+          // Every call that names a relay target is non-payable. A payable one passes
+          // null, so this is belt and braces rather than the real gate.
+          carriesValue: false,
+        });
+
+      // What the confirmation sheet promised, when it rendered. `useRelayerStatus` probes
+      // once per mount, so this is stable across the life of a screen and only moves when
+      // a real refusal knocks it down.
+      const claimedSponsorship = relayable && relayerRef.current.live;
+
+      // Answered from the cached probe inside its window, so the common case costs
+      // nothing. `shouldRelay` is the only place the three conditions are combined.
+      const health = await probeRelayer(RELAYER_URL);
+      if (shouldRelay({ url: RELAYER_URL, health, relayable })) {
+        return relayCall(account, publicClient, params);
+      }
+
+      if (claimedSponsorship) {
+        throw new ExplainedError({
+          name: 'RELAYER_WENT_COLD',
+          title: 'Maren stopped covering the gas for this one',
+          detail:
+            'The relayer was accepting work when this screen loaded and is not now, and ' +
+            'this action was offered to you as sponsored. Nothing was submitted and no gas ' +
+            'was spent. Try again and the interface will tell you who pays before you sign.',
+        });
+      }
+
       onSimulated.current?.();
       return write();
     };
@@ -212,7 +449,11 @@ export function useMarenWrites(options: MarenWriteOptions = {}): MarenWrites {
           args: [upper, lower],
           value: amountWei,
         } as const;
-        return simulateThenSign(
+        return submitCall(
+          account,
+          publicClient,
+          params,
+          null,
           () => publicClient.simulateContract({ ...params, account }),
           () => writeContractAsync({ ...params, chainId: targetChain.id }),
         );
@@ -230,7 +471,11 @@ export function useMarenWrites(options: MarenWriteOptions = {}): MarenWrites {
           functionName: 'borrow',
           args: [amountWei, upper, lower],
         } as const;
-        return simulateThenSign(
+        return submitCall(
+          account,
+          publicClient,
+          params,
+          'marenVault',
           () => publicClient.simulateContract({ ...params, account }),
           () => writeContractAsync({ ...params, chainId: targetChain.id }),
         );
@@ -245,7 +490,11 @@ export function useMarenWrites(options: MarenWriteOptions = {}): MarenWrites {
           functionName: 'repay',
           args: [amountWei, upper, lower],
         } as const;
-        return simulateThenSign(
+        return submitCall(
+          account,
+          publicClient,
+          params,
+          'marenVault',
           () => publicClient.simulateContract({ ...params, account }),
           () => writeContractAsync({ ...params, chainId: targetChain.id }),
         );
@@ -260,7 +509,11 @@ export function useMarenWrites(options: MarenWriteOptions = {}): MarenWrites {
           functionName: 'withdraw',
           args: [amountWei, upper, lower],
         } as const;
-        return simulateThenSign(
+        return submitCall(
+          account,
+          publicClient,
+          params,
+          'marenVault',
           () => publicClient.simulateContract({ ...params, account }),
           () => writeContractAsync({ ...params, chainId: targetChain.id }),
         );
@@ -283,7 +536,11 @@ export function useMarenWrites(options: MarenWriteOptions = {}): MarenWrites {
           functionName: 'approve',
           args: [spender, amountWei],
         } as const;
-        return simulateThenSign(
+        return submitCall(
+          account,
+          publicClient,
+          params,
+          null,
           () => publicClient.simulateContract({ ...params, account }),
           () => writeContractAsync({ ...params, chainId: targetChain.id }),
         );
@@ -298,7 +555,11 @@ export function useMarenWrites(options: MarenWriteOptions = {}): MarenWrites {
           functionName: 'pay',
           args: [to, amountWei, memo],
         } as const;
-        return simulateThenSign(
+        return submitCall(
+          account,
+          publicClient,
+          params,
+          'marenPay',
           () => publicClient.simulateContract({ ...params, account }),
           () => writeContractAsync({ ...params, chainId: targetChain.id }),
         );
@@ -312,7 +573,11 @@ export function useMarenWrites(options: MarenWriteOptions = {}): MarenWrites {
           functionName: 'payToHandle',
           args: [handle.replace(/^@/, ''), amountWei, memo],
         } as const;
-        return simulateThenSign(
+        return submitCall(
+          account,
+          publicClient,
+          params,
+          'marenPay',
           () => publicClient.simulateContract({ ...params, account }),
           () => writeContractAsync({ ...params, chainId: targetChain.id }),
         );
@@ -326,7 +591,11 @@ export function useMarenWrites(options: MarenWriteOptions = {}): MarenWrites {
           functionName: 'createRequest',
           args: [payer, amountWei, memo],
         } as const;
-        return simulateThenSign(
+        return submitCall(
+          account,
+          publicClient,
+          params,
+          'marenPay',
           () => publicClient.simulateContract({ ...params, account }),
           () => writeContractAsync({ ...params, chainId: targetChain.id }),
         );
@@ -340,7 +609,11 @@ export function useMarenWrites(options: MarenWriteOptions = {}): MarenWrites {
           functionName: 'createLink',
           args: [linkKey, amountWei, expiryUnix, memo],
         } as const;
-        return simulateThenSign(
+        return submitCall(
+          account,
+          publicClient,
+          params,
+          'marenPay',
           () => publicClient.simulateContract({ ...params, account }),
           () => writeContractAsync({ ...params, chainId: targetChain.id }),
         );
@@ -355,7 +628,11 @@ export function useMarenWrites(options: MarenWriteOptions = {}): MarenWrites {
           functionName: 'deposit',
           args: [assetsWei, account],
         } as const;
-        return simulateThenSign(
+        return submitCall(
+          account,
+          publicClient,
+          params,
+          'marenEarn',
           () => publicClient.simulateContract({ ...params, account }),
           () => writeContractAsync({ ...params, chainId: targetChain.id }),
         );
@@ -369,7 +646,11 @@ export function useMarenWrites(options: MarenWriteOptions = {}): MarenWrites {
           functionName: 'withdraw',
           args: [assetsWei, account, account],
         } as const;
-        return simulateThenSign(
+        return submitCall(
+          account,
+          publicClient,
+          params,
+          'marenEarn',
           () => publicClient.simulateContract({ ...params, account }),
           () => writeContractAsync({ ...params, chainId: targetChain.id }),
         );
@@ -384,7 +665,11 @@ export function useMarenWrites(options: MarenWriteOptions = {}): MarenWrites {
           functionName: 'commit',
           args: [commitment],
         } as const;
-        return simulateThenSign(
+        return submitCall(
+          account,
+          publicClient,
+          params,
+          'marenRegistry',
           () => publicClient.simulateContract({ ...params, account }),
           () => writeContractAsync({ ...params, chainId: targetChain.id }),
         );
@@ -398,7 +683,11 @@ export function useMarenWrites(options: MarenWriteOptions = {}): MarenWrites {
           functionName: 'register',
           args: [handle.replace(/^@/, ''), secret],
         } as const;
-        return simulateThenSign(
+        return submitCall(
+          account,
+          publicClient,
+          params,
+          'marenRegistry',
           () => publicClient.simulateContract({ ...params, account }),
           () => writeContractAsync({ ...params, chainId: targetChain.id }),
         );
