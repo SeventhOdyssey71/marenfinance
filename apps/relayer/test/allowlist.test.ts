@@ -143,6 +143,97 @@ describe('target and selector allowlist', () => {
   });
 
   /**
+   * THE SELECTORS MATCH THE SOLIDITY, NOT JUST THE FUNCTION NAMES.
+   *
+   * The test above reads `Deploy.s.sol` and checks that every id this relayer
+   * admits is one the hub is allowlisted for. It compares NAMES, because that is
+   * all `MarenPay.pay.selector` gives it — and the drift it was written for was
+   * not a name drift. Every entry in `registry.ts` carried a trailing
+   * `uint256 relayFee` the contracts never had. The names were all correct. The
+   * SIGNATURES were all wrong, so every selector was wrong, so every relay
+   * request the web app could send was destined for SELECTOR_NOT_ALLOWED. The
+   * name-only test would have passed against that file unchanged.
+   *
+   * So this one reads the parameter lists out of `packages/contracts/src/*.sol`
+   * and holds them against the ABI the registry parses. A parameter added,
+   * removed, renamed, reordered or retyped moves the selector, and moves this.
+   *
+   * Struct parameters are compared by position and name only: `payWithPermit2`
+   * takes an `IPermit2.PermitTransferFrom` that the registry spells out as a
+   * tuple, and resolving a struct's fields from source is a Solidity parser this
+   * test has no business being. That is the one gap left, and it is a field
+   * inside one struct rather than a whole file of guesses.
+   */
+  it('every registered signature matches the parameter list in the Solidity', () => {
+    const sources: Record<string, string> = {};
+    for (const [key, file] of [
+      ['marenPay', 'MarenPay'],
+      ['marenRegistry', 'MarenRegistry'],
+      ['marenVault', 'MarenVault'],
+      ['marenEarn', 'MarenEarn'],
+    ] as const) {
+      sources[key] = readFileSync(
+        new URL(`../../../packages/contracts/src/${file}.sol`, import.meta.url),
+        'utf8',
+      );
+    }
+
+    /** `type name` pairs for one externally callable function, or null. */
+    const declaredParams = (
+      source: string,
+      name: string,
+    ): Array<{ type: string; name: string }> | null => {
+      const declaration = new RegExp(
+        `\\bfunction\\s+${name}\\s*\\(([^()]*)\\)\\s*(?:external|public)\\b`,
+      ).exec(source);
+      if (declaration === null) return null;
+      const body = declaration[1]!.trim();
+      if (body === '') return [];
+      return body.split(',').map((entry) => {
+        const words = entry.trim().split(/\s+/);
+        return { type: words[0]!, name: words[words.length - 1]! };
+      });
+    };
+
+    // Guard the parse itself. A regex that matches nothing would make every
+    // assertion below vacuous, which is how the drift got in the first time.
+    expect(declaredParams(sources['marenPay']!, 'pay')).toEqual([
+      { type: 'address', name: 'to' },
+      { type: 'uint256', name: 'amount' },
+      { type: 'string', name: 'memo' },
+    ]);
+    expect(declaredParams(sources['marenVault']!, 'closePosition')).toHaveLength(2);
+    expect(declaredParams(sources['marenPay']!, 'thisDoesNotExist')).toBeNull();
+
+    for (const [contract, functions] of Object.entries(RELAYABLE_FUNCTIONS)) {
+      const source = sources[contract];
+      if (source === undefined) continue; // marenForwarder has no relayable calls
+      for (const fn of functions) {
+        const declared = declaredParams(source, fn.abi.name);
+        expect({ fn: fn.id, declared: declared !== null }).toEqual({
+          fn: fn.id,
+          declared: true,
+        });
+        expect({ fn: fn.id, params: declared!.map((p) => p.name) }).toEqual({
+          fn: fn.id,
+          params: fn.abi.inputs.map((input) => input.name),
+        });
+        for (const [index, input] of fn.abi.inputs.entries()) {
+          const solidityType = declared![index]!.type;
+          // A struct parameter reaches the ABI as a tuple; anything else must be
+          // the same type on both sides or the selector differs.
+          const expected = input.type.startsWith('tuple') ? solidityType : input.type;
+          expect({ fn: fn.id, param: input.name, type: solidityType }).toEqual({
+            fn: fn.id,
+            param: input.name,
+            type: expected,
+          });
+        }
+      }
+    }
+  });
+
+  /**
    * The old invariant — "every relayable function MUST take a trailing
    * `uint256 relayFee`" — is withdrawn. `ERC2771Forwarder.executeBatch`'s
    * `atomic` flag covers validation only, so a batched fee leg settles even when
