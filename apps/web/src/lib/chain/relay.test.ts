@@ -194,8 +194,9 @@ describe('what the hub will forward', () => {
   it('never relays a payable call, allowlist or no allowlist', () => {
     // MarenVault.deposit is payable; the hub reverts ValueNotRelayable. It is refused on
     // the ground that actually applies, before any list is consulted.
-    expect(isRelayableCall({ target: 'marenVault', functionName: 'deposit', carriesValue: true }))
-      .toBe(false);
+    expect(
+      isRelayableCall({ target: 'marenVault', functionName: 'deposit', carriesValue: true }),
+    ).toBe(false);
     expect(
       isRelayableCall({ target: 'marenVault', functionName: 'borrow', carriesValue: true }),
     ).toBe(false);
@@ -317,7 +318,10 @@ describe('the health probe', () => {
   it('treats a 503 with problems as not accepting, and keeps the problems', async () => {
     const health = await probeRelayer('https://r.test', {
       fetchImpl: async () =>
-        jsonResponse(503, { accepting: false, problems: ['daily BTC sponsorship budget is exhausted'] }),
+        jsonResponse(503, {
+          accepting: false,
+          problems: ['daily BTC sponsorship budget is exhausted'],
+        }),
     });
     expect(health.accepting).toBe(false);
     expect(health.reachable).toBe(true);
@@ -332,7 +336,8 @@ describe('the health probe', () => {
       (async () => {
         throw new DOMException('The operation was aborted.', 'AbortError');
       }) as unknown as typeof fetch,
-      (async () => new Response('<html>gateway</html>', { status: 200 })) as unknown as typeof fetch,
+      (async () =>
+        new Response('<html>gateway</html>', { status: 200 })) as unknown as typeof fetch,
     ];
     for (const fetchImpl of cases) {
       resetRelayerHealth();
@@ -535,14 +540,20 @@ describe('postRelay', () => {
   it('throws explained copy on a refusal, and stops routing on a sticky one', async () => {
     await probeRelayer('https://r.test', {
       fetchImpl: (async () =>
-        new Response(JSON.stringify({ accepting: true }), { status: 200 })) as unknown as typeof fetch,
+        new Response(JSON.stringify({ accepting: true }), {
+          status: 200,
+        })) as unknown as typeof fetch,
     });
 
     await expect(
       postRelay('https://r.test', body, {
         fetchImpl: (async () =>
           new Response(
-            JSON.stringify({ error: 'SPONSORSHIP_UNAVAILABLE', detail: 'free tier spent', meta: {} }),
+            JSON.stringify({
+              error: 'SPONSORSHIP_UNAVAILABLE',
+              detail: 'free tier spent',
+              meta: {},
+            }),
             { status: 402, headers: { 'content-type': 'application/json' } },
           )) as unknown as typeof fetch,
       }),
@@ -573,7 +584,9 @@ describe('postRelay', () => {
   it('does not knock down health for a refusal about this one request', async () => {
     await probeRelayer('https://r.test', {
       fetchImpl: (async () =>
-        new Response(JSON.stringify({ accepting: true }), { status: 200 })) as unknown as typeof fetch,
+        new Response(JSON.stringify({ accepting: true }), {
+          status: 200,
+        })) as unknown as typeof fetch,
     });
     await expect(
       postRelay('https://r.test', body, {

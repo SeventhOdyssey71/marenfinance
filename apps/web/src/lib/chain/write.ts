@@ -16,10 +16,10 @@ import { marenEarnAbi, marenPayAbi, marenRegistryAbi, marenVaultAbi } from './ab
 import { ExplainedError } from './errors';
 import { hintsForDelta, NO_HINTS, type Hints } from './hints';
 import {
+  actionIsRelayable,
   buildForwardRequest,
   FORWARD_REQUEST_TYPES,
   forwarderDomain,
-  isRelayableCall,
   postRelay,
   probeRelayer,
   relayGasLimit,
@@ -27,8 +27,8 @@ import {
   RELAYER_URL,
   relayRequestBody,
   shouldRelay,
-  type MarenTargetName,
   type RelayerHealth,
+  type WriteActionId,
 } from './relay';
 import { NETWORK } from '../data/source';
 
@@ -157,6 +157,22 @@ export function gasNote(
   };
 }
 
+/**
+ * The gas claim on its own, for the one-line disclosure beside a button.
+ *
+ * Shares every branch with `gasNote`, so the line under a Send button and the line in the
+ * sheet that Send opens cannot say different things. An action that Maren does not
+ * sponsor at all says so plainly rather than borrowing the "no relayer is running"
+ * sentence, which would suggest it will change when one does.
+ */
+export function gasLine(
+  sponsorable: boolean,
+  relayer: Pick<RelayerStatus, 'configured' | 'live'> = NOT_LIVE,
+): string {
+  if (!sponsorable) return 'You pay the Bitcoin gas. Maren does not sponsor this action.';
+  return gasNote(true, '', relayer).note.trim();
+}
+
 export class WrongNetworkError extends Error {
   constructor(actual: number) {
     super(
@@ -178,7 +194,14 @@ export interface MarenWrites {
   /** True when a real signer is connected to the right chain. */
   ready: boolean;
   depositBtc: (amountWei: bigint) => Promise<Hash>;
-  borrowMusd: (amountWei: bigint) => Promise<Hash>;
+  /**
+   * `sponsorable: false` opts this borrow out of relaying.
+   *
+   * The Vault screen passes it for a direct trove, where Maren's stated policy is that it
+   * does not sponsor. The hub's allowlist does not distinguish the two routes, so without
+   * this the router would relay a borrow the interface had just said costs BTC gas.
+   */
+  borrowMusd: (amountWei: bigint, options?: { sponsorable?: boolean }) => Promise<Hash>;
   repayMusd: (amountWei: bigint) => Promise<Hash>;
   withdrawBtc: (amountWei: bigint) => Promise<Hash>;
   /** ERC-20 approval. Its own transaction on purpose — see the note in `useMarenWrites`. */
@@ -391,21 +414,16 @@ export function useMarenWrites(options: MarenWriteOptions = {}): MarenWrites {
         functionName: string;
         args: readonly unknown[];
       },
-      relayTarget: MarenTargetName | null,
+      action: WriteActionId | null,
       simulate: () => Promise<unknown>,
       write: () => Promise<Hash>,
     ): Promise<Hash> => {
       await simulate();
 
-      const relayable =
-        relayTarget !== null &&
-        isRelayableCall({
-          target: relayTarget,
-          functionName: params.functionName,
-          // Every call that names a relay target is non-payable. A payable one passes
-          // null, so this is belt and braces rather than the real gate.
-          carriesValue: false,
-        });
+      // The same row the screen read to decide what to claim. A null action is a caller
+      // opting out of sponsorship for a reason the allowlist does not encode — see
+      // `borrowMusd` and the direct-trove route.
+      const relayable = action !== null && actionIsRelayable(action);
 
       // What the confirmation sheet promised, when it rendered. `useRelayerStatus` probes
       // once per mount, so this is stable across the life of a screen and only moves when
@@ -453,14 +471,26 @@ export function useMarenWrites(options: MarenWriteOptions = {}): MarenWrites {
           account,
           publicClient,
           params,
-          null,
+          'depositBtc',
           () => publicClient.simulateContract({ ...params, account }),
           () => writeContractAsync({ ...params, chainId: targetChain.id }),
         );
       },
 
-      async borrowMusd(amountWei) {
+      async borrowMusd(amountWei, options = {}) {
         const { account, publicClient } = requireSigner();
+        /**
+         * The one write whose sponsorship is not decided by the allowlist alone.
+         *
+         * `MarenVault.borrow` is on the hub's allowlist unconditionally, so the contract
+         * would forward a borrow against a user's own trove as readily as one against the
+         * social vault. Maren's stated policy on the Vault screen is that it does not
+         * sponsor direct-trove operations, and that is a product decision the allowlist
+         * does not encode. The screen passes the opt-out rather than the copy quietly
+         * disagreeing with what the router does.
+         */
+        const borrowAction: WriteActionId | null =
+          options.sponsorable === false ? null : 'borrowMusd';
         // Worst case for the hint: the whole amount is drawn as new trove debt rather
         // than served from Maren's MUSD reserve. Over-stating the debt moves the hint
         // one way along the list, which the on-chain walk corrects.
@@ -475,7 +505,7 @@ export function useMarenWrites(options: MarenWriteOptions = {}): MarenWrites {
           account,
           publicClient,
           params,
-          'marenVault',
+          borrowAction,
           () => publicClient.simulateContract({ ...params, account }),
           () => writeContractAsync({ ...params, chainId: targetChain.id }),
         );
@@ -494,7 +524,7 @@ export function useMarenWrites(options: MarenWriteOptions = {}): MarenWrites {
           account,
           publicClient,
           params,
-          'marenVault',
+          'repayMusd',
           () => publicClient.simulateContract({ ...params, account }),
           () => writeContractAsync({ ...params, chainId: targetChain.id }),
         );
@@ -513,7 +543,7 @@ export function useMarenWrites(options: MarenWriteOptions = {}): MarenWrites {
           account,
           publicClient,
           params,
-          'marenVault',
+          'withdrawBtc',
           () => publicClient.simulateContract({ ...params, account }),
           () => writeContractAsync({ ...params, chainId: targetChain.id }),
         );
@@ -559,7 +589,7 @@ export function useMarenWrites(options: MarenWriteOptions = {}): MarenWrites {
           account,
           publicClient,
           params,
-          'marenPay',
+          'payAddress',
           () => publicClient.simulateContract({ ...params, account }),
           () => writeContractAsync({ ...params, chainId: targetChain.id }),
         );
@@ -577,7 +607,7 @@ export function useMarenWrites(options: MarenWriteOptions = {}): MarenWrites {
           account,
           publicClient,
           params,
-          'marenPay',
+          'payHandle',
           () => publicClient.simulateContract({ ...params, account }),
           () => writeContractAsync({ ...params, chainId: targetChain.id }),
         );
@@ -595,7 +625,7 @@ export function useMarenWrites(options: MarenWriteOptions = {}): MarenWrites {
           account,
           publicClient,
           params,
-          'marenPay',
+          'createRequest',
           () => publicClient.simulateContract({ ...params, account }),
           () => writeContractAsync({ ...params, chainId: targetChain.id }),
         );
@@ -613,7 +643,7 @@ export function useMarenWrites(options: MarenWriteOptions = {}): MarenWrites {
           account,
           publicClient,
           params,
-          'marenPay',
+          'createLink',
           () => publicClient.simulateContract({ ...params, account }),
           () => writeContractAsync({ ...params, chainId: targetChain.id }),
         );
@@ -632,7 +662,7 @@ export function useMarenWrites(options: MarenWriteOptions = {}): MarenWrites {
           account,
           publicClient,
           params,
-          'marenEarn',
+          'earnDeposit',
           () => publicClient.simulateContract({ ...params, account }),
           () => writeContractAsync({ ...params, chainId: targetChain.id }),
         );
@@ -650,7 +680,7 @@ export function useMarenWrites(options: MarenWriteOptions = {}): MarenWrites {
           account,
           publicClient,
           params,
-          'marenEarn',
+          'earnWithdraw',
           () => publicClient.simulateContract({ ...params, account }),
           () => writeContractAsync({ ...params, chainId: targetChain.id }),
         );
@@ -669,7 +699,7 @@ export function useMarenWrites(options: MarenWriteOptions = {}): MarenWrites {
           account,
           publicClient,
           params,
-          'marenRegistry',
+          'commitHandle',
           () => publicClient.simulateContract({ ...params, account }),
           () => writeContractAsync({ ...params, chainId: targetChain.id }),
         );
@@ -687,7 +717,7 @@ export function useMarenWrites(options: MarenWriteOptions = {}): MarenWrites {
           account,
           publicClient,
           params,
-          'marenRegistry',
+          'registerHandle',
           () => publicClient.simulateContract({ ...params, account }),
           () => writeContractAsync({ ...params, chainId: targetChain.id }),
         );

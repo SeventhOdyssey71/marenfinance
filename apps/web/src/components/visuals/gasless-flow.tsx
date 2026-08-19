@@ -1,4 +1,5 @@
 import { ArrowRight } from '../ui/icons';
+import { RELAYER_CONFIGURED } from '@/lib/chain/relay';
 
 const steps = [
   {
@@ -50,13 +51,24 @@ export function GaslessFlow() {
 
       {/* The honest state of step 02, on the visual that describes step 02. The panel
           used to end on "25 free actions per address" instead, which is a promise made
-          by a service that is deployed nowhere. */}
-      <div className="bg-warning/6 border-warning/25 mt-7 flex flex-wrap items-center gap-x-3 gap-y-2 rounded-[var(--radius-card)] border px-5 py-4">
-        <span className="text-text-muted text-sm">
-          <span className="text-warning">Step 02 is not running yet.</span> Until it is, your own
-          wallet submits and you pay the Bitcoin fee.
-        </span>
-      </div>
+          by a service that is deployed nowhere. It is conditional now rather than
+          removed: a build with no relayer still says exactly this. */}
+      {RELAYER_CONFIGURED ? (
+        <div className="bg-surface-inset mt-7 flex flex-wrap items-center gap-x-3 gap-y-2 rounded-[var(--radius-card)] border border-[var(--border-hairline)] px-5 py-4">
+          <span className="text-text-muted text-sm">
+            <span className="text-text">Step 02 is configured on this deployment.</span> Each screen
+            says whether it is taking work before you sign, and falls back to your own wallet when
+            it is not.
+          </span>
+        </div>
+      ) : (
+        <div className="bg-warning/6 border-warning/25 mt-7 flex flex-wrap items-center gap-x-3 gap-y-2 rounded-[var(--radius-card)] border px-5 py-4">
+          <span className="text-text-muted text-sm">
+            <span className="text-warning">Step 02 is not running yet.</span> Until it is, your own
+            wallet submits and you pay the Bitcoin fee.
+          </span>
+        </div>
+      )}
 
       <p className="text-text-subtle mt-5 flex items-center gap-2 text-xs">
         <ArrowRight className="size-3.5 shrink-0" aria-hidden />

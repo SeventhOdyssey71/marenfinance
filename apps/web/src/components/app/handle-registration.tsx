@@ -18,7 +18,8 @@ import {
   validateHandle,
   type PendingCommitment,
 } from '@/lib/chain/handle';
-import { gasNote, useMarenWrites } from '@/lib/chain/write';
+import { actionIsRelayable } from '@/lib/chain/relay';
+import { gasNote, useMarenWrites, useRelayerStatus } from '@/lib/chain/write';
 import { NETWORK, useDataSource, useHandleAvailable, usePrimaryHandle } from '@/lib/data/source';
 
 /**
@@ -41,6 +42,7 @@ export function HandleRegistration({ runner }: { runner: TxRunner }) {
   const { address } = useAccount();
   const client = usePublicClient();
   const writes = useMarenWrites({ onSimulated: runner.onSimulated });
+  const relayer = useRelayerStatus();
   const queryClient = useQueryClient();
   const { data: primary } = usePrimaryHandle();
 
@@ -152,8 +154,9 @@ export function HandleRegistration({ runner }: { runner: TxRunner }) {
           },
         ],
         gas: gasNote(
-          true,
+          actionIsRelayable('commitHandle'),
           'Publishes a hash, not the name. Nobody watching this transaction can tell which handle you are claiming.',
+          relayer,
         ),
         caution:
           'The secret for this commitment is stored in this browser only. Claim the handle from this device, or you will have to wait seven days for the commitment to expire.',
@@ -201,7 +204,11 @@ export function HandleRegistration({ runner }: { runner: TxRunner }) {
           value: <span className="num text-text-subtle break-all text-xs">{pending.owner}</span>,
         },
       ],
-      gas: gasNote(true, 'Reveals the secret and writes the handle to MarenRegistry.'),
+      gas: gasNote(
+        actionIsRelayable('registerHandle'),
+        'Reveals the secret and writes the handle to MarenRegistry.',
+        relayer,
+      ),
       confirmLabel: 'Claim handle',
       submit: writes.ready
         ? async () => {

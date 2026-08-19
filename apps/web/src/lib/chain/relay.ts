@@ -261,6 +261,56 @@ export function isRelayableCall(call: RelayableCall): boolean {
   return HUB_ALLOWED_FUNCTIONS[call.target].includes(call.functionName);
 }
 
+/**
+ * Every write this app can perform, and the call it becomes.
+ *
+ * ONE TABLE, READ BY BOTH SIDES. The routing in `write.ts` consults it to decide whether
+ * to relay, and the screens consult it to decide what to claim about who pays. That is
+ * the whole reason it exists: while the two were derived separately, the Earn panel said
+ * an action was sponsorable and the router — correctly — self-submitted it, because
+ * `MarenEarn` is not on the hub's allowlist. Copy and behaviour cannot disagree about a
+ * fact they read from the same row.
+ */
+export interface WriteActionSpec {
+  /** The Maren contract, or null for a call to something else entirely. */
+  readonly target: MarenTargetName | null;
+  readonly functionName: string;
+  readonly carriesValue: boolean;
+}
+
+export const WRITE_ACTIONS = {
+  // Payable. Never relayable, and the reason is the value, not the list.
+  depositBtc: { target: 'marenVault', functionName: 'deposit', carriesValue: true },
+  borrowMusd: { target: 'marenVault', functionName: 'borrow', carriesValue: false },
+  repayMusd: { target: 'marenVault', functionName: 'repay', carriesValue: false },
+  withdrawBtc: { target: 'marenVault', functionName: 'withdraw', carriesValue: false },
+  // MUSD is not a Maren contract, so no forwarder trusts it and no allowlist covers it.
+  approveMusd: { target: null, functionName: 'approve', carriesValue: false },
+  payAddress: { target: 'marenPay', functionName: 'pay', carriesValue: false },
+  payHandle: { target: 'marenPay', functionName: 'payToHandle', carriesValue: false },
+  createRequest: { target: 'marenPay', functionName: 'createRequest', carriesValue: false },
+  // On the hub's allowlist for `claimLink` but not `createLink`. Recorded rather than
+  // quietly omitted, so the absence is visible to whoever next reads the deploy script.
+  createLink: { target: 'marenPay', functionName: 'createLink', carriesValue: false },
+  earnDeposit: { target: 'marenEarn', functionName: 'deposit', carriesValue: false },
+  earnWithdraw: { target: 'marenEarn', functionName: 'withdraw', carriesValue: false },
+  commitHandle: { target: 'marenRegistry', functionName: 'commit', carriesValue: false },
+  registerHandle: { target: 'marenRegistry', functionName: 'register', carriesValue: false },
+} as const satisfies Record<string, WriteActionSpec>;
+
+export type WriteActionId = keyof typeof WRITE_ACTIONS;
+
+/** Would `MarenRelayHub` forward this app action? The screens' sponsorship claim. */
+export function actionIsRelayable(id: WriteActionId): boolean {
+  const action: WriteActionSpec = WRITE_ACTIONS[id];
+  if (action.target === null) return false;
+  return isRelayableCall({
+    target: action.target,
+    functionName: action.functionName,
+    carriesValue: action.carriesValue,
+  });
+}
+
 // ---------------------------------------------------------------------------
 // health
 // ---------------------------------------------------------------------------
@@ -582,7 +632,9 @@ function isAccepted(body: unknown): body is RelayAccepted {
 
 function isErrorBody(body: unknown): body is RelayErrorBody {
   return (
-    body !== null && typeof body === 'object' && typeof (body as { error?: unknown }).error === 'string'
+    body !== null &&
+    typeof body === 'object' &&
+    typeof (body as { error?: unknown }).error === 'string'
   );
 }
 

@@ -435,8 +435,14 @@ function Confirming({
       ) : null}
       {signing ? (
         <p className="text-text-muted mt-3 max-w-[52ch] text-sm leading-relaxed">
-          It would succeed against the chain as it is right now. Approve it in your wallet. This is
-          the only signature this action needs.
+          It would succeed against the chain as it is right now.{' '}
+          {intent.gas.sponsored
+            ? // A relayed action asks for a signature over a message, not a transaction.
+              // The wallet says so in its own words and the two should agree: what is
+              // being approved costs the signer nothing and sends nothing by itself.
+              'Sign it in your wallet. You are signing an instruction, not sending a transaction, ' +
+              'and Maren submits it and pays the Bitcoin gas.'
+            : 'Approve it in your wallet. This is the only signature this action needs.'}
         </p>
       ) : null}
 
@@ -490,6 +496,14 @@ function Pending({ intent, hash }: { intent: TxIntent; hash: Hash }) {
         {intent.title}
       </h2>
       <p className="text-text-muted mt-3 max-w-[52ch] text-sm leading-relaxed">
+        {intent.gas.sponsored
+          ? // Which path submitted this, stated where the difference is visible: the
+            // transaction on the explorer will be sent by Maren's relayer, not by the
+            // account that signed it, and a user who does not expect that would read
+            // their own absence from the sender field as something having gone wrong.
+            'Maren’s relayer broadcast this and is paying the Bitcoin gas, so the sender on the ' +
+            'explorer is Maren rather than your account. '
+          : ''}
         Waiting for a receipt. A transaction hash is not a result, so nothing is marked delivered
         until the chain returns one with <span className="num">status success</span>.
       </p>

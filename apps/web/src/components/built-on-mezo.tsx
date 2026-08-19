@@ -1,6 +1,7 @@
 import { Section, Eyebrow } from './ui/section';
 import { Reveal } from './ui/reveal';
 import { ArrowUpRight } from './ui/icons';
+import { RELAYER_CONFIGURED } from '@/lib/chain/relay';
 
 const facts = [
   {
@@ -11,7 +12,9 @@ const facts = [
   {
     label: 'Gas token',
     value: 'Native BTC',
-    body: 'Mezo charges gas in Bitcoin. Maren is built so you will not have to hold a gas balance to use it, though today you still do, because no relayer is running.',
+    body: RELAYER_CONFIGURED
+      ? 'Mezo charges gas in Bitcoin. Maren is built so you will not have to hold a gas balance to use it, and this deployment has a relayer; each screen says whether it is taking work before you sign.'
+      : 'Mezo charges gas in Bitcoin. Maren is built so you will not have to hold a gas balance to use it, though today you still do, because no relayer is running.',
   },
   {
     label: 'Networks',

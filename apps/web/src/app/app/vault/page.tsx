@@ -54,7 +54,15 @@ import {
   type Preflight,
   type VaultState,
 } from '@/lib/chain/preflight';
-import { gasNote, SPENDERS, useMarenWrites, useMusdAllowance } from '@/lib/chain/write';
+import { actionIsRelayable } from '@/lib/chain/relay';
+import {
+  gasLine,
+  gasNote,
+  SPENDERS,
+  useMarenWrites,
+  useMusdAllowance,
+  useRelayerStatus,
+} from '@/lib/chain/write';
 import {
   useBalances,
   useDataSource,
@@ -311,6 +319,7 @@ function BorrowPanel({
 }) {
   const { position, price, stats } = chain;
   const writes = useMarenWrites({ onSimulated: runner.onSimulated });
+  const relayer = useRelayerStatus();
   const livePrice = price.state === 'live' ? price.priceWei : null;
 
   const ceiling = useMemo(
@@ -428,7 +437,11 @@ function BorrowPanel({
         : undefined,
     gas:
       position?.route === 'pooled'
-        ? gasNote(true, 'Draws MUSD against the social vault’s shared trove.')
+        ? gasNote(
+            actionIsRelayable('borrowMusd'),
+            'Draws MUSD against the social vault’s shared trove.',
+            relayer,
+          )
         : {
             sponsored: false,
             note: 'Costs BTC gas. Maren does not sponsor direct-trove operations.',
@@ -437,7 +450,9 @@ function BorrowPanel({
       ? `Bitcoin would only need to fall ${dropPercent}% to liquidate this position.`
       : undefined,
     confirmLabel: `Borrow ${formatMusd(value)}`,
-    submit: writes.ready ? () => writes.borrowMusd(value) : undefined,
+    submit: writes.ready
+      ? () => writes.borrowMusd(value, { sponsorable: position?.route === 'pooled' })
+      : undefined,
   });
 
   /**
@@ -681,9 +696,11 @@ function BorrowPanel({
           >
             {value > 0n ? `Borrow ${formatMusd(value)}` : 'Borrow'}
           </ActionButton>
-          {/* The gas claim, kept true and kept beside the button that incurs it. */}
+          {/* The gas claim, kept true and kept beside the button that incurs it. Same
+              expression the intent uses, so the line under the button and the line in
+              the sheet it opens cannot disagree. */}
           <span className="text-text-subtle text-xs">
-            You pay the Bitcoin gas. No relayer is running yet.
+            {gasLine(position?.route === 'pooled' && actionIsRelayable('borrowMusd'), relayer)}
           </span>
         </div>
       </div>
@@ -831,6 +848,7 @@ function DepositPanel({ runner, chain }: { runner: TxRunner; chain: VaultState }
 function RepayPanel({ runner, chain }: { runner: TxRunner; chain: VaultState }) {
   const { position, balances } = chain;
   const writes = useMarenWrites({ onSimulated: runner.onSimulated });
+  const relayer = useRelayerStatus();
   const [input, setInput] = useState('500');
   const wei = parseUnitsSafe(input);
 
@@ -909,8 +927,9 @@ function RepayPanel({ runner, chain }: { runner: TxRunner; chain: VaultState }) 
         ]
       : undefined,
     gas: gasNote(
-      true,
+      actionIsRelayable('repayMusd'),
       'Repaying is never paused and never gated on the oracle. An exit must always be open.',
+      relayer,
     ),
     confirmLabel: `Repay ${formatMusd(wei)}`,
     submit: writes.ready ? () => writes.repayMusd(wei) : undefined,
@@ -998,6 +1017,7 @@ function RepayPanel({ runner, chain }: { runner: TxRunner; chain: VaultState }) 
 function WithdrawPanel({ runner, chain }: { runner: TxRunner; chain: VaultState }) {
   const { position } = chain;
   const writes = useMarenWrites({ onSimulated: runner.onSimulated });
+  const relayer = useRelayerStatus();
   /**
    * Empty, not `0.01`.
    *
@@ -1038,8 +1058,9 @@ function WithdrawPanel({ runner, chain }: { runner: TxRunner; chain: VaultState 
         ]
       : undefined,
     gas: gasNote(
-      true,
+      actionIsRelayable('withdrawBtc'),
       'Withdrawal is never paused: if Maren halts the vault, entries close and exits stay open.',
+      relayer,
     ),
     confirmLabel: `Withdraw ${formatBtc(wei)}`,
     submit: writes.ready ? () => writes.withdrawBtc(wei) : undefined,
