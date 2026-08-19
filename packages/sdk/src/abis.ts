@@ -683,11 +683,24 @@ export const troveManagerAbi = [
     ],
   },
   {
+    // True when MUSD's system-wide TCR is under the 150% CCR. Takes the price as an
+    // argument and is a plain view on TroveManager, so unlike `PriceFeed.fetchPrice()` it
+    // does NOT revert on a stale oracle: the caller supplies whatever price it has.
     type: 'function',
     name: 'checkRecoveryMode',
     stateMutability: 'view',
     inputs: [{ name: '_price', type: 'uint256' }],
     outputs: [{ type: 'bool' }],
+  },
+  {
+    // The system-wide Total Collateral Ratio, 1e18. Read alongside `checkRecoveryMode` so
+    // the UI can say how far from the 150% threshold the whole protocol is, rather than
+    // only that a boolean flipped.
+    type: 'function',
+    name: 'getTCR',
+    stateMutability: 'view',
+    inputs: [{ name: '_price', type: 'uint256' }],
+    outputs: [{ type: 'uint256' }],
   },
 ] as const;
 
@@ -760,8 +773,20 @@ export const MAREN_PAY_EVENTS = [
   parseAbiItem(
     'event Paid(address indexed from, address indexed to, uint256 amount, bytes32 indexed memoHash, string memo)',
   ),
+  // FIVE parameters, one trailing string. It carried a sixth (`string memo`) until
+  // 2026-08-19, which was not a cosmetic mismatch: an event's topic0 is the hash of its
+  // full signature, so the extra argument produced
+  //   0x310129e95d2636b0c6579ab8cd368da4f0581810c0e2b22a46d7fe0761133c1d
+  // where the deployed MarenPay (matsnet 0xe475Ff919D54E055809f516E3bed8a5c7a101836)
+  // actually emits
+  //   0xf0db1b294d6bbc31336b73cb68f72c857041a71d934da23f335b2aa2d56a38fd
+  // Each hash was located in the contract's runtime bytecode to confirm it. `eth_getLogs`
+  // filters on topic0, so the wrong one matched NOTHING and every payment sent to an
+  // `@handle` was silently missing from Activity, with no error to notice. The other four
+  // MarenPay topics were checked the same way and all match.
+  // Source of truth: `packages/contracts/src/MarenPay.sol:107`.
   parseAbiItem(
-    'event PaidToHandle(bytes32 indexed node, address indexed from, address indexed to, uint256 amount, string handle, string memo)',
+    'event PaidToHandle(bytes32 indexed node, address indexed from, address indexed to, uint256 amount, string handle)',
   ),
   parseAbiItem(
     'event RequestCreated(uint256 indexed requestId, address indexed requester, address indexed payer, uint256 amount, string memo)',

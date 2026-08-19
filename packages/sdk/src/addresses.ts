@@ -16,6 +16,28 @@ import type { MezoNetwork } from './chains';
  *   TroveManager.MCR()           -> 1.1e18
  *   TroveManager.CCR()           -> 1.5e18
  *
+ * RE-VERIFIED 2026-08-19 for the conformance audit, this time at the DISPATCH TABLE rather
+ * than at a handful of getters. The EIP-1967 implementation slot was read on every proxy
+ * and each implementation's runtime bytecode searched for the 4-byte selector of every
+ * function Maren declares. All present on both networks; every Liquity-shaped
+ * `maxFeePercentage` variant absent on both. Implementations current at that date:
+ *
+ *   BorrowerOperations  matsnet 0xc05bf344bd5b58825784326dd3112fb6cc160dcc (24,552 bytes)
+ *                       mainnet 0x501670bbbe2ec8c11449c28c0c9e6677d5ea9b61 (24,552 bytes)
+ *   TroveManager        matsnet 0x9aab567966983e95536fc460c12266fb0cc10b07 (19,997 bytes)
+ *                       mainnet 0xdcfdab0dea52e5efc8400283d46fd0d122a519e9 (19,997 bytes)
+ *   SortedTroves        matsnet 0x9177df58a9614b84c8c2f68df27506ab9a5d0323
+ *   HintHelpers         matsnet 0x8adf3f35dbe4026112bcfc078872bcb967732ea8
+ *   PriceFeed           matsnet 0xec42b37c12b8d73d320f4075a1bcd58b306629c1
+ *   StabilityPool       matsnet 0x8f0ca419bb1d54af4bf6a644f605cc247d6d3e19
+ *
+ * Recorded so the NEXT audit can tell a Mezo upgrade from a Maren regression: if a selector
+ * check starts failing and these hashes have moved, the protocol changed under us.
+ *
+ * MUSD IS NOT A PROXY. Its EIP-1967 implementation slot reads all zeroes on matsnet and its
+ * 6,437 bytes of runtime code carry the ERC-2612 surface directly. The rule below is about
+ * the core protocol contracts, not the token.
+ *
  * All core contracts are TransparentUpgradeableProxy — always integrate against the
  * proxy address below, never an implementation address.
  *
@@ -87,7 +109,13 @@ export function getMusdAddresses(network: MezoNetwork): MusdAddresses {
 
 /**
  * Multicall3 at the canonical cross-chain address.
- * VERIFIED live 2026-08-15: 7,619 bytes of code present on BOTH 31612 and 31611.
+ *
+ * VERIFIED live: 3,808 bytes of runtime code present on BOTH 31612 and 31611, which is the
+ * canonical Multicall3 size. Re-measured 2026-08-19; this line previously read 7,619, which
+ * was the length of the hex STRING `eth_getCode` returns (`0x` + two characters per byte
+ * + a newline) rather than a byte count. The contract is the right one either way, but a
+ * size that is off by 2x is no longer usable as an identity check, which is the only reason
+ * to record one.
  */
 export const MULTICALL3_ADDRESS: Address = '0xcA11bde05977b3631167028862bE2a173976CA11';
 
@@ -111,7 +139,8 @@ export const MEZO_TOKEN_PRECOMPILE: Address = '0x7B7c000000000000000000000000000
  * The buyer signs ONE EIP-712 message (MUSD is permit2 + EIP-2612) and the facilitator
  * settles on-chain. No on-chain approval, no gas on the buyer's side.
  *
- * VERIFIED live 2026-08-15: settlement proxy has 5,829 bytes of code on mainnet.
+ * VERIFIED live: settlement proxy has 2,913 bytes of runtime code on mainnet. Re-measured
+ * 2026-08-19; previously recorded as 5,829, which was a hex-string length, not bytes.
  * Docs: https://mezo.org/docs/developers/getting-started/musd-payments-x402/
  * SDK:  @x402/evm >= 2.15.0
  *
@@ -124,8 +153,9 @@ export const X402_FACILITATOR_URL = 'https://facilitator.vativ.io';
 export const PERMIT2_ADDRESS: Address = '0x000000000022D473030F116dDEE9F6B43aC78BA3';
 
 /**
- * ERC-4337 EntryPoint v0.7 IS deployed here (verified: 32,073 bytes, byte-identical
- * to Ethereum L1) — but it is INERT. Per the Mezo block explorer's index it has never
+ * ERC-4337 EntryPoint v0.7 IS deployed here (re-measured 2026-08-19: 16,035 bytes of
+ * runtime code, byte-identical to Ethereum L1; previously recorded as 32,073, which was a
+ * hex-string length rather than bytes) — but it is INERT. Per the Mezo block explorer's index it has never
  * processed a single UserOperation (zero transactions, no logs; verified against a control
  * read of MUSD, which returns 104,681, so the empty result is not an indexer artefact),
  * and Mezo's RPCs do not implement `debug_traceCall`, so no ERC-7562-compliant bundler

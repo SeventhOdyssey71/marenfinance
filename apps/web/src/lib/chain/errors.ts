@@ -713,6 +713,98 @@ function describe(name: string, args: readonly unknown[]): RevertReason {
   }
 }
 
+/**
+ * MUSD's own `require` strings, translated.
+ *
+ * Mezo's `BorrowerOperations` predates custom errors and refuses with `Error(string)`, so
+ * these arrive as English that is accurate and useless in equal measure: it names the rule
+ * without saying whose rule it is, whether the user did anything wrong, or what to do. The
+ * strings below are transcribed EXACTLY as they appear in the deployed runtime bytecode
+ * (matsnet BorrowerOperations impl 0xc05bf344bd5b58825784326dd3112fb6cc160dcc, read
+ * 2026-08-19), not from Mezo's documentation and not from Liquity, which words several of
+ * them differently.
+ *
+ * Matched on a substring rather than on equality on purpose. These are protocol strings
+ * behind an upgradeable proxy, and a wording tweak in a future MUSD release should degrade
+ * this to the raw string, never to a WRONG explanation.
+ *
+ * `preflight.ts` already stops all three before a signature is requested. This exists for
+ * the gap it cannot close: Recovery Mode is a property of the whole protocol and can begin
+ * between the render and the press, so the last word has to be legible too.
+ */
+/**
+ * The single entry point for a Solidity `require` string, wherever it was unpacked.
+ *
+ * There are three of those paths (viem's native decode, our own `decodeRaw`, and viem's
+ * `reason` shortcut) and they used to produce three different results for identical bytes.
+ * One function so they cannot drift again.
+ */
+function describeErrorString(message: string): RevertReason {
+  return (
+    describeMusdRequire(message) ?? {
+      name: 'Error(string)',
+      title: 'The contract refused this',
+      detail: message || 'No reason given.',
+    }
+  );
+}
+
+function describeMusdRequire(message: string): RevertReason | null {
+  const has = (needle: string) => message.includes(needle);
+
+  if (has('Collateral withdrawal not permitted Recovery Mode')) {
+    return {
+      name: 'Error(string)',
+      title: 'MUSD entered Recovery Mode',
+      detail:
+        'MUSD fell under its 150% system-wide collateral ratio, and while it is there Mezo ' +
+        'refuses every withdrawal from every trove on the chain, whatever your own ratio is. ' +
+        'Nothing moved and nothing was lost. Repaying is still open, and it is one of the two ' +
+        'things that lifts the protocol back out.',
+    };
+  }
+  if (has("Cannot decrease your Trove's ICR in Recovery Mode")) {
+    return {
+      name: 'Error(string)',
+      title: 'MUSD entered Recovery Mode',
+      detail:
+        'MUSD fell under its 150% system-wide collateral ratio. While it is there Mezo refuses ' +
+        'anything that would lower a trove’s ratio, and borrowing always does, so no borrow can ' +
+        'go through at any size. Nothing moved. Depositing and repaying both still work.',
+    };
+  }
+  if (has('Operation not permitted during Recovery Mode')) {
+    return {
+      name: 'Error(string)',
+      title: 'MUSD entered Recovery Mode',
+      detail:
+        'MUSD fell under its 150% system-wide collateral ratio, and Mezo blocks closing and ' +
+        'refinancing a trove while it is there. Nothing moved.',
+    };
+  }
+  if (has('exceeds maxBorrowingCapacity')) {
+    return {
+      name: 'Error(string)',
+      title: 'Past Mezo’s per-trove ceiling',
+      detail:
+        'Mezo fixes a borrowing ceiling per trove at the BTC price the trove opened at, and this ' +
+        'borrow would cross it. Adding collateral does not raise that ceiling; only a refinance ' +
+        'does. Nothing moved.',
+    };
+  }
+  if (has('Oracle is stale')) {
+    return {
+      name: 'Error(string)',
+      title: 'The price feed is stale',
+      detail:
+        'Mezo’s BTC/USD oracle has not reported inside its 60-second tolerance, so MUSD refused ' +
+        'to price the transaction rather than use an old number. Nothing moved. This clears on ' +
+        'its own, usually within a block or two.',
+    };
+  }
+  return null;
+}
+
 /** Solidity's built-in `Error(string)` and `Panic(uint256)`. */
 const builtinsAbi = [
   { type: 'error', name: 'Error', inputs: [{ name: 'message', type: 'string' }] },
@@ -729,11 +821,7 @@ function decodeRaw(data: Hex): RevertReason | null {
   try {
     const decoded = decodeErrorResult({ abi: builtinsAbi, data });
     if (decoded.errorName === 'Error') {
-      return {
-        name: 'Error(string)',
-        title: 'The contract refused this',
-        detail: String(decoded.args?.[0] ?? 'No reason given.'),
-      };
+      return describeErrorString(String(decoded.args?.[0] ?? ''));
     }
     return {
       name: 'Panic(uint256)',
@@ -769,6 +857,15 @@ export function explainError(error: unknown): RevertReason {
   if (error instanceof BaseError) {
     const reverted = error.walk((e) => e instanceof ContractFunctionRevertedError);
     if (reverted instanceof ContractFunctionRevertedError) {
+      // Solidity's built-in `Error(string)` has to be intercepted BEFORE the generic
+      // `describe()` below. viem decodes it natively, so it arrives here already unpacked
+      // as `errorName: 'Error'` and never reaches `decodeRaw`, where the string handling
+      // lives. Left to fall through, every `require` message in MUSD rendered as
+      // `Error(BorrowerOps: ...)` with "this refusal has no plain-language mapping yet"
+      // appended to a sentence that was already plain language.
+      if (reverted.data?.errorName === 'Error') {
+        return describeErrorString(String(reverted.data.args?.[0] ?? reverted.reason ?? ''));
+      }
       if (reverted.data?.errorName) {
         return describe(reverted.data.errorName, (reverted.data.args ?? []) as readonly unknown[]);
       }
@@ -776,13 +873,7 @@ export function explainError(error: unknown): RevertReason {
         const decoded = decodeRaw(reverted.raw);
         if (decoded) return decoded;
       }
-      if (reverted.reason) {
-        return {
-          name: 'Error(string)',
-          title: 'The contract refused this',
-          detail: reverted.reason,
-        };
-      }
+      if (reverted.reason) return describeErrorString(reverted.reason);
     }
 
     const raw = extractRawData(error);
