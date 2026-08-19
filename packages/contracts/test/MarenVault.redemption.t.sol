@@ -502,6 +502,70 @@ contract MarenVaultRedemptionTest is VaultTestBase {
         );
     }
 
+    /**
+     * @notice KNOWN LIMIT, pinned rather than buried (audit H-2). When a redemption cancels
+     *         MORE trove debt than the pool's users actually owe, users are charged the full
+     *         collateral that left the trove but are handed only the relief they could use.
+     * @dev `outstandingDebt = troveNetDebt - reserveMUSD`, so the gap opens exactly when
+     *      `reserveMUSD` is non-zero and the redemption exceeds what is left after subtracting
+     *      it. The excess relief lands in the reserve, which no user has a claim on. The loss
+     *      is bounded by `reserveMUSD` at the instant the redemption lands, which is what this
+     *      asserts alongside the loss itself.
+     *
+     *      Reaching a large reserve is not exotic: `_pushRepayment` is best effort and tolerates
+     *      a stale oracle, so every repayment made during an oracle outage piles up there until
+     *      a keeper deleverages. That is the sequence below.
+     *
+     *      This test asserts the CURRENT behaviour, including the part that is wrong. Fixing it
+     *      means deciding who absorbs the excess, the protocol's own position or the pool,
+     *      and that is a governance call, not a rounding one. When it is made, this test is the
+     *      one to invert.
+     */
+    function test_redemption_reliefIsCappedByTheReserveWhileTheCollateralDebitIsNot() public {
+        _deposit(alice, 2 ether);
+        _borrow(alice, 30_000e18);
+        _deposit(bob, 2 ether);
+        _borrow(bob, 10_000e18);
+
+        // The oracle goes down. Repayments still settle; they just cannot reach the trove.
+        priceFeed.setStale(true);
+        _repay(alice, 25_000e18);
+        priceFeed.setStale(false);
+
+        uint256 reserve = vault.reserveMUSD();
+        assertGt(reserve, 0, "the stalled repayment is sitting in the reserve");
+        assertEq(
+            vault.outstandingDebt(),
+            _troveNetDebt() - reserve,
+            "and it is exactly what separates trove debt from user debt"
+        );
+
+        uint256 debtBefore = vault.debtOf(alice) + vault.debtOf(bob) + vault.debtOf(address(vault));
+        uint256 collBefore = _sumClaimableCollateral();
+
+        // A redemption larger than the pool's users owe, but not large enough to close the trove.
+        _redeem(redeemer, 25_000e18);
+        vault.reconcileRedemption();
+
+        uint256 relief = debtBefore - (vault.debtOf(alice) + vault.debtOf(bob) + vault.debtOf(address(vault)));
+        uint256 charged = collBefore - _sumClaimableCollateral();
+        uint256 chargedValue = (charged * BTC_PRICE) / 1e18;
+
+        assertGt(chargedValue, relief, "users paid more collateral value than the relief they received");
+        assertLe(chargedValue - relief, reserve, "and the gap is bounded by the reserve, as documented");
+        assertApproxEqRel(
+            chargedValue - relief,
+            25_000e18 - relief,
+            0.01e18,
+            "the gap is the redemption the reserve absorbed"
+        );
+        assertGt(
+            vault.reserveMUSD(),
+            _troveNetDebt(),
+            "the vault now holds more MUSD than the trove owes, credited to nobody"
+        );
+    }
+
     // ------------------------------------------------------------------ //
     //                   Redemption is not liquidation                    //
     // ------------------------------------------------------------------ //
@@ -601,6 +665,109 @@ contract MarenVaultRedemptionTest is VaultTestBase {
 
         // Carol, who never borrowed, is untouched by any of it.
         assertEq(vault.collateralOf(carol), carolBefore, "the shortfall was not spread onto her");
+    }
+
+    /**
+     * @notice REGRESSION (audit H-1). A recognised shortfall must not be re-read as a fresh
+     *         redemption.
+     * @dev `_recogniseShortfall` credits the uncollectable debit back to `totalCollateral` so
+     *      the per-account ledger still sums to it. That leaves the books permanently above
+     *      what the trove holds, by exactly the shortfall. The redemption detector reads that
+     *      same difference. Before the fix it therefore saw the shortfall as a brand new
+     *      redemption on the very next sync: `pendingRedemptionCollateral()` reported it, and
+     *      `reconcileRedemption()` booked it into `totalCollateralRedeemed` and charged it pro
+     *      rata to everyone still holding debt shares, with no debt relief to go with it.
+     *
+     *      The precondition is only that some position is under 100%, and both
+     *      `settleRedemption` and `reconcileRedemption` are permissionless, so any passer-by
+     *      could drive the loop.
+     */
+    function test_redemption_recognisedShortfallIsNotReReadAsAFreshRedemption() public {
+        _deposit(alice, 1 ether);
+        _borrow(alice, 30_000e18);
+        _deposit(bob, 10 ether);
+        _borrow(bob, 1_000e18); // a healthy debtor: the one who was being charged
+
+        priceFeed.setPrice(BTC_PRICE / 3);
+        _redeem(redeemer, 25_000e18);
+        vault.reconcileRedemption();
+
+        // Flushing alice's ledger turns the uncollectable part of her debit into a number.
+        vault.settleRedemption(alice);
+        uint256 shortfall = vault.redemptionShortfall();
+        assertGt(shortfall, 0, "alice was under water, so part of her debit could not be charged");
+
+        // The books now sit exactly `shortfall` above the trove, deliberately. That gap is NOT
+        // a redemption and must not read as one.
+        assertEq(
+            vault.totalCollateral() - vault.idleCollateral() - shortfall,
+            protocol.getTroveColl(address(vault)),
+            "the gap between books and trove is the shortfall and nothing else"
+        );
+        assertEq(vault.pendingRedemptionCollateral(), 0, "and it is not reported as a pending redemption");
+
+        uint256 bobClaim = vault.collateralOf(bob);
+        uint256 protocolClaim = vault.collateralOf(address(vault));
+        uint256 bobDebt = vault.debtOf(bob);
+        uint256 redeemedBefore = vault.totalCollateralRedeemed();
+
+        // Nothing has happened on chain. Grind the two permissionless entrypoints anyway.
+        for (uint256 i; i < 10; ++i) {
+            vault.reconcileRedemption();
+            vault.settleRedemption(alice);
+            vault.settleRedemption(bob);
+        }
+
+        assertEq(vault.totalCollateralRedeemed(), redeemedBefore, "no phantom redemption was booked");
+        assertEq(vault.collateralOf(bob), bobClaim, "the healthy debtor paid nothing for it");
+        assertEq(vault.collateral(bob), bobClaim, "and his ledger balance is untouched too");
+        assertEq(vault.debtOf(bob), bobDebt, "and was handed no phantom relief either");
+        assertEq(vault.collateralOf(address(vault)), protocolClaim, "nor was the protocol's own position");
+        assertEq(vault.redemptionShortfall(), shortfall, "the shortfall stayed exactly one shortfall");
+    }
+
+    /**
+     * @notice REGRESSION (audit H-1). A genuine redemption arriving AFTER a recognised
+     *         shortfall is still measured correctly, and is measured on top of it.
+     * @dev The fix subtracts `redemptionShortfall` from the books before comparing them with
+     *      the trove. This pins that it subtracts it once and does not swallow real
+     *      redemptions along with it.
+     */
+    function test_redemption_afterAShortfallIsStillMeasuredExactly() public {
+        _deposit(alice, 1 ether);
+        _borrow(alice, 30_000e18);
+        _deposit(bob, 10 ether);
+        _borrow(bob, 5_000e18);
+
+        priceFeed.setPrice(BTC_PRICE / 3);
+        _redeem(redeemer, 25_000e18);
+        vault.reconcileRedemption();
+        vault.settleRedemption(alice);
+        assertGt(vault.redemptionShortfall(), 0, "the shortfall exists before the second redemption");
+
+        uint256 shortfall = vault.redemptionShortfall();
+        uint256 redeemedBefore = vault.totalCollateralRedeemed();
+        uint256 bobDebtBefore = vault.debtOf(bob);
+        uint256 bobCollBefore = vault.collateralOf(bob);
+
+        uint256 second = 2_000e18;
+        _redeem(redeemer, second);
+        uint256 expectedColl = (second * 1e18) / (BTC_PRICE / 3);
+        assertApproxEqAbs(
+            vault.pendingRedemptionCollateral(), expectedColl, 4, "the second redemption is seen at full size"
+        );
+
+        vault.reconcileRedemption();
+        assertApproxEqAbs(
+            vault.totalCollateralRedeemed() - redeemedBefore, expectedColl, 4, "and booked at full size"
+        );
+        assertEq(vault.redemptionShortfall(), shortfall, "without disturbing the recorded shortfall");
+
+        // Bob still pays for exactly the debt he stopped owing, at the current price.
+        uint256 reliefValue = ((bobCollBefore - vault.collateralOf(bob)) * (BTC_PRICE / 3)) / 1e18;
+        assertApproxEqAbs(
+            reliefValue, bobDebtBefore - vault.debtOf(bob), 1e15, "value neutrality survives the shortfall"
+        );
     }
 
     // ------------------------------------------------------------------ //
