@@ -78,6 +78,43 @@ export function mezoTransport(chain: Chain, timeout: number = READ_TIMEOUT_MS) {
  */
 const logClients = new Map<MezoNetwork, PublicClient>();
 
+/**
+ * One client per endpoint, in the order `chains.ts` argues for.
+ *
+ * WHY `fallback()` IS NOT ENOUGH FOR EVERYTHING. viem's fallback moves on when a request
+ * FAILS. `eth_getTransactionReceipt` for a transaction the node does not have does not
+ * fail: it answers `{"result": null}`, a perfectly successful JSON-RPC response, and viem
+ * raises `TransactionReceiptNotFoundError` at the action layer afterwards. The transport
+ * never saw a problem, so it never failed over.
+ *
+ * Measured on 2026-08-19, that is not hypothetical. https://rpc.test.mezo.org served a
+ * MarenPay log and then `null` for that same transaction's receipt, while
+ * https://mezo-testnet.drpc.org returned the receipt in full, containing the very log the
+ * primary had just served. Three of five rows on the test account's Activity screen read
+ * "awaiting receipt" for transactions confirmed days earlier.
+ *
+ * `chains.ts` states the rule this answers: "Never certify or condemn an endpoint on a
+ * single probe. Repeat it." An empty answer is such a probe.
+ */
+const endpointClients = new Map<MezoNetwork, PublicClient[]>();
+
+export function getEndpointClients(network: MezoNetwork): PublicClient[] {
+  const existing = endpointClients.get(network);
+  if (existing) return existing;
+
+  const chain = getChain(network);
+  const clients = chain.rpcUrls.default.http.map(
+    (url) =>
+      createPublicClient({
+        chain,
+        transport: http(url, { timeout: LOG_TIMEOUT_MS, retryCount: 0 }),
+      }) as PublicClient,
+  );
+
+  endpointClients.set(network, clients);
+  return clients;
+}
+
 export function getLogClient(network: MezoNetwork): PublicClient {
   const existing = logClients.get(network);
   if (existing) return existing;

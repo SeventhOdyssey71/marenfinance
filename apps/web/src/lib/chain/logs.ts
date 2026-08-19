@@ -1,10 +1,13 @@
 import {
+  MAREN_EARN_EVENTS,
+  MAREN_PAY_EVENTS,
+  MAREN_VAULT_EVENTS,
   MEZO_MAX_LOG_RANGE,
   getDeploymentBlock,
   getMarenAddresses,
   type MezoNetwork,
 } from '@maren/sdk';
-import { parseAbiItem, type Address, type Hash, type Log, type PublicClient } from 'viem';
+import type { Address, Hash, Log, PublicClient } from 'viem';
 
 import type { ActivityItem, ActivityKind } from '../data/types';
 import { mergeActivity, planResume } from './activity-cache';
@@ -71,49 +74,17 @@ export interface ActivityWindow {
   complete: boolean;
 }
 
-// ── the events, transcribed from the Solidity ────────────────────────────────
-// Written as `parseAbiItem` strings rather than imported from `abis.ts` because the
-// indexed-ness of each parameter is load-bearing here in a way it is not for a call, and
-// stating it inline keeps the topic layout visible next to the decoding that depends on it.
-
-const VAULT_EVENTS = [
-  parseAbiItem(
-    'event Deposited(address indexed user, uint256 amount, uint256 newCollateral, bool pushedToTrove)',
-  ),
-  parseAbiItem('event Withdrawn(address indexed user, uint256 amount, uint256 newCollateral)'),
-  parseAbiItem(
-    'event Borrowed(address indexed user, uint256 amount, uint256 debtAdded, uint256 newDebt, bool fromReserve)',
-  ),
-  parseAbiItem('event Repaid(address indexed user, uint256 amount, uint256 newDebt)'),
-] as const;
-
-const PAY_EVENTS = [
-  parseAbiItem(
-    'event Paid(address indexed from, address indexed to, uint256 amount, bytes32 indexed memoHash, string memo)',
-  ),
-  parseAbiItem(
-    'event PaidToHandle(bytes32 indexed node, address indexed from, address indexed to, uint256 amount, string handle, string memo)',
-  ),
-  parseAbiItem(
-    'event RequestCreated(uint256 indexed requestId, address indexed requester, address indexed payer, uint256 amount, string memo)',
-  ),
-  parseAbiItem(
-    'event LinkCreated(uint256 indexed linkId, address indexed creator, address indexed linkKey, uint256 amount, uint64 expiry)',
-  ),
-  parseAbiItem(
-    'event LinkClaimed(uint256 indexed linkId, address indexed recipient, uint256 amount)',
-  ),
-] as const;
-
-// MarenEarn is an ERC-4626, so these are the standard vault events, not Maren's own.
-const EARN_EVENTS = [
-  parseAbiItem(
-    'event Deposit(address indexed sender, address indexed owner, uint256 assets, uint256 shares)',
-  ),
-  parseAbiItem(
-    'event Withdraw(address indexed sender, address indexed receiver, address indexed owner, uint256 assets, uint256 shares)',
-  ),
-] as const;
+/**
+ * The events, from `@maren/sdk`.
+ *
+ * They used to be transcribed here. The iOS app now runs the same scan against the same
+ * three contracts, and two copies of a topic layout is how two apps come to disagree
+ * about what a user's history is. The SDK holds one copy, with the note about why
+ * indexed-ness is stated inline; both readers import it.
+ */
+const VAULT_EVENTS = MAREN_VAULT_EVENTS;
+const PAY_EVENTS = MAREN_PAY_EVENTS;
+const EARN_EVENTS = MAREN_EARN_EVENTS;
 
 type DecodedLog = Log & { eventName?: string; args?: Record<string, unknown> };
 
@@ -138,6 +109,15 @@ export async function readActivity(
    * did before the cache existed and what every call still does the first time.
    */
   cached: ActivityWindow | null = null,
+  /**
+   * The endpoints to ask for receipts, in preference order.
+   *
+   * Separate from `client` because a receipt that comes back EMPTY is not a transport
+   * failure and so is never failed over by `fallback()`. See `readReceipts` below and the
+   * note on `getEndpointClients` in `./transport`. Defaults to the scan's own client, so
+   * a caller that does not care keeps the previous single-endpoint behaviour.
+   */
+  receiptClients: PublicClient[] = [client],
 ): Promise<ActivityWindow> {
   const deployedAt = getDeploymentBlock(network);
   if (deployedAt === null) {
@@ -199,7 +179,7 @@ export async function readActivity(
   const shown = mine.slice(0, MAX_ROWS);
   const [timestamps, receipts] = await Promise.all([
     readTimestamps(client, shown),
-    readReceipts(client, shown),
+    readReceipts(receiptClients, shown, account),
   ]);
 
   const items: ActivityItem[] = [];
@@ -376,6 +356,25 @@ function splitRange(from: bigint, to: bigint): { from: bigint; to: bigint }[] {
   return windows;
 }
 
+/**
+ * WHY THESE TWO READS ABSORB THEIR OWN PER-ITEM FAILURES.
+ *
+ * Measured on matsnet, 2026-08-19: `eth_getLogs` against https://rpc.test.mezo.org
+ * returned a MarenPay log, and `eth_getTransactionReceipt` for that same transaction
+ * returned `null` from the same endpoint, while https://mezo-testnet.drpc.org returned
+ * the receipt in full. The endpoints disagree, which is exactly the transient
+ * inconsistency `chains.ts` warns about and tells every client to expect.
+ *
+ * Before this, one such receipt threw out of `Promise.all` and the whole Activity screen
+ * fell into its failure state, telling the user their history could not be read when in
+ * fact all of it but one row's status had been. `status: 'pending'` is already defined as
+ * "we have a hash and no receipt yet", which is precisely the situation, so the gap
+ * degrades the ROW and nothing more.
+ *
+ * A real outage still surfaces as a failure: `getLogs` runs first and throws, so a dead
+ * endpoint can never arrive here and be rendered as a list of pending rows.
+ */
+
 /** Block timestamps for the blocks we are about to render, and only those. */
 async function readTimestamps(
   client: PublicClient,
@@ -384,11 +383,17 @@ async function readTimestamps(
   const unique = [...new Set(logs.map((log) => log.blockNumber).filter((n) => n !== null))];
   const entries = await Promise.all(
     unique.map(async (blockNumber) => {
-      const block = await client.getBlock({ blockNumber });
-      return [blockNumber.toString(), Number(block.timestamp)] as const;
+      try {
+        const block = await client.getBlock({ blockNumber });
+        return [blockNumber.toString(), Number(block.timestamp)] as const;
+      } catch {
+        // Leaves `at` at 0, an unknown time. Deriving one from an assumed block interval
+        // would be a fabricated timestamp on a real transaction.
+        return null;
+      }
     }),
   );
-  return new Map(entries);
+  return new Map(entries.filter((entry): entry is [string, number] => entry !== null));
 }
 
 /**
@@ -396,34 +401,59 @@ async function readTimestamps(
  *
  * `sponsored` is not a label the app applies to itself — it is `receipt.from !== account`,
  * which is what sponsorship physically IS under ERC-2771: somebody else's address paid.
- * With no relayer running this is false on every row today, and it will become true on
- * its own the day one is deployed, without a copy change.
+ * With no relayer running this is false on every row today, and it becomes true on its
+ * own the day one is deployed, without a copy change.
+ *
+ * That last sentence used to be aspirational rather than true: this function read
+ * `receipt.from`, discarded it, and wrote a literal `false`, so nothing would ever have
+ * changed on its own. The expression below is now the definition the comment describes.
  */
 async function readReceipts(
-  client: PublicClient,
+  clients: PublicClient[],
   logs: DecodedLog[],
+  account: Address,
 ): Promise<Map<string, { gasPaid: bigint; sponsored: boolean; success: boolean }>> {
   const unique = [
     ...new Set(logs.map((log) => log.transactionHash).filter((h): h is Hash => h !== null)),
   ];
   const entries = await Promise.all(
     unique.map(async (hash) => {
-      const receipt = await client.getTransactionReceipt({ hash });
-      return [
-        hash.toLowerCase(),
-        {
-          gasPaid: receipt.gasUsed * receipt.effectiveGasPrice,
-          sponsored: false,
-          success: receipt.status === 'success',
-          from: receipt.from,
-        },
-      ] as const;
+      /**
+       * ASK EVERY ENDPOINT BEFORE BELIEVING AN EMPTY ANSWER.
+       *
+       * `{"result": null}` is a successful response, so `fallback()` has nothing to fail
+       * over on. On matsnet the endpoints genuinely disagree about mined transactions, so
+       * one node's "I do not have it" is not the chain's answer. The loop stops at the
+       * first endpoint that produces a receipt.
+       */
+      for (const client of clients) {
+        try {
+          const receipt = await client.getTransactionReceipt({ hash });
+          /**
+           * Derived rather than hard-coded. This used to read `receipt.from` and then
+           * throw it away in favour of a literal `false`, so the comment above described
+           * a behaviour the code did not have: nothing would have started reporting
+           * sponsored on its own. Now it will, because this IS the definition.
+           */
+          const sponsored = receipt.from.toLowerCase() !== account.toLowerCase();
+          return [
+            hash.toLowerCase(),
+            {
+              // A user who did not send the transaction did not pay for it, so a
+              // sponsored row shows nothing rather than the relayer's cost quoted at them.
+              gasPaid: sponsored ? 0n : receipt.gasUsed * receipt.effectiveGasPrice,
+              sponsored,
+              success: receipt.status === 'success',
+            },
+          ] as const;
+        } catch {
+          // This endpoint could not answer. Try the next before concluding anything.
+        }
+      }
+      // Nobody had it. No entry, so the row reports 'pending' rather than borrowing a
+      // status from a receipt nobody read. See the note above this pair of functions.
+      return null;
     }),
   );
-  return new Map(
-    entries.map(([hash, value]) => [
-      hash,
-      { gasPaid: value.gasPaid, sponsored: value.sponsored, success: value.success },
-    ]),
-  );
+  return new Map(entries.filter((entry): entry is NonNullable<typeof entry> => entry !== null));
 }
