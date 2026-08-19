@@ -568,6 +568,122 @@ contract MarenVaultTest is VaultTestBase {
         assertEq(vault.insuranceCollateralAccrued(), 0.3 ether);
     }
 
+    /**
+     * @notice `skim()` is the only function here that derives state from
+     *         `address(this).balance`, so it is the only one a re-entrant call could feed a
+     *         balance the ledger has not caught up with. This pins that it cannot.
+     * @dev The attack to rule out is an admin who is also a withdrawal recipient re-entering
+     *      from their `receive` hook to skim the BTC that is on its way out, which would credit
+     *      `collateral[address(this)]` for it a second time and leave `idleCollateral` above
+     *      what the contract holds. It does not work, and the reason is worth writing down: the
+     *      EVM debits the call value before the callee runs, so by the time the hook executes
+     *      `_sendCollateral` has already lowered `idleCollateral` and the BTC has already gone.
+     *      Balance and ledger match and `skim()` reverts with `NothingToSkim`. `nonReentrant`
+     *      rejects it a step earlier; this test asserts the outcome either way, so it stays
+     *      meaningful if the guard is ever removed for gas.
+     */
+    function test_skim_cannotBeReenteredFromAWithdrawal() public {
+        SkimReenterer attacker = new SkimReenterer(vault);
+        bytes32 adminRole = vault.DEFAULT_ADMIN_ROLE();
+        vm.prank(admin);
+        vault.grantRole(adminRole, address(attacker));
+
+        vm.deal(address(attacker), 1 ether);
+        attacker.deposit(1 ether);
+
+        uint256 creditBefore = vault.collateral(address(vault));
+        attacker.withdrawAll(0.5 ether);
+
+        assertFalse(attacker.reenteredSkimSucceeded(), "the guard has to reject the re-entrant skim");
+        assertEq(vault.collateral(address(vault)), creditBefore, "no BTC was credited twice");
+        assertGe(
+            address(vault).balance, vault.idleCollateral(), "idle collateral must actually be in the contract"
+        );
+    }
+
+    /**
+     * @notice KNOWN LIMIT, pinned rather than buried (audit M-1). `withdrawProtocolCollateral`
+     *         does not pay the admin anything.
+     * @dev `_withdraw` sends to the account it debits, and the account here is `address(this)`,
+     *      so the BTC is pulled out of the trove and then sent from this contract to this
+     *      contract. Nobody is paid. What it actually does is turn `amount` of protocol-owned
+     *      collateral into unattributed surplus that only `skim()` can find again.
+     *
+     *      Pinned rather than fixed because making it pay out means opening an admin exit for
+     *      real BTC, which is a decision to take deliberately and not as an audit drive-by.
+     */
+    function test_withdrawProtocolCollateral_paysNobodyAndOnlySkimRecoversIt() public {
+        _deposit(alice, 1 ether);
+        uint256 adminBefore = admin.balance;
+        uint256 vaultBalanceBefore = address(vault).balance;
+        uint256 creditBefore = vault.collateral(address(vault));
+        uint256 totalBefore = vault.totalCollateral();
+
+        vm.prank(admin);
+        vault.withdrawProtocolCollateral(0.1 ether, address(0), address(0));
+
+        assertEq(admin.balance, adminBefore, "the admin received nothing at all");
+        assertEq(
+            address(vault).balance, vaultBalanceBefore + 0.1 ether, "the BTC only moved trove -> contract"
+        );
+        assertEq(
+            vault.collateral(address(vault)), creditBefore - 0.1 ether, "but the credit for it was burnt"
+        );
+        assertEq(vault.totalCollateral(), totalBefore - 0.1 ether, "and so was the total");
+        assertEq(vault.idleCollateral(), 0, "while idle collateral no longer accounts for it");
+
+        // It is recoverable, which is the only reason this is not a loss.
+        vm.prank(admin);
+        vault.skim();
+        assertEq(vault.collateral(address(vault)), creditBefore, "skim() puts the credit back");
+        assertEq(vault.totalCollateral(), totalBefore, "and the total with it");
+    }
+
+    /**
+     * @notice KNOWN LIMIT, pinned rather than buried (audit M-3). A pooled trove that leaves
+     *         the active state freezes BTC that never entered the trove, and there is no admin
+     *         path out of the frozen state at all.
+     * @dev The file header explains the freeze in terms of collateral sitting in the MUSD
+     *      CollSurplusPool, which this contract cannot reach. Idle collateral is a different
+     *      and larger problem: it is native BTC held right here, whose payout needs no trove,
+     *      no oracle and no protocol call, and it is frozen anyway because `_syncState` runs
+     *      first on every mutation. `closePooledTrove` is the only thing that clears
+     *      `troveOpen`, and it syncs too, so it reverts in exactly the state it is needed.
+     */
+    function test_frozenTroveStrandsIdleBtcWithNoAdminPathOut() public {
+        _deposit(alice, 1 ether);
+        _borrow(alice, 10_000e18);
+
+        // The oracle is down, so bob's deposit is held idle and never reaches the trove.
+        priceFeed.setStale(true);
+        _deposit(bob, 3 ether);
+        priceFeed.setStale(false);
+        assertEq(vault.idleCollateral(), 3 ether, "3 BTC is sitting in this contract, not in the trove");
+        assertEq(address(vault).balance, 3 ether, "and it is really here");
+
+        protocol.liquidateTrove(address(vault));
+        bytes memory frozen = abi.encodeWithSelector(MarenVault.TroveNoLongerActive.selector, 3);
+
+        // Bob cannot have the BTC that never left the building.
+        vm.prank(bob);
+        vm.expectRevert(frozen);
+        vault.withdraw(1 wei, address(0), address(0));
+
+        // And no privileged account can unwind the vault to release it. `closePooledTrove` is
+        // the only setter of `troveOpen`, and it syncs before it does anything.
+        vm.prank(admin);
+        vm.expectRevert(frozen);
+        vault.closePooledTrove();
+
+        vm.prank(admin);
+        vm.expectRevert(frozen);
+        vault.withdrawProtocolCollateral(1 wei, address(0), address(0));
+
+        vm.prank(keeper);
+        vm.expectRevert(frozen);
+        vault.topUpCollateral(1 wei, address(0), address(0));
+    }
+
     function testRevert_skim_whenNothingToSkim() public {
         vm.prank(admin);
         vm.expectRevert(MarenVault.NothingToSkim.selector);
@@ -682,5 +798,38 @@ contract MarenVaultTest is VaultTestBase {
         priceFeed.setStale(true);
         vm.expectRevert(MarenVault.PriceFeedUnavailable.selector);
         vault.collateralRatioOf(alice);
+    }
+}
+
+/**
+ * @notice An admin that tries to skim the BTC of its own withdrawal while that BTC is still in
+ *         flight. The re-entrant call is try/catch'd so the test can assert the guard rejected
+ *         it, rather than merely that the whole transaction reverted for some reason.
+ */
+contract SkimReenterer {
+    MarenVault public immutable vault;
+    bool public reenteredSkimSucceeded;
+    bool private _armed;
+
+    constructor(MarenVault vault_) {
+        vault = vault_;
+    }
+
+    function deposit(uint256 amount) external {
+        vault.deposit{value: amount}(address(0), address(0));
+    }
+
+    function withdrawAll(uint256 amount) external {
+        _armed = true;
+        vault.withdraw(amount, address(0), address(0));
+        _armed = false;
+    }
+
+    receive() external payable {
+        if (!_armed) return;
+        _armed = false;
+        try vault.skim() {
+            reenteredSkimSucceeded = true;
+        } catch {}
     }
 }
