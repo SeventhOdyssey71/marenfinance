@@ -12,7 +12,6 @@ import { Screen } from '../../src/components/Screen';
 import { Label, Num, Txt } from '../../src/components/Text';
 import { base, radius, semanticText, space, text } from '../../src/design/tokens';
 import { fonts } from '../../src/design/type';
-import { MOCK_HANDLE } from '../../src/data/mock';
 import { useAppStore } from '../../src/state/store';
 import { deriveAddress, normalisePrivateKey, storeKey } from '../../src/wallet/keystore';
 
@@ -44,7 +43,9 @@ export default function ImportWallet() {
     setError(null);
     try {
       const protection = await storeKey(normalised);
-      setAccount({ address: preview, handle: MOCK_HANDLE, protection });
+      // The handle is resolved from MarenRegistry once the account exists, never
+      // assumed. An imported address that has no registration simply has no handle.
+      setAccount({ address: preview, handle: null, protection });
       setRaw('');
       router.replace('/(tabs)');
     } catch (e) {

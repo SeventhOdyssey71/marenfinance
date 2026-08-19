@@ -10,6 +10,7 @@ import {
 
 import { Btc, Musd, Ratio, Usd } from '../../src/components/Money';
 import { Card } from '../../src/components/Card';
+import { DemoNotice, ReadFailure } from '../../src/components/DataNotice';
 import { HealthScale } from '../../src/components/HealthScale';
 import { Icon } from '../../src/components/Icon';
 import { PriceBanner } from '../../src/components/PriceBanner';
@@ -30,7 +31,13 @@ import {
   toneColor,
 } from '../../src/design/tokens';
 import { usableTitle } from '../../src/lib/copy';
-import { useBalances, useHealth, usePosition, usePrice } from '../../src/hooks/useChainData';
+import {
+  useBalances,
+  useHealth,
+  usePosition,
+  usePrice,
+  usePrimaryHandle,
+} from '../../src/hooks/useChainData';
 import { useAppStore } from '../../src/state/store';
 
 /**
@@ -51,10 +58,25 @@ export default function Home() {
   const hidden = useAppStore((s) => s.amountsHidden);
   const toggleHidden = useAppStore((s) => s.toggleAmountsHidden);
 
+  const demo = useAppStore((s) => s.dataSource === 'mock');
+
   const price = usePrice();
-  const { data: position } = usePosition();
-  const { data: balances } = useBalances();
+  const { data: position, error: positionError, refetch: refetchPosition } = usePosition();
+  const { data: balances, error: balancesError } = useBalances();
   const health = useHealth();
+
+  // Resolved from MarenRegistry and mirrored into the store, so the header shows this
+  // account's own handle or no handle at all, never a placeholder standing in for one.
+  usePrimaryHandle();
+
+  /**
+   * One notice for the pair, because they fail together.
+   *
+   * Position and balances are read through the same client in the same batch, so an RPC
+   * outage takes both. Two identical warnings stacked on one screen is noise that trains
+   * people to scroll past the thing we most need them to read.
+   */
+  const readError = positionError ?? balancesError;
 
   const tone = health ? (healthTone[health.status] ?? 'neutral') : 'neutral';
   /** Small semantic indicator — keeps the success green. */
@@ -87,6 +109,29 @@ export default function Home() {
           <IconButton name="settings" label="Settings" onPress={() => router.push('/settings')} />
         </View>
       </View>
+
+      {demo ? <DemoNotice /> : null}
+
+      {/*
+        The read failure sits ABOVE the hero, not inside it.
+
+        The hero already has a state for "no live price", and stacking a second failure
+        inside it would make two different problems look like one. This is the other
+        failure: the chain did not answer at all, so there is no position to have an
+        opinion about. The balances below render their dash placeholder rather than
+        zeroes, and this banner is what says why.
+      */}
+      {readError ? (
+        <View style={styles.readError}>
+          <ReadFailure
+            what="your position"
+            detail={readError instanceof Error ? readError.message : String(readError)}
+            onRetry={() => {
+              void refetchPosition();
+            }}
+          />
+        </View>
+      ) : null}
 
       {/* Hero: position health */}
       <Card style={styles.hero}>
@@ -335,6 +380,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     ...cardShadow,
   },
+  readError: { marginBottom: space.lg },
   hero: { marginBottom: space.lg },
   heroTop: {
     flexDirection: 'row',

@@ -69,6 +69,17 @@ export interface TrailingYield {
   lastGainAt: number | null;
 }
 
+/**
+ * Every kind of row a log scan can produce.
+ *
+ * The last three were added when Activity started reading real logs. MarenPay emits
+ * `RequestCreated`, `LinkCreated` and `LinkClaimed` whether or not this app has a screen
+ * for them, and an address that used the web app has them in its history. Dropping those
+ * logs on the floor would have been the quiet kind of wrong: the coverage line says
+ * "read every block from X to Y", and a list that silently discards events inside that
+ * range makes the sentence false. A row the app can describe plainly is better than a
+ * gap, so they are decoded and named.
+ */
 export type ActivityKind =
   | 'deposit'
   | 'withdraw'
@@ -77,7 +88,10 @@ export type ActivityKind =
   | 'send'
   | 'receive'
   | 'earn-deposit'
-  | 'earn-withdraw';
+  | 'earn-withdraw'
+  | 'request-created'
+  | 'link-created'
+  | 'link-claimed';
 
 /**
  * R15 lives in this type. `status` is never derived from "we got a hash back" — it is
@@ -117,4 +131,29 @@ export interface ActivityItem {
 export interface Handle {
   handle: string;
   address: Address;
+}
+
+/**
+ * A list of activity, plus the span it was actually read over.
+ *
+ * `readActivity()` returns this rather than a bare `ActivityItem[]` because THE SPAN IS
+ * PART OF THE ANSWER. "Nothing here" means something different when the scan reached the
+ * block Maren was deployed at than when it only reached three days back, and the screen
+ * renders a different empty state for each. Flattening this to an array would throw the
+ * distinction away and let the UI round "nothing recent" up to "nothing ever".
+ *
+ * The web app's reader returns the identical shape, for the identical reason. See
+ * `apps/web/src/lib/chain/logs.ts`.
+ */
+export interface ActivityWindow {
+  items: ActivityItem[];
+  /** Oldest block actually scanned, inclusive. */
+  fromBlock: bigint;
+  /** Newest block actually scanned, inclusive. */
+  toBlock: bigint;
+  /**
+   * True when `fromBlock` is the deployment block, so an empty `items` is a complete
+   * answer about this account rather than a recent one.
+   */
+  complete: boolean;
 }

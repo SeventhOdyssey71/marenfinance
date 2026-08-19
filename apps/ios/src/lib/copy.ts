@@ -67,6 +67,18 @@ export function activityTitle(kind: ActivityKind, counterparty?: string): string
       return 'Moved to Earn';
     case 'earn-withdraw':
       return 'Withdrew from Earn';
+    /**
+     * MarenPay's request and link events. This app has no screen that creates them, but
+     * an address that used the web app has them in its history, and Activity claims to
+     * have read every block in its window. Naming them plainly is the only way to keep
+     * that claim true without building the screens first.
+     */
+    case 'request-created':
+      return 'Requested MUSD';
+    case 'link-created':
+      return 'Created a payment link';
+    case 'link-claimed':
+      return 'Payment link claimed';
   }
 }
 

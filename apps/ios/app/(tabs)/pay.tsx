@@ -15,7 +15,7 @@ import { Label, Num, Txt } from '../../src/components/Text';
 import { TxSheet, useTxRunner } from '../../src/components/TxSheet';
 import { base, brand, radius, semanticText, space, text } from '../../src/design/tokens';
 import { fonts } from '../../src/design/type';
-import { resolveHandle } from '../../src/data/mock';
+import { resolveHandle } from '../../src/data/source';
 import type { Handle } from '../../src/data/types';
 import { useBalances } from '../../src/hooks/useChainData';
 import { gasCopy } from '../../src/lib/copy';

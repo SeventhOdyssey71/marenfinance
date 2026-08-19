@@ -4,6 +4,7 @@ import { formatMusd } from '@maren/sdk';
 
 import { Amount, Musd } from '../../src/components/Money';
 import { Card } from '../../src/components/Card';
+import { DemoNotice, ReadFailure } from '../../src/components/DataNotice';
 import { Icon } from '../../src/components/Icon';
 import { PillButton } from '../../src/components/PillButton';
 import { StatRow } from '../../src/components/Row';
@@ -13,6 +14,7 @@ import { TxSheet, useTxRunner } from '../../src/components/TxSheet';
 import { base, radius, semanticText, space, text } from '../../src/design/tokens';
 import { timeAgo } from '../../src/lib/copy';
 import { useBalances, useEarn } from '../../src/hooks/useChainData';
+import { useAppStore } from '../../src/state/store';
 
 /**
  * Earn — idle MUSD into the MUSD Stability Pool via MarenEarn (ERC-4626).
@@ -27,8 +29,9 @@ import { useBalances, useEarn } from '../../src/hooks/useChainData';
  * percent sign on it. The screen says so in as many words.
  */
 export default function Earn() {
-  const { data: earn } = useEarn();
+  const { data: earn, error: earnError, refetch: refetchEarn } = useEarn();
   const { data: balances } = useBalances();
+  const demo = useAppStore((s) => s.dataSource === 'mock');
   const runner = useTxRunner();
   const [mode, setMode] = useState<'deposit' | 'withdraw'>('deposit');
 
@@ -42,6 +45,20 @@ export default function Earn() {
           Idle MUSD
         </Txt>
       </View>
+
+      {demo ? <DemoNotice /> : null}
+
+      {earnError ? (
+        <View style={styles.readError}>
+          <ReadFailure
+            what="your Earn position"
+            detail={earnError instanceof Error ? earnError.message : String(earnError)}
+            onRetry={() => {
+              void refetchEarn();
+            }}
+          />
+        </View>
+      ) : null}
 
       {/* Position */}
       <Card style={styles.hero}>
@@ -211,6 +228,7 @@ export default function Earn() {
 const styles = StyleSheet.create({
   header: { marginBottom: space.xl },
   title: { marginTop: space.xs },
+  readError: { marginBottom: space.lg },
   hero: { marginBottom: space.lg },
   heroValue: { marginTop: space.md, marginBottom: space.md },
   yieldCard: { marginBottom: space.xl },
