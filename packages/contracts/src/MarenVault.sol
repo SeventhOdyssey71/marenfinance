@@ -282,7 +282,9 @@ contract MarenVault is AccessControl, ERC2771Context, ReentrancyGuard {
     uint256 public totalCollateral;
     uint256 public totalDebtShares;
 
-    /// @notice Monotonically non-decreasing. Starts at 1e18.
+    /// @notice Starts at 1e18. Non-decreasing everywhere EXCEPT `_reconcileRedemption`, which
+    ///         is the single place it falls and does so only by a quantity measured off the
+    ///         live trove. Do not write code that assumes it only goes up.
     uint256 public interestIndex = WAD;
 
     /// @notice BTC held here but not yet inside the trove (oracle was down when it arrived,
@@ -323,9 +325,22 @@ contract MarenVault is AccessControl, ERC2771Context, ReentrancyGuard {
      * @dev Only reachable for a position already below 100% collateralisation, where the
      *      debit exceeds every wei the account holds. It is capped at the account's balance,
      *      added back to `totalCollateral` and recorded here rather than being spread silently
-     *      onto other users, in exactly the same spirit as `badDebtRecognised`. While it is
-     *      non-zero the pool's credited collateral exceeds the trove's by this amount, and an
-     *      admin makes it whole with `depositProtocolCollateral`.
+     *      onto other users, in exactly the same spirit as `badDebtRecognised`.
+     *
+     *      IT IS A PERMANENT GAP, and every place that compares the books against the live
+     *      trove has to subtract it. `totalCollateral` is credited back so the per-account
+     *      ledger still sums to it, which means the books deliberately record more collateral
+     *      than the protocol holds, by exactly this much, for the life of the contract. The
+     *      redemption detector reads that gap, so without subtracting it the detector would
+     *      re-read the SAME shortfall as a fresh redemption on the very next sync and charge
+     *      it pro rata to everyone still holding debt shares, which is the socialisation this
+     *      whole mechanism exists to prevent. See `_booksInTrove`.
+     *
+     *      THERE IS NO MAKE-WHOLE PATH, and `depositProtocolCollateral` is not one:
+     *      it credits `collateral[address(this)]` and raises `totalCollateral` by the same
+     *      amount it adds to the trove, so the gap survives it unchanged. Covering a shortfall
+     *      means adding BTC that is credited to nobody, and deciding whether the protocol or
+     *      the pool eats it is a governance question. See docs/audit/CONTRACTS-AUDIT.md M-2.
      */
     uint256 public redemptionShortfall;
 
@@ -497,9 +512,7 @@ contract MarenVault is AccessControl, ERC2771Context, ReentrancyGuard {
     /**
      * @notice Deposit BTC and draw MUSD against it in one transaction.
      * @dev This is `deposit` followed by `borrow` and nothing else. It calls the same two
-     *      internals those entrypoints call, in the same order, with the same checks, so the
-     *      revert a caller gets from this is the revert they would have got from whichever of
-     *      the two single calls failed first:
+     *      internals those entrypoints call, in the same order, with the same checks:
      *
      *        `DepositsArePaused` / `DepositBelowMinimum`:  the deposit leg's own guards
      *        `BorrowingIsPaused` / `ZeroAmount` / `TroveNotOpen`: the borrow leg's
@@ -508,6 +521,15 @@ contract MarenVault is AccessControl, ERC2771Context, ReentrancyGuard {
      *        `PriceFeedUnavailable`:                       the borrow leg needs a price
      *        `InsufficientCollateralRatio`:                the 180% per-user floor
      *        `TroveCollateralRatioTooLow`:                 the 180% pooled-trove floor
+     *
+     *      THE REVERT REASON IS NOT ALWAYS THE ONE THE TWO SEPARATE CALLS WOULD HAVE GIVEN,
+     *      and the earlier version of this comment claimed it was. Both guard sets run before
+     *      either leg, so a borrow-leg guard beats a deposit-leg failure that only surfaces at
+     *      or after the sync. Exactly two orderings differ, both verified: over the cap with a
+     *      zero borrow reports `ZeroAmount` where `deposit` alone reports `DepositCapExceeded`,
+     *      and a frozen trove with borrowing paused reports `BorrowingIsPaused` where `deposit`
+     *      alone reports `TroveNoLongerActive`. Nothing executes in either case, so this costs
+     *      a caller diagnosis and never state. See docs/audit/CONTRACTS-AUDIT.md I-1.
      *
      *      The 180% floor is computed on the POST-deposit position, because `_creditDeposit`
      *      has already run when `_borrow` reads `collateral[user]`. A user depositing 0.01 BTC
@@ -927,8 +949,27 @@ contract MarenVault is AccessControl, ERC2771Context, ReentrancyGuard {
         emit PooledTroveClosed(returned);
     }
 
-    /// @notice Credit unattributed BTC sitting in this contract to the insurance buffer.
-    function skim() external onlyRole(DEFAULT_ADMIN_ROLE) {
+    /**
+     * @notice Credit unattributed BTC sitting in this contract to the insurance buffer.
+     * @dev This is the only function here that derives state from `address(this).balance`, so
+     *      it is the only one a re-entrant call could feed a balance the ledger has not caught
+     *      up with. It cannot: the EVM debits the value at CALL time, so by the moment a
+     *      withdrawal recipient's `receive` hook runs, `_sendCollateral` has already lowered
+     *      `idleCollateral` AND the BTC has already left, and `skim()` reverts with
+     *      `NothingToSkim`. `test_skim_cannotBeReenteredFromAWithdrawal` pins that.
+     *
+     *      `nonReentrant` is here as belt-and-braces anyway, because it makes the statement
+     *      "every mutation on this contract is guarded" true without a footnote, and because
+     *      the argument above depends on an EVM detail rather than on anything local.
+     *
+     *      It is also the only mutation that does not `_syncState()` first, deliberately: it
+     *      is a recovery tool and has to keep working when the pooled trove has left the active
+     *      state. The consequence is that its `_settleRedemption` call can be a no-op against a
+     *      per-share figure an unreconciled redemption has not bumped yet. That is harmless:
+     *      the debit is priced off debt shares, which this function does not touch, so it lands
+     *      identically on the next sync.
+     */
+    function skim() external onlyRole(DEFAULT_ADMIN_ROLE) nonReentrant {
         uint256 surplus = address(this).balance - idleCollateral;
         if (surplus == 0) revert NothingToSkim();
         _settleRedemption(address(this));
@@ -939,8 +980,20 @@ contract MarenVault is AccessControl, ERC2771Context, ReentrancyGuard {
         emit Skimmed(surplus);
     }
 
-    /// @notice Withdraw protocol-owned collateral (seed + insurance). Subject to the same
-    ///         180% floor as any user, so the buffer can never be drained out from under one.
+    /**
+     * @notice Move protocol-owned collateral (seed + insurance) out of the pooled trove.
+     *         Subject to the same 180% floor as any user, so the buffer can never be drained
+     *         out from under one.
+     * @dev READ THIS BEFORE CALLING IT. This does NOT pay the admin. `_withdraw` sends to the
+     *      account it debits, and the account here is `address(this)`, so the BTC is pulled out
+     *      of the trove and then sent to this contract from this contract: a no-op transfer.
+     *      What actually happens is that `collateral[address(this)]`, `totalCollateral` and
+     *      `idleCollateral` all fall by `amount` while the contract's real BTC balance does
+     *      not, turning `amount` of protocol-owned collateral into unattributed surplus.
+     *      `skim()` credits that surplus straight back, so nothing is lost, but nothing is
+     *      withdrawn either. Paying an external recipient needs a recipient argument and an
+     *      explicit decision to open an admin exit; see docs/audit/CONTRACTS-AUDIT.md M-1.
+     */
     function withdrawProtocolCollateral(uint256 amount, address upperHint, address lowerHint)
         external
         onlyRole(DEFAULT_ADMIN_ROLE)
@@ -1179,13 +1232,33 @@ contract MarenVault is AccessControl, ERC2771Context, ReentrancyGuard {
         if (candidate > index) index = candidate;
     }
 
+    /**
+     * @dev How much collateral the books say is sitting inside the pooled trove right now.
+     *
+     *      `redemptionShortfall` comes out because it is credited collateral that is KNOWN not
+     *      to exist: `_recogniseShortfall` adds an uncollectable debit back to
+     *      `totalCollateral` so the per-account ledger still sums to it, which leaves the books
+     *      permanently that much above the protocol's real holdings. Leaving it in would make
+     *      the redemption detector read that same gap as a brand new redemption on the very
+     *      next sync, charge it pro rata to every remaining debt-share holder, and repeat on
+     *      every sync after that until the shortfall had been socialised onto exactly the users
+     *      it was recorded to protect.
+     *
+     *      Both callers use this, so the detector and the view that previews it can never
+     *      disagree about what counts.
+     */
+    function _booksInTrove() private view returns (uint256) {
+        uint256 elsewhere = idleCollateral + redemptionShortfall;
+        return totalCollateral > elsewhere ? totalCollateral - elsewhere : 0;
+    }
+
     /// @dev BTC that has left the pooled trove without the vault asking, and has not been
     ///      reconciled yet. Zero in the ordinary case, and zero once anyone transacts.
     function _pendingRedemptionCollateral() private view returns (uint256) {
         if (!troveOpen) return 0;
         if (troveManager.getTroveStatus(address(this)) != TROVE_STATUS_ACTIVE) return 0;
         (uint256 troveColl,) = _troveCollAndNetDebt();
-        uint256 booksInTrove = totalCollateral > idleCollateral ? totalCollateral - idleCollateral : 0;
+        uint256 booksInTrove = _booksInTrove();
         return troveColl >= booksInTrove ? 0 : booksInTrove - troveColl;
     }
 
@@ -1247,13 +1320,24 @@ contract MarenVault is AccessControl, ERC2771Context, ReentrancyGuard {
      *      few wei above outstanding debt in normal operation, as the rounding surplus the
      *      accrual deliberately keeps; re-pegging the index on that alone would hand the
      *      surplus back to users on every single call.
+     *
+     *      KNOWN LIMIT, and it is a real one. The debt relief handed to users is capped at what
+     *      they owe (`accounted`), because that is all the index can cancel. The COLLATERAL
+     *      debit is not capped: the full `collateralRemoved` is split across shares whatever
+     *      the relief turned out to be. When a redemption cancels more trove debt than the
+     *      pool's users actually owe, which needs `reserveMUSD` to be non-zero because
+     *      `outstanding = troveNetDebt - reserveMUSD`, the excess relief lands in the reserve,
+     *      where no user has a claim on it, while users still pay for it in collateral. The
+     *      loss is bounded by `reserveMUSD` at the moment the redemption lands. Deciding who
+     *      absorbs it is a governance question, not a rounding one; it is written up as H-2 in
+     *      docs/audit/CONTRACTS-AUDIT.md rather than guessed at here.
      */
     function _reconcileRedemption() private {
         if (!troveOpen) return;
         _requireTroveActive();
 
         (uint256 troveColl,) = _troveCollAndNetDebt();
-        uint256 booksInTrove = totalCollateral > idleCollateral ? totalCollateral - idleCollateral : 0;
+        uint256 booksInTrove = _booksInTrove();
         if (troveColl >= booksInTrove) return;
 
         uint256 collateralRemoved = booksInTrove - troveColl;
@@ -1340,6 +1424,8 @@ contract MarenVault is AccessControl, ERC2771Context, ReentrancyGuard {
     /// @dev Puts an uncharged redemption debit back on the books instead of quietly spreading
     ///      it across the other users. `totalCollateral` is credited back so the per-account
     ///      ledger never sums to more than it, which would brick withdrawals on an underflow.
+    ///      That credit is the reason `_booksInTrove` subtracts `redemptionShortfall`: read
+    ///      that comment before touching either.
     function _recogniseShortfall(address account, uint256 amount) private {
         if (amount == 0) return;
         redemptionShortfall += amount;
