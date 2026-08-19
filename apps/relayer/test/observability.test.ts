@@ -32,6 +32,7 @@ interface LogLine {
   payer?: string;
   ipHash?: string;
   reservedWei?: string;
+  committedWei?: string;
   limitWei?: string;
   msg?: string;
 }
@@ -204,7 +205,7 @@ describe('a rate limit warns before it bites', () => {
 describe('the daily BTC budget warns before it halts', () => {
   const PER_REQUEST_WEI = 200_000n * 2_600_000n;
 
-  it('WARNs when reservations cross 80% of the daily budget, once', async () => {
+  it('WARNs when committed spend crosses 80% of the daily budget, once', async () => {
     const { logger, lines } = capturingLogger();
     const chain = new FakeChain();
     // Budget for exactly five requests: the fourth crosses 80%.
@@ -227,7 +228,39 @@ describe('the daily BTC budget warns before it halts', () => {
     expect(warned).toHaveLength(1);
     expect(warned[0]?.level).toBe(WARN);
     expect(warned[0]?.pct).toBe(80);
-    expect(warned[0]?.reservedWei).toBe((PER_REQUEST_WEI * 4n).toString());
+    expect(warned[0]?.committedWei).toBe((PER_REQUEST_WEI * 4n).toString());
+  });
+
+  /**
+   * THE SAME SIGNAL, ATTACKED. The warning used to be taken at reservation time,
+   * off the reserved counter. A request that fails simulation still reserves,
+   * crosses the threshold, warns, and is then refunded back under it — so the
+   * next one crosses again, and an anonymous caller can emit the operator's page
+   * signal at will for zero wei of spend. Measured at six warnings from six
+   * reverting requests before this moved onto committed spend.
+   */
+  it('a burst of doomed requests cannot manufacture budget warnings', async () => {
+    const { logger, lines } = capturingLogger();
+    const chain = new FakeChain({ simulateReverts: true });
+    const relayer = await buildTestRelayer(
+      makeEnv({
+        RELAYER_MAX_DAILY_SPONSORED_BTC: (Number(PER_REQUEST_WEI * 2n) / 1e18).toFixed(18),
+        RELAYER_MAX_ACTIONS_PER_ADDRESS_DAY: '999',
+        RELAYER_MAX_ACTIONS_PER_IP_DAY: '999',
+      }),
+      chain,
+      undefined,
+      logger,
+    );
+
+    for (let i = 0; i < 6; i += 1) {
+      const response = await relayer.post('/relay', await signedRequest());
+      expect(response.status).toBe(422);
+    }
+
+    expect(chain.sent).toHaveLength(0);
+    expect(lines().filter((l) => l.event === 'budget.near_limit')).toHaveLength(0);
+    expect(lines().filter((l) => l.event === 'quota.near_limit')).toHaveLength(0);
   });
 
   it('still halts on committed spend, and says so at ERROR', async () => {
