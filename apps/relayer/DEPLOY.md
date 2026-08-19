@@ -230,24 +230,32 @@ first genuine relay is the first sponsored action from the app.
 NEXT_PUBLIC_RELAYER_URL=https://your-relayer-hostname
 ```
 
-Then flip the single flag that records whether a relayer exists:
+**That is the whole configuration.** There is no second flag to flip. The
+hand-edited `RELAYER_AVAILABLE` this section used to describe is gone: it
+recorded an intention rather than a fact, which is why this document had to warn
+you not to set it early. The web app now decides per action, from three things
+it can check:
 
-```ts
-// apps/web/src/lib/chain/write.ts
-export const RELAYER_AVAILABLE = true;
-```
+1. `NEXT_PUBLIC_RELAYER_URL` is set. Read at build time, so it is the same on
+   the server and in the browser.
+2. `GET /healthz` answers 200 with `accepting: true`. Probed from the browser,
+   cached for 30 seconds, and treated as "no" on any timeout, parse failure or
+   unreachable host.
+3. `MarenRelayHub` will forward that exact call. Mirrored from
+   `script/Deploy.s.sol` in `apps/web/src/lib/chain/relay.ts`.
 
-**Be honest about what that does today.** `RELAYER_AVAILABLE` controls the gas
-copy the UI shows, and nothing else: no code in `apps/web` currently POSTs to
-`/relay`. Flipping it before a submit path exists would make the app claim
-sponsorship it does not perform, which is the specific failure the flag was
-introduced to prevent. Deploy the relayer first, then write the client, then
-flip the flag.
+All three, or the user's own wallet submits and the interface says so before
+they press anything. A relayer that is configured but refusing work does not
+produce a hanging button; it produces a screen that says you are paying.
 
-CORS: the relayer sets no CORS headers, so a browser on another origin cannot
-call it yet. Either put it behind the same hostname as the web app (a path
-prefix on your proxy) or add an explicit allowlisted origin when the client is
-written. Do not add a wildcard.
+**CORS.** The relayer still sets no CORS headers, so a browser on another origin
+cannot call it. Put it behind the same hostname as the web app — a path prefix
+on your proxy, forwarding `/relay`, `/status`, `/quota`, `/health` and
+`/healthz` — and set `NEXT_PUBLIC_RELAYER_URL` to that path. Do not add a
+wildcard origin. The health probe fails closed, so an origin the browser blocks
+shows up as "the relayer is not taking work" rather than as a broken action, but
+it is still a misconfiguration and `/healthz` from `curl` on the host will
+disagree with what the app reports.
 
 ---
 

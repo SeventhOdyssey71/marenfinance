@@ -43,15 +43,17 @@ describe('signature verification', () => {
     ['recipient', () => payCalldata(ATTACKER)],
     ['amount', () => payCalldata(undefined, parseEther('1000000'))],
     [
-      'relayFee',
+      // The memo is written on-chain and is publicly readable forever, so swapping it
+      // after signing rewrites the permanent record of a payment the user authorised.
+      // It replaces the old `relayFee` case: no Maren function carries one any more.
+      'memo',
       () =>
         encodeFunctionData({
           abi: [PAY.abi],
           args: [
             getAddress('0x5555555555555555555555555555555555555555'),
             parseEther('10'),
-            'lunch',
-            parseEther('99'),
+            'not what was signed',
           ],
         }),
     ],

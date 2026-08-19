@@ -96,43 +96,79 @@ function fn(contract: MarenContractName, signature: string): RelayableFunction {
  * refuses any request with a non-zero `value` (R3), so a BTC deposit is a call
  * the user makes themselves. Only the MUSD-denominated vault operations are
  * relayable. This is a deliberate omission, not an oversight.
+ *
+ * THESE SIGNATURES WERE RE-READ FROM `packages/contracts/src/*.sol`.
+ *
+ * They had drifted, and the drift was total: every entry here carried a trailing
+ * `uint256 relayFee` that the contracts author later removed, and several named
+ * functions the contracts do not have (`payTo`, `commitHandle`, `revealHandle`,
+ * `withdrawCollateral`, `depositFor`, `redeemFor`). This file predates
+ * `packages/contracts` — the README still said the package "does not exist yet"
+ * — so every signature here was a guess at an unwritten contract, and every one
+ * of them was wrong.
+ *
+ * The failure that produces is the one the header above warns about, at full
+ * scale: a different signature is a different selector, so EVERY relay request
+ * the web app could ever send was destined for `403 SELECTOR_NOT_ALLOWED`. The
+ * failure direction was safe. The service was not usable.
+ *
+ * The set below is the intersection of two authorities: the Solidity, for the
+ * signatures, and `_allowlistRelayableCalls` in `script/Deploy.s.sol`, for which
+ * of them `MarenRelayHub` will forward on-chain. This relayer is willing to pay
+ * for exactly what the hub will accept, and for nothing that would revert
+ * `CallNotAllowed` after we had spent gas discovering it. `allowlist.test.ts`
+ * reads that script and fails if the two ever diverge again.
+ *
+ * A consequence worth stating: no contract carries a `relayFee` argument any
+ * more, so every `feeArgIndex` below is null, so the paid tier is CLOSED rather
+ * than free on every call. Once the free 25 are spent the relayer answers
+ * `402 SPONSORSHIP_UNAVAILABLE`. That is the documented behaviour and the safe
+ * one — a missing fee mechanism must never become an unbounded subsidy (R16).
  */
 export const RELAYABLE_FUNCTIONS: Readonly<
   Record<MarenContractName, readonly RelayableFunction[]>
 > = {
   marenPay: [
-    fn('marenPay', 'function pay(address to, uint256 amount, string memo, uint256 relayFee)'),
-    fn('marenPay', 'function payTo(string handle, uint256 amount, string memo, uint256 relayFee)'),
+    fn('marenPay', 'function pay(address to, uint256 amount, string memo)'),
+    fn('marenPay', 'function payToHandle(string handle, uint256 amount, string memo)'),
     fn(
       'marenPay',
-      'function createRequest(address from, uint256 amount, string memo, uint256 relayFee)',
+      'function payWithPermit(address to, uint256 amount, string memo, uint256 deadline, uint8 v, bytes32 r, bytes32 s)',
     ),
-    fn('marenPay', 'function fulfillRequest(bytes32 id, uint256 relayFee)'),
-    fn('marenPay', 'function cancelRequest(bytes32 id, uint256 relayFee)'),
     fn(
       'marenPay',
-      'function createLink(bytes32 amountHash, uint256 amount, uint64 expiry, uint256 relayFee)',
+      'function payWithPermit2(address to, uint256 amount, string memo, ((address token, uint256 amount) permitted, uint256 nonce, uint256 deadline) permit, bytes signature)',
     ),
-    fn('marenPay', 'function claimLink(bytes32 secret, uint256 relayFee)'),
+    fn('marenPay', 'function createRequest(address payer, uint256 amount, string memo)'),
+    fn('marenPay', 'function fulfillRequest(uint256 requestId)'),
     fn(
       'marenPay',
-      'function split(address[] recipients, uint256[] amounts, string memo, uint256 relayFee)',
+      'function fulfillRequestWithPermit(uint256 requestId, uint256 deadline, uint8 v, bytes32 r, bytes32 s)',
     ),
+    fn('marenPay', 'function cancelRequest(uint256 requestId)'),
+    fn('marenPay', 'function split(address[] recipients, uint256[] amounts, string memo)'),
+    fn('marenPay', 'function claimLink(uint256 linkId, address recipient, bytes signature)'),
   ],
   marenRegistry: [
-    fn('marenRegistry', 'function commitHandle(bytes32 commitment, uint256 relayFee)'),
-    fn('marenRegistry', 'function revealHandle(string handle, bytes32 salt, uint256 relayFee)'),
-    fn('marenRegistry', 'function setPrimaryHandle(string handle, uint256 relayFee)'),
+    fn('marenRegistry', 'function commit(bytes32 commitment)'),
+    fn('marenRegistry', 'function register(string handle, bytes32 secret)'),
+    fn('marenRegistry', 'function setPrimaryHandle(string handle)'),
+    fn('marenRegistry', 'function transferHandle(string handle, address to)'),
   ],
   marenVault: [
-    fn('marenVault', 'function borrow(uint256 amount, uint256 relayFee)'),
-    fn('marenVault', 'function repay(uint256 amount, uint256 relayFee)'),
-    fn('marenVault', 'function withdrawCollateral(uint256 amount, address to, uint256 relayFee)'),
+    fn('marenVault', 'function borrow(uint256 amount, address upperHint, address lowerHint)'),
+    fn('marenVault', 'function repay(uint256 amount, address upperHint, address lowerHint)'),
+    fn('marenVault', 'function withdraw(uint256 amount, address upperHint, address lowerHint)'),
+    fn('marenVault', 'function closePosition(address upperHint, address lowerHint)'),
   ],
-  marenEarn: [
-    fn('marenEarn', 'function depositFor(uint256 assets, address receiver, uint256 relayFee)'),
-    fn('marenEarn', 'function redeemFor(uint256 shares, address receiver, uint256 relayFee)'),
-  ],
+  // EMPTY ON PURPOSE, AND NOT AN OVERSIGHT. `script/Deploy.s.sol` allowlists
+  // MarenRegistry, MarenPay and MarenVault on the hub and does not allowlist
+  // MarenEarn at all. A selector this relayer admitted but the hub then reverted
+  // with `CallNotAllowed` would be caught in simulation and cost nothing — and it
+  // would still be this service advertising a sponsorship the chain refuses, which
+  // is the "documented here, broken in the code" shape R13 forbids. Add MarenEarn
+  // here in the same change that adds it to the deploy script, never before.
+  marenEarn: [],
   // The forwarder is never itself a relay target — relaying a call *to* the
   // forwarder would let a request nest another request. Explicitly empty.
   marenForwarder: [],

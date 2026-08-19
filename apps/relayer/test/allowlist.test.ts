@@ -1,8 +1,9 @@
+import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 import { encodeFunctionData, getAddress, parseEther, toFunctionSelector } from 'viem';
 import {
   buildTestRelayer,
-  MAREN_EARN,
+  MAREN_VAULT,
   makeEnv,
   NOT_ALLOWLISTED,
   payCalldata,
@@ -66,12 +67,13 @@ describe('target and selector allowlist', () => {
     expect(relayer.chainFake.sent).toHaveLength(0);
   });
 
-  it('scopes selectors per target: a MarenPay function is not relayable on MarenEarn', async () => {
+  it('scopes selectors per target: a MarenPay function is not relayable on MarenVault', async () => {
     const relayer = await buildTestRelayer();
-    // Both addresses are allowlisted. The pairing is not.
+    // Both addresses are allowlisted, and both contracts have relayable functions of
+    // their own. The pairing is what is refused.
     const response = await relayer.post(
       '/relay',
-      await signedRequest({ to: MAREN_EARN, data: payCalldata() }),
+      await signedRequest({ to: MAREN_VAULT, data: payCalldata() }),
     );
 
     expect(response.status).toBe(403);
@@ -94,6 +96,50 @@ describe('target and selector allowlist', () => {
 
   it('never relays to the forwarder itself', () => {
     expect(RELAYABLE_FUNCTIONS.marenForwarder).toHaveLength(0);
+  });
+
+  /**
+   * THE REGISTRY MATCHES WHAT THE HUB WILL ACTUALLY FORWARD.
+   *
+   * `MarenRelayHub` keeps its own `allowedCall[target][selector]` map, written by
+   * `_allowlistRelayableCalls` in `script/Deploy.s.sol`, and it checks it on the
+   * inherited `execute` as well as on `executeWithFee`. A selector this service admits
+   * but the hub refuses gets as far as simulation and reverts `CallNotAllowed` — safe,
+   * and still a service advertising a sponsorship the chain will not honour.
+   *
+   * This reads the deploy script rather than a transcription of it, so adding a selector
+   * on one side and not the other fails here. The registry may be NARROWER than the hub
+   * (a call the hub would forward that this relayer chooses not to pay for is a policy
+   * decision), never wider.
+   */
+  it('admits nothing MarenRelayHub would refuse on-chain', () => {
+    const script = readFileSync(
+      new URL('../../../packages/contracts/script/Deploy.s.sol', import.meta.url),
+      'utf8',
+    );
+    const onChain = new Map<string, Set<string>>();
+    for (const [, contract, name] of script.matchAll(
+      /\bMaren(Registry|Pay|Vault|Earn)\.(\w+)\.selector\b/g,
+    )) {
+      const key = `maren${contract!}`;
+      if (!onChain.has(key)) onChain.set(key, new Set());
+      onChain.get(key)!.add(name!);
+    }
+    // Guard the parse itself: an empty match set would make every assertion below pass.
+    expect(onChain.get('marenPay')?.size).toBeGreaterThan(5);
+    expect(onChain.get('marenVault')?.has('borrow')).toBe(true);
+    // MarenVault.deposit is payable, so it is absent from the script by design.
+    expect(onChain.get('marenVault')?.has('deposit')).toBe(false);
+
+    for (const [contract, functions] of Object.entries(RELAYABLE_FUNCTIONS)) {
+      for (const fn of functions) {
+        expect({ contract, name: fn.abi.name, allowedOnChain: true }).toEqual({
+          contract,
+          name: fn.abi.name,
+          allowedOnChain: onChain.get(contract)?.has(fn.abi.name) === true,
+        });
+      }
+    }
   });
 
   /**
