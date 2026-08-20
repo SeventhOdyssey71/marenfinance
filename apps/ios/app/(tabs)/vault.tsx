@@ -1,5 +1,6 @@
 import { useMemo, useState } from 'react';
 import { Pressable, StyleSheet, View } from 'react-native';
+import { useLocalSearchParams } from 'expo-router';
 import {
   BORROWING_RATE,
   MAREN_POLICY,
@@ -61,8 +62,31 @@ const MODES: { key: Mode; label: string }[] = [
  * Every figure in the live preview — resulting CR, liquidation price, total debt — comes
  * from @maren/sdk. There is no arithmetic in this file that touches a user's risk.
  */
+/** Only the four vault modes may arrive as a deep-link parameter. */
+function asMode(value: string | undefined): Mode | null {
+  return value === 'deposit' || value === 'borrow' || value === 'repay' || value === 'withdraw'
+    ? value
+    : null;
+}
+
 export default function Vault() {
-  const [mode, setMode] = useState<Mode>('borrow');
+  /**
+   * The Balances panel routes here with the action it wants preselected
+   * (`/(tabs)/vault?action=deposit`). The param is honoured on arrival and whenever it
+   * changes, using React's adjust-state-during-render pattern rather than an effect — the
+   * same shape the Pay screen uses for its deep-linked recipient, and for the same reason:
+   * an effect renders once on the stale tab and then again on the right one.
+   */
+  const params = useLocalSearchParams<{ action?: string }>();
+  const requested = asMode(params.action);
+
+  const [mode, setMode] = useState<Mode>(requested ?? 'borrow');
+  const [seenAction, setSeenAction] = useState(params.action);
+  if (seenAction !== params.action) {
+    setSeenAction(params.action);
+    if (requested) setMode(requested);
+  }
+
   const price = usePrice();
   const { data: position, error: positionError, refetch: refetchPosition } = usePosition();
   const { data: balances } = useBalances();
