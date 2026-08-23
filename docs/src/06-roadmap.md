@@ -116,10 +116,11 @@ pooled vault uncapped without a review. That is a commitment, not a caveat.
 
 ## Why these numbers
 
-Mezo mainnet currently has **27 troves** against **roughly 29,360 MUSD holders** (16 August 2026). The gap between
-those two figures is the entire thesis: tens of thousands of people hold MUSD and
-almost none of them can mint it, because the protocol's 1,800 MUSD minimum net debt
-requires roughly **0.079 BTC (~$5,000)** of collateral at a responsible ratio.
+Mezo mainnet carries roughly **27 troves**, and only about **4.6% of MUSD's ~31M supply**
+was ever created by user borrowing. MUSD is barely borrowed because the protocol imposes a
+**2,000 MUSD minimum loan**, about $3,000 of BTC to open responsibly, which prices small
+holders out entirely. Maren's pooled vault removes that minimum. Whether enough small
+borrowers exist to fill it is the bet, and this milestone is how we test it cheaply.
 
 250 funded positions would be a **tenfold increase in the number of borrowing accounts on
 Mezo**. We have set the target where it is meaningful to Mezo rather than flattering to
@@ -161,8 +162,9 @@ launch it the way something with systemic risk should be launched.
 | Post-traction (M3) | **100 BTC** | 60 days of clean liquidation history |
 | Steady state       | Governed    | Multisig + timelock decision         |
 
-Direct troves, for users above the ~0.079 BTC threshold, are **uncapped from day one**,
-because they carry no pooling risk at all. The cap constrains only the novel mechanism.
+Direct troves, for users with enough BTC to clear the protocol's 2,000 MUSD minimum loan,
+are **uncapped from day one**, because they carry no pooling risk at all. The cap
+constrains only the novel mechanism.
 
 The interface routes any user with enough BTC for a direct trove _to a direct trove_, and
 tells them why. We would rather lose pooled volume than put someone into a shared position
@@ -190,9 +192,9 @@ Ranked by how much it would actually help.
 
 Stated plainly, so it can be held against the outcome.
 
-- **A new class of MUSD borrower.** Maren's floor is 0.001 BTC against the protocol's
-  effective ~0.079 BTC. That is roughly an eightyfold reduction in the entry requirement,
-  aimed squarely at the holders who cannot currently participate.
+- **A new class of MUSD borrower.** Maren's pooled vault has **no minimum loan size**,
+  borrowing from 0.001 BTC, against the protocol's 2,000 MUSD minimum loan. It is aimed
+  squarely at the small holders who cannot currently participate.
 - **Fees and activity that accrue to Mezo.** Maren deploys its own contracts on Mezo,
   settles in MUSD, and pays BTC gas on Mezo. There is no other chain in the loop.
 - **Upstream contributions already prepared.** Corrections to viem's Mezo chain

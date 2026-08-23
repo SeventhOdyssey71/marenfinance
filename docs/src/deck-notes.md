@@ -23,60 +23,63 @@ Then move on. This slide is worth four seconds.
 
 ---
 
-## 2 · The gap
+## 2 · What the chain shows
 
-**This is the whole pitch. Land it in silence.**
+**This is the honest opening. Land it in silence.**
 
 Put the slide up. Say the two numbers, slowly, and then say nothing for a beat longer
 than is comfortable.
 
-"Fewer than thirty troves open on Mezo mainnet. More than twenty-nine thousand people
-holding MUSD."
+"Of the roughly thirty-one million MUSD in existence, only about four and a half percent
+was created by anyone borrowing it. Nearly half of it sits in the Stability Pool, farming
+yield. MUSD is a DeFi-internal asset, not consumer money."
 
-Both figures drift daily, so **say them as bounds, not as exact counts**. The slide shows
-the exact dated read (27 and 29,360, 16 August 2026); the sentence you say out loud is the
-one that is still true on the day.
+The figures drift, so **say them as rough shares, not exact counts**. The slide shows the
+dated read (16 August 2026); the sentence you say out loud is the one still true on the
+day.
 
-Let them do the arithmetic themselves. Do not explain it. The next slide explains it.
+Do not reach for the old line about tens of thousands of holders against a handful of
+troves. That is a vanity metric, and a Mezo insider sees through it instantly: the holder
+base is a long tail of dust and it proves nothing about demand. The honest point is
+narrower and stronger, there is no consumer economy for MUSD, and the next slide says why.
 
-If someone asks where the numbers come from, before you have got to slide 7: "Both read
-from the chain this morning. `getTroveOwnersCount` on the TroveManager, and the token's
-holder count. I will show you the addresses in a minute."
-
-The count moves by one or two a day. It was 26 the day before. If it has moved since the
-deck was built, **say so out loud** rather than hoping nobody checks. That is the whole
-posture of this talk.
+If someone asks where the numbers come from: "Read from the chain this morning.
+`getEntireSystemDebt` on the TroveManager against the token supply, and the Stability
+Pool balance. I will show you the addresses in a minute."
 
 ---
 
 ## 3 · Why
 
-The mechanism, in one sentence: MUSD requires 1,800 MUSD of net debt before you can
+The mechanism, in one sentence: MUSD imposes a 2,000 MUSD minimum loan before you can
 borrow anything at all.
 
-"That is not a fee. It is a floor. At a responsible collateral ratio, about 250%, you
-have to put up roughly 0.079 BTC, about five thousand dollars, before the protocol will
-lend you your first dollar."
+"That is not a fee. It is a minimum loan size. To open one responsibly you need about
+three thousand dollars of Bitcoin, five thousand to be safe, and even at the liquidation
+edge about twenty-two hundred. You cannot borrow fifty dollars against Bitcoin here at
+all."
 
-Anticipate the objection, because someone will make it: **why 250% and not 110%?** Answer
-it before they ask. "You can technically open at 110%. At 110% you are one bad hour from
-liquidation. Nobody responsible recommends it, and the number I have used is the one you
-would actually tell a friend to use."
+**Do not quote the old $5,004 as the barrier.** That was the safe-250% figure and we
+demoted it; the honest door is nearer $3,000. If someone asks for the safe number, give
+them all three: about $2,200 at the 110% edge, $3,000 responsibly, $5,000 at 250%. The
+real point is that a minimum loan size exists at all, which is what Maren removes.
 
 ---
 
 ## 4 · The wedge
 
-"Maren opens the same product at 0.001 BTC."
+"Maren removes the minimum. You can borrow from 0.001 BTC, with no minimum loan size at
+all."
 
-**Say "roughly eighty times lower." Never say a hundred.** The real figure is 79.3. There
-is a test in the SDK that asserts it. If you round it up you have made the first
-unverifiable claim of the talk and everything after it is worth less.
+**Lead with "no minimum loan," not a multiple.** The edge is that the minimum disappears,
+not that collateral is cheaper. Do not say "eighty times lower" or reach for 79.3×; that
+framed the old vanity pitch and it invites the wrong argument. The concrete version lands
+harder: "You can borrow twenty-five dollars against seventy-seven of Bitcoin, which the
+protocol simply will not do."
 
-If pushed on the arithmetic: 0.079346 divided by 0.001 is 79.346. The price it is
-computed against is pinned from a live oracle read, not read at test time. Say that
-distinction unprompted if you are talking to an engineer, because it is the kind of thing
-they will find and it is better coming from you.
+If pushed by an engineer: the 0.001 BTC deposit floor is asserted by a test in the SDK.
+Say that unprompted, because it is the kind of thing they will check and it is better
+coming from you.
 
 ---
 

@@ -43,16 +43,19 @@ Three people, in order:
 ## Why this, why here
 
 Mezo already runs the hard part: a live, audited borrowing engine where BTC mints a
-dollar. What it does not have is a consumer door. Opening a position requires roughly
-0.079 BTC (about $5,000) before the first dollar, every action costs BTC gas, and once
-you hold MUSD there is almost nowhere to spend it. The result is visible on-chain:
-tens of thousands of MUSD holders, fewer than thirty minting positions.
+dollar. What it does not have is a consumer door. The protocol imposes a 2,000 MUSD
+minimum loan, about $3,000 of BTC to open responsibly, so a small holder cannot borrow at
+all; every action costs BTC gas; and once you hold MUSD there is almost nowhere to spend
+it. The result is visible on-chain: MUSD is a DeFi-internal asset, only about 4.6% of its
+supply created by user borrowing, the rest farmed by a handful of contracts, with fewer
+than thirty troves open. Whether real consumer demand exists is a bet, and the honest
+evidence for it is Mezo's off-chain community, not the trove count.
 
 Maren removes all three barriers in one product:
 
 | Barrier                    | Maren's answer                                                          |
 | -------------------------- | ----------------------------------------------------------------------- |
-| $5,000 minimum             | A pooled vault opens the same loan from 0.001 BTC, about 80x lower      |
+| 2,000 MUSD minimum loan    | A pooled vault removes the minimum: borrow from 0.001 BTC, no minimum loan size |
 | Every action costs BTC gas | Users sign; Maren's relayer submits and pays. About one cent per action |
 | Nowhere to spend MUSD      | Names, links, requests, cashout, and shops, below                       |
 
@@ -187,9 +190,10 @@ its own chain.
 
 ## Distribution
 
-- **Mezo's own community first.** The people most likely to want MUSD without $5,000
-  of collateral already hold MUSD or sit in Mezo's Discord. A testnet cohort drawn
-  from there is the first fifty users, and their transactions are the launch evidence.
+- **Mezo's own community first.** The people most likely to want to borrow small against
+  Bitcoin sit in Mezo's Discord, and that off-chain community is where the demand bet
+  rests. A testnet cohort drawn from there is the first fifty users, and their
+  transactions are the launch evidence.
 - **Money links as the loop.** Every link sent to a non-user is an onboarding with
   money inside. This is the channel the product is structurally built around.
 - **The predecessor's audience.** The team's previous product validated this exact

@@ -20,18 +20,25 @@ else. Users deposit Bitcoin, borrow MUSD against it from 0.001 BTC, and spend it
 `@handles`. Talise stays on Sui; Maren is a separate product under a separate name,
 which is our answer to the separate-deployment and exclusivity questions.
 
-## The thesis in three numbers
+## What the chain actually shows
 
-| Measured 19 August 2026, Mezo mainnet |                           |
-| ------------------------------------- | ------------------------- |
-| Troves open                           | fewer than thirty         |
-| MUSD holders                          | more than 29,000          |
-| Collateral to open a trove            | 0.079 BTC, roughly $5,000 |
+| Measured 19 August 2026, Mezo mainnet |                   |
+| ------------------------------------- | ----------------- |
+| MUSD total supply                     | ~31 million       |
+| Created by user borrowing             | ~4.6%             |
+| Sitting in the Stability Pool (farm)  | ~46%              |
+| Held by the top 20 addresses          | ~99.5%            |
+| Troves open                           | fewer than thirty |
 
-Tens of thousands hold Mezo's stablecoin; fewer than thirty can mint it, because the
-1,800 MUSD minimum net debt sets a $5,000 door. Maren's pooled vault opens the same
-product at 0.001 BTC, roughly eighty times lower. Every Maren user is a net-new MUSD
-borrower.
+MUSD today is a DeFi-internal asset: minted mostly by the protocol, parked in yield
+strategies and AMM pools, and barely borrowed by users. There is no consumer economy for
+it. Two frictions explain that. The protocol imposes a **2,000 MUSD minimum loan** (about
+$3,000 of BTC to open responsibly), so a small holder cannot borrow at all; and once you
+hold MUSD there is nowhere consumer-grade to spend it. Maren's pooled vault removes the
+minimum entirely, borrowing from 0.001 BTC with **no minimum loan size**, and its payments
+layer gives MUSD somewhere to go. Whether that creates real demand is a bet, and the
+evidence for it is off-chain in Mezo's community rather than on-chain in the trove count.
+Every Maren user is a net-new MUSD borrower.
 
 ## Deployed and checkable today, matsnet (31611)
 
