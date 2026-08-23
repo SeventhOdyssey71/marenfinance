@@ -65,14 +65,17 @@ mechanism, and the mechanism can fail.
 
 ## Why we build it anyway
 
-MUSD requires **1,800 MUSD of minimum net debt**. At a responsible 250% collateral ratio
-and BTC at $63,071.83, that is **0.079346 BTC, $5,004.50** of collateral before a user
-can open a position at all. (That figure is not an estimate: it is the output of
+MUSD requires **1,800 MUSD of minimum net debt**, and 2,000 MUSD of total debt once the
+200 MUSD gas compensation is counted. That is a **minimum loan size**: about $3,000 of BTC
+to open responsibly, $5,000 to be safe, and roughly $2,200 at the 110% liquidation edge.
+(The $5,004.50 safe-250% figure is not an estimate: it is the output of
 `collateralRequiredFor()` in `packages/sdk/src/position.ts`, executed against the live
 oracle price, and asserted in the test suite.)
 
-Mezo mainnet has **27 troves**. MUSD has **roughly 29,360 holders** (16 August 2026). The gap between those two
-numbers is a product problem, and the pooled vault is the only honest way to close it.
+The point is not that collateral is expensive. It is that the loan has a minimum size at
+all, which prices small holders out entirely and pushes the few who try to the
+liquidation edge. Maren's pooled vault removes that minimum, safely, which is the only
+honest reason to take on the risk this section describes.
 
 ## Mitigations
 

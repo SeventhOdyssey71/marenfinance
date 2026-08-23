@@ -175,7 +175,7 @@ change a parameter, upgrade a contract, or grant a permission.
 proportional claim inside it, with per-user collateral and debt accounting and a per-user
 ICR computed off the same oracle the protocol uses.
 
-The floor is **0.001 BTC**: a 79.3× reduction against what the protocol alone permits.
+The floor is **0.001 BTC**, and more to the point there is no minimum loan at all: you can borrow 25 MUSD, which the protocol alone does not permit at any collateral level.
 Maren enforces an internal liquidation ratio of **140%** against the protocol's 110%, so
 the pooled trove is never operated near the protocol cliff, and a keeper tops up
 collateral, repays debt, and internally liquidates unhealthy users before the protocol

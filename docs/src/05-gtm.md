@@ -8,17 +8,20 @@ classification: Shared with the Mezo ecosystem team
 
 # Summary
 
-Maren's go-to-market rests on a single observation about Mezo:
+Maren's go-to-market rests on a single honest observation about Mezo:
 
-> **MUSD has roughly 29,360 holders. Mezo mainnet has 27 troves.**
+> **MUSD is a farming instrument, not consumer money.** Of ~31M supply, only ~4.6% was
+> created by user borrowing; ~46% sits in the Stability Pool, and the top 20 addresses,
+> almost all contracts, hold ~99.5%.
 
-Tens of thousands of people already hold Mezo's stablecoin. Fewer than thirty can mint it.
-The distance between those two numbers is not a marketing problem, it is a **1,800 MUSD
-minimum debt**, which at a responsible collateral ratio means **0.079346 BTC ($5,004.50)**
-before anyone can open a position at all.
+There is no consumer economy for MUSD. Two things stand in the way. The protocol imposes a
+**2,000 MUSD minimum loan**, about $3,000 of BTC to open responsibly, so a small holder
+cannot borrow at all; and once you hold MUSD there is nowhere consumer-grade to spend it.
 
-That reframes the entire launch. We are not persuading people to want MUSD; they already
-hold it. We are removing the thing standing between them and being able to create it.
+That sets the launch honestly. We are not capturing a proven demand; we are betting that a
+consumer layer, led by a pooled vault with **no minimum loan size** and payments that
+work, creates borrowing the protocol cannot reach on its own. The evidence for that bet is
+off-chain, in Mezo's community, not yet on-chain in the trove count.
 
 This document covers who we go to, in what order, and what we would ask of Mezo, with an
 explicit note on which channels we think are overrated.
@@ -29,17 +32,24 @@ explicit note on which channels we think are overrated.
 
 Three audiences, in the order we pursue them.
 
-## A. The 29,334: MUSD holders who are not borrowers
+## A. Small borrowers the minimum shuts out
 
-**The primary audience, and the reason to be optimistic.** They have already crossed
-every hard barrier: they found Mezo, bridged, acquired MUSD, and hold it. They are
-pre-qualified in a way no advertising can replicate. The only reason they are not
-borrowers is that the minimum excludes them.
+**The primary audience, and the one Judy pointed us to.** These are Bitcoin holders who
+want to borrow small, less than the 2,000 MUSD the protocol will open, and who today
+either cannot or are pushed to the liquidation edge. The pooled vault is the only venue on
+Mezo that lets them borrow $25 against $77 of BTC safely.
 
-The message is not aspirational. It is: _you already use MUSD. Now you can create it
-against your own Bitcoin, from 0.001 BTC._
+We are deliberately not claiming the ~29,000 MUSD holders are a proven pipeline of these
+borrowers. That number is a long tail of dust and it proves nothing about demand; treating
+it as a queue of waiting customers is the vanity metric a Mezo insider sees through
+instantly. Whether enough people want to borrow small against Bitcoin to spend is the bet
+Maren is making, and the honest place it rests is Mezo's off-chain community, not its
+holder count.
 
-They are reachable, because Mezo already knows where they are.
+The message is not aspirational. It is: _borrow against your own Bitcoin from 0.001 BTC,
+with no minimum loan size, and spend it._
+
+They are reachable, because Mezo's Discord is where they already are.
 
 ## B. Small Bitcoin holders outside Mezo
 
@@ -77,7 +87,8 @@ _Success:_ 50 testnet users, every core flow exercised, a written list of what b
 
 Vault capped at 5 BTC. Direct troves uncapped.
 
-- Launch post: the troves-vs-holders gap, stated with numbers measured that morning.
+- Launch post: how DeFi-internal MUSD actually is, roughly 4.6% of supply borrowed by
+  users, stated with numbers measured that morning, and the pooled vault as the fix.
 - Technical writeup of the seven ways MUSD diverges from Liquity and the three
   doc/bytecode discrepancies, offered as a contribution to other Mezo builders, not as
   criticism. **This is the piece most likely to travel**, because it is genuinely useful
@@ -159,7 +170,8 @@ Ranked by value to us, which is not the same as cost to them.
 
 What we say:
 
-- Bitcoin-backed credit from **0.001 BTC**, where the protocol minimum is ~0.079 BTC.
+- Bitcoin-backed credit from **0.001 BTC**, with **no minimum loan size**, where the
+  protocol imposes a 2,000 MUSD minimum loan.
 - **No gas.** You never need to hold BTC to move your money.
 - Payments that work like messaging: `@handle`, requests, splits, links.
 - **No token.** Revenue comes from spread on real usage.

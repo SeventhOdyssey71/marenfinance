@@ -215,23 +215,26 @@ That figure is **proven, not calculated in a document**. It is the output of
 `collateralRequiredFor()` in `packages/sdk/src/position.ts`, and a test asserts the result
 falls between 0.078 and 0.080 BTC. Anyone who clones the repository can run it.
 
-Maren's floor is 0.001 BTC, which is **79.3× lower**.
+Maren's floor is 0.001 BTC, and the real point is that it has **no minimum loan at all**:
+you can borrow 25 MUSD, which the protocol does not permit at any collateral level.
 
 > [!WARNING]
-> Write "roughly eighty times". Never round it up to a hundred. The whole credibility of
-> this project rests on numbers that survive being checked, and a reader who catches one
-> flattering rounding will re-open every other figure in the set. The same discipline is why
-> collateral ratios round down and required collateral rounds up: a position can never
-> display as safer than it is.
+> Do not resurrect the "eighty times lower" or "79.3x" framing that earlier drafts used, and
+> do not lead with the holder count. On-chain research showed that framing is a vanity
+> metric: of MUSD's ~31M supply only ~4.6% was created by borrowing, ~46% farms the
+> Stability Pool, and the top 20 holders (almost all contracts) hold ~99.5%. The credibility
+> of this project rests on numbers that survive being checked, and a Mezo insider checks
+> these in one query.
 
 ### The chain facts the thesis rests on
 
-**Mezo mainnet has 27 troves. MUSD has roughly 29,360 holders** (16 August 2026)**.** That gap is the thesis: tens of
-thousands of people hold the stablecoin and fewer than thirty can mint it, because minting
-has a five-thousand-dollar door.
+**MUSD is a DeFi-internal asset, not consumer money.** ~27 troves, four whales holding ~80%
+of borrowed MUSD, nearly half the supply farming yield. That is not evidence of pent-up
+borrowing demand; it is evidence that the 2,000 MUSD minimum loan prices out small holders
+and that MUSD has no consumer surface. Maren is a bet that a consumer layer creates the
+demand, resting on Mezo's off-chain community rather than its trove count.
 
-Both were read live on 15 August. The trove count moves, so re-run it on the day you send
-anything quoting it:
+Re-run the counts on the day you send anything quoting them:
 
 ```bash
 cast call 0x94AfB503dBca74aC3E4929BACEeDfCe19B93c193 \

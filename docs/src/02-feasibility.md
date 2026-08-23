@@ -14,10 +14,11 @@ colophon: |
 
 ## What this document establishes
 
-The investment thesis (MRN-001) argues that Mezo's constraint is distribution and
-that Maren removes it. This document establishes that Maren can actually be built, by
-naming every contract it must call, every place the chain diverges from what a
-competent engineer would assume, and every failure mode we have to design around.
+The investment thesis (MRN-001) argues that Mezo's credit primitive has almost no
+consumer use, and that Maren is a bet on the consumer layer that could create it. This
+document establishes that Maren can actually be built, by naming every contract it must
+call, every place the chain diverges from what a competent engineer would assume, and
+every failure mode we have to design around.
 
 Three claims are load-bearing:
 
@@ -266,25 +267,29 @@ breaks.
 
 ### Position math, and which way it rounds
 
-The headline number in MRN-001, the collateral required to reach the 1,800 MUSD
-minimum, is not a calculation performed in a document. It is the output of
-`collateralRequiredFor()` in `packages/sdk/src/position.ts`, executed against the live
-oracle price of $63,071.83, and asserted by a test that requires the result to fall
-between 0.078 and 0.080 BTC:
+The collateral a small position needs is not a calculation performed in a document. It
+is the output of `collateralRequiredFor()` in `packages/sdk/src/position.ts`, executed
+against the live oracle price of $63,071.83, and asserted by a test. At a safe 250%
+ratio it lands at 0.079346 BTC; the responsible door is nearer $3,000, and at the 110%
+liquidation edge about $2,200:
 
-| Quantity                | Value                        |
-| ----------------------- | ---------------------------- |
-| Minimum net debt        | 1,800 MUSD                   |
-| Gas compensation        | 200 MUSD                     |
-| Minimum total debt      | 2,000 MUSD                   |
-| Target collateral ratio | 250%                         |
-| BTC price used          | $63,071.83                   |
-| **Collateral required** | **0.079346 BTC ($5,004.50)** |
-| Maren pooled floor      | 0.001 BTC                    |
-| Reduction               | 79.3×                        |
+| Quantity                       | Value                    |
+| ------------------------------ | ------------------------ |
+| Minimum net debt               | 1,800 MUSD               |
+| Gas compensation               | 200 MUSD                 |
+| Minimum total debt             | 2,000 MUSD               |
+| BTC price used                 | $63,071.83               |
+| Collateral at 250% (safe)      | 0.079346 BTC ($5,004.50) |
+| Collateral to open responsibly | ~$3,000 of BTC           |
+| Collateral at the 110% edge    | ~$2,200 of BTC           |
+| Maren pooled floor             | 0.001 BTC                |
 
-The reduction is 79.3×. We write "roughly eighty times" and never round it to 100×,
-for the same reason the position math itself rounds in one direction only.
+The $5,004.50 figure is the safe-250% output and it is the one we used to quote as the
+barrier; the honest door is nearer $3,000. But the number that matters is none of these.
+It is that the protocol imposes a **minimum loan size at all**: you cannot borrow 50 MUSD
+against Bitcoin on Mezo, only 2,000 or more. Maren's pooled vault removes that minimum
+entirely, which is a different and stronger claim than cheaper collateral. The position
+math itself rounds in one direction only.
 
 **Collateral ratios round down. Liquidation prices and collateral requirements round
 up.** A position can therefore never display as safer than it is. `179.99%` renders as
@@ -415,8 +420,9 @@ The remainder sits in protocol-owned strategies and the Wormhole NTT bridge.
 
 **Consequence:** the CDP portion is fully Bitcoin-backed and that claim is defensible.
 A blanket "every MUSD is backed by Bitcoin" statement is not, and Maren does not repeat
-it to users. This is also the clearest illustration of the thesis's central number: 31.08
-million MUSD and some 29,360 holders sit above a CDP with 27 troves in it.
+it to users. This is also the clearest illustration of the thesis's central fact: of
+31.08 million MUSD, only about 4.6% was created by user borrowing, and it sits above a CDP
+with roughly 27 troves in it. MUSD is a DeFi-internal asset, not consumer money.
 
 ## Maren's contract architecture
 

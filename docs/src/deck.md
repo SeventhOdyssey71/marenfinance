@@ -15,29 +15,29 @@ network: Mezo matsnet 31611
 
 Spend Bitcoin. Never sell it. Built on Mezo.
 
-<!-- slide: stat | kicker: The gap | tag: Mainnet | foot: getTroveOwnersCount() on TroveManager, and the MUSD token holder count. Read 16 August 2026. -->
+<!-- slide: stat | kicker: What the chain shows | tag: Mainnet | foot: getEntireSystemDebt() on TroveManager and the Stability Pool balance, against ~31M MUSD supply. Read 16 August 2026. -->
 
 ```stat
-27 | Troves open on Mezo mainnet
-29,360 | People holding MUSD
+~4.6% | of MUSD's ~31M supply was created by user borrowing
+~46% | sits in the Stability Pool, farmed, not spent
 ```
 
-<!-- slide: stat | kicker: Why | tag: Protocol | foot: minNetDebt() returns 1,800 MUSD. 250% is a responsible ratio, not the 110% liquidation floor. -->
+<!-- slide: stat | kicker: Why | tag: Protocol | foot: minNetDebt() returns 1,800 MUSD; 200 MUSD gas compensation makes the floor 2,000. $3,000 is the responsible door, $5,000 the safe-250% figure. -->
 
-# You cannot borrow a dollar until you have committed five thousand.
+# The protocol has a minimum loan size.
 
 ```stat
-1,800 MUSD | Minimum net debt, before anyone can borrow
-0.079346 BTC | What that needs in collateral, about $5,004
+2,000 MUSD | Minimum loan, before anyone can borrow at all
+~$3,000 | of BTC to open one responsibly. No smaller position exists.
 ```
 
-<!-- slide: stat | kicker: The wedge | tag: Verified | foot: 0.079346 / 0.001 = 79.346. Asserted in packages/sdk/src/position.test.ts against a pinned oracle price. -->
+<!-- slide: stat | kicker: The wedge | tag: Verified | foot: MarenVault's 0.001 BTC deposit floor is asserted in packages/sdk/src/position.test.ts. The edge is removing the minimum, not cheaper collateral. -->
 
-# Maren opens the same product at 0.001 BTC.
+# Maren removes the minimum. Borrow from 0.001 BTC.
 
 ```stat
-0.001 BTC | Maren's minimum deposit
-79.3× | Lower. Roughly eighty times, not a hundred.
+0.001 BTC | Maren's minimum deposit, against a 2,000 MUSD protocol minimum
+No minimum loan | Borrow $25 against $77 of BTC, which the protocol cannot
 ```
 
 <!-- slide: points | kicker: How -->
