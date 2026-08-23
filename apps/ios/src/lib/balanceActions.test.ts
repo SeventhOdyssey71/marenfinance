@@ -24,9 +24,12 @@ function healthy(overrides: Partial<BalanceActionState> = {}): BalanceActionStat
   };
 }
 
-function byKey(state: BalanceActionState): Record<BalanceActionKey, { enabled: boolean; reason: string | null }> {
+function byKey(
+  state: BalanceActionState,
+): Record<BalanceActionKey, { enabled: boolean; reason: string | null }> {
   const out = {} as Record<BalanceActionKey, { enabled: boolean; reason: string | null }>;
-  for (const action of balanceActions(state)) out[action.key] = { enabled: action.enabled, reason: action.reason };
+  for (const action of balanceActions(state))
+    out[action.key] = { enabled: action.enabled, reason: action.reason };
   return out;
 }
 
@@ -45,7 +48,9 @@ describe('balanceActions', () => {
 
   it('gives every enabled action a null reason and every disabled action a non-empty one', () => {
     // A stale price disables the price-dependent actions; the invariant must hold across the mix.
-    const actions = balanceActions(healthy({ priceLive: false, priceReason: 'Price feed is 90s old.' }));
+    const actions = balanceActions(
+      healthy({ priceLive: false, priceReason: 'Price feed is 90s old.' }),
+    );
     for (const action of actions) {
       if (action.enabled) expect(action.reason).toBeNull();
       else expect(action.reason && action.reason.length).toBeGreaterThan(0);
@@ -68,7 +73,11 @@ describe('balanceActions', () => {
     it('reports no debt before it reports a stale price', () => {
       // Precedence: the more fundamental fact wins.
       const repay = byKey(
-        healthy({ position: { collateralWei: WAD, debtWei: 0n }, priceLive: false, priceReason: 'stale' }),
+        healthy({
+          position: { collateralWei: WAD, debtWei: 0n },
+          priceLive: false,
+          priceReason: 'stale',
+        }),
       ).repay;
       expect(repay.reason).toBe('No debt to repay.');
     });

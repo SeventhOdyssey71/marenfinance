@@ -104,14 +104,18 @@ is not vague. It is three mechanical frictions, each with a number attached.
 200 MUSD gas compensation, refunded on close, so the minimum total debt at open is
 **2,000 MUSD**.
 
-At the 250% collateral ratio Maren's own policy treats as responsible, and at the live
-oracle price of $63,071.83, that is **0.079346 BTC, $5,004.50**: before a user can open
-a position at all. At a riskier 200% it is still about 0.063 BTC, roughly $4,000.
+What that costs in Bitcoin depends on how much liquidation risk a user accepts. At the
+liquidation edge (110%) it is about **$2,200**; at a responsible ratio it is **$3,000 to
+$5,000**. Call it a $3,000 door to open a small position without sitting on the cliff.
+That is smaller than the $5,004 we used to quote (that was the safe-250% figure), and we
+have corrected it everywhere.
 
-That figure is not an estimate written into a document. It is the output of
-`collateralRequiredFor()` in `packages/sdk/src/position.ts`, executed against the live
-oracle price, with a test asserting the result falls between 0.078 and 0.080 BTC. Anyone
-who clones the repository can check it.
+The real point is not that the collateral is expensive. It is that **the loan has a
+minimum size at all**: you cannot borrow 50 MUSD against Bitcoin on Mezo, only 2,000 or
+more. Maren's pooled vault removes that minimum entirely, which is a different and
+stronger claim than "cheaper collateral". These figures come from
+`collateralRequiredFor()` in `packages/sdk/src/position.ts` against the live oracle, so
+anyone who clones the repository can check them.
 
 > [!NOTE]
 > This is not a criticism of the parameter. A 1,800 MUSD floor is the correct choice for
