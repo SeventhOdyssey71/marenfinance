@@ -17,25 +17,37 @@ colophon: |
 Mezo's core primitive works. A Bitcoin holder can post BTC, borrow MUSD, and never
 sell. That is the hard part, and it is already shipped, live on mainnet, and correct.
 
-The constraint on Mezo is not the primitive. It is distribution. Three numbers frame it:
+The constraint on Mezo is not the primitive. It is that the primitive has almost no
+consumer use. This is what the chain actually shows, read from mainnet:
 
-| Measure                     | Value                    | Read from                                    |
-| --------------------------- | ------------------------ | -------------------------------------------- |
-| MUSD holders                | ~29,360                  | MUSD token contract, mainnet                 |
-| Troves open on Mezo mainnet | 27                       | `TroveManager.getTroveOwnersCount()`         |
-| Collateral to open one      | 0.079346 BTC ($5,004.50) | `minNetDebt()` at 250% CR, live oracle price |
+| Measure                              | Value          | Read from                            |
+| ------------------------------------ | -------------- | ------------------------------------ |
+| MUSD total supply                    | ~31 million    | MUSD token contract                  |
+| MUSD created by user borrowing       | ~4.6% of that  | `TroveManager.getEntireSystemDebt()` |
+| Sitting in the Stability Pool (farm) | ~46% of supply | Stability Pool balance               |
+| Held by the top 20 addresses         | ~99.5%         | token holders, almost all contracts  |
+| Troves open on Mezo mainnet          | ~27            | `TroveManager.getTroveOwnersCount()` |
 
-Read from mainnet on 16 August 2026 at block 11,166,763. The first two move daily; re-run
-`evidence/VERIFY.sh` before quoting them. The gap between them does not move.
+Re-run `evidence/VERIFY.sh` before quoting any of these; the counts drift. What does not
+drift is the shape. MUSD today is a DeFi-internal asset: minted mostly by the protocol,
+parked in yield strategies and AMM pools, and barely borrowed by users at all. The four
+largest troves hold roughly 80% of all borrowed MUSD. There is no consumer economy for
+MUSD. Nobody spends it, because there is nowhere to spend it and no accessible way for a
+normal-sized holder to create it.
 
-Tens of thousands of people hold MUSD. Fewer than thirty can mint it. That gap is not a
-marketing problem, it is three mechanical frictions, and every one is fixable in
-application code without Mezo changing anything.
+We want to be precise about what that gap is and is not. It is **not** evidence that tens
+of thousands of people are trying to borrow and cannot; the holder base is a long tail of
+dust, and the real MUSD economy is about twenty contracts farming yield. It **is**
+evidence of two real, fixable frictions: the protocol has a **2,000 MUSD minimum loan**
+(about $3,000 of Bitcoin to open responsibly, $5,000 to be safe), which prices out
+small holders entirely; and once you hold MUSD there is no consumer surface to use it on.
 
-**Maren Finance is the consumer layer that removes them.** Pooled Bitcoin credit from
-**0.001 BTC**, roughly eighty times below the protocol minimum. Gasless end to end, so a
-user never has to hold the asset they refused to sell just to spend against it. And
-payments to an `@handle` instead of a hex address.
+**Maren Finance is a bet that a consumer layer creates the demand the protocol cannot
+reach on its own.** A pooled vault with **no minimum loan size** (deposit from 0.001 BTC,
+borrow what you want), gasless so a user never holds the asset they refused to sell, and
+payments to an `@handle` so MUSD finally has somewhere to go. This is demand creation,
+stated as a bet, not a captured market. The evidence for it is off-chain, in Mezo's large
+community, not yet on-chain in the trove count.
 
 The economics are unusually favourable here. Mezo's base fee is 1,300,000 wei, putting a
 100,000-gas transaction at about **$0.008**: under a cent at any BTC price below roughly
@@ -108,13 +120,16 @@ who clones the repository can check it.
 > for the protocol and wrong for the consumer. That is exactly the kind of gap an
 > application layer exists to close.
 
-The consequence is visible on-chain. Mezo mainnet carries **27 troves**. Not 27 thousand.
-Twenty-seven. Meanwhile MUSD has **roughly 29,360 holders** and roughly 31.06 million supply. The
-people are already here. They arrived through bridges, the Mezo Market, and points
-programmes. What they cannot do is mint, because minting has a $5,000 door.
+The consequence is visible on-chain. Mezo mainnet carries about **27 troves**, and four
+whales hold roughly 80% of all the MUSD ever borrowed. Small borrowers do exist, at the
+edge: the smallest live trove is about 0.03 BTC running at a 116% collateral ratio, one
+move from liquidation. That is the whole population the minimum loan pushes to the cliff.
 
-This is the single largest cap on Mezo's borrower count, and it is the number Maren
-exists to move.
+We are deliberately not claiming this proves pent-up borrowing demand. It does not. It
+proves the minimum makes the safe version of a small position impossible, and that the few
+who try anyway run dangerously. Whether enough people want to borrow small against Bitcoin
+to spend is the bet Maren is making, and the honest place that bet rests is Mezo's
+off-chain community, not its trove count.
 
 ### Every action costs BTC gas
 

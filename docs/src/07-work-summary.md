@@ -336,10 +336,13 @@ State it that way to anyone who asks. It is pending, not done. The temptation to
 component as finished because the hard part is finished is exactly how a half-verified thing
 reaches production.
 
-### `MarenEarn`'s swap path is speculative
+### `MarenEarn`'s swap path has venues, but is not wired yet
 
 The Stability Pool pays its gains in native BTC, and `MarenEarn`'s unit of account is MUSD.
-Converting between them needs a DEX, and **no Mezo DEX has been verified to exist**.
+Converting between them needs a DEX. Mezo **does** have one: a BTC/MUSD volatile AMM and a
+MUSD/mUSDT stable AMM are live on mainnet (found in the MUSD holder set). The earlier claim
+that no Mezo DEX had been verified was wrong. What is true is that Maren has not yet
+integrated a router.
 
 So `swapRouter` is `address(0)` at deployment and `harvest()` simply **holds** the BTC,
 counted in `totalAssets()` at the oracle price. Shareholders own it and it is not stranded,
