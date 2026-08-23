@@ -237,7 +237,7 @@ is implemented and tested and running nowhere."
 Then: "I would rather you heard that from me in minute nine than found it in week three."
 
 If someone asks what else is not true yet: the dApp cannot transact, writes are being
-wired now; MarenEarn's swap path is speculative because no Mezo DEX has been verified.
+wired now; MarenEarn's swap path now has real venues: Mezo has a BTC/MUSD volatile AMM and a MUSD/mUSDT stable AMM on-chain.
 Have those ready. Volunteering the second item when only the first was asked is the move.
 
 ---
