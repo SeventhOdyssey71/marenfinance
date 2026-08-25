@@ -45,7 +45,9 @@ export function DocsShell({
         </button>
 
         <Link href="/docs" className="doc-brand" aria-label="Maren docs home">
-          <span className="doc-mark" aria-hidden />
+          {/* The real brand mark, the same asset the app nav uses. */}
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img className="doc-mark" src="/brand/maren-mark.png" alt="" aria-hidden />
           <span>Maren</span>
         </Link>
 
