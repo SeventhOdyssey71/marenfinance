@@ -239,6 +239,45 @@ contracts, recorded in `docs/audit/`. They found real bugs, which is the point:
 Every fix was verified to fail against the unfixed code. The audit reports name what was
 attacked and held, not only what broke.
 
+## How the pilot is measured
+
+The pilot exists to answer one question honestly: do real users borrow small and then
+SPEND what they borrowed, or just poke the app and leave? `tools/metrics` answers it from
+the chain. Every figure is a live contract read or a decoded log across the four deployed
+Maren contracts, walked from the deployment-block floor to the head in the 10,000-block
+windows Mezo's RPC allows, with per-call timeouts and failover to the drpc endpoint. There
+is no third-party tracker and nothing is defaulted into existence: an unread value is
+reported as unavailable, never as zero.
+
+It computes, for a given network (default matsnet 31611):
+
+- **Funded positions.** Distinct addresses whose live `collateral(addr)` is greater than
+  zero. The core adoption number. A deposit that was fully withdrawn does not count, which
+  is why this is read live rather than counted from Deposited logs.
+- **MUSD borrowed through Maren.** Gross MUSD drawn via the vault over all history, summed
+  from Borrowed events. The demand-creation number.
+- **Payments.** Count and MUSD volume of MarenPay transfers (`pay`, `payToHandle`), plus
+  payment requests created versus settled.
+- **Money links / claims.** Links created versus claimed, and claims made by addresses that
+  were brand new to Maren (their first appearance in any Maren log). The growth-loop signal.
+- **Handles registered** on MarenRegistry.
+- **Earn.** Live TVL (`totalAssets`) and the count of depositors still holding shares.
+- **The spend ratio.** Of the addresses that borrowed, the fraction that then appear as the
+  sender on a payment at or after their first borrow. This is THE demand-test metric. A
+  payment made before the first borrow does not count, and 0 borrowers reads as "no data",
+  never as 0%.
+
+The tool prints a dated human summary and writes a machine-readable JSON snapshot under
+`tools/metrics/snapshots/`, so each metric can be tracked across the pilot. The pure
+aggregation is unit-tested against fixture logs; the tests never touch the network.
+
+Read live against matsnet on 2026-08-25 (blocks 14,911,471 to 15,103,657), it returned: 2
+funded positions, 65.72 MUSD borrowed, 0 payments, 1 payment request created and 0 settled,
+0 money links, 2 handles registered, 25.00 MUSD of Earn TVL with 1 depositor, and a **spend
+ratio of 0.0% (0 of 2 borrowers have spent)**. That last number is the whole point of the
+pilot, and today it says what it should: people have borrowed, and the spending has not
+started yet. The tool will show it move, or show that it does not.
+
 ## Not done, stated plainly
 
 No mainnet deployment yet: it is gated on an independent audit, deliberately. No
