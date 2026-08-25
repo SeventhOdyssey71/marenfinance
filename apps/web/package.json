@@ -17,9 +17,13 @@
     "@paper-design/shaders-react": "0.0.80",
     "@tanstack/react-query": "^5.62.0",
     "geist": "1.7.0",
+    "github-slugger": "2.0.0",
     "next": "15.5.4",
+    "next-mdx-remote": "6.0.0",
     "react": "19.2.0",
     "react-dom": "19.2.0",
+    "rehype-slug": "6.0.0",
+    "remark-gfm": "4.0.1",
     "viem": "^2.21.55",
     "wagmi": "^2.14.0"
   },

@@ -10,11 +10,7 @@ type NavLink = { href: string; label: string; external?: boolean };
 const links: readonly NavLink[] = [
   { href: '#product', label: 'Product' },
   { href: '#how-it-works', label: 'How it works' },
-  {
-    href: 'https://github.com/SeventhOdyssey71/marenfinance/tree/main/docs',
-    label: 'Docs',
-    external: true,
-  },
+  { href: '/docs', label: 'Docs' },
   { href: '#faq', label: 'FAQ' },
 ];
 
