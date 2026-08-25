@@ -8,14 +8,9 @@
     "scheme": "maren",
     "userInterfaceStyle": "light",
     "backgroundColor": "#F7F6FB",
-    "newArchEnabled": true,
-    "splash": {
-      "image": "./assets/splash-icon.png",
-      "resizeMode": "contain",
-      "backgroundColor": "#F7F6FB"
-    },
     "ios": {
       "bundleIdentifier": "finance.maren.app",
+      "buildNumber": "1",
       "supportsTablet": false,
       "requireFullScreen": true,
       "associatedDomains": ["applinks:maren.finance"],
@@ -60,6 +55,7 @@
         "expo-splash-screen",
         {
           "image": "./assets/splash-icon.png",
+          "resizeMode": "contain",
           "backgroundColor": "#F7F6FB",
           "imageWidth": 160
         }

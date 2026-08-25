@@ -1,0 +1,64 @@
+{
+  "tool": "@maren/metrics",
+  "schema": 1,
+  "network": "testnet",
+  "chainId": 31611,
+  "readAt": "2026-08-25T08:54:12.506Z",
+  "scannedFromBlock": "14911471",
+  "scannedToBlock": "15103657",
+  "contracts": {
+    "marenVault": "0x46252B00AB59384518d9dB6D1f210ffF1221645b",
+    "marenPay": "0xe475Ff919D54E055809f516E3bed8a5c7a101836",
+    "marenRegistry": "0x9e123Cdd0CD524812CF9F552d3FAB13d8143b77E",
+    "marenEarn": "0xE3B02b215085B99Ce61E0F5ea9763Ac637aa7826"
+  },
+  "fundedPositions": {
+    "value": 2,
+    "distinctDepositorsAllTime": 2,
+    "totalCollateralWei": "79061097205866344",
+    "note": "distinct addresses whose live collateral(addr) read is > 0. THE core adoption number."
+  },
+  "musdBorrowed": {
+    "wei": "65729038884000000000",
+    "display": "65.72 MUSD",
+    "note": "gross MUSD drawn through the vault over all history (sum of Borrowed.amount). The demand-creation number."
+  },
+  "payments": {
+    "count": 0,
+    "volumeWei": "0",
+    "volumeDisplay": "0.00 MUSD",
+    "distinctSenders": 0,
+    "distinctRecipients": 0,
+    "requestsCreated": 1,
+    "requestsSettled": 0,
+    "requestsSettledVolumeWei": "0",
+    "requestsSettledVolumeDisplay": "0.00 MUSD"
+  },
+  "moneyLinks": {
+    "deployed": true,
+    "created": 0,
+    "createdVolumeWei": "0",
+    "claimed": 0,
+    "claimedVolumeWei": "0",
+    "claimsByBrandNewAddresses": 0,
+    "note": "brand new = the claim is that address first appearance in ANY Maren log (new to Maren, not to the chain). The growth-loop signal."
+  },
+  "handlesRegistered": {
+    "value": 2,
+    "note": "distinct nodes on MarenRegistry.HandleRegistered."
+  },
+  "earn": {
+    "tvlWei": "25000000000000000000",
+    "tvlDisplay": "25.00 MUSD",
+    "currentDepositors": 1,
+    "distinctDepositorsAllTime": 1,
+    "note": "TVL is live totalAssets(); current depositors have balanceOf(addr) > 0."
+  },
+  "spendRatio": {
+    "borrowers": 2,
+    "borrowedThenSpent": 0,
+    "ratio": 0,
+    "ratioDisplay": "0.0%",
+    "definition": "Of addresses that borrowed (user on Borrowed), how many later appear as from on a payment (Paid/PaidToHandle) at or after their first borrow. THE demand-test metric."
+  }
+}
