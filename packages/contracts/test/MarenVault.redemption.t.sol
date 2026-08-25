@@ -503,25 +503,22 @@ contract MarenVaultRedemptionTest is VaultTestBase {
     }
 
     /**
-     * @notice KNOWN LIMIT, pinned rather than buried (audit H-2). When a redemption cancels
-     *         MORE trove debt than the pool's users actually owe, users are charged the full
-     *         collateral that left the trove but are handed only the relief they could use.
-     * @dev `outstandingDebt = troveNetDebt - reserveMUSD`, so the gap opens exactly when
-     *      `reserveMUSD` is non-zero and the redemption exceeds what is left after subtracting
-     *      it. The excess relief lands in the reserve, which no user has a claim on. The loss
-     *      is bounded by `reserveMUSD` at the instant the redemption lands, which is what this
-     *      asserts alongside the loss itself.
+     * @notice H-2 (FIXED), inverted from the pin that used to assert the bug. When a redemption
+     *         cancels MORE trove debt than the pool's users owe, the surplus relief accrues to
+     *         `reserveMUSD`, which no user can claim. Each user is still made whole: they give up
+     *         collateral worth exactly the debt they stopped owing, no more. The collateral
+     *         matching the reserve's surplus is charged to the protocol's OWN position instead of
+     *         being socialised across users.
+     * @dev `outstandingDebt = troveNetDebt - reserveMUSD`, so the excess opens exactly when
+     *      `reserveMUSD` is non-zero and the redemption exceeds what is left after subtracting it.
+     *      Reaching a large reserve is not exotic: `_pushRepayment` is best effort and tolerates a
+     *      stale oracle, so every repayment made during an oracle outage piles up there until a
+     *      keeper deleverages. That is the sequence below.
      *
-     *      Reaching a large reserve is not exotic: `_pushRepayment` is best effort and tolerates
-     *      a stale oracle, so every repayment made during an oracle outage piles up there until
-     *      a keeper deleverages. That is the sequence below.
-     *
-     *      This test asserts the CURRENT behaviour, including the part that is wrong. Fixing it
-     *      means deciding who absorbs the excess, the protocol's own position or the pool,
-     *      and that is a governance call, not a rounding one. When it is made, this test is the
-     *      one to invert.
+     *      This is the inversion the old KNOWN LIMIT pin was written to force: it used to assert
+     *      users were charged for relief they never received; it now asserts they are not.
      */
-    function test_redemption_reliefIsCappedByTheReserveWhileTheCollateralDebitIsNot() public {
+    function test_redemption_reliefBeyondUserDebtIsAbsorbedByTheProtocolNotUsers() public {
         _deposit(alice, 2 ether);
         _borrow(alice, 30_000e18);
         _deposit(bob, 2 ether);
@@ -540,30 +537,106 @@ contract MarenVaultRedemptionTest is VaultTestBase {
             "and it is exactly what separates trove debt from user debt"
         );
 
-        uint256 debtBefore = vault.debtOf(alice) + vault.debtOf(bob) + vault.debtOf(address(vault));
-        uint256 collBefore = _sumClaimableCollateral();
+        int256 aliceValueBefore = _netValue(alice);
+        int256 bobValueBefore = _netValue(bob);
+        int256 protocolValueBefore = _netValue(address(vault));
+        uint256 valueTolerance = (_roundingBound() * BTC_PRICE) / 1e18 + 1;
 
-        // A redemption larger than the pool's users owe, but not large enough to close the trove.
-        _redeem(redeemer, 25_000e18);
+        // Each user is made whole, and neither loses collateral worth more than the debt they
+        // stopped owing (the H-2 invariant). Scoped so the before/after snapshots do not all live
+        // on the stack at once.
+        {
+            uint256 aliceDebtBefore = vault.debtOf(alice);
+            uint256 bobDebtBefore = vault.debtOf(bob);
+            uint256 aliceCollBefore = vault.collateralOf(alice);
+            uint256 bobCollBefore = vault.collateralOf(bob);
+
+            // A redemption larger than the pool's users owe, but not enough to close the trove.
+            _redeem(redeemer, 25_000e18);
+            vault.reconcileRedemption();
+
+            _assertMadeWhole(alice, aliceValueBefore, aliceDebtBefore, aliceCollBefore, valueTolerance);
+            _assertMadeWhole(bob, bobValueBefore, bobDebtBefore, bobCollBefore, valueTolerance);
+        }
+
+        // The excess the reserve absorbed is charged to the protocol's own position instead: its
+        // net value falls by that excess, and the fall is bounded by the reserve, as documented.
+        int256 protocolLoss = protocolValueBefore - _netValue(address(vault));
+        assertGt(protocolLoss, 0, "the protocol's own position absorbed the excess");
+        assertLe(uint256(protocolLoss), reserve, "the excess it absorbed is bounded by the reserve");
+        assertApproxEqRel(
+            uint256(protocolLoss),
+            reserve - _troveNetDebt(),
+            0.01e18,
+            "the excess is exactly the reserve's surplus over what the trove now owes"
+        );
+        // The seed position (1 BTC) easily covers it, so no shortfall is recorded here.
+        assertEq(vault.redemptionShortfall(), 0, "the protocol's own position covered the excess in full");
+    }
+
+    /// @dev A position is made whole by a redemption when its net value is unchanged and its
+    ///      collateral loss does not exceed the value of the debt it stopped owing.
+    function _assertMadeWhole(
+        address who,
+        int256 valueBefore,
+        uint256 debtBefore,
+        uint256 collBefore,
+        uint256 valueTolerance
+    ) internal view {
+        assertApproxEqAbs(_netValue(who), valueBefore, valueTolerance, "position is made whole");
+        uint256 relief = debtBefore - vault.debtOf(who);
+        uint256 loss = ((collBefore - vault.collateralOf(who)) * BTC_PRICE) / 1e18;
+        assertLe(loss, relief + valueTolerance, "collateral loss exceeded the relief received");
+    }
+
+    /**
+     * @notice H-2 INVARIANT (fuzz). After any redemption, including the reserve-excess case, no
+     *         user's collateral loss exceeds the value of the debt relief they received.
+     * @dev The reserve is built the documented way: a repayment made while the oracle is stale
+     *      piles up there. The redemption is allowed to exceed what users owe, which is the H-2
+     *      case, while staying under the trove's net debt so the trove stays active.
+     */
+    function testFuzz_redemption_userLossNeverExceedsRelief(
+        uint256 aliceDebt,
+        uint256 bobDebt,
+        uint256 repayAmount,
+        uint256 redemption
+    ) public {
+        _deposit(alice, 2 ether);
+        _deposit(bob, 2 ether);
+        aliceDebt = bound(aliceDebt, 1e18, 20_000e18);
+        bobDebt = bound(bobDebt, 1e18, 20_000e18);
+        _borrow(alice, aliceDebt);
+        _borrow(bob, bobDebt);
+
+        // A repayment during an oracle outage piles up in the reserve, which is what opens the
+        // gap between trove debt and user debt that H-2 lives in.
+        repayAmount = bound(repayAmount, 0, aliceDebt - 1);
+        if (repayAmount > 0) {
+            priceFeed.setStale(true);
+            _repay(alice, repayAmount);
+            priceFeed.setStale(false);
+        }
+
+        redemption = bound(redemption, 1e18, _troveNetDebt() - 1);
+
+        uint256 aliceDebtBefore = vault.debtOf(alice);
+        uint256 bobDebtBefore = vault.debtOf(bob);
+        uint256 aliceCollBefore = vault.collateralOf(alice);
+        uint256 bobCollBefore = vault.collateralOf(bob);
+
+        _redeem(redeemer, redemption);
         vault.reconcileRedemption();
 
-        uint256 relief = debtBefore - (vault.debtOf(alice) + vault.debtOf(bob) + vault.debtOf(address(vault)));
-        uint256 charged = collBefore - _sumClaimableCollateral();
-        uint256 chargedValue = (charged * BTC_PRICE) / 1e18;
+        uint256 valueBound = (_roundingBound() * BTC_PRICE) / 1e18 + 1;
 
-        assertGt(chargedValue, relief, "users paid more collateral value than the relief they received");
-        assertLe(chargedValue - relief, reserve, "and the gap is bounded by the reserve, as documented");
-        assertApproxEqRel(
-            chargedValue - relief,
-            25_000e18 - relief,
-            0.01e18,
-            "the gap is the redemption the reserve absorbed"
-        );
-        assertGt(
-            vault.reserveMUSD(),
-            _troveNetDebt(),
-            "the vault now holds more MUSD than the trove owes, credited to nobody"
-        );
+        uint256 aliceRelief = aliceDebtBefore - vault.debtOf(alice);
+        uint256 aliceLoss = ((aliceCollBefore - vault.collateralOf(alice)) * BTC_PRICE) / 1e18;
+        assertLe(aliceLoss, aliceRelief + valueBound, "alice's collateral loss exceeded her relief");
+
+        uint256 bobRelief = bobDebtBefore - vault.debtOf(bob);
+        uint256 bobLoss = ((bobCollBefore - vault.collateralOf(bob)) * BTC_PRICE) / 1e18;
+        assertLe(bobLoss, bobRelief + valueBound, "bob's collateral loss exceeded his relief");
     }
 
     // ------------------------------------------------------------------ //
@@ -665,6 +738,65 @@ contract MarenVaultRedemptionTest is VaultTestBase {
 
         // Carol, who never borrowed, is untouched by any of it.
         assertEq(vault.collateralOf(carol), carolBefore, "the shortfall was not spread onto her");
+    }
+
+    /**
+     * @notice H-2 residual (FIXED). A recognised shortfall, including the H-2 case where the
+     *         protocol's own position could not cover the redemption excess, is retired by
+     *         `depositProtocolCollateral`. Real BTC deposited there fills the phantom the
+     *         shortfall marks, lowering `redemptionShortfall` in lockstep without re-crediting the
+     *         books or any account. Only the surplus over the shortfall becomes claimable.
+     * @dev This is the make-whole audit M-2 found missing, now real for this path. The scenario
+     *      is the recorded-shortfall one; the retirement is what H-2 added.
+     */
+    function test_redemption_depositProtocolCollateralRetiresTheShortfall() public {
+        _deposit(alice, 1 ether);
+        _borrow(alice, 30_000e18);
+
+        priceFeed.setPrice(BTC_PRICE / 3);
+        _redeem(redeemer, 25_000e18);
+        vault.reconcileRedemption();
+        vault.settleRedemption(alice);
+
+        uint256 shortfall = vault.redemptionShortfall();
+        assertGt(shortfall, 1, "there is a shortfall to retire");
+
+        // Flush the protocol's own redemption debit first, so the snapshot below moves only with
+        // the deposit's cover/credit split and not with a settlement the deposit would trigger.
+        vault.settleRedemption(address(vault));
+        uint256 protocolClaimBefore = vault.collateral(address(vault));
+
+        // A deposit smaller than the shortfall goes entirely to retiring it: none of it becomes
+        // claimable protocol collateral.
+        uint256 part = shortfall / 2;
+        vm.deal(keeper, part);
+        vm.prank(keeper);
+        vault.depositProtocolCollateral{value: part}(address(0), address(0));
+
+        assertEq(vault.redemptionShortfall(), shortfall - part, "the shortfall fell by exactly the deposit");
+        assertEq(
+            vault.collateral(address(vault)),
+            protocolClaimBefore,
+            "and none of it became claimable protocol collateral"
+        );
+
+        // A deposit larger than the remainder retires it in full; the surplus is claimable.
+        uint256 remaining = vault.redemptionShortfall();
+        uint256 extra = remaining + 0.5 ether;
+        vm.deal(keeper, extra);
+        vm.prank(keeper);
+        vault.depositProtocolCollateral{value: extra}(address(0), address(0));
+
+        assertEq(vault.redemptionShortfall(), 0, "the shortfall is fully retired");
+        assertEq(
+            vault.collateral(address(vault)),
+            protocolClaimBefore + (extra - remaining),
+            "only the surplus over the shortfall is claimable protocol collateral"
+        );
+
+        // Conservation still holds: claims never exceed what is really held plus any shortfall.
+        uint256 held = protocol.getTroveColl(address(vault)) + vault.idleCollateral();
+        assertLe(_sumClaimableCollateral(), held + vault.redemptionShortfall(), "claims stay within holdings");
     }
 
     /**
