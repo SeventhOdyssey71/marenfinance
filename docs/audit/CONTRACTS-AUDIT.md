@@ -21,9 +21,9 @@ things that broke.
 | ID  | Severity | One line                                                                                                                                                                      | Status                   |
 | --- | -------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------ |
 | H-1 | High     | A recognised `redemptionShortfall` is re-read as a fresh redemption on the next sync and charged pro rata to every remaining debtor, repeatedly, until it is fully socialised | FIXED                    |
-| H-2 | High     | Redemption relief is capped by `reserveMUSD` but the collateral debit is not, so users pay collateral for relief that lands in the reserve where nobody can claim it          | DOCUMENTED               |
+| H-2 | High     | Redemption relief is capped by `reserveMUSD` but the collateral debit is not, so users pay collateral for relief that lands in the reserve where nobody can claim it          | FIXED                    |
 | M-1 | Medium   | `withdrawProtocolCollateral` pays nobody: `_withdraw` sends to the account it debits, which here is `address(this)`                                                           | DOCUMENTED               |
-| M-2 | Medium   | There is no way to cover a `redemptionShortfall`, and `depositProtocolCollateral` is not one despite the natspec saying so                                                    | DOCUMENTED               |
+| M-2 | Medium   | There was no way to cover a `redemptionShortfall`; the H-2 fix makes `depositProtocolCollateral` retire it, which is the make-whole the natspec had claimed                   | FIXED                    |
 | M-3 | Medium   | A pooled trove that leaves the active state freezes idle BTC that never entered the trove, and no admin path out of that state exists                                         | DOCUMENTED               |
 | L-1 | Low      | `interestIndex` was documented as monotonically non-decreasing; it falls on redemption                                                                                        | FIXED (comment)          |
 | L-2 | Low      | `_outstandingDebt()` clamps at zero silently; the clamp is the mechanism behind H-2                                                                                           | DOCUMENTED               |
@@ -125,7 +125,7 @@ change and re-running):
 
 ---
 
-## H-2 (High, DOCUMENTED). Relief is capped by the reserve; the collateral debit is not
+## H-2 (High, FIXED). Relief is capped by the reserve; the collateral debit is not
 
 **Affected:** `src/MarenVault.sol`: `_reconcileRedemption` L1335 (the `debtRemoved` branch,
 L1358), `_outstandingDebt` L1200.
@@ -141,7 +141,7 @@ So when a redemption cancels more trove debt than the pool's users owe, which ne
 received. The excess relief lands in `reserveMUSD`, which no user has a claim on: the only things
 that spend it are `_borrow` (serving _future_ borrowers) and `deleverage`.
 
-**Measured** (`test_redemption_reliefIsCappedByTheReserveWhileTheCollateralDebitIsNot`). Alice
+**Measured, pre-fix** (the scenario the pin now inverts). Alice
 2 BTC / 30,000 MUSD, bob 2 BTC / 10,000 MUSD; the oracle goes stale, alice repays 25,000 which
 `_pushRepayment` cannot push into the trove and which therefore piles up in the reserve; the
 oracle recovers; a 25,000 MUSD redemption lands.
@@ -157,8 +157,10 @@ that collateral is worth                  24,997 MUSD
 value taken with nothing given for it      9,959 MUSD
 ```
 
-Afterwards the vault holds 25,000 MUSD of reserve against a trove that owes 15,040: a 9,960 MUSD
-surplus credited to nobody.
+Before the fix the vault held 25,000 MUSD of reserve against a trove that owed 15,040 and had
+socialised the 9,960 MUSD collateral cost onto users. After the fix, that same excess is charged to
+the protocol's own position: alice and bob each end value-neutral, and the protocol's position
+absorbs the ~9,960 MUSD, which the inverted pin now asserts.
 
 **Bound.** The loss is at most `reserveMUSD` at the instant the redemption lands, because the
 excess relief is exactly the part of `mUSDLot` that the reserve was already covering.
@@ -170,23 +172,35 @@ during an oracle outage, because `_pushRepayment` deliberately swallows the fail
 repayment can still settle for the user. Mezo's oracle reverting above 60 seconds of staleness
 is a documented, expected condition, and point 3 of the file's own READ THIS FIRST.
 
-**Not fixed, deliberately.** Every available fix decides who absorbs the excess, which is a
-governance question and not a rounding one. The two obvious candidates:
+**Fixed: the protocol absorbs the excess.** Candidate 1 was taken. `_reconcileRedemption` now
+splits `collateralRemoved` in two. The share-holders pay only for the collateral matching relief
+they actually received; the EXCESS (the collateral matching relief that landed in the reserve) is
+charged to `collateral[address(this)]`, mirroring the `shares == 0` branch that already routes
+unattributable amounts to the protocol. The excess is measured directly from state at the moment
+of reconciliation: `excessRelief = reserveMUSD - troveNetDebt` when the reserve over-covers the
+trove (which is exactly the reserve-clamped case), and the excess collateral is that same fraction
+of `collateralRemoved`, since `collateralRemoved` is worth `debtRemoved + excessRelief` of cancelled
+trove debt. It is rounded UP toward the protocol, so no share-holder's collateral loss can exceed
+the value of the debt it stopped owing. `_previewCollateralPerShare` mirrors the split so the views
+stay honest in the window before anyone reconciles. After the fix the splitter's central claim,
+"each debtor loses collateral worth exactly the debt they stopped owing", holds again.
 
-1. Charge the excess collateral to `collateral[address(this)]`, mirroring the `shares == 0`
-   branch. Coherent, since the excess relief accrued to the reserve, which is
-   protocol-controlled, so the protocol pays for it; but it can exhaust the protocol's own position and fall into the
-   shortfall path.
-2. Distribute the surplus reserve to the debtors who paid for it, which needs a second per-share
-   accumulator on the MUSD side and is a real design change.
+The alternative, distributing the surplus reserve back to the debtors who paid for it, needs a
+second per-share accumulator on the MUSD side and is a larger design change; it was not taken.
 
-The behaviour is now stated in `_reconcileRedemption`'s natspec as a KNOWN LIMIT, and the test
-above pins it including the part that is wrong, so the day it is fixed the test inverts rather
-than silently passing.
+**Residual an auditor should still note.** If the reserve excess is larger than the protocol's own
+position (`collateral[address(this)]`), the uncovered remainder falls to the existing
+`_recogniseShortfall(address(this))` path, exactly as the `shares == 0` branch does. The seed
+position (1 BTC) covers the reachable cases, but exhaustion is possible with a large enough reserve.
+The H-2 change also makes `depositProtocolCollateral` actually retire that shortfall: real BTC
+deposited there now lowers `redemptionShortfall` in lockstep (without re-crediting `totalCollateral`
+or any account, since the collateral was a loss the protocol already took), so the protocol can be
+made whole. That is the reverse of M-2's finding for this specific path.
 
-**For the paid audit:** this is the finding to start on. It is the one place where the splitter's
-central claim, "each debtor loses collateral worth exactly the debt they stopped owing",
-is false for a reason that is not rounding.
+**Pinned by** `test_redemption_reliefBeyondUserDebtIsAbsorbedByTheProtocolNotUsers` (the inversion
+of the old pin), `testFuzz_redemption_userLossNeverExceedsRelief` (the H-2 invariant: after any
+redemption, no user's collateral loss exceeds the value of their relief), and
+`test_redemption_depositProtocolCollateralRetiresTheShortfall` (the residual make-whole).
 
 ---
 
@@ -217,28 +231,25 @@ threat model, not to an audit pass.
 
 ---
 
-## M-2 (Medium, DOCUMENTED). A recognised shortfall can never be covered
+## M-2 (Medium, FIXED alongside H-2). A recognised shortfall can now be covered
 
 **Affected:** `src/MarenVault.sol`: `redemptionShortfall` natspec L321, `depositProtocolCollateral`
 L890.
 
-The natspec claimed "an admin makes it whole with `depositProtocolCollateral`". It does not.
-That function raises `totalCollateral` by `msg.value` at the same time as it adds `msg.value` to
-the trove, so the gap between books and reality is exactly what it was before. Covering a
-shortfall requires adding BTC that is credited to _nobody_, the opposite of what
-`depositProtocolCollateral` is for.
+The natspec used to claim "an admin makes it whole with `depositProtocolCollateral`" while the
+function did not: it raised `totalCollateral` by `msg.value` at the same time as it added
+`msg.value` to the trove, so the gap between books and reality was exactly what it was before.
 
-With H-1 fixed the shortfall is a stable, permanent marker of "the books credit this much more
-than the protocol holds", and everything stays consistent around it indefinitely. So this is not
-urgent. It is Medium because the contract currently advertises a remedy that does not work, and
-because a wind-down eventually needs one.
+The H-2 fix delivered the make-whole this finding asked for, because H-2's residual needs it: when
+a redemption drains the protocol's own position past zero, `_recogniseShortfall(address(this))`
+records the uncovered part, and `depositProtocolCollateral` now retires it. Real BTC deposited there
+lowers `redemptionShortfall` in lockstep with the deposit (capped at the shortfall) WITHOUT
+re-crediting `totalCollateral` or any account, because that collateral was a loss the protocol
+already took; only the surplus over the shortfall becomes claimable protocol collateral. This is
+the shape the finding described (`redemptionShortfall` moved down in lockstep so `_booksInTrove`
+does not under-report), folded into the existing entrypoint rather than a new one.
 
-The shape of a real fix, for the record, is a payable admin function that does
-`idleCollateral += msg.value; redemptionShortfall -= msg.value;` and pushes to the trove, without
-touching `totalCollateral` or any account's balance. Note that it must move `redemptionShortfall`
-down in lockstep, or `_booksInTrove` starts under-reporting and a later genuine redemption of
-less than the covered amount goes undetected. The natspec on `redemptionShortfall` now says all
-of this.
+**Pinned by** `test_redemption_depositProtocolCollateralRetiresTheShortfall`.
 
 ---
 
@@ -454,8 +465,9 @@ Two things that look like they should break it and do not:
 - **The banked rounding surplus.** Also folded into `debtRemoved`, also acknowledged in the code,
   and bounded by `totalDebtShares / 1e18` wei.
 
-The one thing that DOES break it is H-2, where `debtRemoved` is capped and `collateralRemoved` is
-not.
+The one place this used to break was H-2, where `debtRemoved` is capped and `collateralRemoved` is
+not. That is now handled: the uncapped remainder of `collateralRemoved` is charged to the protocol's
+own position rather than socialised across users (see H-2, FIXED).
 
 ### V-3. Rounding directions all favour the pool
 
@@ -630,9 +642,10 @@ Code:
 Comments, all correcting claims that were false:
 
 - `interestIndex` is no longer described as monotonic. (L-1)
-- `redemptionShortfall` now states that it is a permanent gap, that every books-versus-trove
-  comparison must subtract it, and that `depositProtocolCollateral` does not cover it. (M-2)
-- `_reconcileRedemption` now carries H-2 as a stated KNOWN LIMIT with its bound.
+- `redemptionShortfall` now states that it is a permanent gap and that every books-versus-trove
+  comparison must subtract it. (M-2)
+- `_reconcileRedemption` now charges the reserve-excess collateral to the protocol's own position
+  and states H-2 as FIXED, with the protocol-exhaustion shortfall as its residual.
 - `withdrawProtocolCollateral` now says it pays nobody. (M-1)
 - `depositAndBorrow` now names the two orderings where revert parity does not hold. (I-1)
 - `skim()` now records why the reentrancy does not work and why the guard is there anyway. (I-2)
@@ -643,7 +656,7 @@ Tests, 7 added, whole suite green at 309:
 | ------------------------------------------------------------------------ | ---------- | ------------------ |
 | `test_redemption_recognisedShortfallIsNotReReadAsAFreshRedemption`       | redemption | H-1, fails pre-fix |
 | `test_redemption_afterAShortfallIsStillMeasuredExactly`                  | redemption | H-1, fails pre-fix |
-| `test_redemption_reliefIsCappedByTheReserveWhileTheCollateralDebitIsNot` | redemption | H-2                |
+| `test_redemption_reliefBeyondUserDebtIsAbsorbedByTheProtocolNotUsers`    | redemption | H-2, fails pre-fix |
 | `test_withdrawProtocolCollateral_paysNobodyAndOnlySkimRecoversIt`        | vault      | M-1                |
 | `test_frozenTroveStrandsIdleBtcWithNoAdminPathOut`                       | vault      | M-3                |
 | `test_skim_cannotBeReenteredFromAWithdrawal`                             | vault      | I-2                |

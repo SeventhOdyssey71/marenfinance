@@ -336,11 +336,12 @@ contract MarenVault is AccessControl, ERC2771Context, ReentrancyGuard {
      *      it pro rata to everyone still holding debt shares, which is the socialisation this
      *      whole mechanism exists to prevent. See `_booksInTrove`.
      *
-     *      THERE IS NO MAKE-WHOLE PATH, and `depositProtocolCollateral` is not one:
-     *      it credits `collateral[address(this)]` and raises `totalCollateral` by the same
-     *      amount it adds to the trove, so the gap survives it unchanged. Covering a shortfall
-     *      means adding BTC that is credited to nobody, and deciding whether the protocol or
-     *      the pool eats it is a governance question. See docs/audit/CONTRACTS-AUDIT.md M-2.
+     *      THE MAKE-WHOLE PATH is `depositProtocolCollateral` (H-2 / M-2 fix): real BTC deposited
+     *      there retires this gap, lowering it in lockstep with the deposit (capped at the gap)
+     *      WITHOUT re-crediting `totalCollateral` or any account, because the missing collateral
+     *      was a loss the protocol already took. It covers a shortfall of any origin; the H-2
+     *      residual (the protocol's own position exhausted by a redemption excess) is the case it
+     *      was added for. See docs/audit/CONTRACTS-AUDIT.md H-2 and M-2.
      */
     uint256 public redemptionShortfall;
 
@@ -887,6 +888,13 @@ contract MarenVault is AccessControl, ERC2771Context, ReentrancyGuard {
     /// @notice Add protocol-owned BTC to strengthen the trove. Counted as the protocol's own
     ///         collateral, so it can be withdrawn again by admin only, subject to the same
     ///         health checks as any user.
+    /// @dev H-2 residual make-whole. If a redemption drained the protocol's own position past
+    ///      zero, `_recogniseShortfall` recorded the uncovered part against `address(this)` and
+    ///      credited it to `totalCollateral` as phantom BTC so the ledger still summed. Real BTC
+    ///      deposited here retires that phantom FIRST: it lowers `redemptionShortfall` in lockstep
+    ///      (or `_booksInTrove` would under-report and miss a later redemption) WITHOUT
+    ///      re-crediting `totalCollateral` or any account, because that collateral was a loss the
+    ///      protocol already took. Only the remainder becomes fresh, claimable protocol collateral.
     function depositProtocolCollateral(address upperHint, address lowerHint)
         external
         payable
@@ -896,8 +904,15 @@ contract MarenVault is AccessControl, ERC2771Context, ReentrancyGuard {
         if (msg.value == 0) revert ZeroAmount();
         _syncState();
         _settleRedemption(address(this));
-        collateral[address(this)] += msg.value;
-        totalCollateral += msg.value;
+
+        uint256 shortfall = redemptionShortfall;
+        uint256 cover = msg.value < shortfall ? msg.value : shortfall;
+        uint256 credited = msg.value - cover;
+        if (cover > 0) redemptionShortfall = shortfall - cover;
+        if (credited > 0) {
+            collateral[address(this)] += credited;
+            totalCollateral += credited;
+        }
         idleCollateral += msg.value;
         _tryPushCollateral(msg.value, upperHint, lowerHint);
         emit ProtocolCollateralAdded(msg.value);
@@ -1269,7 +1284,16 @@ contract MarenVault is AccessControl, ERC2771Context, ReentrancyGuard {
         uint256 shares = totalDebtShares;
         if (shares == 0) return perShare;
         uint256 pending = _pendingRedemptionCollateral();
-        if (pending > 0) perShare += Math.mulDiv(pending, REDEMPTION_PRECISION, shares, Math.Rounding.Ceil);
+        if (pending == 0) return perShare;
+        // Preview only the share-holders' portion, exactly as `_reconcileRedemption` will split
+        // it (audit H-2): the excess the protocol's own position absorbs is not spread per share,
+        // so a per-user view would over-charge in the window before anyone reconciles without it.
+        (, uint256 netDebt) = _troveCollAndNetDebt();
+        uint256 accounted = _accountedDebt();
+        uint256 outstanding = _outstandingDebt();
+        uint256 debtRemoved = accounted > outstanding ? accounted - outstanding : 0;
+        uint256 excess = _redemptionExcessCollateral(pending, debtRemoved, netDebt);
+        perShare += Math.mulDiv(pending - excess, REDEMPTION_PRECISION, shares, Math.Rounding.Ceil);
     }
 
     /// @dev What `account` can actually claim: its ledger balance less every redemption debit
@@ -1321,22 +1345,24 @@ contract MarenVault is AccessControl, ERC2771Context, ReentrancyGuard {
      *      accrual deliberately keeps; re-pegging the index on that alone would hand the
      *      surplus back to users on every single call.
      *
-     *      KNOWN LIMIT, and it is a real one. The debt relief handed to users is capped at what
-     *      they owe (`accounted`), because that is all the index can cancel. The COLLATERAL
-     *      debit is not capped: the full `collateralRemoved` is split across shares whatever
-     *      the relief turned out to be. When a redemption cancels more trove debt than the
-     *      pool's users actually owe, which needs `reserveMUSD` to be non-zero because
-     *      `outstanding = troveNetDebt - reserveMUSD`, the excess relief lands in the reserve,
-     *      where no user has a claim on it, while users still pay for it in collateral. The
-     *      loss is bounded by `reserveMUSD` at the moment the redemption lands. Deciding who
-     *      absorbs it is a governance question, not a rounding one; it is written up as H-2 in
-     *      docs/audit/CONTRACTS-AUDIT.md rather than guessed at here.
+     *      H-2 (FIXED). The debt relief handed to users is capped at what they owe
+     *      (`accounted`), because that is all the index can cancel. When a redemption cancels
+     *      MORE trove debt than the pool's users owe, which needs `reserveMUSD` to be non-zero
+     *      because `outstanding = troveNetDebt - reserveMUSD`, the surplus relief accrues to the
+     *      reserve, which no share-holder can claim. The collateral that paid for that surplus is
+     *      NO LONGER split across users: the portion matching relief that landed in the reserve
+     *      is charged to the protocol's own position, mirroring the `shares == 0` branch, so each
+     *      debtor loses collateral worth exactly the debt it stopped owing (value neutral per
+     *      position). The removed KNOWN LIMIT was that this excess was socialised onto users.
+     *      RESIDUAL: if the protocol's own position cannot cover the excess, the remainder falls
+     *      to `_recogniseShortfall(address(this))`, and `depositProtocolCollateral` retires that
+     *      shortfall. Written up as H-2 in docs/audit/CONTRACTS-AUDIT.md.
      */
     function _reconcileRedemption() private {
         if (!troveOpen) return;
         _requireTroveActive();
 
-        (uint256 troveColl,) = _troveCollAndNetDebt();
+        (uint256 troveColl, uint256 troveNetDebt) = _troveCollAndNetDebt();
         uint256 booksInTrove = _booksInTrove();
         if (troveColl >= booksInTrove) return;
 
@@ -1372,12 +1398,23 @@ contract MarenVault is AccessControl, ERC2771Context, ReentrancyGuard {
                 uint256 newIndex = Math.mulDiv(oldIndex, outstanding, accounted, Math.Rounding.Ceil);
                 interestIndex = newIndex == 0 ? 1 : newIndex;
             }
+            // H-2. The reserve may have absorbed relief no share-holder can claim; the collateral
+            // that paid for it must not be split across users. `_redemptionExcessCollateral` is
+            // that portion, and the protocol's own position absorbs it exactly as the `shares == 0`
+            // branch does, falling to the shortfall path if the position cannot cover it.
+            uint256 excess = _redemptionExcessCollateral(collateralRemoved, debtRemoved, troveNetDebt);
+            if (excess > 0) {
+                uint256 own = collateral[address(this)];
+                uint256 charged = own < excess ? own : excess;
+                collateral[address(this)] = own - charged;
+                _recogniseShortfall(address(this), excess - charged);
+            }
             // Rounding UP the per-share debit means the debits collectively exceed what left
             // the trove, so the dust stays in the pool rather than in a withdrawer's pocket.
             // The overshoot is bounded by `totalDebtShares / REDEMPTION_PRECISION` wei of BTC,
             // which is what one unit of per-share error is worth across every holder.
             redemptionCollateralPerShare += Math.mulDiv(
-                collateralRemoved, REDEMPTION_PRECISION, shares, Math.Rounding.Ceil
+                collateralRemoved - excess, REDEMPTION_PRECISION, shares, Math.Rounding.Ceil
             );
         }
 
@@ -1388,6 +1425,27 @@ contract MarenVault is AccessControl, ERC2771Context, ReentrancyGuard {
         emit RedemptionReconciled(
             collateralRemoved, debtRemoved, oldIndex, interestIndex, redemptionCollateralPerShare
         );
+    }
+
+    /// @dev The part of a redemption's `collateralRemoved` that corresponds to relief the reserve
+    ///      absorbed rather than any share-holder (audit H-2). Non-zero only when the redemption
+    ///      drove `outstandingDebt` to its reserve-clamped floor: then `reserveMUSD` over-covers
+    ///      the trove by `reserveMUSD - netDebt`, MUSD credited to nobody. The collateral matching
+    ///      it is that same fraction of `collateralRemoved`, since `collateralRemoved` is worth
+    ///      `debtRemoved + excessRelief` of cancelled trove debt. Rounds the protocol's share UP so
+    ///      no share-holder's collateral loss can exceed the value of the debt it stopped owing.
+    function _redemptionExcessCollateral(uint256 collateralRemoved, uint256 debtRemoved, uint256 netDebt)
+        private
+        view
+        returns (uint256)
+    {
+        uint256 reserve = reserveMUSD;
+        uint256 excessRelief = reserve > netDebt ? reserve - netDebt : 0;
+        if (excessRelief == 0) return 0;
+        uint256 reliefTotal = debtRemoved + excessRelief;
+        if (reliefTotal == 0) return 0;
+        uint256 excess = Math.mulDiv(collateralRemoved, excessRelief, reliefTotal, Math.Rounding.Ceil);
+        return excess < collateralRemoved ? excess : collateralRemoved;
     }
 
     /**
