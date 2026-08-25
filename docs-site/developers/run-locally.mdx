@@ -1,0 +1,115 @@
+---
+title: "Run locally"
+description: "Clone the monorepo, install, and run the web app, contracts, and tests."
+---
+
+Maren is a single pnpm monorepo: five Solidity contracts, one shared TypeScript SDK, the web app,
+the iOS app, and the relayer, orchestrated with Turborepo. This is how to run it.
+
+## Prerequisites
+
+<CardGroup cols={3}>
+  <Card title="Node >= 22" icon="node-js">
+    The workspace pins `pnpm@10.19.0` via `packageManager` and requires Node 22 or newer.
+  </Card>
+  <Card title="pnpm" icon="box">
+    Corepack ships pnpm with Node. `corepack enable` picks up the pinned version.
+  </Card>
+  <Card title="Foundry" icon="hammer">
+    `forge` and `cast` for the contracts and for on-chain verification.
+  </Card>
+</CardGroup>
+
+## Clone and install
+
+<CodeGroup>
+```bash clone
+git clone https://github.com/SeventhOdyssey71/marenfinance.git
+cd marenfinance
+```
+
+```bash install
+corepack enable
+pnpm install
+```
+</CodeGroup>
+
+## Run each part
+
+<Tabs>
+  <Tab title="Web app">
+    ```bash
+    pnpm --filter @maren/web dev
+    # Next.js on http://localhost:3000, live reads against matsnet
+    ```
+    The web app reads live from matsnet contracts. The write path is wired and exercised on
+    testnet.
+  </Tab>
+  <Tab title="Contracts">
+    ```bash
+    pnpm contracts:build   # forge build --sizes, checks the EIP-170 limit
+    pnpm contracts:test    # forge test
+    pnpm contracts:fmt     # forge fmt --check
+    ```
+    All five deployed contracts sit inside the 24,576-byte EIP-170 limit; `MarenVault`, the
+    largest, is 14,508 bytes.
+  </Tab>
+  <Tab title="Tests">
+    ```bash
+    pnpm test          # turbo run test across the workspace
+    pnpm typecheck     # tsc --noEmit across packages
+    pnpm lint          # turbo run lint
+    ```
+  </Tab>
+</Tabs>
+
+## The test suites
+
+| Suite | Count | Runs against |
+| --- | ---: | --- |
+| Contract unit and property tests | 311 | Foundry, including the redemption splitter and the audit regressions |
+| Fork tests | 11 | The real MUSD contracts on matsnet, including a driven redemption |
+| Relayer | 286 | Four adversarial review rounds, plus packaging and nonce serialisation |
+| Web behaviour suite | 104 | The built app, live matsnet, read-only signer |
+| Web unit tests | 108 | Preflight, revert decoding, the relayer client and its routing |
+
+<Info>
+  **The fork tests** run Maren's contracts against the actual deployed MUSD system rather than a
+  mock, so a divergence between MUSD's documentation and its bytecode breaks a test instead of a
+  user. **The behaviour suite** drives the real interface against the real chain with a signer that
+  structurally cannot sign, and reads the account nonce before and after to prove no signature was
+  ever requested.
+</Info>
+
+## The CI=true note
+
+<Warning>
+  A guard in this codebase fails closed. One of the rules inherited from a real audit is that a
+  gate reading `if (FLAG !== "false") return true` is a pass-through whenever the variable is
+  unset. Maren's equivalent has a test that boots with empty configuration and asserts the service
+  refuses to operate. When running the full suite in a CI-shaped environment, set `CI=true` so the
+  environment-sensitive tests take the CI path. Note also that GitHub CI currently shows a known
+  account-billing failure at startup that is unrelated to the code.
+</Warning>
+
+## The em-dash guard
+
+Product copy in this repo does not use em dashes, and a scanner enforces it. Run it before
+shipping copy changes:
+
+```bash
+node tools/copy/em-dash-scan.mjs
+# scans apps/web and apps/ios; exits non-zero on a prose em dash
+```
+
+The fix for a flagged dash is to rewrite the sentence, not delete the glyph. A lone dash glyph
+used as a "no value" placeholder is exempt.
+
+<CardGroup cols={2}>
+  <Card title="Verify on-chain" icon="terminal" href="/developers/verify-on-chain">
+    Read the live pooled trove and confirm every address with `cast`.
+  </Card>
+  <Card title="The SDK" icon="code" href="/reference/sdk">
+    The shared package the web and iOS clients both call.
+  </Card>
+</CardGroup>

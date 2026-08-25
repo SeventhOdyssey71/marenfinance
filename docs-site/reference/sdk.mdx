@@ -1,0 +1,114 @@
+---
+title: "SDK"
+description: "@maren/sdk: what it exports, and where the numbers a user sees come from."
+---
+
+`@maren/sdk` is the single TypeScript package holding every protocol constant, address, and piece
+of position math. The web app and the iOS app call the same functions, so a rule enforced in one
+is the rule in the other, and every number a user sees is computed in exactly one place.
+
+## What it exports
+
+<CardGroup cols={2}>
+  <Card title="chains" icon="network-wired">
+    Mezo chain definitions with failover RPC lists, chain IDs, and `resolveNetwork()`.
+  </Card>
+  <Card title="addresses" icon="location-dot">
+    Maren and MUSD addresses per network, the precompiles, and the deployment-block floor.
+  </Card>
+  <Card title="constants" icon="ruler">
+    MCR, CCR, the 1,800 MUSD minimum, `MAREN_POLICY`, the seven Liquity divergences.
+  </Card>
+  <Card title="position" icon="calculator">
+    Collateral ratio, liquidation price, health, and borrow-route selection.
+  </Card>
+  <Card title="borrow / vault" icon="vault">
+    Borrow and pooled-vault helpers built on the position primitives.
+  </Card>
+  <Card title="format" icon="hashtag">
+    BRAND.md number formatting: units always shown, health figures round conservatively.
+  </Card>
+</CardGroup>
+
+## Position math
+
+Everything is integer math on 1e18 fixed-point values. No floats touch a number a liquidation
+decision depends on. The rounding rule is applied without exception: **when a rounding choice
+exists, round so the position looks less safe, never more.**
+
+<ResponseField name="collateralRatio(collateralWei, debtWei, priceWei)" type="bigint">
+  Collateral times price over debt, as a 1e18 ratio. Truncating division rounds the ratio down,
+  the conservative direction. Returns `MAX_CR` when debt is zero.
+</ResponseField>
+
+<ResponseField name="liquidationPrice(collateralWei, debtWei)" type="bigint">
+  The BTC price at which the protocol liquidates (ICR below 110%). Rounds up. Returns `0` when
+  there is no debt: an empty account is at no risk, not infinite risk.
+</ResponseField>
+
+<ResponseField name="maxNetDebtAt(collateralWei, priceWei, targetCr, borrowingRateWei)" type="bigint">
+  The most net debt borrowable while staying at or above `targetCr`. Direct troves only; rounds
+  down. Inverts `totalDebtFor` to back out the origination fee and gas compensation.
+</ResponseField>
+
+<ResponseField name="collateralRequiredFor(netDebtWei, priceWei, targetCr, borrowingRateWei)" type="bigint">
+  Collateral required to borrow `netDebt` at `targetCr`. Direct troves only; rounds up, so it
+  never under-quotes what a user needs. The pooled route deliberately does not match this.
+</ResponseField>
+
+<ResponseField name="assessHealth(collateralWei, debtWei, priceWei)" type="PositionHealth">
+  Full health snapshot: status, collateral ratio, liquidation price, drop-to-liquidation in basis
+  points, and whether the user may borrow more under the 180% floor.
+</ResponseField>
+
+<ResponseField name="assessBorrowRoute(collateralWei, priceWei, targetCr?, borrowingRateWei?)" type="BorrowEligibility">
+  Decides `direct` versus `pooled`, or says plainly why a user cannot borrow. Prefers a direct
+  trove whenever collateral supports one, because it carries no pooling risk.
+</ResponseField>
+
+<Info>
+  `classifyRatio(cr)` exists for the pooled trove, whose ratio arrives from
+  `MarenVault.troveStatus()` as a single number. Recomputing it from the collateral and debt
+  beside it would produce a second answer that can disagree with the one the contract ranks and
+  liquidates on, in the last decimal place, on exactly the day it matters. So the measured ratio
+  is classified directly.
+</Info>
+
+## Constants worth knowing
+
+These are read live from the deployed contracts and recorded with a verification date, not copied
+from docs. Where deployed code and official docs disagree, the code wins.
+
+| Constant | Value | Note |
+| --- | --- | --- |
+| `MCR` | 110% | Protocol liquidation threshold, hardcoded, not governable |
+| `CCR` | 150% | Recovery Mode threshold |
+| `MIN_NET_DEBT` | 1,800 MUSD | The minimum loan the pooled vault removes |
+| `MUSD_GAS_COMPENSATION` | 200 MUSD | Escrowed at open, refunded on close |
+| `INTEREST_RATE_BPS` | 100 | 1.00% APR, simple, fixed for the life of the loan |
+| `MAREN_POLICY.minHealthyCr` | 180% | Maren refuses new borrowing below this |
+| `MAREN_POLICY.targetCr` | 250% | The recommended safe level |
+| `MAREN_VAULT.liquidationCr` | 140% | Where Maren's keeper liquidates a pooled position |
+
+<Note>
+  `LIQUITY_DIVERGENCES` and `DOC_DISCREPANCIES` live in the same module, because each entry breaks
+  a naively ported frontend or contradicts Mezo's own docs. They are integration-critical, so they
+  live in code, not prose. See [Borrow](/product/borrow) for the ones that touch the borrow path.
+</Note>
+
+## Number formatting
+
+The `format` module implements BRAND.md number policy: how a balance is rendered changes what a
+user believes about their risk.
+
+```typescript
+import { formatBtc, formatMusd, formatCollateralRatio } from '@maren/sdk';
+
+formatBtc(1_000_000_000_000_000n);   // "0.001 BTC"  (6 dp max, trailing zeros trimmed)
+formatMusd(2_002_000_000_000_000_000_000n); // "2,002.00 MUSD" (2 dp, grouped)
+formatCollateralRatio(2_259_300_000_000_000_000n); // "225.9%" (rounds DOWN)
+```
+
+A ratio at 179.99% renders as `179.9%`, never `180%`, because 180% is the borrow threshold and the
+flattering rounding would tell a user they can act when they cannot. A position with no debt shows
+`∞`, not a fabricated liquidation price.

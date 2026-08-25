@@ -1,0 +1,193 @@
+---
+title: "Risk"
+description: "What can go wrong in Maren, ordered by expected harm, including the risks we accept."
+---
+
+This states the risks in Maren plainly, including the ones that could cost users money and the
+ones the team has chosen to accept. It follows one principle: a security document that only lists
+successes is not a security document.
+
+<Warning>
+  **Maren is pre-audit.** It should not be used with funds a user cannot afford to lose, and the
+  interface says so rather than burying it in a terms page. No mainnet deployment exists, and a
+  third-party audit is the deliberate gate.
+</Warning>
+
+Three things to take from this page:
+
+<CardGroup cols={3}>
+  <Card title="One custodial-failure surface" icon="vault">
+    The pooled vault is the only component that can lose user funds through a Maren design
+    failure. Everything else is non-custodial.
+  </Card>
+  <Card title="Inherited MUSD risk" icon="building-columns">
+    Maren inherits risk from MUSD it cannot mitigate, only disclose: upgradeable proxies and a
+    validator-set oracle.
+  </Card>
+  <Card title="Controls from real failures" icon="clipboard-check">
+    The controls are derived from a real audit of the team's previous product, not from theory.
+  </Card>
+</CardGroup>
+
+## Risk inventory
+
+Ordered by expected harm, not by likelihood.
+
+| # | Risk | Who bears it | Severity | Status |
+| --- | --- | --- | --- | --- |
+| R-1 | Pooled vault socialises a loss in a fast BTC drawdown | Pooled users | Critical | Mitigated, capped, audit scope |
+| R-2 | MUSD proxy upgrade changes behaviour underneath us | All users | Critical | Disclosed, not mitigable |
+| R-3 | Oracle failure or manipulation | All users | High | Partially mitigated |
+| R-4 | Keeper fails to act in time | Pooled users | High | Mitigated |
+| R-5 | Relayer key compromise | Maren treasury | Medium | Mitigated by design |
+| R-6 | Contract bug in Pay / Registry / Earn | Individual users | Medium | Audit and tests |
+| R-7 | Sponsorship abuse drains the gas budget | Maren treasury | Low | Mitigated |
+| R-8 | Handle squatting or impersonation | Individual users | Medium | Mitigated |
+| R-9 | Front-end compromise | All users | High | Standard controls |
+
+## R-1: The pooled vault
+
+This is the risk that matters. Everything else is smaller. `MarenVault` maintains one MUSD trove
+and a per-user ledger inside it, so a user's collateral is **segregated in accounting, not in
+custody**.
+
+<Warning>
+  If the pooled trove were ever liquidated by the MUSD protocol, the loss would fall across pooled
+  users in proportion to their share, including users whose own position was perfectly healthy.
+  Maren does not describe this as "your funds are safe". They are subject to a mechanism, and the
+  mechanism can fail.
+</Warning>
+
+**Why build it anyway.** MUSD's 1,800 MUSD minimum net debt is a minimum loan size that prices
+small holders out entirely and pushes the few who try to the liquidation edge. The pooled vault
+removes that minimum, safely, which is the only honest reason to take on this risk.
+
+**Mitigations.**
+
+- A 30-point buffer above the cliff: protocol liquidates at 110%, Maren internally at 140%, blocks
+  borrowing below 180%, and manages to a 250% target.
+- Users who do not need pooling do not get it: `assessBorrowRoute()` sends anyone with enough
+  collateral to a direct trove, which carries no pooling risk.
+- Borrowing pauses before withdrawal does, a hard contract requirement with a dedicated test.
+- Caps that widen on evidence, not schedule.
+- An insurance buffer funded from the 5% internal liquidation penalty.
+- A 0.001 BTC minimum deposit, keeping positions large enough that liquidating one is rational.
+
+| Phase | Cap | Gate |
+| --- | --- | --- |
+| Mainnet launch | 5 BTC | 14 days, no keeper failure |
+| Post-audit | 25 BTC | Critical/High findings resolved |
+| Post-traction | 100 BTC | 60 days clean liquidation history |
+
+<Note>
+  **If the team cannot satisfy itself the pooled vault is safe, Maren ships without it.** Direct
+  troves, gasless payments, and Earn are valuable on their own. This commitment is in the roadmap
+  and it is binding.
+</Note>
+
+## R-2: Inherited MUSD risk
+
+Findings from reading the deployed contracts, offered without editorial.
+
+<AccordionGroup>
+  <Accordion title="MUSD's core contracts are upgradeable proxies" icon="key">
+    `PCV.owner()`, `PriceFeed.owner()`, and `MUSD.owner()` all resolve to the same Gnosis Safe,
+    `0x98D8899c3030741925BE630C710A98B57F397C7a`. That key can upgrade implementations, swap the
+    oracle, and modify mint/burn lists. `council()` and `treasury()` both return the zero address,
+    so effective control sits with a Thesis/Mezo multisig. Mezo documents immutability as a
+    later-stage goal, so this is a disclosed choice. Maren cannot mitigate it, only disclose it,
+    and avoid compounding it: Maren's own upgradeable contracts sit behind a multisig **and** a
+    timelock from deployment day one.
+  </Accordion>
+  <Accordion title="MUSD's backing is not what a casual reader assumes" icon="scale-unbalanced">
+    Total supply is roughly 31.08M. Trove-backed debt is roughly 1.60M, plus an outstanding PCV
+    bootstrap loan of roughly 14.97M. The remainder sits in protocol-owned strategies and the
+    Wormhole NTT bridge. "100% Bitcoin-backed" is true of the CDP portion but not of most
+    circulating MUSD today. Maren does not repeat a blanket backing claim.
+  </Accordion>
+  <Accordion title="Two places MUSD's docs and bytecode disagree" icon="triangle-exclamation">
+    The docs state a borrower with an outstanding loan pays a zero redemption fee;
+    `isAccountFeeExempt` appears only in `BorrowerOperations`, never in `TroveManager`, which
+    applies the redemption rate unconditionally. Maren does not promise this waiver. The docs list
+    the refinance fee as 0.1%; the code computes roughly 0.02% of old net debt. Maren follows the
+    bytecode.
+  </Accordion>
+</AccordionGroup>
+
+## R-3: Oracle
+
+MUSD's price feed reads a native Mezo precompile (Skip Connect, fed by the validator set), not
+Chainlink and not Pyth.
+
+- `fetchPrice()` reverts above 60 seconds of staleness and has no `lastGoodPrice()` fallback. Both
+  apps have an explicit price-unavailable state and will not let a user borrow against a stale
+  number.
+- The feed is secured by Mezo's validator set, a correlated risk: a consensus failure is
+  simultaneously a price failure.
+- Pyth is deployed on Mezo but roughly 28 days stale, with ETH/USD reverting. Maren never reads
+  Pyth for liquidation math.
+
+Maren's keeper treats an oracle revert as a **halt condition**, not an error to retry through: it
+stops opening new debt and continues to permit withdrawals.
+
+## R-4 to R-9: Controls
+
+<AccordionGroup>
+  <Accordion title="R-4 Keeper" icon="robot">
+    Per-block health checks, permissionless to call for liquidation so Maren is not a single point
+    of failure, with an economic incentive via the 5% penalty. If the keeper halts, borrowing
+    stops; withdrawals do not.
+  </Accordion>
+  <Accordion title="R-5 Relayer" icon="paper-plane">
+    A full compromise of the relayer key costs Maren its BTC gas float and nothing else. The
+    relayer is never an owner, approver, or custodian. It relays only to allowlisted Maren
+    contracts, only for allowlisted selectors, and derives the payer from the recovered signature,
+    not any client field. At Mezo gas prices a 100,000-gas transaction costs about $0.0092.
+  </Accordion>
+  <Accordion title="R-6 Contracts" icon="file-code">
+    Full unit and fuzz coverage; invariant tests asserting the vault's per-user ledger cannot
+    drift from the trove's real debt, with any rounding error required to fall in the protocol's
+    favour; fork tests against the real MUSD contracts on matsnet. `MarenVault` and the forwarder
+    are the audit scope.
+  </Accordion>
+  <Accordion title="R-7 Sponsorship abuse" icon="gas-pump">
+    Per-address and per-IP rate limits, a global daily BTC spend cap that halts relaying, and a
+    25-action free tier after which a fee is taken in-band in MUSD. Exhaustion returns a typed
+    error, never a silent fallback that spends Maren's money.
+  </Accordion>
+  <Accordion title="R-8 Handles" icon="at">
+    Commit-reveal registration prevents front-running, `[a-z0-9_]` eliminates homoglyph attacks,
+    and the payment interface shows the resolved address alongside the handle before any
+    confirmation.
+  </Accordion>
+  <Accordion title="R-9 Front-end" icon="browser">
+    Strict CSP, subresource integrity, no third-party analytics on signing paths, and transaction
+    simulation with a human-readable summary before every signature.
+  </Accordion>
+</AccordionGroup>
+
+## Rules inherited from a real audit
+
+The controls above are not theoretical. The team's previous product, Talise, was audited on 24
+July 2026: 7 Critical, 13 High, 20 Medium, 24 Low. The core custody model held and the IDOR sweep
+came back clean, but each finding is now a hard rule in this repository. The load-bearing ones:
+
+- Bind the funding source to the caller; a relayer that trusts a client-asserted source can be
+  made to fund an attacker.
+- Every value-moving parameter lives inside the signed struct: recipient, amount, fee, deadline,
+  nonce.
+- Never key escrow by a shared address.
+- Verify funding on-chain; never trust a client-supplied digest.
+- Gates fail closed. Maren's equivalent has a test that boots with empty configuration and asserts
+  the service refuses to operate.
+- Timelock and multisig the proxy admin at deployment, not later.
+- A transaction hash is not success; only a receipt with `status === 'success'` marks a payment
+  delivered.
+- Do not claim an attestation you have not implemented.
+
+<Info>
+  Disclosure: **security@maren.finance** for vulnerability reports, never a public issue.
+  Acknowledgement within 48 hours, assessment within 5 working days. Contracts and audit reports
+  are published in the public repository, and incidents are disclosed with a timeline, including
+  ones caught before user harm.
+</Info>

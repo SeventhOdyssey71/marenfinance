@@ -1,0 +1,106 @@
+---
+title: "The pooled vault"
+description: "Shares, the per-user ledger, and the minimum-viable-vault finding."
+---
+
+`MarenVault` maintains **one MUSD trove** and holds a **per-user ledger** of collateral and debt
+inside it. This page is the mechanism: how one shared position accounts for many users, and one
+sizing result that decides whether the vault can serve a borrow at all.
+
+## One trove, many ledgers
+
+A user's collateral is segregated in accounting, not in custody. The vault records each user's
+share of collateral and debt, and the sum of those shares equals what the single trove actually
+holds in Mezo's `TroveManager`. This is what lets the vault offer sub-minimum borrowing: the
+trove as a whole clears the protocol's 1,800 MUSD minimum, while an individual user inside it
+borrows far less.
+
+<Info>
+  Because the vault holds exactly one trove regardless of how many users sit inside it, Maren's
+  cost of computing `SortedTroves` insertion hints does not grow with Maren's user count. One
+  trove, one hint computation, however many depositors.
+</Info>
+
+## How a borrow is served
+
+A pooled borrow can be served two ways, and the accounting differs by design:
+
+<AccordionGroup>
+  <Accordion title="From new trove debt" icon="plus">
+    The vault increases the shared trove's debt via `adjustTrove` and credits the user's ledger.
+    This adds real protocol debt and is subject to the trove-wide 180% floor.
+  </Accordion>
+  <Accordion title="From the MUSD reserve" icon="piggy-bank">
+    The vault holds a `reserveMUSD` balance. A borrow served from the reserve adds no trove debt
+    at all and pays no origination fee. It is still refused while the pooled trove sits under the
+    180% floor, because the floor is checked unconditionally.
+  </Accordion>
+</AccordionGroup>
+
+This is why the pooled position math deliberately does **not** match the direct-trove math. A
+pooled user pays no per-user 200 MUSD gas compensation, because one payment covers the whole
+trove, and a reserve-served borrow pays no origination fee. Applying the direct-trove
+`collateralRequiredFor()` to a pooled position would over-quote every user by 200 MUSD of
+collateral they do not owe.
+
+## The two floors
+
+The contract checks two collateral-ratio floors on every borrow, and they close borrowing for
+different populations:
+
+| Constant | Meaning | Effect |
+| --- | --- | --- |
+| `MIN_BORROW_CR` = 180% | The floor **your** position must clear | Refuses your borrow with `InsufficientCollateralRatio` |
+| `MIN_TROVE_CR` = 180% | The floor the **shared** trove must clear after any borrow | Closes borrowing for everyone at once, even a reserve-served borrow |
+| `LIQUIDATION_CR` = 140% | Where Maren's keeper liquidates a pooled position | Above the protocol's 110% cliff |
+
+<Note>
+  `MIN_TROVE_CR` is the constraint that closes borrowing for the whole pool at once, and it is
+  checked unconditionally. Even a borrow served entirely from the reserve, which adds no trove
+  debt, is refused while the pooled trove sits under it. This is a system-wide state, not a
+  per-user one.
+</Note>
+
+## The minimum-viable-vault finding
+
+A pooled vault seeded at the protocol minimum can **never serve a borrow**. The reason is exact:
+MUSD's 1,800 MUSD minimum net debt pins the seed position's debt right at the borrowing floor,
+so there is no headroom to lend from. The vault has to be seeded above the minimum before it can
+do anything.
+
+Maren hit this in practice on matsnet, and the fix is on-chain in two transactions: the pooled
+trove's ICR moved from **153% to about 220%** by adding collateral, which opened borrowing
+headroom. The trove currently holds 0.069 BTC against 2,002.0 MUSD of debt, an ICR of **223%**,
+with borrowing enabled.
+
+<CodeGroup>
+```bash read the live pooled trove collateral
+cast call 0xE47c80e8c23f6B4A1aE41c34837a0599D5D16bb0 \
+  "getTroveColl(address)(uint256)" \
+  0x46252B00AB59384518d9dB6D1f210ffF1221645b \
+  --rpc-url https://rpc.test.mezo.org
+```
+</CodeGroup>
+
+The first argument is Mezo's `TroveManager`; the second is `MarenVault`, which owns the trove.
+
+## The keeper
+
+A keeper runs per-block health checks on the pooled trove. It tops up collateral, repays debt,
+and internally liquidates unhealthy users by seizing their collateral at a 5% penalty and
+repaying their share of pooled debt. Calling for liquidation is permissionless, so Maren is not a
+single point of failure, and the 5% penalty gives any caller an economic incentive to act.
+
+<Warning>
+  If the keeper cannot act, borrowing stops but withdrawals do not. The residual risk is a BTC
+  drawdown faster than the keeper can respond. See the [risk inventory](/security/risk).
+</Warning>
+
+<CardGroup cols={2}>
+  <Card title="The redemption splitter" icon="scissors" href="/how-it-works/redemptions">
+    How a protocol redemption against the shared trove is divided across users, value-neutrally.
+  </Card>
+  <Card title="The product view" icon="vault" href="/product/social-vault">
+    The same vault, framed as the wedge and the risk a user takes on.
+  </Card>
+</CardGroup>

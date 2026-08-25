@@ -1,0 +1,68 @@
+---
+title: "Activity"
+description: "History read from contract logs, with honest empty states."
+---
+
+Activity is the app's history, and it is built on one rule: **nothing is rendered that cannot be
+proven.** Every row is read from contract logs, and every row carries a real transaction hash
+linked to `explorer.test.mezo.org`. There is no sample data anywhere in the product.
+
+## Read from the chain, not a tracker
+
+Activity walks the four deployed Maren contracts from the deployment-block floor to the chain
+head, in the 10,000-block windows Mezo's RPC allows, decoding logs into rows. The floor is a
+real, bisected block number, so a reader that starts there and finds nothing has read **all** of
+the history, not merely a recent slice.
+
+```typescript
+import { getDeploymentBlock, MEZO_MAX_LOG_RANGE } from '@maren/sdk';
+
+// testnet -> 14_911_471n, the earliest block any Maren contract existed at.
+// mainnet -> null, because Maren is not deployed there: "no history to read",
+//            which the UI must render as unavailable, never as empty.
+const floor = getDeploymentBlock('testnet');
+const window = MEZO_MAX_LOG_RANGE; // 10_000n, the widest [from, to] the RPC answers
+```
+
+## The three honest empty states
+
+An empty screen has to say which of three different things happened, because they are not the
+same and the difference matters to a user.
+
+<CardGroup cols={3}>
+  <Card title="Nothing yet" icon="inbox">
+    History was scanned in full from the deployment floor and there is genuinely nothing. The
+    empty state says precisely what was scanned before concluding that.
+  </Card>
+  <Card title="Could not read" icon="triangle-exclamation">
+    A log scan failed, for example an RPC timeout. This is reported as **unknown**, never as an
+    empty history. Failing the scan and rendering "no history" would be the worst available
+    answer, and a false one.
+  </Card>
+  <Card title="No history to read" icon="ban">
+    On a network where Maren is not deployed, the deployment floor is `null`. There is no
+    history that could exist, which is an unavailable state, not an empty one.
+  </Card>
+</CardGroup>
+
+<Warning>
+  A missing receipt is not a missing history. Mezo's primary matsnet RPC has returned a Maren
+  log and then `null` for that same transaction's receipt, while the fallback returned the full
+  receipt. The log reader absorbs a per-transaction receipt failure and marks that row as
+  awaiting a receipt, rather than failing the whole scan. See [Networks](/reference/networks).
+</Warning>
+
+## What each row proves
+
+Deposits, withdrawals, borrows, payments, requests, and the full Earn cycle all appear in
+Activity, each decoded from a real event. A settled request shows in both parties' history with
+the same hash. The [pilot metrics tool](/developers/verify-on-chain) reads the same logs to
+compute adoption, and it applies the same rule: an unread value is reported as unavailable,
+never defaulted to zero.
+
+<Note>
+  This discipline caught a real bug. A payment event once carried a phantom parameter that made
+  its topic hash never match what the chain emitted, silently dropping every handle payment from
+  Activity. It was found in the [conformance audit](/security/audits), fixed, and regression
+  tested.
+</Note>

@@ -1,0 +1,113 @@
+---
+title: "Borrow"
+description: "Deposit, borrow, repay, and withdraw against Bitcoin, with health you can read."
+---
+
+Borrowing is the core mechanic underneath the money app: deposit BTC, draw MUSD against it, and
+get all your Bitcoin back when you repay. The interface offers only what the deployed contract
+will accept, and shows health as a plain number with a plain meaning.
+
+## The four actions
+
+<Steps>
+  <Step title="Deposit">
+    Add native BTC as collateral, from 0.001 BTC in the pooled vault. Collateral is passed as
+    `msg.value`, so there is no ERC-20 approval step for it. Below the minimum, `deposit`
+    reverts with `DepositBelowMinimum`.
+  </Step>
+  <Step title="Borrow">
+    Draw MUSD against your collateral. The borrow slider is bounded by
+    [preflight](/how-it-works/preflight), and the real per-trove ceiling is
+    `TroveManager.getTroveMaxBorrowingCapacity()`, not an ICR-derived number.
+  </Step>
+  <Step title="Repay">
+    Return MUSD to reduce your debt. Repaying restores borrowing headroom and moves your
+    collateral ratio up.
+  </Step>
+  <Step title="Withdraw">
+    Take Bitcoin back out, down to zero once your debt is repaid. Exits stay open even when the
+    vault halts new entries.
+  </Step>
+</Steps>
+
+## The 180% floor, and why it is not 110%
+
+The MUSD protocol liquidates a trove at a **110% collateral ratio**. Maren refuses to let you
+borrow below **180%**, warns hard below **160%**, and recommends a **250%** target. The buffer
+is the product: at the recommended 250%, Bitcoin must roughly halve before a position
+approaches Maren's internal threshold.
+
+<Info>
+  These are two different numbers doing two different jobs. `MAREN_POLICY` is what Maren
+  recommends. `MAREN_VAULT` is what the deployed contract enforces before it reverts. They
+  currently agree at 180%, and the duplication is deliberate: if governance ever moved one,
+  silently reusing the other would put a slider's hard stop on the wrong side of a revert.
+</Info>
+
+## Reading health
+
+Health is shown as how far Bitcoin can fall before anything is at risk, computed by the SDK so
+every client shows the same number. The math rounds in one direction only: **collateral ratios
+round down, liquidation prices round up**, so a position can never display as safer than it is.
+
+<CodeGroup>
+```typescript position health
+import { assessHealth } from '@maren/sdk';
+
+const health = assessHealth(collateralWei, debtWei, priceWei);
+// {
+//   status: 'healthy' | 'caution' | 'warning' | 'danger' | 'liquidatable' | 'none',
+//   collateralRatio,             // rounds DOWN, so 179.99% never shows as 180%
+//   liquidationPrice,            // rounds UP, a low quote would cost a user collateral
+//   priceDropToLiquidationBps,   // how far BTC can fall before protocol liquidation
+//   canBorrow,                   // true only at or above the 180% floor
+// }
+```
+</CodeGroup>
+
+With no debt there is no liquidation price at all. An empty account is at no risk, not infinite
+risk, so the app states that in a sentence rather than showing an empty gauge.
+
+## What MUSD does that a ported frontend gets wrong
+
+MUSD is a Liquity v1 descendant, and that is a trap: close enough that a ported frontend
+compiles, far enough that it fails in production. The borrow path touches several of these.
+
+<AccordionGroup>
+  <Accordion title="No slippage parameter on any borrower operation" icon="ban">
+    Liquity's `openTrove` and `adjustTrove` take a `_maxFeePercentage` guard. MUSD's rates are
+    flat and timelocked, so the parameter is simply gone. A ported ABI encodes an extra
+    argument and every call reverts on decode.
+  </Accordion>
+  <Accordion title="The borrow limit does not rise when you add collateral" icon="lock">
+    `maxBorrowingCapacity` is a Mezo-only per-trove ceiling fixed at the price when the trove
+    was opened. Adding collateral does not raise it; only `refinance()` does. Always display
+    `getTroveMaxBorrowingCapacity()` as the real limit.
+  </Accordion>
+  <Accordion title="Debt is principal plus interest, six values not four" icon="calculator">
+    `getEntireDebtAndColl` returns six values, not Liquity v1's four. Interest must be added to
+    principal to get total debt; treating `principal` as the debt understates what you owe.
+    Interest is **1.00% APR, simple, and fixed for the life of the loan**.
+  </Accordion>
+  <Accordion title="Recovery Mode does not move the liquidation threshold" icon="triangle-exclamation">
+    In MUSD the liquidation threshold stays 110% in both normal and Recovery Mode. A ported
+    frontend that widens liquidations in Recovery Mode would tell a user at 130% they are about
+    to be liquidated when they are not. See the [conformance audit](/security/audits).
+  </Accordion>
+</AccordionGroup>
+
+<Warning>
+  The price feed can revert. `PriceFeed.fetchPrice()` reverts if the oracle is more than 60
+  seconds stale, and every borrow, adjust, and repay path can revert with it. Maren has an
+  explicit "price feed unavailable" state and never renders a stale figure as live. See
+  [Networks](/reference/networks).
+</Warning>
+
+<CardGroup cols={2}>
+  <Card title="How offers are computed" icon="filter" href="/how-it-works/preflight">
+    Preflight evaluates every rule the contract enforces before a control is enabled.
+  </Card>
+  <Card title="Position math in the SDK" icon="code" href="/reference/sdk">
+    `collateralRatio`, `liquidationPrice`, `maxNetDebtAt`, and the rounding rules.
+  </Card>
+</CardGroup>

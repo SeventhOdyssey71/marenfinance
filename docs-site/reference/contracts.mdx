@@ -1,0 +1,113 @@
+---
+title: "Contracts"
+description: "The five live matsnet addresses, the MUSD protocol addresses, and the precompiles."
+---
+
+Every address on this page is transcribed from `packages/sdk/src/addresses.ts`, where each was
+verified on-chain before being committed. Do not hand-edit an address anywhere: a wrong one
+silently sends funds nowhere.
+
+## Maren contracts
+
+<Warning>
+  **Maren is deployed to Mezo matsnet (chain `31611`) only.** Its mainnet addresses are all
+  zeroes because Maren is not on mainnet: a third-party audit is the deliberate gate. The
+  deployment block floor for matsnet is `14,911,471`; on mainnet it is `null`, meaning there is
+  no history to read.
+</Warning>
+
+The five contracts, all source-verified on Blockscout. `MarenRelayHub` is the single trusted
+forwarder; `MarenPay.trustedForwarder()` confirms it on-chain.
+
+| Contract | Matsnet address (31611) | Mainnet (31612) |
+| --- | --- | --- |
+| MarenVault | `0x46252B00AB59384518d9dB6D1f210ffF1221645b` | `0x0000...0000` |
+| MarenPay | `0xe475Ff919D54E055809f516E3bed8a5c7a101836` | `0x0000...0000` |
+| MarenRelayHub | `0x22cC1Adfb0C91D9359746dE3F7E8cB7F2B8eA98C` | `0x0000...0000` |
+| MarenRegistry | `0x9e123Cdd0CD524812CF9F552d3FAB13d8143b77E` | `0x0000...0000` |
+| MarenEarn | `0xE3B02b215085B99Ce61E0F5ea9763Ac637aa7826` | `0x0000...0000` |
+
+Deployment took 11 transactions from the deployer
+`0x54196397D6f01b48739dB3957257cB33cD341885`, costing 11,688,063 gas in total, about 4 nano-BTC.
+Every deploy hash resolves on `explorer.test.mezo.org`.
+
+<Note>
+  The standalone `MarenForwarder` is `MarenRelayHub`'s base class and is deliberately **not**
+  deployed. Two trusted forwarders would be two independent ways to forge a sender, only one of
+  which is allowlisted. Always treat `MarenRelayHub` as the forwarder.
+</Note>
+
+## MUSD protocol contracts
+
+Maren calls Mezo's already-deployed MUSD system rather than reimplementing any of it. All core
+contracts are `TransparentUpgradeableProxy`, so always integrate against the proxy, never an
+implementation address. All fifteen addresses were verified three independent ways: the
+`mezo-org/musd` deployment artifacts, the OpenZeppelin proxy manifest, and live `eth_getCode`
+plus functional calls.
+
+<Tabs>
+  <Tab title="Matsnet (31611)">
+    | Contract | Address |
+    | --- | --- |
+    | MUSD | `0x118917a40FAF1CD7a13dB0Ef56C86De7973Ac503` |
+    | BorrowerOperations | `0xCdF7028ceAB81fA0C6971208e83fa7872994beE5` |
+    | BorrowerOperationsSignatures | `0xD757e3646AF370b15f32EB557F0F8380Df7D639e` |
+    | TroveManager | `0xE47c80e8c23f6B4A1aE41c34837a0599D5D16bb0` |
+    | StabilityPool | `0x1CCA7E410eE41739792eA0A24e00349Dd247680e` |
+    | PriceFeed | `0x86bCF0841622a5dAC14A313a15f96A95421b9366` |
+    | SortedTroves | `0x722E4D24FD6Ff8b0AC679450F3D91294607268fA` |
+    | HintHelpers | `0x4e4cBA3779d56386ED43631b4dCD6d8EacEcBCF6` |
+    | InterestRateManager | `0xD4D6c36A592A2c5e86035A6bca1d57747a567f37` |
+    | GovernableVariables | `0x6552059B6eFc6aA4AE3ea45f28ED4D92acE020cD` |
+  </Tab>
+  <Tab title="Mainnet (31612)">
+    | Contract | Address |
+    | --- | --- |
+    | MUSD | `0xdD468A1DDc392dcdbEf6db6e34E89AA338F9F186` |
+    | BorrowerOperations | `0x44b1bac67dDA612a41a58AAf779143B181dEe031` |
+    | BorrowerOperationsSignatures | `0xB57ab578BF20b3e318f3EFAA587C51DBccE5df7a` |
+    | TroveManager | `0x94AfB503dBca74aC3E4929BACEeDfCe19B93c193` |
+    | StabilityPool | `0x73245Eff485aB3AAc1158B3c4d8f4b23797B0e32` |
+    | PriceFeed | `0xc5aC5A8892230E0A3e1c473881A2de7353fFcA88` |
+    | SortedTroves | `0x8C5DB4C62BF29c1C4564390d10c20a47E0b2749f` |
+    | HintHelpers | `0xD267b3bE2514375A075fd03C3D9CBa6b95317DC3` |
+    | InterestRateManager | `0x4a453700d157717Fe02fB62E7700ED7845048285` |
+    | GovernableVariables | `0x560AC4Ea44Fb7EB2D4d3c00608CB1CAb2613d389` |
+  </Tab>
+</Tabs>
+
+<Info>
+  MUSD is **not** a proxy. Its EIP-1967 implementation slot reads all zeroes and its runtime code
+  carries the ERC-2612 surface directly. The proxy rule above is about the core protocol
+  contracts, not the token.
+</Info>
+
+## Precompiles and standard infrastructure
+
+Two things a developer reaches for on other chains behave differently here. The BTC/USD oracle is
+a native chain precompile, not a deployed Chainlink or Pyth contract, and the ERC-4337 EntryPoint
+is deployed but inert.
+
+| Component | Address | Status |
+| --- | --- | --- |
+| BTC gas-token precompile | `0x7b7C000000000000000000000000000000000000` | Live |
+| Price oracle precompile | `0x7b7c000000000000000000000000000000000015` | Live, Skip Connect |
+| MEZO token precompile | `0x7B7c000000000000000000000000000000000001` | Live |
+| Multicall3 | `0xcA11bde05977b3631167028862bE2a173976CA11` | Deployed both networks |
+| Permit2 | `0x000000000022D473030F116dDEE9F6B43aC78BA3` | Deployed |
+| x402 settlement proxy | `0x402085c248EeA27D92E8b30b2C58ed07f9E20001` | Live both networks |
+| ERC-4337 EntryPoint v0.7 | `0x0000000071727De22E5E9d8BAf0edAc6f37da032` | Deployed and inert |
+
+<Warning>
+  The price oracle precompile implements only `decimals()` and `latestRoundData()` from the
+  Chainlink `AggregatorV3` interface; `description()` reverts. It reverts entirely above 60
+  seconds of staleness. Pyth is also deployed on Mezo but its feeds run roughly 28 days stale and
+  ETH/USD reverts outright, so it is not a usable substitute. Maren reads the precompile, the same
+  source MUSD's own liquidation engine uses. See [Networks](/reference/networks).
+</Warning>
+
+<Warning>
+  The ERC-4337 EntryPoint has processed zero UserOperations and no compliant bundler can run
+  against Mezo, because the RPCs lack `debug_traceCall`. It is recorded here only so nobody
+  rediscovers it and concludes 4337 is viable. It is not. See [Gasless](/how-it-works/gasless).
+</Warning>

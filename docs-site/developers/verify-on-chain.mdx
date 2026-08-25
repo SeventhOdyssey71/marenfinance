@@ -1,0 +1,134 @@
+---
+title: "Verify on-chain"
+description: "Check the live pooled trove, confirm every address, and read the pilot metrics yourself."
+---
+
+Every claim in these docs is meant to be checkable without trusting Maren. This page is the
+commands. All of it runs against Mezo matsnet (chain `31611`), where Maren is deployed.
+
+## Confirm the chain
+
+<CodeGroup>
+```bash matsnet
+cast chain-id --rpc-url https://rpc.test.mezo.org
+# -> 31611
+```
+
+```bash mainnet
+cast chain-id --rpc-url https://jsonrpc-mezo.boar.network
+# -> 31612
+```
+</CodeGroup>
+
+## Read the live pooled trove
+
+The pooled trove is live inside Mezo's own `TroveManager`. It currently holds 0.069 BTC against
+2,002.0 MUSD of debt, an ICR of about 223%, with borrowing enabled. Read its collateral directly:
+
+```bash
+# arg 1: Mezo TroveManager (matsnet). arg 2: MarenVault, which owns the trove.
+cast call 0xE47c80e8c23f6B4A1aE41c34837a0599D5D16bb0 \
+  "getTroveColl(address)(uint256)" \
+  0x46252B00AB59384518d9dB6D1f210ffF1221645b \
+  --rpc-url https://rpc.test.mezo.org
+```
+
+## Confirm the Maren addresses have code
+
+An address with no code is not a deployed contract. Each of these returns a long bytecode string;
+an undeployed mainnet address would return `0x`.
+
+<CodeGroup>
+```bash MarenVault
+cast code 0x46252B00AB59384518d9dB6D1f210ffF1221645b \
+  --rpc-url https://rpc.test.mezo.org | head -c 12
+```
+
+```bash MarenPay
+cast code 0xe475Ff919D54E055809f516E3bed8a5c7a101836 \
+  --rpc-url https://rpc.test.mezo.org | head -c 12
+```
+
+```bash MarenEarn
+cast code 0xE3B02b215085B99Ce61E0F5ea9763Ac637aa7826 \
+  --rpc-url https://rpc.test.mezo.org | head -c 12
+```
+</CodeGroup>
+
+<Note>
+  Maren's mainnet addresses are all zeroes on purpose, because Maren is not on mainnet. Running the
+  same reads against a mainnet RPC and the zero address returns nothing, which is the honest
+  result, not a broken command. See [Contracts](/reference/contracts).
+</Note>
+
+## Confirm the trusted forwarder wiring
+
+`MarenRelayHub` is the single trusted forwarder. `MarenPay.trustedForwarder()` should return the
+RelayHub address, confirming the wiring on-chain:
+
+```bash
+cast call 0xe475Ff919D54E055809f516E3bed8a5c7a101836 \
+  "trustedForwarder()(address)" \
+  --rpc-url https://rpc.test.mezo.org
+# -> 0x22cC1Adfb0C91D9359746dE3F7E8cB7F2B8eA98C
+```
+
+## Confirm the MUSD protocol constants
+
+The numbers Maren shows are read from the deployed MUSD contracts, not from docs. Two spot checks:
+
+<CodeGroup>
+```bash minimum net debt
+cast call 0xCdF7028ceAB81fA0C6971208e83fa7872994beE5 \
+  "minNetDebt()(uint256)" \
+  --rpc-url https://rpc.test.mezo.org
+# -> 1800000000000000000000  (1,800 MUSD)
+```
+
+```bash MUSD symbol
+cast call 0x118917a40FAF1CD7a13dB0Ef56C86De7973Ac503 \
+  "symbol()(string)" \
+  --rpc-url https://rpc.test.mezo.org
+# -> "MUSD"
+```
+</CodeGroup>
+
+## Read the pilot metrics
+
+`@maren/metrics` reads adoption live from the four deployed Maren contracts and their logs, walked
+from the deployment-block floor to the head in 10,000-block windows. Every figure is a live
+contract read or a decoded log. An unread value is reported as unavailable, never as zero.
+
+```bash
+# matsnet (31611) is the default. Prints a dated summary and writes a JSON snapshot.
+pnpm --filter @maren/metrics start
+
+# also print the JSON to stdout
+pnpm --filter @maren/metrics start -- --json
+```
+
+It computes funded positions, MUSD borrowed through Maren, payments, money-link claims by
+brand-new addresses, handles registered, Earn TVL, and the **spend ratio**: of the addresses that
+borrowed, the fraction that then spent.
+
+<Info>
+  Read live against matsnet on 2026-08-25, the tool returned: 2 funded positions, 65.72 MUSD
+  borrowed, 0 payments, 1 payment request created and 0 settled, 0 money links, 2 handles
+  registered, 25.00 MUSD of Earn TVL with 1 depositor, and a **spend ratio of 0.0% (0 of 2
+  borrowers have spent)**. That last number is the whole point of the pilot, and today it says what
+  it should: people have borrowed, and the spending has not started yet. The tool will show it
+  move, or show that it does not.
+</Info>
+
+<Warning>
+  There is no separate `VERIFY.sh` in the repository today; the commands above and the
+  `@maren/metrics` tool are the verification path. If a wrapper script is added later it will live
+  under `tools/`.
+</Warning>
+
+## Where the addresses come from
+
+Every address on this page is transcribed from `packages/sdk/src/addresses.ts`, where each was
+verified three independent ways before being committed: the `mezo-org/musd` deployment artifacts,
+the OpenZeppelin proxy manifest, and live `eth_getCode` plus functional calls. Do not hand-edit an
+address anywhere.

@@ -1,0 +1,115 @@
+---
+title: "Networks"
+description: "Chain IDs, RPCs verified live, and the oracle staleness behaviour to design around."
+---
+
+Maren's chain definitions live in `packages/sdk/src/chains.ts`. The RPC hosts here were each
+confirmed with a live `cast chain-id`, not copied from a doc page, because several official Mezo
+doc pages list hosts that do not resolve.
+
+## Chain facts
+
+| Fact | Mainnet | Matsnet |
+| --- | --- | --- |
+| Name | Mezo | Mezo Matsnet |
+| Chain ID | `31612` | `31611` |
+| Chain ID, hex | `0x7b7c` | `0x7b7b` |
+| Gas token | BTC | BTC |
+| Decimals | 18 | 18 |
+| Maren deployed | No, addresses are zero | Yes, chain `31611` |
+
+<Warning>
+  **BTC has 18 decimals here, not 8.** Mezo is an EVM chain and BTC is its gas token, so it
+  follows the EVM convention. Every balance, gas estimate, and `msg.value` is a 1e18-scaled
+  quantity. Reusing a Bitcoin-side 1e8 assumption produces errors of ten orders of magnitude,
+  silently, in the direction of thinking the user is rich.
+</Warning>
+
+## RPC endpoints
+
+Order is load-bearing: a client pinned to one URL has no answer for the hour that URL is degraded.
+Every Maren client fails over across the list rather than pinning one host.
+
+<Tabs>
+  <Tab title="Matsnet (31611)">
+    | Priority | RPC | Notes |
+    | --- | --- | --- |
+    | Primary | `https://rpc.test.mezo.org` | Answered every method in a repeated sweep |
+    | Fallback | `https://mezo-testnet.drpc.org` | Verified `0x7b7b`; free tier times out on some 10,000-block log scans |
+
+    Explorer: `https://explorer.test.mezo.org` (API at `https://api.explorer.test.mezo.org/api`).
+  </Tab>
+  <Tab title="Mainnet (31612)">
+    | Priority | RPC | Notes |
+    | --- | --- | --- |
+    | Primary | `https://jsonrpc-mezo.boar.network` | Stable throughout testing |
+    | Fallback | `https://mainnet.mezo.public.validationcloud.io` | Second certified endpoint |
+    | Fallback | `https://mezo.drpc.org` | Only endpoint advertising WebSocket |
+
+    Explorer: `https://explorer.mezo.org` (API at `https://api.explorer.mezo.org/api`, note the
+    `api.` subdomain, because `explorer.mezo.org/api/...` returns 404).
+  </Tab>
+</Tabs>
+
+<Warning>
+  **Some official Mezo RPC hosts do not resolve.** `rpc.mezo.org`, `testnet-rpc.mezo.org`, and
+  `testnet-explorer.mezo.org` are listed in Mezo's own documentation and return NXDOMAIN. Do not
+  "fix" the URLs above to match the docs without re-running `cast chain-id` against them first.
+  None of Alchemy, QuickNode, Ankr, Infura, or Chainstack support Mezo at all.
+</Warning>
+
+<Info>
+  A `-32601 "method does not exist"` on Mezo is **not** proof of a missing feature. During
+  testing an endpoint returned `-32601` for `eth_call`, `eth_getLogs`, and `eth_estimateGas`
+  across a full probe sweep, then served all of them correctly an hour later: a degraded backend
+  behind a load balancer, not a capability limit. Never certify or condemn an endpoint on a single
+  probe.
+</Info>
+
+## Verify a chain yourself
+
+<CodeGroup>
+```bash matsnet
+cast chain-id --rpc-url https://rpc.test.mezo.org
+# -> 31611
+```
+
+```bash mainnet
+cast chain-id --rpc-url https://jsonrpc-mezo.boar.network
+# -> 31612
+```
+</CodeGroup>
+
+## The oracle staleness behaviour
+
+The BTC/USD price comes from a native Mezo precompile (Skip Connect, secured by the validator
+set), not Chainlink or Pyth. `PriceFeed.fetchPrice()` reads it, and its behaviour shapes the whole
+app.
+
+<Warning>
+  `fetchPrice()` **reverts if the price is more than 60 seconds stale**, and it is a `view`
+  function with no `lastGoodPrice()` fallback. Every borrow, adjust, redeem, and liquidate path
+  can revert for reasons unrelated to the user. Both Maren apps carry an explicit "price feed
+  unavailable" state and never render a stale price as live. The keeper treats a price revert as a
+  hold, not an error, and retries with backoff.
+</Warning>
+
+## Reader caveats that are not optional
+
+Two measured behaviours the log and receipt readers are built around:
+
+<AccordionGroup>
+  <Accordion title="A missing receipt is not a missing history" icon="receipt">
+    On matsnet the primary RPC has returned a Maren log and then `null` for that same
+    transaction's receipt, while the fallback returned the full receipt. Both log readers absorb a
+    per-transaction receipt failure and mark that row as awaiting a receipt, rather than failing
+    the whole scan.
+  </Accordion>
+  <Accordion title="Log scans walk in 10,000-block windows" icon="layer-group">
+    Mezo's public RPC answers a `eth_getLogs` range of at most 10,000 blocks
+    (`MEZO_MAX_LOG_RANGE`). A wider range returns
+    `maximum [from, to] blocks distance: 10000`. At matsnet's roughly 4.7s blocks that is about
+    13 hours per request, which is why a reader walks backwards in windows rather than asking for
+    everything at once.
+  </Accordion>
+</AccordionGroup>

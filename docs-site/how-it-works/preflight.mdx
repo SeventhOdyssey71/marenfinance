@@ -1,0 +1,80 @@
+---
+title: "Preflight"
+description: "Offer only what clears: evaluate every contract rule before asking for a signature."
+---
+
+Preflight is the discipline behind every control in the app: **an action Maren offers is an
+action that clears.** The interface evaluates every rule the deployed contract enforces, in the
+contract's own order, before a button is enabled or a slider bound is set. A refusal states the
+same reason the revert would have given, with live numbers. Nobody pays gas to discover a "no".
+
+## The order matters
+
+Preflight runs the contract's checks in the contract's own sequence, because the first one to
+fail is the reason the user needs to see. Checking them in a different order, or checking only
+some, would surface a real but secondary reason and hide the one that actually blocks the action.
+
+<Steps>
+  <Step title="Read live state">
+    Collateral, debt, the oracle price, the per-trove borrowing ceiling, and the pooled trove's
+    ratio, all read from chain via Multicall3.
+  </Step>
+  <Step title="Evaluate every rule the contract will">
+    The minimum deposit, the 180% borrow floor, the shared trove's floor, the real borrowing
+    capacity, and the oracle's staleness, using the same constants the contract checks.
+  </Step>
+  <Step title="Set the bound, or state the reason">
+    A slider is bounded to exactly the range that clears. A blocked action shows the live reason,
+    not a generic error, and no signature is requested.
+  </Step>
+</Steps>
+
+## Proven, not asserted
+
+The behaviour suite drives the real interface against the real chain with a signer that
+**structurally cannot sign**. It asserts that every offered action matches what the deployed
+contract would accept, and that no signature is ever requested. The account nonce is read before
+and after as the final check: if the app had signed anything, the nonce would move.
+
+<Info>
+  A real user borrowed 25.7 MUSD through this path on matsnet. At the same position, a 40 MUSD
+  borrow reverts with `InsufficientCollateralRatio` at the account's own 180% floor. The
+  interface offered exactly the range the contract accepted, computed before any signature.
+</Info>
+
+## The real borrow limit is not the obvious one
+
+The most common way a ported Liquity frontend misleads a user is by deriving the borrow limit
+from ICR and current price. On Mezo that number is usually too high, so the interface offers a
+borrow that will revert.
+
+<Warning>
+  The real limit is `TroveManager.getTroveMaxBorrowingCapacity()`, a Mezo-only per-trove ceiling
+  fixed at the price when the trove was opened. Adding collateral does not raise it; only
+  `refinance()` does. Preflight reads this getter and never an ICR-derived number.
+</Warning>
+
+## Rounding always favours caution
+
+Preflight uses the SDK's position math, which rounds in one direction only: **collateral ratios
+round down, liquidation prices and collateral requirements round up.** A position can never be
+offered as safer than it is. `179.99%` renders as `179.9%`, never `180%`, because 180% is the
+borrow threshold and the flattering rounding would tell a user they can act when they cannot.
+
+```typescript
+import { maxNetDebtAt, collateralRequiredFor } from '@maren/sdk';
+
+// The most a user can borrow at the target ratio. Rounds DOWN.
+const maxNet = maxNetDebtAt(collateralWei, priceWei, targetCr, borrowingRateWei);
+
+// The collateral a given borrow needs. Rounds UP: ask for more, never less.
+const needed = collateralRequiredFor(netDebtWei, priceWei, targetCr, borrowingRateWei);
+```
+
+## When the price is unavailable
+
+`PriceFeed.fetchPrice()` reverts above 60 seconds of staleness, and it is a `view` function with
+no `lastGoodPrice()` fallback. Preflight treats a price revert as an explicit **price
+unavailable** state: borrowing is disabled and no stale figure is rendered as live. This is a
+state the interface is designed for, not an error it stumbles into. See
+[Networks](/reference/networks) for the oracle detail.

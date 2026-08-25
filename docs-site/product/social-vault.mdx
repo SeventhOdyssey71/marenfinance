@@ -1,0 +1,105 @@
+---
+title: "The Social Vault"
+description: "A pooled Bitcoin trove that removes the minimum loan size, and the risk that comes with sharing it."
+---
+
+The Social Vault is Maren's differentiator, and its risk. It is one large, conservatively
+managed MUSD trove that many users share, each holding a proportional claim on it through a
+per-user ledger. It exists to do one thing the protocol cannot: let a small holder borrow.
+
+## The wedge: no minimum loan size
+
+MUSD requires a **minimum net debt of 1,800 MUSD**, which becomes 2,000 MUSD of total debt once
+the 200 MUSD gas compensation is counted. That is a minimum loan size. At a safe collateral
+ratio and a BTC price around $63,000, opening a trove of your own responsibly needs about
+$3,000 of Bitcoin, and a small holder cannot borrow at all.
+
+<Note>
+  Maren's edge is **not** "cheaper collateral" or an "80x" headline. It is that the protocol
+  imposes a minimum loan size at all. You cannot borrow 50 MUSD against Bitcoin on Mezo, only
+  2,000 or more. The pooled vault removes that minimum entirely, which is a different and
+  stronger claim than a discount on collateral.
+</Note>
+
+Concretely, the vault lets someone **borrow $25 against $77 of BTC**, a position the protocol
+would reject outright. That is the whole product wedge in one sentence.
+
+## Who should not use it
+
+The vault is for people the protocol prices out. Anyone with enough collateral for a trove of
+their own is steered to a **direct trove** instead, which carries no pooling risk at all. The
+SDK's `assessBorrowRoute()` makes this decision, and the interface explains it:
+
+<CodeGroup>
+```typescript route selection
+import { assessBorrowRoute } from '@maren/sdk';
+
+// If the collateral supports a >= 1,800 MUSD direct trove, prefer it: no pooling risk.
+const decision = assessBorrowRoute(collateralWei, priceWei);
+// -> { eligible: true, route: 'direct' }   enough for your own trove
+// -> { eligible: true, route: 'pooled' }   below the minimum, the vault is the only route
+// -> { eligible: false, reason: 'Below the 0.001 BTC minimum deposit.', shortfallWei }
+```
+</CodeGroup>
+
+Maren loses pooled volume by routing capable users away from the pool. That is the correct
+trade.
+
+## How the shared position is kept safe
+
+The vault keeps a wide margin above the protocol's liquidation cliff. These are the constants
+the deployed contract actually checks, transcribed into the SDK so the interface can evaluate
+the same conditions before you sign.
+
+| Property | Value |
+| --- | --- |
+| Minimum deposit | 0.001 BTC |
+| Protocol liquidation threshold (MCR) | 110% |
+| Maren internal liquidation CR | 140% |
+| Maren minimum healthy CR (borrow floor) | 180% |
+| Maren target CR | 250% |
+| Internal liquidation penalty | 5% |
+
+A keeper tops up collateral, repays debt, and internally liquidates unhealthy users by seizing
+collateral at a 5% penalty and repaying their share of pooled debt. A user must fall 110
+percentage points below the 250% target before the protocol has any claim on the trove.
+
+<Info>
+  **Borrowing pauses before withdrawal does.** This is a hard requirement in the contract with
+  a dedicated test. If the vault must be halted, entries close first and exits stay open, so a
+  user is never trapped in a position they want out of.
+</Info>
+
+## The risk, stated plainly
+
+<Warning>
+  A pooled deposit is **segregated in accounting, not in custody**. If the shared trove were
+  ever liquidated by the MUSD protocol, the loss would fall across pooled users in proportion
+  to their share, including users whose own position was perfectly healthy. This is the one
+  component in Maren that can lose user funds through a design failure.
+</Warning>
+
+The residual risk is a BTC drawdown faster than the keeper can act: a gap down through 140% to
+below 110% without an intervening block in which liquidation is possible. The 30-point buffer
+above the cliff makes this remote. It does not make it impossible, and the app says so where
+the decision is made rather than in a footnote.
+
+There is also a binding commitment behind the vault: **if the team cannot satisfy itself that
+the pooled vault is safe, Maren ships without it.** Direct troves, gasless payments, and Earn
+are valuable on their own.
+
+## A sizing result worth knowing
+
+A pooled vault seeded at the protocol minimum can never serve a borrow, because MUSD's 1,800
+minimum net debt pins the seed below its own borrowing floor. Maren hit this in practice, and
+the pooled trove's move from a 153% ICR to a healthy one is on-chain in two transactions. The
+detail lives in [How the pooled vault works](/how-it-works/pooled-vault).
+
+<CardGroup cols={2}>
+  <Card title="Under the hood" icon="gears" href="/how-it-works/pooled-vault">
+    Shares, the per-user ledger, and the minimum-viable-vault finding.
+  </Card>
+  <Card title="The full risk inventory" icon="shield-halved" href="/security/risk">
+    Pooling, market, oracle, and inherited MUSD risk, ordered by expected harm.
+  </Card>
+</CardGroup>

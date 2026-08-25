@@ -1,0 +1,92 @@
+{
+  "$schema": "https://mintlify.com/docs.json",
+  "theme": "mint",
+  "name": "Maren Finance",
+  "colors": {
+    "primary": "#5B3DF5",
+    "light": "#8B77FF",
+    "dark": "#4A2BE0"
+  },
+  "favicon": "/favicon.png",
+  "logo": {
+    "light": "/logo/maren-mark.png",
+    "dark": "/logo/maren-mark-dark.png"
+  },
+  "navigation": {
+    "tabs": [
+      {
+        "tab": "Docs",
+        "groups": [
+          {
+            "group": "Get started",
+            "pages": [
+              "get-started/introduction",
+              "get-started/quickstart"
+            ]
+          },
+          {
+            "group": "The product",
+            "pages": [
+              "product/social-vault",
+              "product/borrow",
+              "product/pay",
+              "product/earn",
+              "product/activity"
+            ]
+          },
+          {
+            "group": "How it works",
+            "pages": [
+              "how-it-works/pooled-vault",
+              "how-it-works/gasless",
+              "how-it-works/preflight",
+              "how-it-works/redemptions"
+            ]
+          },
+          {
+            "group": "Reference",
+            "pages": [
+              "reference/contracts",
+              "reference/networks",
+              "reference/sdk"
+            ]
+          },
+          {
+            "group": "Security",
+            "pages": [
+              "security/risk",
+              "security/audits"
+            ]
+          },
+          {
+            "group": "Developers",
+            "pages": [
+              "developers/run-locally",
+              "developers/verify-on-chain"
+            ]
+          }
+        ]
+      }
+    ],
+    "global": {
+      "anchors": [
+        {
+          "anchor": "GitHub",
+          "href": "https://github.com/SeventhOdyssey71/marenfinance",
+          "icon": "github"
+        }
+      ]
+    }
+  },
+  "navbar": {
+    "primary": {
+      "type": "github",
+      "href": "https://github.com/SeventhOdyssey71/marenfinance"
+    }
+  },
+  "footer": {
+    "socials": {
+      "github": "https://github.com/SeventhOdyssey71/marenfinance"
+    }
+  }
+}

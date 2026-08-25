@@ -1,0 +1,96 @@
+---
+title: "Redemptions"
+description: "How a protocol redemption against the shared trove is split, value-neutrally, and the H-2 boundary."
+---
+
+MUSD lets anyone redeem MUSD for BTC against the lowest-collateralised troves, at par. When that
+happens to the pooled trove, the trove loses collateral and sheds debt in one event, and the
+vault has to divide both sides across its users fairly. That is the job of the **redemption
+splitter**.
+
+## What a redemption does to the pool
+
+A redemption removes collateral from the shared trove and cancels an equal value of its debt.
+Neither side belongs to any single user, so the splitter distributes both across debt shares: the
+collateral removed is charged pro rata, and the debt relief is credited pro rata.
+
+<Info>
+  The splitter is **value-neutral** by design. A user charged some BTC of collateral should
+  receive an equal value of debt relief, so a redemption changes what a user holds but not what it
+  is worth. The audit's regression tests assert this neutrality holds for a solvent debtor, both
+  on a plain redemption and on one arriving after a recognised shortfall.
+</Info>
+
+The relevant functions are `reconcileRedemption`, `_syncState`, `redemptionCollateralPerShare`,
+`settleRedemption`, and `collateralOf`. They were the primary target of the
+[contracts audit](/security/audits).
+
+## The bug that was found and fixed: H-1
+
+The first version of the splitter had a High-severity flaw. When a redemption produced a
+**shortfall** (an uncollectable debit from a position below 100% collateralisation), the contract
+correctly recorded the shortfall rather than papering over it, but then re-read that same
+recorded shortfall on the next sync as if it were a brand new redemption.
+
+<Warning>
+  The effect was a phantom redemption charged pro rata to every solvent debtor, repeatedly, with
+  no debt relief attached, until the shortfall was fully socialised onto the solvent users. Both
+  entrypoints that drive it are permissionless and need no price, so any passer-by could grind the
+  loop. In the measured reproduction, about 0.0336 BTC (roughly $2,122) was drained from a solvent
+  debtor with nothing given in return.
+</Warning>
+
+The fix routes both the detector and the preview through one function that subtracts the recorded
+shortfall before comparing the books against the trove, saturating so it cannot underflow. Two
+regression tests, both proven to fail against the pre-fix contract, pin it: one grinds both
+permissionless entrypoints ten times and asserts no phantom is booked, the other asserts a genuine
+redemption arriving after a shortfall is still measured at full size.
+
+## The boundary that is documented, not fixed: H-2
+
+One High-severity edge is **documented and left for the paid audit**, deliberately, with a test
+pinning it.
+
+The mechanism: debt relief is capped by the vault's MUSD reserve (`outstandingDebt = troveNetDebt
+- reserveMUSD`), but the collateral debit is not. When a redemption cancels more trove debt than
+the pool's users actually owe, which needs a non-zero reserve and a large redemption, users are
+charged collateral for relief that lands in the reserve, where no user has a direct claim on it.
+
+<Note>
+  **The loss is bounded**: at most `reserveMUSD` at the instant the redemption lands, because the
+  excess relief is exactly the part the reserve was already covering. In the measured case, a
+  25,000 MUSD reserve against a trove owing 15,040 MUSD produced about 9,959 MUSD of value taken
+  with nothing given for it, and the surplus sat in the reserve credited to nobody.
+</Note>
+
+## Why H-2 is left for the auditor
+
+Every available fix decides **who** absorbs the excess, which is a governance question rather than
+a rounding one:
+
+<AccordionGroup>
+  <Accordion title="Charge the excess to the protocol's own position" icon="building-columns">
+    Coherent, since the excess relief accrued to the protocol-controlled reserve. This is the
+    change that makes the value-neutrality claim strictly true. The tradeoff is that it can
+    exhaust the protocol's own position and fall into the shortfall path.
+  </Accordion>
+  <Accordion title="Redistribute the surplus reserve to the debtors who paid for it" icon="arrows-split-up-and-left">
+    Also coherent, but it needs a second per-share accumulator and more moving parts, which is
+    itself new surface for the paid audit to review.
+  </Accordion>
+</AccordionGroup>
+
+<Warning>
+  Because the choice is a governance decision with real tradeoffs, it is left for the paid audit
+  rather than resolved unilaterally, and a test pins the current behaviour so it cannot drift
+  unnoticed. This is the honest state: a bounded, documented High, not a silent one.
+</Warning>
+
+<CardGroup cols={2}>
+  <Card title="The pooled vault mechanism" icon="gears" href="/how-it-works/pooled-vault">
+    Shares, the reserve, and the two floors that gate borrowing.
+  </Card>
+  <Card title="The audits in full" icon="file-shield" href="/security/audits">
+    All three adversarial audits, what they attacked, and what held.
+  </Card>
+</CardGroup>

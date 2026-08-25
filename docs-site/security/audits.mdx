@@ -1,0 +1,149 @@
+---
+title: "Audits"
+description: "Three adversarial audits against Mezo's live bytecode, what they found, and what a paid audit gates."
+---
+
+Before anything went out, three adversarial audits ran against Mezo's live contracts. They found
+real bugs, which is the point. These reports live in `docs/audit/` in the repository, and each
+names what was attacked and held, not only what broke.
+
+<Warning>
+  These are pre-audit hardening passes by the author's own tooling, not a substitute for a paid
+  third-party audit. **A paid audit gates mainnet.** No Maren contract reaches mainnet before an
+  independent audit of `MarenVault` and `MarenRelayHub`, the two contracts that carry risk, with
+  findings and remediations published.
+</Warning>
+
+## The three audits
+
+<CardGroup cols={3}>
+  <Card title="Contracts" icon="file-contract">
+    `MarenVault` and the redemption splitter. A permissionless fund-drain found and fixed; one
+    bounded High documented for the paid audit.
+  </Card>
+  <Card title="Mezo conformance" icon="link">
+    Every selector Maren calls checked against the deployed bytecode. Two bugs found and fixed.
+  </Card>
+  <Card title="Meta-transaction path" icon="paper-plane">
+    The relayer, forwarder, and web relay client. A budget-halt denial of service fixed.
+  </Card>
+</CardGroup>
+
+## Contracts audit
+
+Scope was `MarenVault` and the redemption splitter, measured against Mezo's own source
+(`MEZO-GROUND-TRUTH.md`) and the SDK's divergence records.
+
+<AccordionGroup>
+  <Accordion title="H-1 (FIXED): a shortfall re-read as a phantom redemption" icon="circle-check">
+    A recognised redemption shortfall was re-read on the next sync as a fresh redemption and
+    charged pro rata to every solvent debtor, repeatedly, with no relief attached, until the
+    shortfall was fully socialised. Both entrypoints are permissionless and need no price, so any
+    passer-by could grind the loop; the measured reproduction drained about 0.0336 BTC (roughly
+    $2,122) from a solvent debtor. Fixed by routing the detector and preview through one function
+    that subtracts the recorded shortfall before comparing books with trove. Two regression tests,
+    both proven to fail against the pre-fix contract.
+  </Accordion>
+  <Accordion title="H-2 (DOCUMENTED): relief capped by the reserve, collateral debit not" icon="circle-dot">
+    When a redemption cancels more trove debt than the pool's users owe, which needs a non-zero
+    MUSD reserve, users are charged collateral for relief that lands in the reserve where no user
+    has a direct claim. The loss is **bounded** by `reserveMUSD` at the instant of redemption.
+    Left for the paid audit deliberately, because every fix decides who absorbs the excess, which
+    is a governance question, and a test pins the current behaviour. See
+    [Redemptions](/how-it-works/redemptions).
+  </Accordion>
+  <Accordion title="Lower-severity items" icon="list-check">
+    Several Medium and Info items are documented (an admin-path gap on a non-active trove, an
+    unbounded per-share growth as debt shares shrink) and two Info items fixed with guards and
+    pinned tests. Each carries a reproduction or an argument.
+  </Accordion>
+</AccordionGroup>
+
+<Info>
+  The audit also records what was **attacked and held**, including the interest-first ordering
+  question the ground-truth file headlines, verified correct under a proof rather than assumed.
+</Info>
+
+## Mezo conformance audit
+
+The question: does Maren integrate with Mezo and MUSD correctly, against the contracts actually
+deployed rather than the documentation? Audited 19 August 2026 against both networks, working at
+the **dispatch table**: for each proxy the EIP-1967 implementation slot was read, the
+implementation bytecode fetched, and the 4-byte selector of every function Maren declares searched
+for inside it.
+
+| Verdict | Count | Where |
+| --- | --- | --- |
+| PASS | 64 | Selectors, divergences, doc discrepancies, hints, oracle, precompiles |
+| DRIFTED | 6 | Recovery Mode, a payment event topic, an unread staleness flag, three byte counts |
+| UNPROVEN | 3 | Refinance-fee arithmetic, circulating-vs-backed ratio, MEZO token precompile |
+
+Every one of the 44 function selectors Maren declares exists on the deployed contract with the
+argument types Maren encodes, on both networks. Two bugs were found and fixed:
+
+<AccordionGroup>
+  <Accordion title="Recovery Mode blocks more than recorded" icon="triangle-exclamation">
+    Read out of the deployed `BorrowerOperations` bytecode: in Recovery Mode, borrow and
+    collateral withdrawal are closed outright and revert with a bare `Error(string)`. Maren had no
+    defence at any layer. Fixed, with a test.
+  </Accordion>
+  <Accordion title="A payment event with a phantom parameter" icon="at">
+    A `PaidToHandle` event signature hashed to a topic the chain never emits, silently dropping
+    every handle payment from Activity. Fixed, with a test.
+  </Accordion>
+</AccordionGroup>
+
+<Note>
+  Negative controls are part of what makes this pass stronger than a getter check: every
+  Liquity-shaped variant carrying `_maxFeePercentage` was searched for too, and confirmed absent
+  on both networks. A claim that a parameter does not exist is only worth something if the method
+  could have found it.
+</Note>
+
+## Meta-transaction audit
+
+Scope was the forwarder and relay hub contracts, the whole relayer service, and the web relay
+client, read against ground truth with live `cast` calls where a claim could be settled on-chain.
+
+<AccordionGroup>
+  <Accordion title="High (FIXED): a signer-chosen gas ceiling latches the daily budget halt" icon="circle-check">
+    The day-long budget halt latched on committed spend debited with `request.gas`, a ceiling the
+    signer picks, and reconciliation never re-read the latch. One request signing 1,000,000 gas
+    against a budget sized for it took the relayer offline for the rest of the day, though the
+    transaction settled at 120,000 gas, and it costs nothing to do on purpose. Fixed: the halt is
+    lifted when reconciliation shows committed spend back under the limit, with three regression
+    tests.
+  </Accordion>
+  <Accordion title="Medium/Low fixed items" icon="wrench">
+    Calldata gas moved inside the signed reservation; a failed reservation now refunded; the hub
+    validates before calling an arbitrary address; the web client no longer believes a 202 on its
+    hash alone; the relayer URL must not be plaintext.
+  </Accordion>
+  <Accordion title="Documented items" icon="circle-dot">
+    `executeWithFee` has no fee-token allowlist (needs a contract redeploy); the free tier is
+    Sybilable and the daily BTC cap is the real bound; health endpoints disclose posture. Each is
+    documented with its bound.
+  </Accordion>
+</AccordionGroup>
+
+<Info>
+  The relayer's four adversarial rounds were structured attacks on Maren's own design. Round two
+  found a budget race allowing 52x overspend; round three found the fix created a denial-of-service
+  path; round four found the CI had never actually exercised the relayer's code. Each finding is
+  fixed and regression-tested.
+</Info>
+
+## What holds every fix honest
+
+Every fix was verified to fail against the unfixed code, by reverting the change and re-running the
+suite. That is the discipline behind the whole product: a claim is only as good as the test that
+would break if it were false.
+
+<CardGroup cols={2}>
+  <Card title="The risks these audits scope" icon="shield-halved" href="/security/risk">
+    The full risk inventory, ordered by expected harm.
+  </Card>
+  <Card title="Verify the live contracts yourself" icon="terminal" href="/developers/verify-on-chain">
+    Read the pooled trove and confirm every address with `cast`.
+  </Card>
+</CardGroup>

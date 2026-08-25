@@ -1,0 +1,102 @@
+---
+title: "Quickstart"
+description: "Connect on matsnet, deposit BTC, borrow MUSD, and spend it."
+---
+
+This walks through the whole product loop on Mezo testnet: fund an account, deposit Bitcoin,
+borrow MUSD against it, and pay someone. Every step runs against the five contracts live on
+matsnet and the real MUSD protocol underneath them.
+
+<Info>
+  Everything here happens on **Mezo matsnet, chain `31611`**. There is no real money at risk,
+  and there is no Maren mainnet deployment to point at. Testnet BTC is the gas token, same as
+  mainnet.
+</Info>
+
+<Steps>
+  <Step title="Connect a wallet on matsnet">
+    Add the Mezo matsnet network to your wallet and switch to it. The primary RPC is
+    `https://rpc.test.mezo.org`; a second endpoint is listed on [Networks](/reference/networks)
+    for failover. The native gas token is **BTC with 18 decimals**, not 8, because Mezo is an
+    EVM chain and BTC is its gas token.
+
+    <Warning>
+      Several official Mezo doc pages list RPC hosts that do not resolve (`rpc.mezo.org`,
+      `testnet-rpc.mezo.org`). Use the endpoints on the [Networks](/reference/networks) page,
+      each verified with a live `cast chain-id` rather than copied from a doc.
+    </Warning>
+  </Step>
+
+  <Step title="Fund the account with a little testnet BTC">
+    You need a small amount of matsnet BTC to pay for gas. The first deposit into the vault is
+    a transaction you submit and pay for yourself. There is no faucet-free path to the first
+    action: see the note on the first deposit below.
+  </Step>
+
+  <Step title="Deposit Bitcoin into the Social Vault">
+    Deposit from as little as **0.001 BTC**. The vault holds one shared MUSD trove and gives
+    you a proportional claim inside it, which is what lets you borrow below the protocol's
+    minimum loan size. Collateral is native BTC passed as `msg.value`, so there is no ERC-20
+    approval step.
+
+    <Note>
+      **Your first deposit costs BTC gas, always.** The relayer deliberately excludes
+      `MarenVault.deposit()` from its sponsored allowlist, because a gasless relay cannot carry
+      value. Everything you do after the deposit can be sponsored once the relayer is hosted.
+      See [Gasless](/how-it-works/gasless).
+    </Note>
+  </Step>
+
+  <Step title="Borrow MUSD, inside the range the contract will accept">
+    Drag the borrow slider. It is bounded by the same computation the deployed contract
+    enforces, in the contract's own order, so an amount you can select is an amount that
+    clears. Maren refuses new borrowing below a **180% collateral ratio**, far above the
+    protocol's 110% liquidation threshold, and marks a recommended safe level at **250%**.
+    Nobody pays gas to discover a "no". See [Preflight](/how-it-works/preflight).
+
+    A real user did exactly this on 17 August 2026: they deposited BTC and drew **25.7 MUSD**
+    in a single transaction. At the same position a 40 MUSD borrow reverts with
+    `InsufficientCollateralRatio` at the account's own 180% floor.
+  </Step>
+
+  <Step title="Spend the MUSD">
+    Now the MUSD is yours to move.
+
+    <Tabs>
+      <Tab title="Pay a name">
+        Register a handle through commit-reveal, then pay `@amaka` with an optional on-chain
+        memo. Raw addresses work too. See [Pay](/product/pay).
+      </Tab>
+      <Tab title="Send a money link">
+        Put MUSD into a claimable link and send it anywhere text goes. The recipient claims it
+        with or without a Maren account and needs no BTC. Unclaimed links can be cancelled and
+        refunded.
+      </Tab>
+      <Tab title="Request money">
+        Ask for an amount with a note, share it as a link, and the payer settles in two taps.
+        Both parties see the settled request in Activity with the transaction hash attached.
+      </Tab>
+    </Tabs>
+  </Step>
+
+  <Step title="Check it in Activity">
+    Every action you took is a row in [Activity](/product/activity), read from contract logs,
+    each with a real transaction hash linked to `explorer.test.mezo.org`. There is no sample
+    data anywhere in the product.
+  </Step>
+</Steps>
+
+## Repay and walk away
+
+You can always exit. Repay your share of the pooled debt and withdraw your Bitcoin. If the
+pooled trove is ever under stress, borrowing halts before withdrawals do, so exits stay open
+when entries close. You are never trapped in a position you want out of.
+
+<CardGroup cols={2}>
+  <Card title="Understand the vault first" icon="vault" href="/product/social-vault">
+    The pooled model, the wedge, and the risk of sharing one trove.
+  </Card>
+  <Card title="Verify all of this yourself" icon="terminal" href="/developers/verify-on-chain">
+    The `cast` commands that read the live trove and confirm every address.
+  </Card>
+</CardGroup>
