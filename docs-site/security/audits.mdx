@@ -18,8 +18,8 @@ names what was attacked and held, not only what broke.
 
 <CardGroup cols={3}>
   <Card title="Contracts" icon="file-contract">
-    `MarenVault` and the redemption splitter. A permissionless fund-drain found and fixed; one
-    bounded High documented for the paid audit.
+    `MarenVault` and the redemption splitter. A permissionless fund-drain found and fixed, and a
+    second bounded High (H-2) since fixed so users are made whole on every redemption.
   </Card>
   <Card title="Mezo conformance" icon="link">
     Every selector Maren calls checked against the deployed bytecode. Two bugs found and fixed.
@@ -44,13 +44,15 @@ Scope was `MarenVault` and the redemption splitter, measured against Mezo's own 
     that subtracts the recorded shortfall before comparing books with trove. Two regression tests,
     both proven to fail against the pre-fix contract.
   </Accordion>
-  <Accordion title="H-2 (DOCUMENTED): relief capped by the reserve, collateral debit not" icon="circle-dot">
+  <Accordion title="H-2 (FIXED): relief the reserve over-covers is absorbed by the protocol" icon="circle-check">
     When a redemption cancels more trove debt than the pool's users owe, which needs a non-zero
-    MUSD reserve, users are charged collateral for relief that lands in the reserve where no user
-    has a direct claim. The loss is **bounded** by `reserveMUSD` at the instant of redemption.
-    Left for the paid audit deliberately, because every fix decides who absorbs the excess, which
-    is a governance question, and a test pins the current behaviour. See
-    [Redemptions](/how-it-works/redemptions).
+    MUSD reserve, users were charged collateral for relief that landed in the reserve where no user
+    has a direct claim. The loss was **bounded** by `reserveMUSD` at the instant of redemption.
+    Fixed by having the protocol's own position absorb that excess instead of splitting it across
+    users, so each user loses collateral worth exactly the debt they stopped owing. The pinning
+    test was inverted to assert users are made whole, and proven to fail against the pre-fix code.
+    Residual for the paid audit: if the protocol's own position is exhausted, the remainder falls
+    to the shortfall path. See [Redemptions](/how-it-works/redemptions).
   </Accordion>
   <Accordion title="Lower-severity items" icon="list-check">
     Several Medium and Info items are documented (an admin-path gap on a non-active trove, an

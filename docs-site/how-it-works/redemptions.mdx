@@ -1,6 +1,6 @@
 ---
 title: "Redemptions"
-description: "How a protocol redemption against the shared trove is split, value-neutrally, and the H-2 boundary."
+description: "How a protocol redemption against the shared trove is split, value-neutrally, and how the H-2 reserve-excess edge was fixed."
 ---
 
 MUSD lets anyone redeem MUSD for BTC against the lowest-collateralised troves, at par. When that
@@ -46,44 +46,31 @@ regression tests, both proven to fail against the pre-fix contract, pin it: one 
 permissionless entrypoints ten times and asserts no phantom is booked, the other asserts a genuine
 redemption arriving after a shortfall is still measured at full size.
 
-## The boundary that is documented, not fixed: H-2
+## The reserve-excess edge, and how it was fixed: H-2
 
-One High-severity edge is **documented and left for the paid audit**, deliberately, with a test
-pinning it.
+An adversarial audit found one High-severity edge here, and it has since been fixed.
 
-The mechanism: debt relief is capped by the vault's MUSD reserve (`outstandingDebt = troveNetDebt
-- reserveMUSD`), but the collateral debit is not. When a redemption cancels more trove debt than
-the pool's users actually owe, which needs a non-zero reserve and a large redemption, users are
-charged collateral for relief that lands in the reserve, where no user has a direct claim on it.
+The mechanism: debt relief is capped by the vault's MUSD reserve (`outstandingDebt =
+troveNetDebt - reserveMUSD`), but the collateral debit was not. When a redemption cancelled more
+trove debt than the pool's users actually owed, which needs a non-zero reserve and a large
+redemption, users were charged collateral for relief that landed in the reserve, where no user has
+a direct claim on it.
 
 <Note>
-  **The loss is bounded**: at most `reserveMUSD` at the instant the redemption lands, because the
-  excess relief is exactly the part the reserve was already covering. In the measured case, a
-  25,000 MUSD reserve against a trove owing 15,040 MUSD produced about 9,959 MUSD of value taken
-  with nothing given for it, and the surplus sat in the reserve credited to nobody.
+  The loss was **bounded**: at most `reserveMUSD` at the instant the redemption lands, because the
+  excess relief is exactly the part the reserve was already covering.
 </Note>
 
-## Why H-2 is left for the auditor
-
-Every available fix decides **who** absorbs the excess, which is a governance question rather than
-a rounding one:
-
-<AccordionGroup>
-  <Accordion title="Charge the excess to the protocol's own position" icon="building-columns">
-    Coherent, since the excess relief accrued to the protocol-controlled reserve. This is the
-    change that makes the value-neutrality claim strictly true. The tradeoff is that it can
-    exhaust the protocol's own position and fall into the shortfall path.
-  </Accordion>
-  <Accordion title="Redistribute the surplus reserve to the debtors who paid for it" icon="arrows-split-up-and-left">
-    Also coherent, but it needs a second per-share accumulator and more moving parts, which is
-    itself new surface for the paid audit to review.
-  </Accordion>
-</AccordionGroup>
+The fix: the excess is now **absorbed by the protocol's own position** instead of being split
+across users, so each user loses collateral worth exactly the debt they stopped owing, and the
+per-position value-neutrality claim is strictly true again. `depositProtocolCollateral` retires
+any resulting shortfall, which is the make-whole path the natspec had always promised. The pinning
+test was inverted to assert users are made whole and proven to fail against the pre-fix code.
 
 <Warning>
-  Because the choice is a governance decision with real tradeoffs, it is left for the paid audit
-  rather than resolved unilaterally, and a test pins the current behaviour so it cannot drift
-  unnoticed. This is the honest state: a bounded, documented High, not a silent one.
+  Residual left for the paid audit: if the protocol's own position is exhausted by a large excess,
+  the remainder falls to the shortfall path. It is bounded and recorded, not silent, and the
+  make-whole path can retire it. This is the honest state.
 </Warning>
 
 <CardGroup cols={2}>
