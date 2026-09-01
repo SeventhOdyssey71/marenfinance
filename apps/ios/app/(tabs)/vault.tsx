@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useMemo, useRef, useState } from 'react';
 import { Pressable, StyleSheet, View } from 'react-native';
 import { useLocalSearchParams } from 'expo-router';
 import {
@@ -17,12 +17,14 @@ import {
 import { Amount, Btc, Musd, Ratio } from '../../src/components/Money';
 import { Card } from '../../src/components/Card';
 import { DemoNotice, ReadFailure } from '../../src/components/DataNotice';
+import { HealthScale } from '../../src/components/HealthScale';
 import { Icon } from '../../src/components/Icon';
 import { PillButton } from '../../src/components/PillButton';
 import { PriceBanner } from '../../src/components/PriceBanner';
 import { StatRow } from '../../src/components/Row';
 import { Screen } from '../../src/components/Screen';
 import { Slider } from '../../src/components/Slider';
+import { SuccessCover } from '../../src/components/SuccessCover';
 import { Label, Num, Txt } from '../../src/components/Text';
 import { TxSheet, useTxRunner } from '../../src/components/TxSheet';
 import {
@@ -90,8 +92,25 @@ export default function Vault() {
   const price = usePrice();
   const { data: position, error: positionError, refetch: refetchPosition } = usePosition();
   const { data: balances } = useBalances();
-  const runner = useTxRunner();
   const demo = useAppStore((s) => s.dataSource === 'mock');
+
+  /**
+   * The celebration cover is shown for a delivered BORROW — the payoff moment, when MUSD
+   * lands in the wallet. Deposit, repay and withdraw are housekeeping and keep the tx
+   * sheet's block-and-gas receipt, which for the payable deposit is the honest place the
+   * BTC gas actually paid is shown. `lastRun` records what was submitted so `onDelivered`
+   * knows which of the two confirmations to raise; it fires only on a delivered outcome,
+   * so the cover cannot appear without a receipt behind it.
+   */
+  const [celebrated, setCelebrated] = useState<bigint | null>(null);
+  const lastRun = useRef<{ type: Mode; wei: bigint } | null>(null);
+  const runner = useTxRunner(() => {
+    const done = lastRun.current;
+    if (done?.type === 'borrow') setCelebrated(done.wei);
+  });
+  const mark = (m: Mode, wei: bigint) => {
+    lastRun.current = { type: m, wei };
+  };
 
   const gate = priceGate(price);
   const livePrice = price.state === 'live' ? price.priceWei : null;
@@ -190,9 +209,10 @@ export default function Vault() {
           position={position}
           price={livePrice}
           gateReason={gate.allowed ? null : gate.reason}
-          onSubmit={(wei) =>
-            runner.run({ type: 'borrow', musdWei: wei }, `Borrow ${formatMusd(wei)}`)
-          }
+          onSubmit={(wei) => {
+            mark('borrow', wei);
+            void runner.run({ type: 'borrow', musdWei: wei }, `Borrow ${formatMusd(wei)}`);
+          }}
         />
       ) : null}
 
@@ -211,9 +231,10 @@ export default function Vault() {
           sponsored={isSponsoredKind('deposit')}
           disabledReason={gate.allowed ? null : gate.reason}
           cta="Deposit"
-          onSubmit={(wei) =>
-            runner.run({ type: 'deposit', btcWei: wei }, `Deposit ${formatBtc(wei)}`)
-          }
+          onSubmit={(wei) => {
+            mark('deposit', wei);
+            void runner.run({ type: 'deposit', btcWei: wei }, `Deposit ${formatBtc(wei)}`);
+          }}
         />
       ) : null}
 
@@ -230,9 +251,10 @@ export default function Vault() {
           maxLabel="Your MUSD balance"
           disabledReason={gate.allowed ? null : gate.reason}
           cta="Repay"
-          onSubmit={(wei) =>
-            runner.run({ type: 'repay', musdWei: wei }, `Repay ${formatMusd(wei)}`)
-          }
+          onSubmit={(wei) => {
+            mark('repay', wei);
+            void runner.run({ type: 'repay', musdWei: wei }, `Repay ${formatMusd(wei)}`);
+          }}
         />
       ) : null}
 
@@ -250,13 +272,32 @@ export default function Vault() {
           sponsored={isSponsoredKind('withdraw')}
           disabledReason={gate.allowed ? null : gate.reason}
           cta="Withdraw"
-          onSubmit={(wei) =>
-            runner.run({ type: 'withdraw', btcWei: wei }, `Withdraw ${formatBtc(wei)}`)
-          }
+          onSubmit={(wei) => {
+            mark('withdraw', wei);
+            void runner.run({ type: 'withdraw', btcWei: wei }, `Withdraw ${formatBtc(wei)}`);
+          }}
         />
       ) : null}
 
-      <TxSheet runner={runner} />
+      {/*
+        One overlay at a time: a delivered borrow raises the celebration in place of the
+        sheet's receipt, so the sheet is unmounted while the cover is up. The other three
+        actions keep the standard sheet.
+      */}
+      {celebrated === null ? <TxSheet runner={runner} /> : null}
+      <SuccessCover
+        visible={celebrated !== null}
+        amountWei={celebrated ?? 0n}
+        unit="musd"
+        eyebrow="Borrowed"
+        headline="It’s in your wallet"
+        subline="is now spendable MUSD. Your Bitcoin stays as collateral, costing you nothing until you repay."
+        doneLabel="Back to Vault"
+        onDone={() => {
+          setCelebrated(null);
+          runner.dismiss();
+        }}
+      />
     </Screen>
   );
 }
@@ -405,6 +446,13 @@ function BorrowPanel({
               </Txt>
             </View>
           </View>
+
+          {/*
+            The same scale the Home hero uses, so a borrower sees where this amount lands
+            between the liquidation cliff and the target rather than reading a bare ratio.
+            It repeats the numerals above it, so it stays quiet while healthy (§2).
+          */}
+          <HealthScale collateralRatio={preview.cr} tone={tone} />
 
           <View style={styles.previewFooter}>
             <StatRow
