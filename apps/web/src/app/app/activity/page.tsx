@@ -1,15 +1,26 @@
 'use client';
 
-import { useState } from 'react';
-import { formatBtc, formatMusd, getChain, shortAddress, shortHash } from '@maren/sdk';
+import { useEffect, useMemo, useState, type ReactNode } from 'react';
+import { WAD, formatBtc, formatMusd, getChain, shortAddress, shortHash } from '@maren/sdk';
+import type { Address } from 'viem';
 
 import { ConnectPrompt } from '@/components/app/connect-prompt';
 import { Segmented } from '@/components/app/controls';
 import { Btc, Num } from '@/components/app/money';
 import { EmptyState, Info, Label, Loading, Note, Panel } from '@/components/app/primitives';
-import { ArrowUpRight } from '@/components/ui/icons';
+import {
+  ArrowDown,
+  ArrowUpRight,
+  Check,
+  CopyIcon,
+  EarnIcon,
+  LinkIcon,
+  PayIcon,
+  VaultIcon,
+} from '@/components/ui/icons';
+import { explorerTxUrl } from '@/components/app/tx';
 import { activityDirection, activityTitle, statusLabel, timeAgo } from '@/lib/copy';
-import { NETWORK, useActivity, useDataSource } from '@/lib/data/source';
+import { NETWORK, useActivity, useCounterpartyHandles, useDataSource } from '@/lib/data/source';
 import type { ActivityItem, ActivityKind } from '@/lib/data/types';
 import { RELAYER_CONFIGURED } from '@/lib/chain/relay';
 
@@ -50,14 +61,33 @@ const explorer = getChain(NETWORK).blockExplorers.default;
  * reads a bounded window rather than all of history, and the empty state distinguishes
  * "we read everything since deployment and you have done nothing" from "we read the last
  * few days". Those are different claims and only one of them is a fact about the user.
+ *
+ * THE PRESENTATION IS TALISE'S, THE DATA IS MEZO'S. Rows carry a direction badge, an
+ * asset-coloured amount and a per-transaction receipt, ported from Talise's history UI —
+ * but not one field is drawn from anything except a decoded log or an on-chain read.
  */
 export default function ActivityPage() {
   const source = useDataSource();
   const { data: window, isPending, error } = useActivity();
   const [filter, setFilter] = useState<Filter>('all');
 
-  const items = window?.items ?? [];
+  const items = useMemo(() => window?.items ?? [], [window]);
   const rows = items.filter((item) => filter === 'all' || GROUPS[filter].includes(item.kind));
+
+  /**
+   * The counterparty addresses worth asking the registry about: rows that recorded a raw
+   * address rather than a handle the payer typed. Gathered here — at the top of the only
+   * component that always renders — so the reverse-resolution hook is called
+   * unconditionally, and passed down to the rows that need it.
+   */
+  const addressesToResolve = useMemo(
+    () =>
+      items
+        .filter((item) => item.counterpartyAddress && !item.counterparty?.startsWith('@'))
+        .map((item) => item.counterpartyAddress as Address),
+    [items],
+  );
+  const handles = useCounterpartyHandles(addressesToResolve);
 
   return (
     <div className="flex flex-col gap-4">
@@ -75,6 +105,7 @@ export default function ActivityPage() {
         window={window}
         isPending={isPending}
         error={error}
+        handles={handles}
       />
     </div>
   );
@@ -89,6 +120,7 @@ function Body({
   window,
   isPending,
   error,
+  handles,
 }: {
   connected: boolean;
   filter: Filter;
@@ -98,6 +130,7 @@ function Body({
   window: ReturnType<typeof useActivity>['data'];
   isPending: boolean;
   error: unknown;
+  handles: Map<string, string>;
 }) {
   /**
    * Two different absences, two different screens. Disconnected means the query never
@@ -134,37 +167,52 @@ function Body({
     );
   }
 
+  const days = groupByDay(rows);
+
   return (
     <>
       <Segmented options={FILTERS} value={filter} onChange={setFilter} label="Activity filter" />
 
       <Panel title={`${rows.length} ${rows.length === 1 ? 'entry' : 'entries'}`}>
-        <div className="px-5">
-          {rows.map((item, index) => (
-            <Row key={item.id} item={item} last={index === rows.length - 1} />
-          ))}
-          {rows.length === 0 ? (
-            <div className="py-6">
-              {items.length > 0 ? (
-                <EmptyState title="Nothing in this filter">
-                  You have history, just none of this kind. Switch back to All.
-                </EmptyState>
-              ) : window?.complete ? (
-                <EmptyState title="Nothing here yet">
-                  This account has never transacted with Maren. We read every block since the
-                  contracts were deployed, so that is the whole story rather than a recent slice.
-                  Deposit Bitcoin in the Vault and the first row appears here.
-                </EmptyState>
-              ) : (
-                <EmptyState title="Nothing in the blocks we could read">
-                  Mezo’s RPC answers 10,000 blocks at a time, so this scan covered the most recent
-                  stretch rather than all of history. Anything older than that is not shown and is
-                  not claimed to be absent.
-                </EmptyState>
-              )}
-            </div>
-          ) : null}
-        </div>
+        {rows.length > 0 ? (
+          <div className="px-5">
+            {days.map((day) => (
+              <section key={day.key} aria-label={day.label} className="pt-4 first:pt-3">
+                <h3 className="t-label text-text-subtle pb-1">{day.label}</h3>
+                <div>
+                  {day.rows.map((item, index) => (
+                    <Row
+                      key={item.id}
+                      item={item}
+                      handles={handles}
+                      last={index === day.rows.length - 1}
+                    />
+                  ))}
+                </div>
+              </section>
+            ))}
+          </div>
+        ) : (
+          <div className="px-5 py-6">
+            {items.length > 0 ? (
+              <EmptyState title="Nothing in this filter">
+                You have history, just none of this kind. Switch back to All.
+              </EmptyState>
+            ) : window?.complete ? (
+              <EmptyState title="Nothing here yet">
+                This account has never transacted with Maren. We read every block since the
+                contracts were deployed, so that is the whole story rather than a recent slice.
+                Deposit Bitcoin in the Vault and the first row appears here.
+              </EmptyState>
+            ) : (
+              <EmptyState title="Nothing in the blocks we could read">
+                Mezo’s RPC answers 10,000 blocks at a time, so this scan covered the most recent
+                stretch rather than all of history. Anything older than that is not shown and is
+                not claimed to be absent.
+              </EmptyState>
+            )}
+          </div>
+        )}
       </Panel>
 
       {window ? <Coverage window={window} /> : null}
@@ -241,86 +289,373 @@ function Coverage({ window }: { window: NonNullable<ReturnType<typeof useActivit
   );
 }
 
-function Row({ item, last }: { item: ActivityItem; last: boolean }) {
-  const direction = activityDirection(item.kind);
-  const amount =
-    item.musdWei !== undefined
-      ? formatMusd(item.musdWei)
-      : item.btcWei !== undefined
-        ? formatBtc(item.btcWei)
-        : null;
+// ── one row, and the receipt behind it ───────────────────────────────────────
 
-  const statusClass =
+/**
+ * A row is a native `<details>`: the summary is the ledger line, and expanding it reveals
+ * the receipt in place. A disclosure rather than a modal because it works on touch,
+ * survives no-JS, and is announced by a screen reader without any ARIA of ours — the same
+ * reasoning as `primitives.tsx`'s `Info`.
+ */
+function Row({
+  item,
+  handles,
+  last,
+}: {
+  item: ActivityItem;
+  handles: Map<string, string>;
+  last: boolean;
+}) {
+  const direction = activityDirection(item.kind);
+  const counterparty = counterpartyLabel(item, handles);
+
+  const statusTone =
     item.status === 'failed'
       ? 'text-danger'
       : item.status === 'pending'
         ? 'text-warning'
         : 'text-text-subtle';
 
-  // A counterparty is either a handle the payer actually typed on-chain or a raw address.
-  // Addresses are shortened for the row; nothing is looked up to make them prettier,
-  // because a name the chain did not record is a name we would be inventing.
-  const counterparty = item.counterparty
-    ? item.counterparty.startsWith('@')
-      ? item.counterparty
-      : shortAddress(item.counterparty)
-    : undefined;
+  return (
+    <details className={`group ${last ? '' : 'border-b border-[var(--border-hairline)]'}`}>
+      <summary className="marker:content-none flex cursor-pointer list-none items-center gap-3 rounded-[var(--radius-input)] py-3">
+        <Badge kind={item.kind} />
+
+        <div className="min-w-0 flex-1">
+          <p className="text-text truncate text-sm">{activityTitle(item.kind, counterparty)}</p>
+          <p className="text-text-subtle mt-1 flex flex-wrap items-center gap-x-2 text-xs">
+            <span>{item.at > 0 ? timeAgo(item.at) : 'time unknown'}</span>
+            <span aria-hidden>·</span>
+            <span className={statusTone}>{statusLabel(item.status)}</span>
+          </p>
+        </div>
+
+        <div className="flex shrink-0 items-center gap-2">
+          <LedgerAmount item={item} direction={direction} />
+          {/* The affordance that says the row opens. Rotates on open; the chevron is the
+              only thing that moves, so the motion names `transform` alone. */}
+          <ArrowDown
+            aria-hidden
+            className="text-text-subtle size-4 transition-transform duration-200 ease-out group-open:rotate-180"
+          />
+        </div>
+      </summary>
+
+      <Receipt item={item} counterparty={counterparty} />
+    </details>
+  );
+}
+
+/**
+ * The circular direction badge, Talise's shape in Maren's palette.
+ *
+ * The disc stays neutral — a hairline well — and the glyph carries the row's asset colour,
+ * so badge and amount agree on what moved. Colour here means "which asset", never "good or
+ * bad": BRAND.md §2 keeps the semantic reds and greens for health, not for a ledger.
+ */
+function Badge({ kind }: { kind: ActivityKind }) {
+  const { Icon, tone } = badgeFor(kind);
+  return (
+    <span className="bg-surface-inset grid size-9 shrink-0 place-items-center rounded-[var(--radius-pill)] border border-[var(--border-hairline)]">
+      <Icon className={`size-4 ${tone}`} />
+    </span>
+  );
+}
+
+function badgeFor(kind: ActivityKind): {
+  Icon: typeof ArrowUpRight;
+  tone: string;
+} {
+  switch (kind) {
+    case 'send':
+      return { Icon: ArrowUpRight, tone: 'text-musd' };
+    case 'receive':
+      return { Icon: ArrowDown, tone: 'text-musd' };
+    case 'deposit':
+      return { Icon: VaultIcon, tone: 'text-btc' };
+    case 'withdraw':
+      return { Icon: VaultIcon, tone: 'text-btc' };
+    case 'borrow':
+      return { Icon: ArrowDown, tone: 'text-musd' };
+    case 'repay':
+      return { Icon: ArrowUpRight, tone: 'text-musd' };
+    case 'earn-deposit':
+      return { Icon: EarnIcon, tone: 'text-musd' };
+    case 'earn-withdraw':
+      return { Icon: EarnIcon, tone: 'text-musd' };
+    case 'link-created':
+      return { Icon: LinkIcon, tone: 'text-musd' };
+    case 'link-claimed':
+      return { Icon: LinkIcon, tone: 'text-musd' };
+    case 'request-created':
+      return { Icon: PayIcon, tone: 'text-musd' };
+  }
+}
+
+/**
+ * The amount, signed, with the fractional part and unit greyed so the eye lands on the
+ * figure that matters. Asset-coloured — BTC amber, MUSD green — with the exact,
+ * unabbreviated value on hover per BRAND.md §8.
+ */
+function LedgerAmount({
+  item,
+  direction,
+}: {
+  item: ActivityItem;
+  direction: 'in' | 'out' | 'none';
+}) {
+  const isMusd = item.musdWei !== undefined;
+  const wei = isMusd ? item.musdWei : item.btcWei;
+  if (wei === undefined) return null;
+
+  const unit = isMusd ? 'MUSD' : 'BTC';
+  const formatted = isMusd ? formatMusd(wei, { unit: false }) : formatBtc(wei, { unit: false });
+  const [whole, frac] = formatted.split('.');
+  const sign = direction === 'out' ? '−' : direction === 'in' ? '+' : '';
 
   return (
-    <div
-      className={`flex flex-wrap items-baseline justify-between gap-x-6 gap-y-1.5 py-3 ${
-        last ? '' : 'border-b border-[var(--border-hairline)]'
-      }`}
-    >
-      <div className="min-w-0">
-        <p className="text-text truncate text-sm">{activityTitle(item.kind, counterparty)}</p>
-        <p className="text-text-subtle mt-1 flex flex-wrap items-center gap-x-2 text-xs">
-          <span>{item.at > 0 ? timeAgo(item.at) : 'time unknown'}</span>
-          <span aria-hidden>·</span>
-          <span className={statusClass}>{statusLabel(item.status)}</span>
-          {item.memo ? (
-            <>
-              <span aria-hidden>·</span>
-              <span className="truncate">{item.memo}</span>
-            </>
-          ) : null}
-          {item.hash ? (
-            <a
-              href={`${explorer.url}/tx/${item.hash}`}
-              target="_blank"
-              rel="noreferrer noopener"
-              className="num text-text-subtle hover:text-text inline-flex items-center gap-1 rounded-[var(--radius-pill)] transition-colors duration-[120ms] ease-out"
-            >
-              {shortHash(item.hash)}
-              <ArrowUpRight className="size-3" />
-              <span className="sr-only">open on {explorer.name}</span>
-            </a>
-          ) : null}
-        </p>
-      </div>
+    <Num size="md" tone={isMusd ? 'musd' : 'btc'} title={exactValue(wei, unit)}>
+      {sign}
+      {whole}
+      {frac ? <span className="text-text-subtle">.{frac}</span> : null}
+      <span className="text-text-subtle"> {unit}</span>
+    </Num>
+  );
+}
 
-      <div className="shrink-0 text-right">
-        {amount ? (
-          <Num size="md">
-            {direction === 'out' ? '−' : direction === 'in' ? '+' : ''}
-            {amount}
-          </Num>
+/**
+ * The receipt: the mechanical facts behind a row, revealed in place.
+ *
+ * Every line is read off the decoded log or its receipt. Gas is stated honestly — a
+ * sponsored transaction says so and quotes nothing, a direct one quotes the exact BTC from
+ * the receipt — and the hash is a link to the explorer, never dressed up as a result on
+ * its own. The block number is shown because it is exact, where the relative time is not.
+ */
+function Receipt({ item, counterparty }: { item: ActivityItem; counterparty?: string }) {
+  const partyLabel = item.kind === 'receive' ? 'From' : item.kind === 'send' ? 'To' : null;
+
+  return (
+    <div className="bg-surface-inset mb-3 rounded-[var(--radius-input)] border border-[var(--border-hairline)] px-4">
+      <dl>
+        {partyLabel && counterparty ? (
+          <DetailRow label={partyLabel}>
+            <span className={counterparty.startsWith('@') ? '' : 'num'}>{counterparty}</span>
+          </DetailRow>
         ) : null}
-        <p className="text-text-subtle mt-1 text-xs">
-          {item.sponsored ? (
-            'Gas paid by a relayer'
+
+        {item.memo ? (
+          <DetailRow label="Memo">
+            <span className="break-words">{item.memo}</span>
+          </DetailRow>
+        ) : null}
+
+        <DetailRow label="Status">
+          <span
+            className={
+              item.status === 'failed'
+                ? 'text-danger'
+                : item.status === 'pending'
+                  ? 'text-warning'
+                  : 'text-text'
+            }
+          >
+            {statusLabel(item.status)}
+          </span>
+        </DetailRow>
+
+        <DetailRow label="When">
+          {item.at > 0 ? (
+            <span>{absoluteTime(item.at)}</span>
           ) : (
-            <>
-              {/* `Btc` rather than a bare `formatBtc`, because Mezo's gas price is a few
-                  hundred wei and a real fee of 0.000000029 BTC rounds to "0 BTC" at the
-                  display precision. Rendering zero for a fee that was genuinely paid is a
-                  small lie of the same family as the ones this pass removed, so the exact
-                  figure stays reachable in the hover title — BRAND.md §8. */}
-              Gas <Btc wei={item.gasPaidWei} size="sm" tone="subtle" />
-            </>
+            <span className="text-text-subtle">time unknown</span>
           )}
-        </p>
-      </div>
+        </DetailRow>
+
+        {item.blockNumber !== undefined ? (
+          <DetailRow label="Block">
+            <span className="num">{item.blockNumber.toString()}</span>
+          </DetailRow>
+        ) : null}
+
+        <DetailRow label="Network">
+          <span>{explorer.name}</span>
+        </DetailRow>
+
+        <DetailRow label="Gas">
+          {item.status === 'pending' ? (
+            <span className="text-text-subtle">not settled yet</span>
+          ) : item.sponsored ? (
+            <span className="text-text">Sponsored — no gas paid by you</span>
+          ) : (
+            // `Btc` not a bare `formatBtc`: Mezo's gas is a few hundred wei and a real fee
+            // of 0.000000029 BTC rounds to "0 BTC" at display precision, so the exact
+            // figure stays reachable in the hover title — BRAND.md §8.
+            <Btc wei={item.gasPaidWei} size="sm" />
+          )}
+        </DetailRow>
+
+        {item.hash ? <HashRow hash={item.hash} /> : null}
+      </dl>
     </div>
   );
+}
+
+function DetailRow({ label, children }: { label: string; children: ReactNode }) {
+  return (
+    <div className="flex items-baseline justify-between gap-4 border-b border-[var(--border-hairline)] py-3 last:border-b-0">
+      <dt className="text-text-muted shrink-0 text-sm">{label}</dt>
+      <dd className="text-text min-w-0 text-right text-sm">{children}</dd>
+    </div>
+  );
+}
+
+/**
+ * The transaction hash: truncated, with a copy affordance and the explorer link. Reuses
+ * `explorerTxUrl` from `tx.tsx` so the sheet and the receipt cannot point at different
+ * explorers, and `shortHash` from the SDK so web and iOS truncate identically. Nobody
+ * reads 66 characters; the full value stays reachable through Copy and the `title`.
+ */
+function HashRow({ hash }: { hash: `0x${string}` }) {
+  const [copied, setCopied] = useState(false);
+
+  useEffect(() => {
+    if (!copied) return;
+    const id = setTimeout(() => setCopied(false), 1_800);
+    return () => clearTimeout(id);
+  }, [copied]);
+
+  return (
+    <div className="flex items-center justify-between gap-4 border-b border-[var(--border-hairline)] py-3 last:border-b-0">
+      <dt className="text-text-muted shrink-0 text-sm">Transaction</dt>
+      <dd className="flex min-w-0 items-center gap-3">
+        <button
+          type="button"
+          title={hash}
+          onClick={() => {
+            void navigator.clipboard?.writeText(hash);
+            setCopied(true);
+          }}
+          className="num text-text-muted hover:text-text inline-flex items-center gap-1.5 rounded-[var(--radius-pill)] text-xs transition-colors duration-[120ms] ease-out"
+        >
+          <span>{shortHash(hash)}</span>
+          {/* Cross-fade on swap: the copy glyph fades, shrinks and blurs out while the
+              check enters the same way. Both stay mounted; the transition names opacity,
+              transform and filter — nothing else. */}
+          <span className="relative grid size-3.5 place-items-center">
+            <CopyIcon
+              aria-hidden
+              className={`absolute transition-[opacity,transform,filter] duration-150 ease-out ${
+                copied ? 'scale-50 opacity-0 blur-[2px]' : 'scale-100 opacity-100 blur-0'
+              }`}
+            />
+            <Check
+              aria-hidden
+              className={`text-success absolute transition-[opacity,transform,filter] duration-150 ease-out ${
+                copied ? 'scale-100 opacity-100 blur-0' : 'scale-50 opacity-0 blur-[2px]'
+              }`}
+            />
+          </span>
+          <span className="sr-only">{copied ? 'Copied' : 'Copy the full transaction hash'}</span>
+        </button>
+        <a
+          href={explorerTxUrl(hash)}
+          target="_blank"
+          rel="noreferrer noopener"
+          className="text-text-muted hover:text-text inline-flex items-center gap-1.5 text-xs transition-colors duration-[120ms] ease-out"
+        >
+          Explorer
+          <ArrowUpRight aria-hidden className="size-3.5" />
+          <span className="sr-only">open this transaction on {explorer.name}</span>
+        </a>
+      </dd>
+    </div>
+  );
+}
+
+// ── helpers ───────────────────────────────────────────────────────────────────
+
+/**
+ * A counterparty is the handle the payer actually typed on-chain, the registry's current
+ * handle for the counterparty's address, or a shortened address — in that order of
+ * honesty. `handles` is the reverse-resolution map from `useCounterpartyHandles`; a miss
+ * means the row shows the address rather than a name the registry did not give.
+ */
+function counterpartyLabel(item: ActivityItem, handles: Map<string, string>): string | undefined {
+  if (item.counterparty?.startsWith('@')) return item.counterparty;
+  if (item.counterpartyAddress) {
+    const resolved = handles.get(item.counterpartyAddress.toLowerCase());
+    return resolved ?? shortAddress(item.counterpartyAddress);
+  }
+  return item.counterparty ? shortAddress(item.counterparty) : undefined;
+}
+
+/** The exact, unabbreviated amount for the hover title — BRAND.md §8. */
+function exactValue(wei: bigint, unit: 'BTC' | 'MUSD'): string {
+  const whole = wei / WAD;
+  const frac = (wei % WAD).toString().padStart(18, '0');
+  return unit === 'BTC' ? `${whole}.${frac} BTC exactly` : `${whole}.${frac} MUSD`;
+}
+
+interface DayGroup {
+  key: string;
+  label: string;
+  rows: ActivityItem[];
+}
+
+/**
+ * Group rows into days, newest first, preserving the incoming order within each day.
+ *
+ * Rows whose block timestamp could not be read (`at === 0`) are not forced into "today" —
+ * that would be a fabricated date. They fall into a single "Time unknown" group, which is
+ * the honest label for a real transaction with an unread timestamp.
+ */
+function groupByDay(rows: ActivityItem[]): DayGroup[] {
+  const groups = new Map<string, DayGroup>();
+  for (const row of rows) {
+    const key = row.at > 0 ? dayKey(row.at) : 'unknown';
+    let group = groups.get(key);
+    if (!group) {
+      group = { key, label: key === 'unknown' ? 'Time unknown' : dayLabel(row.at), rows: [] };
+      groups.set(key, group);
+    }
+    group.rows.push(row);
+  }
+  return [...groups.values()];
+}
+
+function dayKey(unixSeconds: number): string {
+  const d = new Date(unixSeconds * 1000);
+  return `${d.getFullYear()}-${d.getMonth()}-${d.getDate()}`;
+}
+
+function dayLabel(unixSeconds: number): string {
+  const date = new Date(unixSeconds * 1000);
+  const today = new Date();
+  const yesterday = new Date(today);
+  yesterday.setDate(today.getDate() - 1);
+
+  if (sameDay(date, today)) return 'Today';
+  if (sameDay(date, yesterday)) return 'Yesterday';
+
+  return date.toLocaleDateString(undefined, {
+    day: 'numeric',
+    month: 'short',
+    year: date.getFullYear() === today.getFullYear() ? undefined : 'numeric',
+  });
+}
+
+function sameDay(a: Date, b: Date): boolean {
+  return (
+    a.getFullYear() === b.getFullYear() &&
+    a.getMonth() === b.getMonth() &&
+    a.getDate() === b.getDate()
+  );
+}
+
+/** An absolute timestamp for the receipt — exact where the row's relative time is not. */
+function absoluteTime(unixSeconds: number): string {
+  return new Date(unixSeconds * 1000).toLocaleString(undefined, {
+    dateStyle: 'medium',
+    timeStyle: 'short',
+  });
 }

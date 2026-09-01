@@ -257,6 +257,54 @@ export function useProtocolStats(): UseQueryResult<ProtocolStats> {
   });
 }
 
+/**
+ * Reverse-resolve a set of counterparty addresses to their current `@handle`.
+ *
+ * This is a REAL chain read, not a guess: MarenRegistry.primaryHandle(addr) is the
+ * registry's own answer to "what handle does this address own right now". It reuses
+ * `live.reverseResolve` — the same call `usePrimaryHandle` makes — so no resolution logic
+ * is duplicated here.
+ *
+ * It is deliberately a FALLBACK only. A MarenPay send that carried a typed handle already
+ * has the string the payer actually wrote, and that is the honest label for that row; this
+ * is for the rows that only ever recorded a raw address, so an address the registry knows
+ * a name for reads as that name instead of forty hex characters. Anything it cannot resolve
+ * stays a short address — an unresolved counterparty is never invented into a handle.
+ *
+ * Returns a Map keyed by lowercased address. Missing entry = show the address.
+ */
+export function useCounterpartyHandles(addresses: readonly Address[]): Map<string, string> {
+  const { source, ctx } = useLiveContext();
+  const unique = [...new Set(addresses.map((a) => a.toLowerCase()))].sort();
+
+  const query = useQuery<Record<string, string>>({
+    queryKey: key(['counterparty-handles', unique.join(',')], source),
+    queryFn: async () => {
+      if (!ctx) return {};
+      const resolved: Record<string, string> = {};
+      await Promise.all(
+        unique.map(async (addr) => {
+          try {
+            const handle = await live.reverseResolve(ctx, addr as Address);
+            if (handle) resolved[addr] = handle;
+          } catch {
+            // A failed lookup is not a missing handle — the row falls back to the address,
+            // which is always true, rather than borrowing a name from a read that did not
+            // return.
+          }
+        }),
+      );
+      return resolved;
+    },
+    enabled: ctx !== null && unique.length > 0,
+    // A handle→address mapping changes only when someone re-registers; well worth caching
+    // across the session rather than re-reading the registry on every render.
+    staleTime: 5 * 60_000,
+  });
+
+  return new Map(Object.entries(query.data ?? {}));
+}
+
 /** The account's own `@handle`, from MarenRegistry's reverse resolution. */
 export function usePrimaryHandle(): UseQueryResult<string | null> {
   const { source, ctx } = useLiveContext();

@@ -223,6 +223,81 @@ export function Sats({ wei, size = 'numericSm' }: { wei: bigint; size?: Size }) 
 }
 
 /**
+ * A signed ledger figure — the History row's and the receipt's amount.
+ *
+ * One renderer, shared by both, so a row and the receipt it opens can never disagree
+ * about a sign, a decimal, or a colour. It carries §2's asset mark (green MUSD, orange
+ * BTC on the unit only) and the reference wallet's greyed fraction so the eye lands on
+ * the whole number first — the same treatment `Amount` gives a hero balance, applied to
+ * a ledger line.
+ *
+ * A FAILED ROW IS STRUCK THROUGH AND DROPPED TO MUTED. R15's read-path half: a reverted
+ * transaction moved no funds, so its amount reads as withdrawn rather than as money that
+ * changed hands, and it never wears the asset colour a settled value would.
+ */
+export function LedgerAmount({
+  musdWei,
+  btcWei,
+  direction,
+  failed = false,
+  size = 'numeric',
+}: {
+  musdWei?: bigint;
+  btcWei?: bigint;
+  /** The sign the caller derived from the kind — an en dash for outflow, never a hyphen. */
+  direction: '+' | '−';
+  failed?: boolean;
+  size?: Size;
+}) {
+  const value =
+    musdWei !== undefined ? formatMusd(musdWei) : btcWei !== undefined ? formatBtc(btcWei) : null;
+
+  if (value === null) {
+    return (
+      <Num size={size} tone="muted">
+        —
+      </Num>
+    );
+  }
+
+  const [numeral, unit] = splitUnit(value);
+  const [intPart, fracPart] = splitFraction(numeral);
+  const assetTone: 'musd' | 'btc' = musdWei !== undefined ? 'musd' : 'btc';
+
+  // Visual-only: it groups under the row's Pressable or the receipt hero, each of which
+  // owns the spoken label (see `signedAmountText`), so the figure is announced once.
+  if (failed) {
+    return (
+      <View style={[styles.amount, styles.alignRight]}>
+        <Num size={size} tone="muted" style={styles.struck}>
+          {direction}
+          {value}
+        </Num>
+      </View>
+    );
+  }
+
+  return (
+    <View style={[styles.amount, styles.alignRight]}>
+      <Num size={size} tone="primary">
+        {direction}
+        {intPart}
+        {fracPart ? (
+          <Num size={size} tone="muted">
+            {fracPart}
+          </Num>
+        ) : null}
+      </Num>
+      {unit ? (
+        <Num size={unitSizeFor[size]} tone={assetTone}>
+          {unit}
+        </Num>
+      ) : null}
+    </View>
+  );
+}
+
+/**
  * Split "1,234.00 MUSD" into ["1,234.00", "MUSD"].
  *
  * Splits on the last space only when the tail is a unit word, so a `$`-prefixed USD
@@ -270,4 +345,5 @@ const styles = StyleSheet.create({
   },
   alignRight: { justifyContent: 'flex-end' },
   alignLeft: { justifyContent: 'flex-start' },
+  struck: { textDecorationLine: 'line-through' },
 });

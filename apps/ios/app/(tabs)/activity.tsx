@@ -1,21 +1,28 @@
 import { Fragment, useState } from 'react';
 import { Pressable, StyleSheet, View } from 'react-native';
-import * as Linking from 'expo-linking';
 import { useRouter } from 'expo-router';
-import { collateralValue, formatBtc, formatMusd, formatUsd, getChain, shortHash } from '@maren/sdk';
+import { collateralValue, formatBtc, formatUsd, getChain } from '@maren/sdk';
 
 import { Card } from '../../src/components/Card';
 import { DemoNotice, ReadFailure } from '../../src/components/DataNotice';
 import { Icon, type IconName } from '../../src/components/Icon';
-import { Btc, Musd, Sats, Usd } from '../../src/components/Money';
+import { Btc, LedgerAmount, Musd, Sats, Usd } from '../../src/components/Money';
 import { PriceBanner } from '../../src/components/PriceBanner';
+import { ReceiptSheet } from '../../src/components/ReceiptSheet';
 import { StatRow } from '../../src/components/Row';
 import { Screen } from '../../src/components/Screen';
 import { SegmentedControl } from '../../src/components/SegmentedControl';
 import { Label, Num, Txt } from '../../src/components/Text';
 import { base, radius, semanticText, space, text as textColors } from '../../src/design/tokens';
 import { priceGate } from '../../src/chain/price';
-import { activityTitle, statusLabel, timeAgo } from '../../src/lib/copy';
+import {
+  activityTitle,
+  counterpartyLabel,
+  isOutflow,
+  signedAmountText,
+  statusLabel,
+  timeAgo,
+} from '../../src/lib/copy';
 import {
   balanceActions,
   type BalanceAction,
@@ -329,6 +336,10 @@ function HistoryTab() {
   const demo = useAppStore((s) => s.dataSource === 'mock');
   const explorer = getChain(network).blockExplorers?.default.url ?? 'https://explorer.mezo.org';
 
+  // The row the receipt is open for. Held here rather than in each Row so only one sheet
+  // can ever be mounted, and it survives the list re-sorting under it.
+  const [selected, setSelected] = useState<ActivityItem | null>(null);
+
   const items = window?.items ?? [];
   const groups = groupByDay(items);
 
@@ -365,7 +376,12 @@ function HistoryTab() {
             <Label style={styles.dayLabel}>{day}</Label>
             <Card padded={false} style={styles.group}>
               {rows.map((item, i) => (
-                <Row key={item.id} item={item} explorer={explorer} last={i === rows.length - 1} />
+                <Row
+                  key={item.id}
+                  item={item}
+                  onSelect={setSelected}
+                  last={i === rows.length - 1}
+                />
               ))}
             </Card>
           </Fragment>
@@ -374,6 +390,13 @@ function HistoryTab() {
 
       {/* Coverage is a claim about a scan, so it is only shown when a scan happened. */}
       {window && !error && !demo ? <Coverage window={window} /> : null}
+
+      <ReceiptSheet
+        item={selected}
+        explorer={explorer}
+        network={network}
+        onClose={() => setSelected(null)}
+      />
     </>
   );
 }
@@ -397,25 +420,32 @@ function Coverage({ window }: { window: ActivityWindow }) {
   );
 }
 
-function Row({ item, explorer, last }: { item: ActivityItem; explorer: string; last: boolean }) {
+/**
+ * One activity row. Tapping it opens the receipt — the row is the summary, the receipt is
+ * the detail with the memo, the block and the explorer link. Every field here is decoded
+ * from a log Mezo returned; nothing is defaulted into existence.
+ */
+function Row({
+  item,
+  onSelect,
+  last,
+}: {
+  item: ActivityItem;
+  onSelect: (item: ActivityItem) => void;
+  last: boolean;
+}) {
   const failed = item.status === 'failed';
-  const amount =
-    item.musdWei !== undefined
-      ? formatMusd(item.musdWei)
-      : item.btcWei !== undefined
-        ? formatBtc(item.btcWei)
-        : '—';
-  const direction = outflow(item.kind) ? '−' : '+';
-  const [numeral, unit] = splitAmount(amount);
+  const who = counterpartyLabel(item);
+  const direction: '+' | '−' = isOutflow(item.kind) ? '−' : '+';
 
-  const label = `${activityTitle(item.kind, item.counterparty)}, ${amount}, ${statusLabel(item.status)}, ${timeAgo(item.at)}`;
+  const label = `${activityTitle(item.kind, who)}, ${signedAmountText(item)}, ${statusLabel(item.status)}, ${timeAgo(item.at)}`;
 
   return (
     <Pressable
-      onPress={item.hash ? () => Linking.openURL(`${explorer}/tx/${item.hash}`) : undefined}
-      accessibilityRole={item.hash ? 'link' : undefined}
+      onPress={() => onSelect(item)}
+      accessibilityRole="button"
       accessibilityLabel={label}
-      accessibilityHint={item.hash ? 'Opens this transaction on explorer.mezo.org' : undefined}
+      accessibilityHint="Opens the receipt for this transaction"
       style={({ pressed }) => [styles.row, !last && styles.rowDivider, pressed && styles.pressed]}
     >
       <View style={[styles.rowIcon, failed && styles.rowIconFailed]}>
@@ -428,7 +458,7 @@ function Row({ item, explorer, last }: { item: ActivityItem; explorer: string; l
 
       <View style={styles.rowBody}>
         <Txt variant="body" style={styles.rowTitle} numberOfLines={1}>
-          {activityTitle(item.kind, item.counterparty)}
+          {activityTitle(item.kind, who)}
         </Txt>
 
         <View style={styles.rowMeta}>
@@ -443,49 +473,16 @@ function Row({ item, explorer, last }: { item: ActivityItem; explorer: string; l
             “{item.memo}”
           </Txt>
         ) : null}
-
-        {item.hash ? (
-          <View style={styles.hashRow}>
-            <Num size="numericSm" tone="muted" style={styles.hash}>
-              {shortHash(item.hash)}
-            </Num>
-            <Icon name="external" size={11} color={textColors.subtle} />
-          </View>
-        ) : null}
       </View>
 
       <View style={styles.rowRight}>
-        {/*
-          Numeral and unit are separate runs, as everywhere else: the figure carries the
-          value in plain text and the unit carries the asset colour (§2's "asset mark").
-          A failed row strikes the whole pair through and drops it to muted, so it reads
-          as withdrawn rather than as money that moved.
-        */}
-        <View style={styles.amountPair}>
-          <Num
-            size="numeric"
-            tone="inherit"
-            style={[styles.amount, failed ? styles.amountFailed : styles.amountLive]}
-          >
-            {direction}
-            {numeral}
-          </Num>
-          {unit ? (
-            <Num
-              size="numericSm"
-              tone="inherit"
-              style={
-                failed
-                  ? styles.amountFailed
-                  : item.musdWei !== undefined
-                    ? styles.amountMusd
-                    : styles.amountBtc
-              }
-            >
-              {unit}
-            </Num>
-          ) : null}
-        </View>
+        <LedgerAmount
+          musdWei={item.musdWei}
+          btcWei={item.btcWei}
+          direction={direction}
+          failed={failed}
+          size="numeric"
+        />
 
         {item.sponsored ? (
           <Txt variant="small" tone="muted" style={styles.gas}>
@@ -503,14 +500,6 @@ function Row({ item, explorer, last }: { item: ActivityItem; explorer: string; l
       </View>
     </Pressable>
   );
-}
-
-/** "1,500.00 MUSD" -> ["1,500.00", "MUSD"]; "—" survives unsplit. */
-function splitAmount(value: string): [string, string | null] {
-  const at = value.lastIndexOf(' ');
-  if (at < 0) return [value, null];
-  const tail = value.slice(at + 1);
-  return /^[A-Za-z]+$/.test(tail) ? [value.slice(0, at), tail] : [value, null];
 }
 
 function StatusChip({ status }: { status: ActivityStatus }) {
@@ -565,19 +554,6 @@ function iconFor(kind: ActivityKind): IconName {
     case 'link-claimed':
       return 'arrowDown';
   }
-}
-
-/**
- * Which way the money went, for the sign on the amount.
- *
- * The three payment-link and request kinds are deliberately absent from this list, so
- * they render with a plus. None of them moves money at the moment they are emitted: a
- * request is an ask, a created link is escrowed and reclaimable, and a claim is an
- * inflow to whoever claimed it. Signing them as outgoing would put a minus against a
- * balance that did not fall.
- */
-function outflow(kind: ActivityKind): boolean {
-  return kind === 'send' || kind === 'repay' || kind === 'deposit' || kind === 'earn-deposit';
 }
 
 /** Group into "Today" / "Yesterday" / a date. */
@@ -672,20 +648,7 @@ const styles = StyleSheet.create({
   chip: { flexDirection: 'row', alignItems: 'center', gap: 5 },
   chipDot: { width: 5, height: 5, borderRadius: radius.pill },
   memo: { marginTop: 2 },
-  hashRow: { flexDirection: 'row', alignItems: 'center', gap: 5, marginTop: 3 },
-  hash: { fontSize: 11 },
   rowRight: { alignItems: 'flex-end', gap: 2 },
-  amount: { fontSize: 15 },
-  amountPair: { flexDirection: 'row', alignItems: 'baseline', justifyContent: 'flex-end', gap: 6 },
-  amountLive: { color: textColors.primary },
-  amountMusd: { color: semanticText.musd },
-  amountBtc: { color: semanticText.btc },
-  /**
-   * `muted`, not `subtle`. This is a 15px figure a user reads to work out that a payment
-   * did not happen — the strike-through says withdrawn, the tone says quiet, and neither
-   * is allowed to say illegible. #82828C would be 3.80:1 on this card; #55555E is 7.38.
-   */
-  amountFailed: { color: textColors.muted, textDecorationLine: 'line-through' },
   gas: { fontSize: 11 },
   gasRow: { flexDirection: 'row', alignItems: 'center' },
   emptyBody: { marginTop: space.sm },

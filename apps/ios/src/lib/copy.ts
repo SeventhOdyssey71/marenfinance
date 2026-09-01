@@ -1,6 +1,7 @@
-import { formatMusd } from '@maren/sdk';
+import { formatBtc, formatMusd, shortAddress } from '@maren/sdk';
+import type { Address } from 'viem';
 
-import type { ActivityKind, ActivityStatus } from '../data/types';
+import type { ActivityItem, ActivityKind, ActivityStatus } from '../data/types';
 
 /**
  * Copy helpers.
@@ -47,6 +48,23 @@ export function usableTitle(bps: number): string {
   if (bps < 1_500) return 'a bad week would do it';
   if (bps < 3_500) return 'meaningful buffer';
   return 'wide buffer';
+}
+
+/**
+ * How a counterparty is named on a row and in its receipt.
+ *
+ * The `@handle` is only ever the string the payer actually typed into `PaidToHandle` —
+ * `logs.ts` decodes it and refuses to reverse-look-up a name for a bare address, so a
+ * row can never wear a handle the chain did not associate with it. Everything else is the
+ * address, shortened for the eye and expanded again on the explorer. Never the full 40
+ * hex characters inline, which is what shipped before and pushed the amount off the row.
+ */
+export function counterpartyLabel(
+  item: Pick<ActivityItem, 'counterparty' | 'counterpartyAddress'>,
+): string | undefined {
+  if (item.counterparty?.startsWith('@')) return item.counterparty;
+  const address = item.counterpartyAddress ?? (item.counterparty as Address | undefined);
+  return address ? shortAddress(address) : undefined;
 }
 
 export function activityTitle(kind: ActivityKind, counterparty?: string): string {
@@ -111,4 +129,33 @@ export function timeAgo(unixSeconds: number, now = Math.floor(Date.now() / 1000)
 /** "12,000.00 MUSD" with an explicit sign, for a ledger column. */
 export function signedMusd(wei: bigint, direction: 'in' | 'out'): string {
   return `${direction === 'out' ? '−' : '+'}${formatMusd(wei)}`;
+}
+
+/**
+ * Which way the money went, for the sign on the amount — shared by the row and the
+ * receipt so the two can never sign the same transaction differently.
+ *
+ * The three payment-link and request kinds are deliberately absent, so they render with a
+ * plus. None of them moves money at the moment they are emitted: a request is an ask, a
+ * created link is escrowed and reclaimable, and a claim is an inflow to whoever claimed
+ * it. Signing them as outgoing would put a minus against a balance that did not fall.
+ */
+export function isOutflow(kind: ActivityKind): boolean {
+  return kind === 'send' || kind === 'repay' || kind === 'deposit' || kind === 'earn-deposit';
+}
+
+/**
+ * The signed amount as a spoken string — the VoiceOver reading of a `LedgerAmount`.
+ *
+ * `LedgerAmount` itself is visual-only so it groups under whichever row or hero owns the
+ * accessibility label; this is what those owners put in that label, so the figure is
+ * announced exactly once and reads the same on the row and in its receipt.
+ */
+export function signedAmountText(
+  item: Pick<ActivityItem, 'kind' | 'musdWei' | 'btcWei'>,
+): string {
+  const sign = isOutflow(item.kind) ? '−' : '+';
+  if (item.musdWei !== undefined) return `${sign}${formatMusd(item.musdWei)}`;
+  if (item.btcWei !== undefined) return `${sign}${formatBtc(item.btcWei)}`;
+  return '—';
 }
