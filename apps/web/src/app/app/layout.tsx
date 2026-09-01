@@ -1,9 +1,7 @@
 import type { Metadata } from 'next';
 import type { ReactNode } from 'react';
 
-import { AppNav } from '@/components/app/app-nav';
-import { ChainStatus, VaultProvenance } from '@/components/app/chain-status';
-import { NetworkGuard } from '@/components/app/wallet';
+import { AppShell } from '@/components/app/app-shell';
 import { AppProviders } from './providers';
 
 export const metadata: Metadata = {
@@ -19,8 +17,10 @@ export const metadata: Metadata = {
 /**
  * The app shell.
  *
- * Everything below the nav is a client tree because it reads chain state; the shell
+ * Everything below the nav is a client tree because it reads chain state; the layout
  * itself stays a server component so the wallet stack is not in the marketing bundle.
+ * The chrome — the desktop sidebar, the mobile bottom nav, the connect control and the
+ * pre-audit disclosure — lives in `AppShell`.
  */
 export default function AppLayout({ children }: { children: ReactNode }) {
   return (
@@ -30,41 +30,8 @@ export default function AppLayout({ children }: { children: ReactNode }) {
           inline body rule keeps overscroll rubber-banding light instead of flashing
           the marketing background behind it. */}
       <style>{`body:has([data-app-theme='light']){background-color:#f7f6fb}`}</style>
-      <div data-app-theme="light" className="bg-bg text-text flex min-h-screen flex-col">
-        {/* Removed on the owner's direct instruction — see the note in `app/page.tsx`.
-            `#app-content` is still on <main> below, so restoring the link is one element. */}
-        <AppNav />
-
-        <main id="app-content" className="container-maren flex-1 pb-24 pt-8">
-          <div className="flex flex-col gap-6">
-            <NetworkGuard />
-            <ChainStatus />
-          </div>
-          <div className="mt-8">{children}</div>
-        </main>
-
-        <footer className="hairline-t">
-          <div className="container-maren text-text-subtle flex flex-wrap items-center justify-between gap-4 py-8 text-xs">
-            {/* Kept in full: an unaudited contract holding user funds, and pooled
-              collateral segregated in accounting rather than custody, are the two facts
-              a user most needs and least expects. Tightened to one sentence, not cut. */}
-            <p className="max-w-[68ch] leading-relaxed">
-              Pre-audit: MarenVault and MarenPay hold user funds and have not been audited. Pooled
-              collateral is segregated in accounting, not custody.
-            </p>
-            <div className="flex flex-wrap items-center gap-5">
-              <VaultProvenance />
-              <a
-                href="https://github.com/SeventhOdyssey71/marenfinance/tree/main/docs"
-                target="_blank"
-                rel="noreferrer noopener"
-                className="text-text-muted hover:text-text transition-colors duration-[120ms] ease-out"
-              >
-                Docs
-              </a>
-            </div>
-          </div>
-        </footer>
+      <div data-app-theme="light" className="bg-bg text-text min-h-screen">
+        <AppShell>{children}</AppShell>
       </div>
     </AppProviders>
   );

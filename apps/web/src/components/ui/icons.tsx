@@ -9,12 +9,15 @@ import {
   Coins01Icon,
   FlashIcon,
   GithubIcon,
+  Home01Icon,
   InformationCircleIcon,
   Link01Icon,
   MinusSignIcon,
   NewTwitterIcon,
   SentIcon,
   Shield01Icon,
+  UserCircleIcon,
+  Wallet01Icon,
 } from '@hugeicons/core-free-icons';
 import type { SVGProps } from 'react';
 
@@ -132,6 +135,24 @@ export const EarnIcon = icon(Coins01Icon, 'EarnIcon');
 
 /** Portfolio — the position overview, not a wallet and not a generic square. */
 export const PortfolioIcon = icon(Analytics01Icon, 'PortfolioIcon');
+
+// ── App shell navigation ───────────────────────────────────────────────────
+//
+// The four shell destinations: Home, Finance, Activity, Profile. Activity keeps
+// the Analytics glyph it has always carried (it is the ledger); the other three
+// are new to the shell.
+
+/** Home — the balance overview and the launch point for every action. */
+export const HomeIcon = icon(Home01Icon, 'HomeIcon');
+
+/** Finance — Vault and Earn grouped: a wallet, the money you hold and put to work. */
+export const FinanceIcon = icon(Wallet01Icon, 'FinanceIcon');
+
+/** Activity — the ledger, on the same Analytics glyph the old Portfolio nav used. */
+export const ActivityIcon = icon(Analytics01Icon, 'ActivityIcon');
+
+/** Profile — your handle, account and settings. */
+export const ProfileIcon = icon(UserCircleIcon, 'ProfileIcon');
 
 // ── Supporting ───────────────────────────────────────────────────────────────
 

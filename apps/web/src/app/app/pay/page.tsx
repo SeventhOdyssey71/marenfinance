@@ -71,6 +71,15 @@ export default function PayPage() {
   const [tab, setTab] = useState<Tab>('send');
   const runner = useTxRunner();
 
+  // Home's action pills deep-link a tab through the URL hash (e.g. `/app/pay#receive`).
+  // Read it once on mount so "Receive" lands on Receive; unknown hashes are ignored and
+  // the default Send stands. No new state, and the segmented control still owns `tab`.
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const fromHash = window.location.hash.replace(/^#/, '');
+    if (TABS.some((t) => t.key === fromHash)) setTab(fromHash as Tab);
+  }, []);
+
   if (!source.connected) {
     return (
       <div className="flex flex-col gap-4">

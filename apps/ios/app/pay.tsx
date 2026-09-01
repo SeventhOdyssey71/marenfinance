@@ -8,16 +8,17 @@ import QRCode from 'react-native-qrcode-svg';
 import type { Hex } from 'viem';
 import { formatMusd, shortAddress } from '@maren/sdk';
 
-import { Amount, Musd } from '../../src/components/Money';
-import { AmountPad } from '../../src/components/AmountPad';
-import { Card } from '../../src/components/Card';
-import { Icon } from '../../src/components/Icon';
-import { PillButton } from '../../src/components/PillButton';
-import { StatRow } from '../../src/components/Row';
-import { Screen } from '../../src/components/Screen';
-import { Label, Num, Txt } from '../../src/components/Text';
-import { TxSheet, useTxRunner } from '../../src/components/TxSheet';
-import { isSponsored, type CreatedRefs } from '../../src/chain/actions';
+import { Amount, Musd } from '../src/components/Money';
+import { AmountPad } from '../src/components/AmountPad';
+import { BackHeader } from '../src/components/BackHeader';
+import { Card } from '../src/components/Card';
+import { Icon } from '../src/components/Icon';
+import { PillButton } from '../src/components/PillButton';
+import { StatRow } from '../src/components/Row';
+import { Screen } from '../src/components/Screen';
+import { Label, Num, Txt } from '../src/components/Text';
+import { TxSheet, useTxRunner } from '../src/components/TxSheet';
+import { isSponsored, type CreatedRefs } from '../src/chain/actions';
 import {
   base,
   brand,
@@ -28,15 +29,15 @@ import {
   semanticText,
   space,
   text,
-} from '../../src/design/tokens';
-import { fonts } from '../../src/design/type';
-import { resolveHandle } from '../../src/data/source';
-import type { Handle } from '../../src/data/types';
-import { useBalances } from '../../src/hooks/useChainData';
-import { gasCopy } from '../../src/lib/copy';
-import { buildClaimLink, buildPaymentPayload } from '../../src/lib/payment';
-import { useAppStore } from '../../src/state/store';
-import { createPrivateKey, deriveAddress } from '../../src/wallet/keystore';
+} from '../src/design/tokens';
+import { fonts } from '../src/design/type';
+import { resolveHandle } from '../src/data/source';
+import type { Handle } from '../src/data/types';
+import { useBalances } from '../src/hooks/useChainData';
+import { gasCopy } from '../src/lib/copy';
+import { buildClaimLink, buildPaymentPayload } from '../src/lib/payment';
+import { useAppStore } from '../src/state/store';
+import { createPrivateKey, deriveAddress } from '../src/wallet/keystore';
 
 type Tab = 'send' | 'request' | 'split' | 'link';
 
@@ -60,20 +61,26 @@ const TAB_LABELS: Record<Tab, string> = {
  * The gasless claim is made on Review, once, from `gasCopy` and gated on the SAME
  * `isSponsored` the submit path routes by. A send goes through MarenPay on the relayer's
  * allowlist, so it is truthfully gasless here; the copy would flip if the routing did.
+ *
+ * Pay is now a pushed route off Home rather than a bottom tab, so it opens over whatever
+ * the user was on and dismisses with the BackHeader. Home's Receive pill deep-links to the
+ * Request segment (`/pay?tab=request`); a scanned or pasted code arrives with `to`/`amount`
+ * and lands on Send, which is the default.
  */
+function asTab(value: string | undefined): Tab | null {
+  return value === 'send' || value === 'request' || value === 'split' || value === 'link'
+    ? value
+    : null;
+}
+
 export default function Pay() {
-  const params = useLocalSearchParams<{ to?: string; amount?: string }>();
+  const params = useLocalSearchParams<{ to?: string; amount?: string; tab?: string }>();
   const router = useRouter();
-  const [tab, setTab] = useState<Tab>('send');
+  const [tab, setTab] = useState<Tab>(asTab(params.tab) ?? 'send');
 
   return (
     <Screen bottomInset={space.xxl}>
-      <View style={styles.header}>
-        <Label>Pay</Label>
-        <Txt variant="h2" style={styles.title}>
-          Move dollars
-        </Txt>
-      </View>
+      <BackHeader kicker="Pay" title="Move dollars" />
 
       <View style={styles.segmented} accessibilityRole="tablist">
         {(['send', 'request', 'split', 'link'] as Tab[]).map((t) => {

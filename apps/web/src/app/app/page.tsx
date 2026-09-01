@@ -39,9 +39,18 @@ import { ConnectPrompt } from '@/components/app/connect-prompt';
 import { ProtocolPanel } from '@/components/app/protocol-panel';
 import { SocialVaultPanel } from '@/components/app/social-vault';
 import { LivePulseFrame } from '@/components/shaders/live-pulse';
-import { ArrowRight, VaultIcon } from '@/components/ui/icons';
+import {
+  ArrowDown,
+  ArrowRight,
+  ArrowUpRight,
+  EarnIcon,
+  PayIcon,
+  VaultIcon,
+} from '@/components/ui/icons';
+import { activityDirection, activityTitle, timeAgo } from '@/lib/copy';
 import { healthTone, policyRatio, toneShaderColors } from '@/lib/health';
 import {
+  useActivity,
   useBalances,
   useDataSource,
   useEarn,
@@ -49,6 +58,7 @@ import {
   usePrice,
   usePrimaryHandle,
 } from '@/lib/data/source';
+import type { ActivityItem } from '@/lib/data/types';
 
 /**
  * Portfolio — the home screen.
@@ -118,6 +128,8 @@ export default function PortfolioPage() {
   return (
     <div className="flex flex-col gap-4">
       <AccountHeader handle={handle ?? null} account={source.account ?? ''} price={price} />
+
+      <ActionPills />
 
       {/* ---------------------------------------------------------------- Hero */}
       {debtFree && position ? (
@@ -281,6 +293,110 @@ export default function PortfolioPage() {
 
         <BorrowingCapacity />
       </div>
+
+      <RecentActivity />
+    </div>
+  );
+}
+
+/**
+ * The four things you launch from Home — the Talise pattern, adapted.
+ *
+ * Send and Receive open the Pay hub (a flow, not a nav peer); Borrow opens the Vault;
+ * Earn opens the Stability Pool. Receive deep-links the Pay hub's Receive tab through a
+ * URL hash, which `PayPage` reads on mount — no new state and no logic touched.
+ */
+function ActionPills() {
+  const actions = [
+    { href: '/app/pay', label: 'Send', Icon: PayIcon },
+    { href: '/app/pay#receive', label: 'Receive', Icon: ArrowDown },
+    { href: '/app/vault', label: 'Borrow', Icon: VaultIcon },
+    { href: '/app/earn', label: 'Earn', Icon: EarnIcon },
+  ] as const;
+
+  return (
+    <nav aria-label="Quick actions" className="grid grid-cols-4 gap-2 sm:gap-3">
+      {actions.map(({ href, label, Icon }) => (
+        <Link
+          key={label}
+          href={href}
+          className="card group flex flex-col items-center gap-2 px-2 py-4 transition-colors duration-[120ms] ease-out hover:border-[var(--border-strong)]"
+        >
+          <span
+            aria-hidden
+            className="bg-surface-inset grid size-10 place-items-center rounded-[var(--radius-pill)] text-violet-500 transition-transform duration-[120ms] ease-out group-hover:-translate-y-0.5"
+          >
+            <Icon className="size-[18px]" />
+          </span>
+          <span className="text-text text-xs font-medium sm:text-sm">{label}</span>
+        </Link>
+      ))}
+    </nav>
+  );
+}
+
+/**
+ * A short window on the ledger, so Home answers "what just happened" without a trip to
+ * Activity. Real decoded logs only — the same `useActivity` read Activity uses — capped
+ * at the four newest rows, with the full history one tap away. When there is nothing to
+ * show (no history, a scan still in flight, or a failed read) this renders nothing and
+ * leaves the accounting to the Activity screen, which states each of those honestly.
+ */
+function RecentActivity() {
+  const { data: window } = useActivity();
+  const items = window?.items ?? [];
+  if (items.length === 0) return null;
+
+  return (
+    <Panel
+      title="Recent activity"
+      meta={
+        <Link
+          href="/app/activity"
+          className="text-text-muted hover:text-text inline-flex items-center gap-1 text-xs transition-colors duration-[120ms] ease-out"
+        >
+          View all
+          <ArrowUpRight className="size-3.5" />
+        </Link>
+      }
+    >
+      <PanelBody>
+        {items.slice(0, 4).map((item, index) => (
+          <RecentRow key={item.id} item={item} last={index === Math.min(items.length, 4) - 1} />
+        ))}
+      </PanelBody>
+    </Panel>
+  );
+}
+
+function RecentRow({ item, last }: { item: ActivityItem; last: boolean }) {
+  const direction = activityDirection(item.kind);
+  const isMusd = item.musdWei !== undefined;
+  const wei = isMusd ? item.musdWei : item.btcWei;
+  const sign = direction === 'out' ? '−' : direction === 'in' ? '+' : '';
+
+  return (
+    <div
+      className={`flex items-baseline justify-between gap-4 py-2.5 ${
+        last ? '' : 'border-b border-[var(--border-hairline)]'
+      }`}
+    >
+      <span className="text-text min-w-0 truncate text-sm">{activityTitle(item.kind)}</span>
+      <span className="flex shrink-0 items-baseline gap-3 text-right">
+        <span className="text-text-subtle text-xs">
+          {item.at > 0 ? timeAgo(item.at) : 'time unknown'}
+        </span>
+        {wei !== undefined ? (
+          <span className="flex items-baseline gap-0.5">
+            {sign ? <span className="text-text-subtle text-sm">{sign}</span> : null}
+            {isMusd ? (
+              <Musd wei={wei} size="sm" tone="musd" />
+            ) : (
+              <Btc wei={wei} size="sm" tone="btc" />
+            )}
+          </span>
+        ) : null}
+      </span>
     </div>
   );
 }
@@ -435,6 +551,8 @@ function NoPosition({
   return (
     <div className="flex flex-col gap-4">
       <AccountHeader handle={handle} account={account} price={price} />
+
+      <ActionPills />
 
       <AppCard className="p-5">
         <EmptyState

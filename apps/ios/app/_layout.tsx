@@ -106,6 +106,9 @@ export default function RootLayout() {
             {/* Claiming a link is a self-contained errand a recipient arrives at from a
                 pasted or scanned link, so it presents as a card over whatever they were on. */}
             <Stack.Screen name="claim" options={{ presentation: 'card' }} />
+            {/* Pay is no longer a tab. Its send/request/split/link flows push over Home as a
+                card and dismiss with the screen's BackHeader (or the swipe-back gesture). */}
+            <Stack.Screen name="pay" options={{ presentation: 'card' }} />
           </Stack>
         </View>
       </SafeAreaProvider>

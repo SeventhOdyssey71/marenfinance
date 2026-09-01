@@ -32,6 +32,7 @@ export type IconName =
   | 'earn'
   | 'activity'
   | 'settings'
+  | 'person'
   | 'faceid'
   | 'backspace';
 
@@ -126,6 +127,12 @@ export function Icon({ name, size = 20, color = text.primary }: IconProps) {
             d="M12 3.2v2.3M12 18.5v2.3M20.8 12h-2.3M5.5 12H3.2M18.2 5.8l-1.6 1.6M7.4 16.6l-1.6 1.6M18.2 18.2l-1.6-1.6M7.4 7.4 5.8 5.8"
             {...s}
           />
+        </>
+      )}
+      {name === 'person' && (
+        <>
+          <Circle cx="12" cy="8.5" r="3.6" {...s} />
+          <Path d="M5.5 19.5a6.5 6.5 0 0 1 13 0" {...s} />
         </>
       )}
       {name === 'faceid' && (

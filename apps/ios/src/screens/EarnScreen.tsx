@@ -2,21 +2,20 @@ import { useRef, useState } from 'react';
 import { Pressable, StyleSheet, View } from 'react-native';
 import { formatMusd } from '@maren/sdk';
 
-import { Amount, Musd } from '../../src/components/Money';
-import { Card } from '../../src/components/Card';
-import { DemoNotice, ReadFailure } from '../../src/components/DataNotice';
-import { Icon } from '../../src/components/Icon';
-import { PillButton } from '../../src/components/PillButton';
-import { StatRow } from '../../src/components/Row';
-import { Screen } from '../../src/components/Screen';
-import { SegmentedControl } from '../../src/components/SegmentedControl';
-import { SuccessCover } from '../../src/components/SuccessCover';
-import { Label, Num, Txt } from '../../src/components/Text';
-import { TxSheet, useTxRunner } from '../../src/components/TxSheet';
-import { base, radius, semanticText, space, text } from '../../src/design/tokens';
-import { timeAgo } from '../../src/lib/copy';
-import { useBalances, useEarn } from '../../src/hooks/useChainData';
-import { useAppStore } from '../../src/state/store';
+import { Amount, Musd } from '../components/Money';
+import { Card } from '../components/Card';
+import { DemoNotice, ReadFailure } from '../components/DataNotice';
+import { Icon } from '../components/Icon';
+import { PillButton } from '../components/PillButton';
+import { StatRow } from '../components/Row';
+import { SegmentedControl } from '../components/SegmentedControl';
+import { SuccessCover } from '../components/SuccessCover';
+import { Label, Num, Txt } from '../components/Text';
+import { TxSheet, useTxRunner } from '../components/TxSheet';
+import { base, radius, semanticText, space, text } from '../design/tokens';
+import { timeAgo } from '../lib/copy';
+import { useBalances, useEarn } from '../hooks/useChainData';
+import { useAppStore } from '../state/store';
 
 const WAD = 10n ** 18n;
 
@@ -25,27 +24,21 @@ type Mode = 'deposit' | 'withdraw';
 /**
  * Earn — idle MUSD into the MUSD Stability Pool via MarenEarn (ERC-4626).
  *
- * The hard rule for this screen, from both ARCHITECTURE.md §3.5 and the brief: there is
- * NO APY here. The Stability Pool has no token emissions; its yield is liquidation gains
- * only, which are lumpy and unpredictable. So the headline number is realised MUSD over
- * an observed window, labelled backward-looking, with the event count shown so the
- * lumpiness is visible rather than smoothed into a rate.
- *
- * Deriving an annualised figure from three events in ninety days would be a lie with a
- * percent sign on it. The screen says so in as many words.
+ * The body of what used to be the Earn tab, lifted verbatim into a Finance section. Only
+ * its <Screen> shell and screen-title header were removed; the hard rule for this screen is
+ * untouched: there is NO APY here. The Stability Pool has no token emissions; its yield is
+ * liquidation gains only, which are lumpy and unpredictable. So the headline number is
+ * realised MUSD over an observed window, labelled backward-looking, with the event count
+ * shown so the lumpiness is visible rather than smoothed into a rate.
  *
  * ── Gas honesty ────────────────────────────────────────────────────────────────
  *
- * Earn does NOT ride the relayer. `MarenEarn` is absent from the relay hub's allowlist
- * (`Deploy.s.sol:_allowlistRelayableCalls`), so `submitLive` in chain/actions.ts routes
- * both `earn-deposit` and `earn-withdraw` DIRECT from the user's wallet — the user pays
- * the BTC gas. `sponsorship.ts` still marks Earn sponsored for the relay-request shape it
- * shares with Pay, but the actual on-chain routing is what a user's wallet feels, so the
- * copy on this screen is derived from the routing and says plainly that you pay gas here.
- * It must never be the borrowed "gasless" line, which would promise something the chain
- * will not honour.
+ * Earn does NOT ride the relayer. `MarenEarn` is absent from the relay hub's allowlist, so
+ * `submitLive` in chain/actions.ts routes both `earn-deposit` and `earn-withdraw` DIRECT
+ * from the user's wallet — the user pays the BTC gas. The copy on this screen is derived
+ * from the routing and says plainly that you pay gas here.
  */
-export default function Earn() {
+export function EarnBody() {
   const { data: earn, error: earnError, refetch: refetchEarn } = useEarn();
   const { data: balances } = useBalances();
   const demo = useAppStore((s) => s.dataSource === 'mock');
@@ -102,14 +95,7 @@ export default function Earn() {
   };
 
   return (
-    <Screen bottomInset={space.xxl}>
-      <View style={styles.header}>
-        <Label>Earn</Label>
-        <Txt variant="h2" style={styles.title}>
-          Idle MUSD
-        </Txt>
-      </View>
-
+    <>
       {demo ? <DemoNotice /> : null}
 
       {earnError ? (
@@ -326,13 +312,11 @@ export default function Earn() {
           runner.dismiss();
         }}
       />
-    </Screen>
+    </>
   );
 }
 
 const styles = StyleSheet.create({
-  header: { marginBottom: space.xl },
-  title: { marginTop: space.xs },
   readError: { marginBottom: space.lg },
   hero: { marginBottom: space.lg },
   heroValue: { marginTop: space.md, marginBottom: space.md },

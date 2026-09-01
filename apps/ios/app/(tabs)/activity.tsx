@@ -84,7 +84,7 @@ export default function Activity() {
   const demo = useAppStore((s) => s.dataSource === 'mock');
 
   return (
-    <Screen bottomInset={space.xxl}>
+    <Screen bottomInset={space.huge}>
       <View style={styles.header}>
         <Label>Account</Label>
         <Txt variant="h2" style={styles.title}>
@@ -127,19 +127,22 @@ const ACTION_ICON: Record<BalanceActionKey, IconName> = {
   pay: 'send',
 };
 
-/** Where each action goes. The vault modes are preselected through its `action` param. */
+/**
+ * Where each action goes. The vault modes are preselected on the Finance screen's Vault
+ * section through its `action` param; Pay is now a pushed route rather than a tab.
+ */
 function hrefFor(key: BalanceActionKey): string {
   switch (key) {
     case 'deposit':
-      return '/(tabs)/vault?action=deposit';
+      return '/(tabs)/finance?section=vault&action=deposit';
     case 'withdraw':
-      return '/(tabs)/vault?action=withdraw';
+      return '/(tabs)/finance?section=vault&action=withdraw';
     case 'borrow':
-      return '/(tabs)/vault?action=borrow';
+      return '/(tabs)/finance?section=vault&action=borrow';
     case 'repay':
-      return '/(tabs)/vault?action=repay';
+      return '/(tabs)/finance?section=vault&action=repay';
     case 'pay':
-      return '/(tabs)/pay';
+      return '/pay';
   }
 }
 

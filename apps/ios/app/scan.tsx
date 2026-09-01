@@ -71,7 +71,7 @@ export default function Scan() {
 
     handled.current = true;
     router.replace({
-      pathname: '/(tabs)/pay',
+      pathname: '/pay',
       params: { to: parsed.to, ...(parsed.amount ? { amount: parsed.amount } : {}) },
     });
   };

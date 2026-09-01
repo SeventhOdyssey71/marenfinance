@@ -14,19 +14,18 @@ import {
   totalDebtFor,
 } from '@maren/sdk';
 
-import { Amount, Btc, Musd, Ratio } from '../../src/components/Money';
-import { Card } from '../../src/components/Card';
-import { DemoNotice, ReadFailure } from '../../src/components/DataNotice';
-import { HealthScale } from '../../src/components/HealthScale';
-import { Icon } from '../../src/components/Icon';
-import { PillButton } from '../../src/components/PillButton';
-import { PriceBanner } from '../../src/components/PriceBanner';
-import { StatRow } from '../../src/components/Row';
-import { Screen } from '../../src/components/Screen';
-import { Slider } from '../../src/components/Slider';
-import { SuccessCover } from '../../src/components/SuccessCover';
-import { Label, Num, Txt } from '../../src/components/Text';
-import { TxSheet, useTxRunner } from '../../src/components/TxSheet';
+import { Amount, Btc, Musd, Ratio } from '../components/Money';
+import { Card } from '../components/Card';
+import { DemoNotice, ReadFailure } from '../components/DataNotice';
+import { HealthScale } from '../components/HealthScale';
+import { Icon } from '../components/Icon';
+import { PillButton } from '../components/PillButton';
+import { PriceBanner } from '../components/PriceBanner';
+import { StatRow } from '../components/Row';
+import { Slider } from '../components/Slider';
+import { SuccessCover } from '../components/SuccessCover';
+import { Label, Num, Txt } from '../components/Text';
+import { TxSheet, useTxRunner } from '../components/TxSheet';
 import {
   base,
   brand,
@@ -36,12 +35,12 @@ import {
   semanticText,
   space,
   toneColor,
-} from '../../src/design/tokens';
-import { isSponsoredKind } from '../../src/chain/sponsorship';
-import { priceGate } from '../../src/chain/price';
-import { gasCopy } from '../../src/lib/copy';
-import { useBalances, usePosition, usePrice } from '../../src/hooks/useChainData';
-import { useAppStore } from '../../src/state/store';
+} from '../design/tokens';
+import { isSponsoredKind } from '../chain/sponsorship';
+import { priceGate } from '../chain/price';
+import { gasCopy } from '../lib/copy';
+import { useBalances, usePosition, usePrice } from '../hooks/useChainData';
+import { useAppStore } from '../state/store';
 
 type Mode = 'deposit' | 'borrow' | 'repay' | 'withdraw';
 
@@ -55,14 +54,15 @@ const MODES: { key: Mode; label: string }[] = [
 /**
  * Vault — deposit BTC, borrow MUSD, repay, withdraw.
  *
- * The borrow slider is the centre of this screen. It is bounded by the exact MUSD amount
- * that lands the position on Maren's 180% floor, computed by the SDK's `maxNetDebtAt`,
- * so the control cannot be dragged into a state we would refuse. That is a deliberate
- * choice over validating on submit: a slider that goes somewhere and then throws an
- * error has already told the user they can do something they cannot.
+ * This is the body of what used to be the Vault tab, lifted verbatim so it can live as one
+ * section of the Finance screen. Only its outer <Screen> shell and screen-title header were
+ * removed — Finance owns those now — so the borrow slider, the four-mode segmented control,
+ * the live CR preview and every SDK call are exactly as they were. Nothing here computes a
+ * user's risk that @maren/sdk does not.
  *
- * Every figure in the live preview — resulting CR, liquidation price, total debt — comes
- * from @maren/sdk. There is no arithmetic in this file that touches a user's risk.
+ * The borrow slider is the centre of this section. It is bounded by the exact MUSD amount
+ * that lands the position on Maren's 180% floor, computed by the SDK's `maxNetDebtAt`, so
+ * the control cannot be dragged into a state we would refuse.
  */
 /** Only the four vault modes may arrive as a deep-link parameter. */
 function asMode(value: string | undefined): Mode | null {
@@ -71,13 +71,12 @@ function asMode(value: string | undefined): Mode | null {
     : null;
 }
 
-export default function Vault() {
+export function VaultBody() {
   /**
-   * The Balances panel routes here with the action it wants preselected
-   * (`/(tabs)/vault?action=deposit`). The param is honoured on arrival and whenever it
-   * changes, using React's adjust-state-during-render pattern rather than an effect — the
-   * same shape the Pay screen uses for its deep-linked recipient, and for the same reason:
-   * an effect renders once on the stale tab and then again on the right one.
+   * The Balances panel and Home's Borrow pill route to Finance with the action they want
+   * preselected (`/(tabs)/finance?section=vault&action=deposit`). The param is honoured on
+   * arrival and whenever it changes, using React's adjust-state-during-render pattern rather
+   * than an effect — an effect renders once on the stale mode and then again on the right one.
    */
   const params = useLocalSearchParams<{ action?: string }>();
   const requested = asMode(params.action);
@@ -116,14 +115,7 @@ export default function Vault() {
   const livePrice = price.state === 'live' ? price.priceWei : null;
 
   return (
-    <Screen bottomInset={space.xxl}>
-      <View style={styles.header}>
-        <Label>Vault</Label>
-        <Txt variant="h2" style={styles.title}>
-          Bitcoin credit
-        </Txt>
-      </View>
-
+    <>
       {demo ? <DemoNotice /> : null}
 
       {/*
@@ -298,7 +290,7 @@ export default function Vault() {
           runner.dismiss();
         }}
       />
-    </Screen>
+    </>
   );
 }
 
@@ -632,8 +624,6 @@ function formatPriceDropCaption(bps: number): string {
 }
 
 const styles = StyleSheet.create({
-  header: { marginBottom: space.xl },
-  title: { marginTop: space.xs },
   banner: { marginBottom: space.lg },
   summary: { marginBottom: space.xl },
   segmented: {
@@ -657,7 +647,6 @@ const styles = StyleSheet.create({
   panelBody: { marginTop: space.sm },
   amountBlock: { marginTop: space.xl },
   amountRow: { flexDirection: 'row', alignItems: 'baseline', gap: space.sm, marginTop: space.sm },
-  unit: { marginBottom: 2 },
   slider: { marginTop: space.lg },
   sliderEnds: {
     flexDirection: 'row',

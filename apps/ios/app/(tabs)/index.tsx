@@ -96,7 +96,7 @@ export default function Home() {
       : null;
 
   return (
-    <Screen wash bottomInset={space.xxl}>
+    <Screen wash bottomInset={space.huge}>
       {/* Header */}
       <View style={styles.header}>
         <View>
@@ -280,10 +280,22 @@ export default function Home() {
         44pt target. Routing is unchanged; this is dressing only.
       */}
       <View style={styles.actionBar}>
-        <QuickAction icon="send" label="Send" onPress={() => router.push('/(tabs)/pay')} />
-        <QuickAction icon="scan" label="Scan" onPress={() => router.push('/scan')} />
-        <QuickAction icon="plus" label="Borrow" onPress={() => router.push('/(tabs)/vault')} />
-        <QuickAction icon="earn" label="Earn" onPress={() => router.push('/(tabs)/earn')} />
+        <QuickAction icon="send" label="Send" onPress={() => router.push('/pay')} />
+        <QuickAction
+          icon="arrowDown"
+          label="Receive"
+          onPress={() => router.push('/pay?tab=request')}
+        />
+        <QuickAction
+          icon="plus"
+          label="Borrow"
+          onPress={() => router.push('/(tabs)/finance?section=vault')}
+        />
+        <QuickAction
+          icon="earn"
+          label="Earn"
+          onPress={() => router.push('/(tabs)/finance?section=earn')}
+        />
       </View>
 
       {/*
@@ -374,7 +386,7 @@ function QuickAction({
   label,
   onPress,
 }: {
-  icon: Extract<IconName, 'send' | 'scan' | 'plus' | 'earn'>;
+  icon: Extract<IconName, 'send' | 'arrowDown' | 'plus' | 'earn'>;
   label: string;
   onPress: () => void;
 }) {

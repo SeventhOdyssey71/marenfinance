@@ -322,7 +322,7 @@ function PreviewCard({
 
 /**
  * The clock, read in a module-level helper rather than in a component body — the same
- * render-purity discipline as `app/(tabs)/pay.tsx`. The value gates the claimable/expired
+ * render-purity discipline as `app/pay.tsx`. The value gates the claimable/expired
  * split, so a read at the moment of classification is exactly what is wanted.
  */
 function nowSeconds(): number {
