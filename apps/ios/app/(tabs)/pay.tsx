@@ -1185,7 +1185,9 @@ function LinkIssued({
   const linkId = issued.claimUrl ? readLinkId(issued.claimUrl) : null;
   const reclaimable = nowSeconds() >= issued.expiry;
 
-  const reclaimRunner = useTxRunner();
+  // A reclaimed link is spent, so a delivered reclaim clears this screen back to a clean
+  // start rather than leaving the dead claim link and QR sitting there as if still payable.
+  const reclaimRunner = useTxRunner(() => onDone());
   const expiryDate = new Date(issued.expiry * 1000);
 
   const copy = async () => {

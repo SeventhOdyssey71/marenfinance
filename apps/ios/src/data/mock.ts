@@ -14,8 +14,11 @@ import type {
   Balances,
   EarnPosition,
   Handle,
+  LinkState,
   Position,
 } from './types';
+
+const ZERO_ADDRESS: Address = '0x0000000000000000000000000000000000000000';
 
 /**
  * Mock chain state.
@@ -296,7 +299,52 @@ function tick(): Promise<void> {
  */
 let nextRequestId = 1n;
 let nextLinkId = 1n;
-const linkEscrow = new Map<string, bigint>();
+
+/**
+ * The demo's copy of `MarenPay.links`. It tracks enough to model a link's whole life —
+ * escrowed, then claimed OR reclaimed — so `readLink` can answer honestly for a link this
+ * session created. It knows nothing about links created elsewhere, which is correct: demo
+ * data must never pretend to have read a stranger's link off a chain it is not talking to,
+ * so `readLink` returns "no such link" for any id it did not mint.
+ */
+interface DemoLink {
+  amountWei: bigint;
+  expiry: number;
+  claimed: boolean;
+  reclaimed: boolean;
+}
+const linkLedger = new Map<string, DemoLink>();
+
+/**
+ * A claimable link's state, for the demo claim flow.
+ *
+ * Only links this demo session created are known; everything else reads back as
+ * `creator === address(0)`, exactly as an unminted id would on-chain, so the claim screen
+ * says "no such link" rather than inventing one. `creator`/`linkKey` are the demo account
+ * because a demo link is one this wallet made.
+ */
+export async function readLink(linkId: bigint): Promise<LinkState> {
+  await tick();
+  const link = linkLedger.get(linkId.toString());
+  if (!link) {
+    return {
+      creator: ZERO_ADDRESS,
+      linkKey: ZERO_ADDRESS,
+      amountWei: 0n,
+      expiry: 0,
+      claimed: false,
+      reclaimed: false,
+    };
+  }
+  return {
+    creator: MOCK_ADDRESS,
+    linkKey: MOCK_ADDRESS,
+    amountWei: link.amountWei,
+    expiry: link.expiry,
+    claimed: link.claimed,
+    reclaimed: link.reclaimed,
+  };
+}
 
 export const mutate = {
   depositBtc(wei: bigint) {
@@ -334,20 +382,39 @@ export const mutate = {
   createRequest(): bigint | undefined {
     return nextRequestId++;
   },
-  /** A created link escrows the amount out of the spendable balance until it is claimed. */
+  /** A created link escrows the amount out of the spendable balance until it is settled. */
   createLink(wei: bigint): bigint | undefined {
     state.musdWei -= wei;
     const id = nextLinkId++;
-    linkEscrow.set(id.toString(), wei);
+    // A 30-day default expiry so a demo-created link reads back as claimable; the real expiry
+    // lives on-chain, and the live path reads it from `links(linkId)`.
+    linkLedger.set(id.toString(), {
+      amountWei: wei,
+      expiry: Math.floor(Date.now() / 1000) + 30 * 86_400,
+      claimed: false,
+      reclaimed: false,
+    });
     return id;
   },
-  /** Reclaiming an unclaimed link returns exactly what it escrowed. */
+  /** Reclaiming an unsettled link returns exactly what it escrowed. */
   reclaimLink(linkId: bigint): bigint | undefined {
-    const escrowed = linkEscrow.get(linkId.toString());
-    if (escrowed !== undefined) {
-      state.musdWei += escrowed;
-      linkEscrow.delete(linkId.toString());
+    const link = linkLedger.get(linkId.toString());
+    if (link && !link.claimed && !link.reclaimed) {
+      state.musdWei += link.amountWei;
+      link.reclaimed = true;
     }
     return undefined;
+  },
+  /**
+   * Claiming credits the escrowed amount to the spendable balance and settles the link. In
+   * demo the claimer and creator are the same wallet, so this nets to zero against the debit
+   * `createLink` made — which is the honest demo of the mechanic, not a free top-up.
+   */
+  claimLink(linkId: bigint): void {
+    const link = linkLedger.get(linkId.toString());
+    if (link && !link.claimed && !link.reclaimed) {
+      state.musdWei += link.amountWei;
+      link.claimed = true;
+    }
   },
 };

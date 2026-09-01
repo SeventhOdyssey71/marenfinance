@@ -12,7 +12,12 @@ import { isSponsoredKind } from './chain/sponsorship';
 import { classifyPrice, priceGate, usablePrice, STALE_AFTER_SECONDS } from './chain/price';
 import { gasCopy } from './lib/copy';
 import { confirmTransaction } from './chain/receipt';
-import { parsePaymentPayload, buildPaymentPayload, buildClaimLink } from './lib/payment';
+import {
+  parsePaymentPayload,
+  buildPaymentPayload,
+  buildClaimLink,
+  parseClaimLink,
+} from './lib/payment';
 
 /**
  * Tests for the three rules the brief calls out by number.
@@ -277,6 +282,48 @@ describe('a claimable link keeps its secret out of the query string', () => {
     const built = buildClaimLink(42n, SECRET);
     const [beforeHash] = built.split('#');
     expect(beforeHash).not.toContain(SECRET);
+  });
+});
+
+describe('claim-link parsing reads the secret only from the fragment', () => {
+  // A real one-time key: 0x + 32 bytes. The parser validates the format precisely, because a
+  // truncated or tampered fragment must fail closed rather than reach the chain.
+  const KEY = `0x${'a'.repeat(64)}` as const;
+
+  it('round-trips what buildClaimLink emits: id from the query, secret from the fragment', () => {
+    const built = buildClaimLink(7n, KEY);
+    expect(parseClaimLink(built)).toEqual({ linkId: 7n, secret: KEY });
+  });
+
+  it('refuses a secret smuggled into the query string', () => {
+    // The bearer key never belongs in a query param; a link that puts it there is not honoured
+    // even though the fragment is what is actually read. This is the mirror of the build-side
+    // guarantee above: neither side ever treats a query secret as valid.
+    expect(parseClaimLink(`https://maren.finance/claim?id=7&secret=${KEY}`)).toBeNull();
+  });
+
+  it('rejects a link with no fragment secret', () => {
+    expect(parseClaimLink('https://maren.finance/claim?id=7')).toBeNull();
+  });
+
+  it('rejects a malformed secret (wrong length)', () => {
+    expect(parseClaimLink('https://maren.finance/claim?id=7#0xdeadbeef')).toBeNull();
+  });
+
+  it('rejects a missing or non-numeric id', () => {
+    expect(parseClaimLink(`https://maren.finance/claim#${KEY}`)).toBeNull();
+    expect(parseClaimLink(`https://maren.finance/claim?id=abc#${KEY}`)).toBeNull();
+    expect(parseClaimLink(`https://maren.finance/claim?id=0#${KEY}`)).toBeNull();
+  });
+
+  it('rejects another host, a custom scheme, and http', () => {
+    expect(parseClaimLink(`https://evil.example/claim?id=7#${KEY}`)).toBeNull();
+    expect(parseClaimLink(`maren://claim?id=7#${KEY}`)).toBeNull();
+    expect(parseClaimLink(`http://maren.finance/claim?id=7#${KEY}`)).toBeNull();
+  });
+
+  it('rejects the pay path, so the two link shapes never cross', () => {
+    expect(parseClaimLink(`https://maren.finance/pay?id=7#${KEY}`)).toBeNull();
   });
 });
 

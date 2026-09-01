@@ -31,7 +31,9 @@
  *    oversight to paper over in the copy — it is what the deployed allowlist says.
  *
  * Everything else — borrow, repay, withdraw, and the rest of Pay (pay, split, createRequest,
- * fulfillRequest, claimLink) — is relayed and costs the user nothing.
+ * fulfillRequest, claimLink) — is relayed and costs the user nothing. `claimLink` being on
+ * the allowlist is the whole point of a claimable link: a brand-new recipient holding no BTC
+ * can collect the MUSD, because the relayer pays the gas.
  *
  * Every "gasless" claim in the interface is derived from this function rather than typed
  * into a screen, so a screen cannot drift into promising something the relayer will
@@ -51,7 +53,8 @@ export type ActionType =
   | 'split'
   | 'request'
   | 'link-create'
-  | 'link-reclaim';
+  | 'link-reclaim'
+  | 'link-claim';
 
 export function isSponsoredKind(type: ActionType): boolean {
   switch (type) {
@@ -74,6 +77,9 @@ export function isSponsoredKind(type: ActionType): boolean {
     case 'send':
     case 'split':
     case 'request':
+    case 'link-claim':
+      // claimLink IS on the hub's allowlist (Deploy.s.sol payCalls[9]), so a claim is relayed
+      // and gasless — a recipient with no BTC can still collect. See the rule note above.
       return true;
   }
 }

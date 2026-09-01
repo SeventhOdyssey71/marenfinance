@@ -2,7 +2,7 @@ import type { Address } from 'viem';
 
 import * as live from './live';
 import * as mock from './mock';
-import type { ActivityWindow, Balances, EarnPosition, Handle, Position } from './types';
+import type { ActivityWindow, Balances, EarnPosition, Handle, LinkState, Position } from './types';
 import type { PriceObservation } from '../chain/price';
 
 /**
@@ -75,6 +75,11 @@ export function resolveHandle(query: string): Promise<Handle | null> {
   return active().resolveHandle(query);
 }
 
+/** A claimable link's on-chain state, read before a claimer signs. See both modules. */
+export function readLink(linkId: bigint): Promise<LinkState> {
+  return active().readLink(linkId);
+}
+
 export function reverseResolve(address: Address): Promise<string | null> {
   return active().reverseResolve(address);
 }
@@ -116,4 +121,5 @@ export const mutate = {
   createRequest: () => active().mutate.createRequest(),
   createLink: (wei: bigint) => active().mutate.createLink(wei),
   reclaimLink: (linkId: bigint) => active().mutate.reclaimLink(linkId),
+  claimLink: (linkId: bigint) => active().mutate.claimLink(linkId),
 };

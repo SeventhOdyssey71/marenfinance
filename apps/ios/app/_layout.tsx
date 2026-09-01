@@ -103,6 +103,9 @@ export default function RootLayout() {
               name="scan"
               options={{ presentation: 'fullScreenModal', animation: 'fade' }}
             />
+            {/* Claiming a link is a self-contained errand a recipient arrives at from a
+                pasted or scanned link, so it presents as a card over whatever they were on. */}
+            <Stack.Screen name="claim" options={{ presentation: 'card' }} />
           </Stack>
         </View>
       </SafeAreaProvider>

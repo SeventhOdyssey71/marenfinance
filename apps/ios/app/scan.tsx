@@ -9,7 +9,8 @@ import { Icon } from '../src/components/Icon';
 import { PillButton } from '../src/components/PillButton';
 import { Label, Txt } from '../src/components/Text';
 import { base, cardShadow, radius, semanticText, space, text } from '../src/design/tokens';
-import { parsePaymentPayload } from '../src/lib/payment';
+import { parseClaimLink, parsePaymentPayload } from '../src/lib/payment';
+import { stashClaimLink } from '../src/lib/claimHandoff';
 
 /**
  * Scan to pay.
@@ -51,9 +52,20 @@ export default function Scan() {
   const onScanned = ({ data }: { data: string }) => {
     if (handled.current) return;
 
+    // A claimable-link QR (the one the Pay → Link tab shows) carries a bearer secret in its
+    // fragment. It is handed to the claim screen IN MEMORY, never as a navigation param, so the
+    // secret never ends up in anything URL-shaped. See lib/claimHandoff.
+    const claim = parseClaimLink(data);
+    if (claim) {
+      handled.current = true;
+      stashClaimLink(data);
+      router.replace('/claim');
+      return;
+    }
+
     const parsed = parsePaymentPayload(data);
     if (!parsed) {
-      setRejected('That code is not a Maren payment request.');
+      setRejected('That code is not a Maren payment request or claim link.');
       return;
     }
 

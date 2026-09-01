@@ -134,6 +134,27 @@ export interface Handle {
 }
 
 /**
+ * The on-chain state of a claimable link, from `MarenPay.links(linkId)`.
+ *
+ * Read BEFORE a claimer signs anything, so the screen can show what is really being
+ * collected and refuse a dead link honestly. `creator === address(0)` is how the mapping
+ * reports "no such link" — an id that was never created reads back all-zero, which is a
+ * different sentence from a link that exists and has been settled, and the two must not be
+ * collapsed. `claimed` and `reclaimed` are terminal; `expiry` is unix seconds.
+ */
+export interface LinkState {
+  /** The address that funded the link. Zero means the link does not exist. */
+  creator: Address;
+  /** Address of the one-time keypair whose private key is the bearer secret. */
+  linkKey: Address;
+  amountWei: bigint;
+  /** Unix seconds after which the creator (and only the creator) may reclaim. */
+  expiry: number;
+  claimed: boolean;
+  reclaimed: boolean;
+}
+
+/**
  * A list of activity, plus the span it was actually read over.
  *
  * `readActivity()` returns this rather than a bare `ActivityItem[]` because THE SPAN IS

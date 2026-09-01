@@ -5,6 +5,7 @@ import {
   getMarenAddresses,
   getMusdAddresses,
   marenEarnAbi,
+  marenPayAbi,
   marenRegistryAbi,
   marenVaultAbi,
   priceOracleAbi,
@@ -16,7 +17,7 @@ import { readActivityWindow } from '../chain/logs';
 import type { PriceObservation } from '../chain/price';
 import { getEndpointClients, getLogClient, getReadClient } from '../chain/transport';
 import { getReadContext, requireAccount } from './context';
-import type { ActivityWindow, Balances, EarnPosition, Handle, Position } from './types';
+import type { ActivityWindow, Balances, EarnPosition, Handle, LinkState, Position } from './types';
 
 /**
  * The live chain state.
@@ -315,6 +316,30 @@ export async function reverseResolve(address: Address): Promise<string | null> {
 }
 
 /**
+ * A claimable link's on-chain state, from `MarenPay.links(linkId)`.
+ *
+ * Needs no account — the mapping is public and the same for everyone — so it reads the
+ * network from `getReadContext` rather than insisting on a loaded wallet. The claim screen
+ * calls this before it signs, so a claimer sees exactly what they are collecting and a dead
+ * link (already claimed, reclaimed, expired, or never created) is caught before any gas is
+ * spent. A non-existent id reads back `creator == address(0)`, which the screen renders as
+ * "no such link" rather than as a zero-value link.
+ */
+export async function readLink(linkId: bigint): Promise<LinkState> {
+  const { network } = getReadContext();
+  const client = getReadClient(network);
+
+  const [creator, linkKey, amount, expiry, claimed, reclaimed] = await client.readContract({
+    address: getMarenAddresses(network).marenPay,
+    abi: marenPayAbi,
+    functionName: 'links',
+    args: [linkId],
+  });
+
+  return { creator, linkKey, amountWei: amount, expiry: Number(expiry), claimed, reclaimed };
+}
+
+/**
  * Activity, from `eth_getLogs`.
  *
  * Returns the window rather than the rows alone, because the span is part of the answer.
@@ -369,4 +394,5 @@ export const mutate = {
   reclaimLink(_linkId: bigint): bigint | undefined {
     return undefined;
   },
+  claimLink(_linkId: bigint): void {},
 };

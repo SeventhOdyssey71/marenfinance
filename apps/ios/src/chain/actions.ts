@@ -1,8 +1,10 @@
 import {
   createWalletClient,
   decodeEventLog,
+  encodeAbiParameters,
   encodeFunctionData,
   getAddress,
+  keccak256,
   zeroAddress,
   type Chain,
   type Hash,
@@ -96,7 +98,14 @@ export type ActionKind =
   /** Escrow MUSD to whoever holds the one-time link secret. `linkKey` is that secret's address. */
   | { type: 'link-create'; linkKey: string; musdWei: bigint; expiry: bigint; memo?: string }
   /** Take an unclaimed link back after its expiry. */
-  | { type: 'link-reclaim'; linkId: bigint };
+  | { type: 'link-reclaim'; linkId: bigint }
+  /**
+   * Collect a claimable link into the claimer's own wallet. `secret` is the one-time bearer
+   * key from the link's URL fragment: it signs the CLAIMER'S address so the payout is bound
+   * to them and an observer who saw the link cannot redirect it. It is a secret — never
+   * logged, never put in a query string, held only for the duration of this claim.
+   */
+  | { type: 'link-claim'; linkId: bigint; secret: Hex };
 
 /**
  * Whether the relayer sponsors this action.
@@ -453,6 +462,58 @@ async function buildLiveCall(
         sponsored: false,
       };
     }
+    case 'link-claim': {
+      // `claimLink` IS on the hub's allowlist (Deploy.s.sol payCalls[9]), so it is RELAYED and
+      // gasless — the whole point of a claimable link is that a brand-new recipient holding no
+      // BTC can collect the escrowed MUSD.
+      //
+      // The payout is bound to THIS claimer. MarenPay.claimLink takes the recipient explicitly
+      // and verifies an ECDSA signature by the link's one-time key over
+      // `linkClaimDigest(linkId, recipient)`, so a signature an observer copied off the wire is
+      // only ever valid for the recipient it already names — it cannot be redirected. We sign
+      // for the claimer's own loaded address (`from`).
+      const recipient = getAddress(from);
+
+      // `linkClaimDigest` = toEthSignedMessageHash(keccak256(abi.encode("MarenPay.claimLink",
+      // chainId, marenPay, linkId, recipient))). The abi.encode is reproduced exactly here; a
+      // mismatch would recover to the wrong signer and the contract would revert
+      // `InvalidLinkSignature`, spending nothing.
+      const inner = keccak256(
+        encodeAbiParameters(
+          [
+            { type: 'string' },
+            { type: 'uint256' },
+            { type: 'address' },
+            { type: 'uint256' },
+            { type: 'address' },
+          ],
+          [
+            'MarenPay.claimLink',
+            BigInt(MEZO_CHAIN_IDS[network]),
+            maren.marenPay,
+            action.linkId,
+            recipient,
+          ],
+        ),
+      );
+
+      // The bearer key signs, and only for the length of this call. `signMessage` over raw
+      // bytes applies the same EIP-191 prefix `toEthSignedMessageHash` does, so `ECDSA.recover`
+      // lands on the stored `linkKey`. The key is never logged and never leaves this scope.
+      const linkAccount = privateKeyToAccount(action.secret);
+      const signature = await linkAccount.signMessage({ message: { raw: inner } });
+
+      return {
+        to: maren.marenPay,
+        data: encodeFunctionData({
+          abi: marenPayAbi,
+          functionName: 'claimLink',
+          args: [action.linkId, recipient, signature],
+        }),
+        relayable: true,
+        sponsored: true,
+      };
+    }
   }
 }
 
@@ -603,6 +664,9 @@ function applyLocalEffect(action: ActionKind): CreatedRefs | undefined {
       return { linkId: mutate.createLink(action.musdWei) };
     case 'link-reclaim':
       mutate.reclaimLink(action.linkId);
+      return undefined;
+    case 'link-claim':
+      mutate.claimLink(action.linkId);
       return undefined;
   }
 }
