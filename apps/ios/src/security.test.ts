@@ -261,23 +261,22 @@ describe('payment QR parsing is allowlisted', () => {
 
 describe('gas sponsorship is exactly one exception, and the copy says so', () => {
   /**
-   * `MarenVault.deposit()` is payable and the relayer refuses any request carrying
-   * value, unconditionally. That makes the first deposit the one action a user pays BTC
-   * gas for. If someone later "simplifies" this to always-true, the app starts promising
-   * something the relayer will refuse — R13's failure mode, applied to a fee claim.
+   * Two actions are unsponsored, and both are grounded in the deployed contracts, not in
+   * policy we could flip in the interface:
+   *   - `MarenVault.deposit()` is payable, and the relayer refuses any request carrying
+   *     value, so the first deposit is paid by the user;
+   *   - `MarenEarn` is absent from the relay hub's allowlist (Deploy.s.sol allowlists only
+   *     MarenRegistry, MarenPay and MarenVault), so Earn settles from the user's wallet.
+   * If someone later "simplifies" either to always-true, the app starts promising gasless
+   * where the relayer will refuse — R13's failure mode, applied to a fee claim.
    */
-  it('sponsors everything except the payable deposit', () => {
-    expect(isSponsoredKind('deposit')).toBe(false);
+  it('sponsors Pay and Vault borrow/repay/withdraw; the payable deposit and Earn are not', () => {
+    const unsponsored = ['deposit', 'earn-deposit', 'earn-withdraw'] as const;
+    for (const kind of unsponsored) {
+      expect(isSponsoredKind(kind)).toBe(false);
+    }
 
-    const relayed = [
-      'withdraw',
-      'borrow',
-      'repay',
-      'send',
-      'earn-deposit',
-      'earn-withdraw',
-    ] as const;
-
+    const relayed = ['withdraw', 'borrow', 'repay', 'send'] as const;
     for (const kind of relayed) {
       expect(isSponsoredKind(kind)).toBe(true);
     }
