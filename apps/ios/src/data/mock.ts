@@ -288,6 +288,16 @@ function tick(): Promise<void> {
  * The real implementations submit a transaction and then go through
  * `confirmTransaction` before any of this state moves — see chain/actions.ts.
  */
+/**
+ * Demo id counters and the escrow the demo ledger holds against unclaimed links. The live
+ * ledger keeps none of this — the chain does — but the demo has to assign the same shaped ids
+ * `createRequest` / `createLink` would, and remember what a link escrowed so a reclaim can
+ * return it. Both start at 1, matching MarenPay's `nextRequestId`/`nextLinkId`.
+ */
+let nextRequestId = 1n;
+let nextLinkId = 1n;
+const linkEscrow = new Map<string, bigint>();
+
 export const mutate = {
   depositBtc(wei: bigint) {
     state.collateralWei += wei;
@@ -314,5 +324,30 @@ export const mutate = {
   earnWithdraw(wei: bigint) {
     state.musdWei += wei;
     state.earnSharesWei -= (wei * WAD) / 1_021_400_000_000_000_000n;
+  },
+  /** A split debits the sum of the legs, like a batch of sends. */
+  split(totalWei: bigint): bigint | undefined {
+    state.musdWei -= totalWei;
+    return undefined;
+  },
+  /** A request moves no money; it only records an ask, and hands back the id it was given. */
+  createRequest(): bigint | undefined {
+    return nextRequestId++;
+  },
+  /** A created link escrows the amount out of the spendable balance until it is claimed. */
+  createLink(wei: bigint): bigint | undefined {
+    state.musdWei -= wei;
+    const id = nextLinkId++;
+    linkEscrow.set(id.toString(), wei);
+    return id;
+  },
+  /** Reclaiming an unclaimed link returns exactly what it escrowed. */
+  reclaimLink(linkId: bigint): bigint | undefined {
+    const escrowed = linkEscrow.get(linkId.toString());
+    if (escrowed !== undefined) {
+      state.musdWei += escrowed;
+      linkEscrow.delete(linkId.toString());
+    }
+    return undefined;
   },
 };

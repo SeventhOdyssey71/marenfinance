@@ -12,7 +12,7 @@ import { isSponsoredKind } from './chain/sponsorship';
 import { classifyPrice, priceGate, usablePrice, STALE_AFTER_SECONDS } from './chain/price';
 import { gasCopy } from './lib/copy';
 import { confirmTransaction } from './chain/receipt';
-import { parsePaymentPayload, buildPaymentPayload } from './lib/payment';
+import { parsePaymentPayload, buildPaymentPayload, buildClaimLink } from './lib/payment';
 
 /**
  * Tests for the three rules the brief calls out by number.
@@ -257,26 +257,59 @@ describe('payment QR parsing is allowlisted', () => {
   });
 });
 
+describe('a claimable link keeps its secret out of the query string', () => {
+  const SECRET = '0xabc123def456';
+
+  /**
+   * The bearer secret rides in the URL FRAGMENT, never a query parameter. A fragment is
+   * never sent to a server by any browser, so the one-time key that authorises the claim
+   * cannot leak to maren.finance's logs or to a proxy in between — the same reasoning as
+   * MarenPay's own note on `createLink`. If it ever moved into a query param this fails.
+   */
+  it('puts the id in the query and the secret only in the fragment', () => {
+    const url = new URL(buildClaimLink(7n, SECRET));
+    expect(url.searchParams.get('id')).toBe('7');
+    expect(url.hash).toBe(`#${SECRET}`);
+    expect(url.search).not.toContain(SECRET);
+  });
+
+  it('never emits the secret anywhere but the fragment', () => {
+    const built = buildClaimLink(42n, SECRET);
+    const [beforeHash] = built.split('#');
+    expect(beforeHash).not.toContain(SECRET);
+  });
+});
+
 // ── The gas claim: true, or not shipped ──────────────────────────────────────
 
 describe('gas sponsorship is exactly one exception, and the copy says so', () => {
   /**
-   * Two actions are unsponsored, and both are grounded in the deployed contracts, not in
-   * policy we could flip in the interface:
+   * The unsponsored actions are grounded in the deployed contracts, not in policy we could
+   * flip in the interface:
    *   - `MarenVault.deposit()` is payable, and the relayer refuses any request carrying
    *     value, so the first deposit is paid by the user;
    *   - `MarenEarn` is absent from the relay hub's allowlist (Deploy.s.sol allowlists only
-   *     MarenRegistry, MarenPay and MarenVault), so Earn settles from the user's wallet.
-   * If someone later "simplifies" either to always-true, the app starts promising gasless
-   * where the relayer will refuse — R13's failure mode, applied to a fee claim.
+   *     MarenRegistry, MarenPay and MarenVault), so Earn settles from the user's wallet;
+   *   - `MarenPay.createLink` / `reclaimLink` are absent from that allowlist too — the
+   *     payCalls list stops at claimLink — so a claimable link is created and reclaimed from
+   *     the user's own wallet even though the rest of Pay is relayed.
+   * If someone later "simplifies" any of these to always-true, the app starts promising
+   * gasless where the relayer will refuse — R13's failure mode, applied to a fee claim.
    */
-  it('sponsors Pay and Vault borrow/repay/withdraw; the payable deposit and Earn are not', () => {
-    const unsponsored = ['deposit', 'earn-deposit', 'earn-withdraw'] as const;
+  it('sponsors the relayed Pay and Vault calls; deposit, Earn and link create/reclaim are not', () => {
+    const unsponsored = [
+      'deposit',
+      'earn-deposit',
+      'earn-withdraw',
+      'link-create',
+      'link-reclaim',
+    ] as const;
     for (const kind of unsponsored) {
       expect(isSponsoredKind(kind)).toBe(false);
     }
 
-    const relayed = ['withdraw', 'borrow', 'repay', 'send'] as const;
+    // Everything on the hub's payCalls / vault allowlist: relayed and gasless.
+    const relayed = ['withdraw', 'borrow', 'repay', 'send', 'split', 'request'] as const;
     for (const kind of relayed) {
       expect(isSponsoredKind(kind)).toBe(true);
     }

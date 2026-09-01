@@ -210,6 +210,12 @@ export interface MarenWrites {
   payHandle: (handle: string, amountWei: bigint, memo: string) => Promise<Hash>;
   /** `payer` is the zero address when anyone may fulfil the request. */
   createRequest: (payer: Address, amountWei: bigint, memo: string) => Promise<Hash>;
+  /**
+   * Pay N recipients in one call. `recipients[i]` receives `amountsWei[i]`; the arrays
+   * are index-aligned and the contract reverts `ArrayLengthMismatch` if they are not.
+   * Nothing is pooled — each leg is an independent payer -> recipient transfer.
+   */
+  splitPayment: (recipients: Address[], amountsWei: bigint[], memo: string) => Promise<Hash>;
   createLink: (
     linkKey: Address,
     amountWei: bigint,
@@ -626,6 +632,24 @@ export function useMarenWrites(options: MarenWriteOptions = {}): MarenWrites {
           publicClient,
           params,
           'createRequest',
+          () => publicClient.simulateContract({ ...params, account }),
+          () => writeContractAsync({ ...params, chainId: targetChain.id }),
+        );
+      },
+
+      async splitPayment(recipients, amountsWei, memo) {
+        const { account, publicClient } = requireSigner();
+        const params = {
+          address: maren.marenPay,
+          abi: marenPayAbi,
+          functionName: 'split',
+          args: [recipients, amountsWei, memo],
+        } as const;
+        return submitCall(
+          account,
+          publicClient,
+          params,
+          'splitPayment',
           () => publicClient.simulateContract({ ...params, account }),
           () => writeContractAsync({ ...params, chainId: targetChain.id }),
         );

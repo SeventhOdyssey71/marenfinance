@@ -112,4 +112,8 @@ export const mutate = {
   send: (wei: bigint) => active().mutate.send(wei),
   earnDeposit: (wei: bigint) => active().mutate.earnDeposit(wei),
   earnWithdraw: (wei: bigint) => active().mutate.earnWithdraw(wei),
+  split: (totalWei: bigint) => active().mutate.split(totalWei),
+  createRequest: () => active().mutate.createRequest(),
+  createLink: (wei: bigint) => active().mutate.createLink(wei),
+  reclaimLink: (linkId: bigint) => active().mutate.reclaimLink(linkId),
 };

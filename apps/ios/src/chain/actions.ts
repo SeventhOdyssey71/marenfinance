@@ -1,7 +1,9 @@
 import {
   createWalletClient,
+  decodeEventLog,
   encodeFunctionData,
   getAddress,
+  zeroAddress,
   type Chain,
   type Hash,
   type Hex,
@@ -58,8 +60,24 @@ import type { LocalAccount } from 'viem/accounts';
  * whether a relayer is configured — never faked. See `submitAction`.
  */
 
+/**
+ * Ids the chain assigns to an action that creates something, read back from the receipt.
+ *
+ * A payment request and a claimable link are only useful once you know the id the contract
+ * gave them (`nextRequestId++` / `nextLinkId++`), and that id is not known until the
+ * transaction is mined. It is NEVER guessed from `nextRequestId()` before submitting — that
+ * races every other creator on the chain — it is decoded from the `RequestCreated` /
+ * `LinkCreated` event in this transaction's own receipt. When the receipt cannot be read the
+ * ref is simply absent, and the screen says the action landed but points the user at Activity
+ * for the id rather than inventing one.
+ */
+export interface CreatedRefs {
+  readonly requestId?: bigint;
+  readonly linkId?: bigint;
+}
+
 export type ActionResult =
-  | { kind: 'ok'; outcome: Extract<TxOutcome, { kind: 'delivered' }> }
+  | { kind: 'ok'; outcome: Extract<TxOutcome, { kind: 'delivered' }>; refs?: CreatedRefs }
   | { kind: 'declined'; reason: string }
   | { kind: 'failed'; outcome: TxOutcome };
 
@@ -70,7 +88,15 @@ export type ActionKind =
   | { type: 'repay'; musdWei: bigint }
   | { type: 'send'; musdWei: bigint; to: string; memo?: string }
   | { type: 'earn-deposit'; musdWei: bigint }
-  | { type: 'earn-withdraw'; musdWei: bigint };
+  | { type: 'earn-withdraw'; musdWei: bigint }
+  /** Pay many at once. Each leg is an independent payer -> recipient transfer; nothing pools. */
+  | { type: 'split'; recipients: string[]; amounts: bigint[]; memo?: string }
+  /** Record an on-chain ask. Moves no funds; `payer` is left open so anyone may fulfil it. */
+  | { type: 'request'; musdWei: bigint; memo?: string }
+  /** Escrow MUSD to whoever holds the one-time link secret. `linkKey` is that secret's address. */
+  | { type: 'link-create'; linkKey: string; musdWei: bigint; expiry: bigint; memo?: string }
+  /** Take an unclaimed link back after its expiry. */
+  | { type: 'link-reclaim'; linkId: bigint };
 
 /**
  * Whether the relayer sponsors this action.
@@ -141,8 +167,11 @@ interface LiveCall {
  *
  *   - the payable `deposit` goes DIRECT from a walletClient carrying BTC value, because the
  *     hub reverts `ValueNotRelayable` on any value and always will;
- *   - `borrow` / `repay` / `withdraw` / `pay` are on the hub's allowlist and are RELAYED as
- *     signed `ForwardRequest`s, costing the user nothing;
+ *   - `borrow` / `repay` / `withdraw` / `pay` / `split` / `createRequest` are on the hub's
+ *     allowlist and are RELAYED as signed `ForwardRequest`s, costing the user nothing;
+ *   - `createLink` and `reclaimLink` are NOT allowlisted (Deploy.s.sol's payCalls stops at
+ *     claimLink), so they SELF-SUBMIT from the user's wallet and the user pays the BTC gas —
+ *     the same divergence as Earn, and the link screens say so in as many words;
  *   - Earn is NOT on the hub's allowlist (`MarenEarn` is absent from
  *     `Deploy.s.sol:_allowlistRelayableCalls`), so it self-submits from the user's wallet
  *     even though `sponsorship.ts` marks it sponsored. Relaying it would earn a
@@ -199,8 +228,49 @@ async function submitLive(action: ActionKind, relayerUrl: string): Promise<Actio
   });
   if (outcome.kind !== 'delivered') return { kind: 'failed', outcome };
 
-  // The chain has moved; the next read is the truth, so no optimistic local mutation.
-  return { kind: 'ok', outcome };
+  // A create-shaped action needs the id the chain assigned; it is read from this receipt's
+  // own event, never guessed. The chain has otherwise moved, and the next read is the truth,
+  // so there is no optimistic local mutation.
+  const refs = await readCreatedRefs(network, action, hash);
+  return { kind: 'ok', outcome, refs };
+}
+
+/**
+ * Decode the id a create-shaped action was given, from its own transaction receipt.
+ *
+ * Only `request` and `link-create` produce one. The `RequestCreated` / `LinkCreated` event is
+ * emitted whoever submits the call, so this works for the relayed request and the
+ * self-submitted link alike. Every failure path returns `undefined` rather than a placeholder:
+ * an id we did not read is one the screen must not pretend to have.
+ */
+async function readCreatedRefs(
+  network: MezoNetwork,
+  action: ActionKind,
+  hash: Hash,
+): Promise<CreatedRefs | undefined> {
+  if (action.type !== 'request' && action.type !== 'link-create') return undefined;
+  const marenPay = getMarenAddresses(network).marenPay.toLowerCase();
+  try {
+    const receipt = await getReadClient(network).getTransactionReceipt({ hash });
+    for (const log of receipt.logs) {
+      if (log.address.toLowerCase() !== marenPay) continue;
+      let decoded: ReturnType<typeof decodeEventLog>;
+      try {
+        decoded = decodeEventLog({ abi: marenPayAbi, data: log.data, topics: log.topics });
+      } catch {
+        continue; // Not one of MarenPay's events, or an event this ABI does not carry.
+      }
+      if (action.type === 'request' && decoded.eventName === 'RequestCreated') {
+        return { requestId: (decoded.args as { requestId: bigint }).requestId };
+      }
+      if (action.type === 'link-create' && decoded.eventName === 'LinkCreated') {
+        return { linkId: (decoded.args as { linkId: bigint }).linkId };
+      }
+    }
+    return undefined;
+  } catch {
+    return undefined;
+  }
 }
 
 /**
@@ -322,6 +392,67 @@ async function buildLiveCall(
         sponsored: false,
       };
     }
+    case 'split': {
+      // `split` IS on the hub's allowlist (Deploy.s.sol payCalls[8]), so it is relayed and
+      // gasless. Recipients arrive already resolved to addresses; `getAddress` throws on
+      // anything else, which is caught and declined rather than sent. Each leg moves funds
+      // under the payer's own MUSD allowance, exactly as `pay` does — nothing is pooled.
+      return {
+        to: maren.marenPay,
+        data: encodeFunctionData({
+          abi: marenPayAbi,
+          functionName: 'split',
+          args: [action.recipients.map((r) => getAddress(r)), action.amounts, action.memo ?? ''],
+        }),
+        relayable: true,
+        sponsored: true,
+      };
+    }
+    case 'request': {
+      // `createRequest` IS allowlisted (payCalls[4]) and moves no funds, so it is relayed and
+      // gasless. `payer` is left as the zero address so anyone may fulfil the ask.
+      return {
+        to: maren.marenPay,
+        data: encodeFunctionData({
+          abi: marenPayAbi,
+          functionName: 'createRequest',
+          args: [zeroAddress, action.musdWei, action.memo ?? ''],
+        }),
+        relayable: true,
+        sponsored: true,
+      };
+    }
+    case 'link-create': {
+      // `createLink` is NOT on the allowlist (Deploy.s.sol payCalls stops at claimLink; create
+      // and reclaim are absent), so it SELF-SUBMITS and the creator pays the BTC gas. It also
+      // escrows MUSD via transferFrom, so it needs a prior MUSD allowance to MarenPay, exactly
+      // as `pay` and `split` do. The copy on the review step says the gas is the user's.
+      return {
+        to: maren.marenPay,
+        data: encodeFunctionData({
+          abi: marenPayAbi,
+          functionName: 'createLink',
+          args: [getAddress(action.linkKey), action.musdWei, action.expiry, action.memo ?? ''],
+        }),
+        relayable: false,
+        sponsored: false,
+      };
+    }
+    case 'link-reclaim': {
+      // `reclaimLink` is also absent from the allowlist, so it too self-submits and the creator
+      // pays the gas. The contract reverts before its expiry, so the UI only offers this once
+      // the chosen expiry has passed.
+      return {
+        to: maren.marenPay,
+        data: encodeFunctionData({
+          abi: marenPayAbi,
+          functionName: 'reclaimLink',
+          args: [action.linkId],
+        }),
+        relayable: false,
+        sponsored: false,
+      };
+    }
   }
 }
 
@@ -431,26 +562,48 @@ async function submitSimulated(action: ActionKind): Promise<ActionResult> {
 
   if (outcome.kind !== 'delivered') return { kind: 'failed', outcome };
 
-  applyLocalEffect(action);
-  return { kind: 'ok', outcome };
+  const refs = applyLocalEffect(action);
+  return { kind: 'ok', outcome, refs };
 }
 
-function applyLocalEffect(action: ActionKind): void {
+/**
+ * Move the in-memory demo ledger and, for a create-shaped action, return the id the demo
+ * assigned. The live path never calls this — the chain has already moved — and reads its ids
+ * back from the receipt instead. See `mock.ts:mutate` for the counters these ids come from.
+ */
+function applyLocalEffect(action: ActionKind): CreatedRefs | undefined {
   switch (action.type) {
     case 'deposit':
-      return mutate.depositBtc(action.btcWei);
+      mutate.depositBtc(action.btcWei);
+      return undefined;
     case 'withdraw':
-      return mutate.withdrawBtc(action.btcWei);
+      mutate.withdrawBtc(action.btcWei);
+      return undefined;
     case 'borrow':
-      return mutate.borrow(action.musdWei);
+      mutate.borrow(action.musdWei);
+      return undefined;
     case 'repay':
-      return mutate.repay(action.musdWei);
+      mutate.repay(action.musdWei);
+      return undefined;
     case 'send':
-      return mutate.send(action.musdWei);
+      mutate.send(action.musdWei);
+      return undefined;
     case 'earn-deposit':
-      return mutate.earnDeposit(action.musdWei);
+      mutate.earnDeposit(action.musdWei);
+      return undefined;
     case 'earn-withdraw':
-      return mutate.earnWithdraw(action.musdWei);
+      mutate.earnWithdraw(action.musdWei);
+      return undefined;
+    case 'split':
+      mutate.split(action.amounts.reduce((sum, a) => sum + a, 0n));
+      return undefined;
+    case 'request':
+      return { requestId: mutate.createRequest() };
+    case 'link-create':
+      return { linkId: mutate.createLink(action.musdWei) };
+    case 'link-reclaim':
+      mutate.reclaimLink(action.linkId);
+      return undefined;
   }
 }
 

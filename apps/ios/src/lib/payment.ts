@@ -63,3 +63,23 @@ export function buildPaymentPayload(to: string, amount?: string): string {
   if (amount && /^\d+(\.\d+)?$/.test(amount)) url.searchParams.set('amount', amount);
   return url.toString();
 }
+
+/**
+ * Build the shareable link for a claimable payment.
+ *
+ * THE SECRET GOES IN THE FRAGMENT, DELIBERATELY. `#secret` is never sent to a server by any
+ * browser — it stays on the device that opens the link — so the one-time private key that
+ * authorises the claim does not leak to `maren.finance`'s logs or to any proxy in between.
+ * This mirrors MarenPay's own design note on `createLink`: the private key travels in the URL
+ * fragment and never touches the chain until the claimer signs their own address with it.
+ *
+ * The id is the on-chain `linkId`. Both are required; a link missing either cannot be claimed.
+ * The secret is a bearer token — anyone holding this string can claim the funds — so it is
+ * shown once, shared by the user, and never logged.
+ */
+export function buildClaimLink(linkId: bigint, secret: string): string {
+  const url = new URL(`https://${PAYMENT_HOST}/claim`);
+  url.searchParams.set('id', linkId.toString());
+  url.hash = secret;
+  return url.toString();
+}

@@ -6,7 +6,7 @@ import * as Linking from 'expo-linking';
 import { getChain, shortHash } from '@maren/sdk';
 
 import { describeOutcome, type TxOutcome } from '../chain/receipt';
-import { submitAction, type ActionKind } from '../chain/actions';
+import { submitAction, type ActionKind, type CreatedRefs } from '../chain/actions';
 import { base, brand, modalShadow, radius, semantic, semanticText, space } from '../design/tokens';
 import { useAppStore } from '../state/store';
 import { Icon } from './Icon';
@@ -38,7 +38,7 @@ export interface TxRunner {
   dismiss: () => void;
 }
 
-export function useTxRunner(onDelivered?: () => void): TxRunner {
+export function useTxRunner(onDelivered?: (refs?: CreatedRefs) => void): TxRunner {
   const [state, setState] = useState<TxPhase>({ phase: 'idle' });
   const queryClient = useQueryClient();
 
@@ -80,7 +80,10 @@ export function useTxRunner(onDelivered?: () => void): TxRunner {
          * figures from before it, which is the whole ordering argument in `actions.ts`.
          */
         queryClient.invalidateQueries();
-        onDelivered?.();
+        // The created id (a request or link) rides along so a flow can move to its share step
+        // with the real, chain-assigned id rather than one it guessed. Undefined for every
+        // other action, and undefined too when the receipt could not be decoded.
+        onDelivered?.(result.refs);
       } else {
         Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error).catch(() => {});
       }

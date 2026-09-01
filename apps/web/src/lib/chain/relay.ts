@@ -311,6 +311,9 @@ export const WRITE_ACTIONS = {
   payAddress: { target: 'marenPay', functionName: 'pay', carriesValue: false },
   payHandle: { target: 'marenPay', functionName: 'payToHandle', carriesValue: false },
   createRequest: { target: 'marenPay', functionName: 'createRequest', carriesValue: false },
+  // On the hub's allowlist (Deploy.s.sol payCalls[8]), so a split is sponsorable when a
+  // relayer is live — the same free-tier path pay/payToHandle/createRequest take.
+  splitPayment: { target: 'marenPay', functionName: 'split', carriesValue: false },
   // On the hub's allowlist for `claimLink` but not `createLink`. Recorded rather than
   // quietly omitted, so the absence is visible to whoever next reads the deploy script.
   createLink: { target: 'marenPay', functionName: 'createLink', carriesValue: false },

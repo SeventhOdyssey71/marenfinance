@@ -354,4 +354,19 @@ export const mutate = {
   send(_wei: bigint) {},
   earnDeposit(_wei: bigint) {},
   earnWithdraw(_wei: bigint) {},
+  // The chain has already moved, so live does nothing and reads its ids back from the
+  // receipt (see chain/actions.ts:readCreatedRefs). Same names and arities as mock.ts, which
+  // data/parity.test.ts enforces so the source switch stays safe.
+  split(_totalWei: bigint): bigint | undefined {
+    return undefined;
+  },
+  createRequest(): bigint | undefined {
+    return undefined;
+  },
+  createLink(_wei: bigint): bigint | undefined {
+    return undefined;
+  },
+  reclaimLink(_linkId: bigint): bigint | undefined {
+    return undefined;
+  },
 };

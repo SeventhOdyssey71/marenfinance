@@ -24,8 +24,14 @@
  *    pays to discover. Making Earn gasless is a redeploy (add MarenEarn to that allowlist),
  *    not a copy change, so this stays honest until that ships.
  *
- * Everything else — borrow, repay, withdraw and all of Pay — is relayed and costs the user
- * nothing.
+ *    THE SAME IS TRUE OF TWO PAY CALLS. `_allowlistRelayableCalls` lists MarenPay's payCalls
+ *    exactly, and `createLink` and `reclaimLink` are NOT among them (the list stops at
+ *    `claimLink`). So a claimable link is created and reclaimed from the user's own wallet
+ *    and they pay the BTC gas, even though every other Pay call is relayed. This is not an
+ *    oversight to paper over in the copy — it is what the deployed allowlist says.
+ *
+ * Everything else — borrow, repay, withdraw, and the rest of Pay (pay, split, createRequest,
+ * fulfillRequest, claimLink) — is relayed and costs the user nothing.
  *
  * Every "gasless" claim in the interface is derived from this function rather than typed
  * into a screen, so a screen cannot drift into promising something the relayer will
@@ -35,7 +41,17 @@
  */
 
 export type ActionType =
-  'deposit' | 'withdraw' | 'borrow' | 'repay' | 'send' | 'earn-deposit' | 'earn-withdraw';
+  | 'deposit'
+  | 'withdraw'
+  | 'borrow'
+  | 'repay'
+  | 'send'
+  | 'earn-deposit'
+  | 'earn-withdraw'
+  | 'split'
+  | 'request'
+  | 'link-create'
+  | 'link-reclaim';
 
 export function isSponsoredKind(type: ActionType): boolean {
   switch (type) {
@@ -47,10 +63,17 @@ export function isSponsoredKind(type: ActionType): boolean {
       // MarenEarn is not on the relay hub's allowlist, so Earn settles from the user's
       // own wallet and they pay the BTC gas. See rule 2 above.
       return false;
+    case 'link-create':
+    case 'link-reclaim':
+      // createLink / reclaimLink are absent from the allowlist, so they self-submit and the
+      // user pays the BTC gas. See rule 2 above.
+      return false;
     case 'withdraw':
     case 'borrow':
     case 'repay':
     case 'send':
+    case 'split':
+    case 'request':
       return true;
   }
 }
