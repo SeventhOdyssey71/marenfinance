@@ -37,7 +37,8 @@ const linkCreated = (creator, amount, block, idx = 0) =>
   log('LinkCreated', { creator, amount: BigInt(amount) }, block, idx);
 const linkClaimed = (recipient, amount, block, idx = 0) =>
   log('LinkClaimed', { recipient, amount: BigInt(amount) }, block, idx);
-const handle = (node, owner, block, idx = 0) => log('HandleRegistered', { node, owner }, block, idx);
+const handle = (node, owner, block, idx = 0) =>
+  log('HandleRegistered', { node, owner }, block, idx);
 
 describe('primitives', () => {
   it('distinctByField folds case and skips non-strings', () => {
@@ -61,9 +62,15 @@ describe('primitives', () => {
   });
 
   it('comparePosition orders by block then logIndex', () => {
-    expect(comparePosition({ blockNumber: 1n, logIndex: 9 }, { blockNumber: 2n, logIndex: 0 })).toBeLessThan(0);
-    expect(comparePosition({ blockNumber: 5n, logIndex: 2 }, { blockNumber: 5n, logIndex: 1 })).toBeGreaterThan(0);
-    expect(comparePosition({ blockNumber: 5n, logIndex: 1 }, { blockNumber: 5n, logIndex: 1 })).toBe(0);
+    expect(
+      comparePosition({ blockNumber: 1n, logIndex: 9 }, { blockNumber: 2n, logIndex: 0 }),
+    ).toBeLessThan(0);
+    expect(
+      comparePosition({ blockNumber: 5n, logIndex: 2 }, { blockNumber: 5n, logIndex: 1 }),
+    ).toBeGreaterThan(0);
+    expect(
+      comparePosition({ blockNumber: 5n, logIndex: 1 }, { blockNumber: 5n, logIndex: 1 }),
+    ).toBe(0);
   });
 });
 
@@ -140,7 +147,10 @@ describe('newAddressClaims (growth loop)', () => {
     const newClaim = linkClaimed(C, 1n, 10, 0);
     const oldClaim = linkClaimed(A, 1n, 11, 0);
     const all = [deposited(A, 1), newClaim, oldClaim];
-    expect(newAddressClaims([newClaim, oldClaim], all)).toEqual({ totalClaims: 2, brandNewClaims: 1 });
+    expect(newAddressClaims([newClaim, oldClaim], all)).toEqual({
+      totalClaims: 2,
+      brandNewClaims: 1,
+    });
   });
 });
 

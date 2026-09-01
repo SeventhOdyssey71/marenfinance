@@ -12,11 +12,13 @@ import { Btc, Musd, Ratio, Usd } from '../../src/components/Money';
 import { Card } from '../../src/components/Card';
 import { DemoNotice, ReadFailure } from '../../src/components/DataNotice';
 import { HealthScale } from '../../src/components/HealthScale';
-import { Icon } from '../../src/components/Icon';
+import { Icon, type IconName } from '../../src/components/Icon';
 import { PriceBanner } from '../../src/components/PriceBanner';
 import { StatRow } from '../../src/components/Row';
 import { Screen } from '../../src/components/Screen';
+import { Sparkline } from '../../src/components/Sparkline';
 import { Label, Num, Txt } from '../../src/components/Text';
+import { TraceOutline } from '../../src/components/TraceOutline';
 import {
   base,
   brand,
@@ -38,6 +40,7 @@ import {
   usePrice,
   usePrimaryHandle,
 } from '../../src/hooks/useChainData';
+import { useSessionPriceSeries } from '../../src/hooks/usePriceSamples';
 import { useAppStore } from '../../src/state/store';
 
 /**
@@ -61,6 +64,9 @@ export default function Home() {
   const demo = useAppStore((s) => s.dataSource === 'mock');
 
   const price = usePrice();
+  // This session's live oracle observations, folded in as they poll — the only honest
+  // series behind the sparkline. No indexer, no history, nothing back-filled.
+  const priceSeries = useSessionPriceSeries(price);
   const { data: position, error: positionError, refetch: refetchPosition } = usePosition();
   const { data: balances, error: balancesError } = useBalances();
   const health = useHealth();
@@ -135,6 +141,12 @@ export default function Home() {
 
       {/* Hero: position health */}
       <Card style={styles.hero}>
+        {/*
+          The one trace-outline accent in the app, on the one card the whole screen is
+          built around. Kept quiet — a low-alpha violet dash, slowly marching — so it reads
+          as a highlight rather than a warning. Under reduce-motion it renders static.
+        */}
+        <TraceOutline color="rgba(91,61,245,0.35)" cornerRadius={13} inset={5} animated />
         <View style={styles.heroTop}>
           <Label>Position health</Label>
           {health ? (
@@ -206,6 +218,18 @@ export default function Home() {
       {price.state === 'live' ? (
         <View style={styles.ticker}>
           <PriceBanner feed={price} />
+          {/*
+            The sparkline traces THIS SESSION's live observations only — the samples the
+            15s poll has actually seen since the app opened — so it is labelled as such and
+            never dressed up as price history. It appears once there are at least two real
+            points to join; before that there is no honest line to draw.
+          */}
+          {priceSeries.length >= 2 ? (
+            <View style={styles.tickerTrend}>
+              <Sparkline data={priceSeries} color={text.muted} width={72} height={22} />
+              <Label style={styles.tickerTrendLabel}>This session</Label>
+            </View>
+          ) : null}
         </View>
       ) : null}
 
@@ -218,7 +242,7 @@ export default function Home() {
             accessibilityLabel={`Bitcoin collateral ${position ? formatBtc(position.collateralWei) : 'unknown'}`}
             value={
               position ? (
-                <Btc wei={position.collateralWei} size="numericMd" hidden={hidden} />
+                <Btc wei={position.collateralWei} size="numericMd" hidden={hidden} dimFraction />
               ) : (
                 <Dash />
               )
@@ -228,7 +252,11 @@ export default function Home() {
           <StatRow
             label="MUSD balance"
             value={
-              balances ? <Musd wei={balances.musdWei} size="numericMd" hidden={hidden} /> : <Dash />
+              balances ? (
+                <Musd wei={balances.musdWei} size="numericMd" hidden={hidden} dimFraction />
+              ) : (
+                <Dash />
+              )
             }
             sub={
               <Txt variant="small" tone="muted">
@@ -245,8 +273,13 @@ export default function Home() {
         </View>
       </Card>
 
-      {/* Quick actions */}
-      <View style={styles.actions}>
+      {/*
+        Quick actions as one grouped floating pill — a surfaceInset track carrying four
+        icon+label segments, per the reference toolbar. It sits in the page flow rather
+        than pinned, so it can never ride over the tab bar, and each segment clears the
+        44pt target. Routing is unchanged; this is dressing only.
+      */}
+      <View style={styles.actionBar}>
         <QuickAction icon="send" label="Send" onPress={() => router.push('/(tabs)/pay')} />
         <QuickAction icon="scan" label="Scan" onPress={() => router.push('/scan')} />
         <QuickAction icon="plus" label="Borrow" onPress={() => router.push('/(tabs)/vault')} />
@@ -340,7 +373,7 @@ function QuickAction({
   label,
   onPress,
 }: {
-  icon: 'send' | 'scan' | 'plus' | 'earn';
+  icon: Extract<IconName, 'send' | 'scan' | 'plus' | 'earn'>;
   label: string;
   onPress: () => void;
 }) {
@@ -349,11 +382,13 @@ function QuickAction({
       onPress={onPress}
       accessibilityRole="button"
       accessibilityLabel={label}
-      style={({ pressed }) => [styles.quickAction, pressed && styles.pressed]}
+      hitSlop={6}
+      // The pressed segment lifts to a white raised chip inside the inset track — the same
+      // affordance the segmented control uses, so a tap reads as "this one" the moment it
+      // lands rather than only as a dim.
+      style={({ pressed }) => [styles.actionSeg, pressed && styles.actionSegPressed]}
     >
-      <View style={styles.quickIcon}>
-        <Icon name={icon} size={19} color={text.primary} />
-      </View>
+      <Icon name={icon} size={20} color={text.primary} />
       <Txt variant="small" tone="muted">
         {label}
       </Txt>
@@ -419,26 +454,40 @@ const styles = StyleSheet.create({
   },
   blockedText: { flex: 1 },
   priceState: { marginTop: space.lg },
-  ticker: { marginBottom: space.xl, paddingHorizontal: space.xs },
-  sectionLabel: { marginBottom: space.md },
-  balances: { paddingHorizontal: space.xl, marginBottom: space.xl },
-  balanceBlock: { paddingVertical: space.xs },
-  actions: {
+  ticker: {
     flexDirection: 'row',
+    alignItems: 'center',
     justifyContent: 'space-between',
     gap: space.md,
     marginBottom: space.xl,
+    paddingHorizontal: space.xs,
   },
-  quickAction: { flex: 1, alignItems: 'center', gap: space.sm },
-  quickIcon: {
-    width: 52,
-    height: 52,
+  tickerTrend: { alignItems: 'flex-end', gap: 2 },
+  tickerTrendLabel: { fontSize: 10, letterSpacing: 0.5 },
+  sectionLabel: { marginBottom: space.md },
+  balances: { paddingHorizontal: space.xl, marginBottom: space.xl },
+  balanceBlock: { paddingVertical: space.xs },
+  /** The grouped floating pill: an inset track with the card's own soft drop. */
+  actionBar: {
+    flexDirection: 'row',
+    backgroundColor: base.surfaceInset,
     borderRadius: radius.pill,
-    backgroundColor: base.surface,
-    alignItems: 'center',
-    justifyContent: 'center',
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: base.border,
+    padding: 6,
+    marginBottom: space.xl,
     ...cardShadow,
   },
+  actionSeg: {
+    flex: 1,
+    minHeight: 56,
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 5,
+    paddingVertical: space.sm,
+    borderRadius: radius.pill,
+  },
+  actionSegPressed: { backgroundColor: base.surfaceRaised },
   gasNote: { marginBottom: space.xl },
   gasHead: { flexDirection: 'row', alignItems: 'center', gap: space.sm },
   gasBody: { marginTop: space.sm },

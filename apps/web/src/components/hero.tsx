@@ -1,7 +1,7 @@
 import { PillButton } from './ui/pill-button';
 import { EyebrowPill } from './ui/section';
 import { ArrowUpRight } from './ui/icons';
-import { HeroMesh } from './shaders/hero-mesh';
+import { HeroScene } from './three/hero-scene';
 
 /**
  * Three facts, each one readable off the contracts today.
@@ -20,7 +20,7 @@ const heroFacts = [
 export function Hero() {
   return (
     <section className="relative isolate overflow-hidden" aria-labelledby="hero-title">
-      <HeroMesh />
+      <HeroScene />
 
       {/* Legibility floor: the shader never sits under copy below 4.5:1.
           The copy is centred, so the scrim is centre-weighted rather than

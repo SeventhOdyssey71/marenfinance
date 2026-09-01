@@ -19,10 +19,7 @@
         "groups": [
           {
             "group": "Get started",
-            "pages": [
-              "get-started/introduction",
-              "get-started/quickstart"
-            ]
+            "pages": ["get-started/introduction", "get-started/quickstart"]
           },
           {
             "group": "The product",
@@ -45,25 +42,15 @@
           },
           {
             "group": "Reference",
-            "pages": [
-              "reference/contracts",
-              "reference/networks",
-              "reference/sdk"
-            ]
+            "pages": ["reference/contracts", "reference/networks", "reference/sdk"]
           },
           {
             "group": "Security",
-            "pages": [
-              "security/risk",
-              "security/audits"
-            ]
+            "pages": ["security/risk", "security/audits"]
           },
           {
             "group": "Developers",
-            "pages": [
-              "developers/run-locally",
-              "developers/verify-on-chain"
-            ]
+            "pages": ["developers/run-locally", "developers/verify-on-chain"]
           }
         ]
       }

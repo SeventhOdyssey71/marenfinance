@@ -23,7 +23,7 @@ export function Sidebar({ nav, onNavigate }: { nav: SidebarGroup[]; onNavigate?:
                 href={page.href}
                 onClick={onNavigate}
                 aria-current={active ? 'page' : undefined}
-                className={`doc-navlink${active ? ' is-active' : ''}`}
+                className={`doc-navlink${active ? 'is-active' : ''}`}
               >
                 {page.title}
               </Link>

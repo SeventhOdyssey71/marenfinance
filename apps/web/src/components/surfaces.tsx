@@ -1,5 +1,6 @@
 import { Section, Eyebrow } from './ui/section';
 import { Reveal } from './ui/reveal';
+import { TraceOutline } from './ui/trace-outline';
 import { VaultIcon, PayIcon, EarnIcon, PortfolioIcon } from './ui/icons';
 
 export function Surfaces() {
@@ -20,7 +21,8 @@ export function Surfaces() {
                 differentiator card read a shade lighter than the three beside it, which
                 is the filled-panel look this pass exists to remove — at a larger scale
                 than the fill itself. */}
-            <article className="card relative h-full overflow-hidden p-6 md:p-8">
+            <article className="card relative h-full p-6 md:p-8">
+              <TraceOutline />
               <div className="relative flex h-full flex-col">
                 <div className="flex items-center gap-3.5">
                   <span className="grid size-10 shrink-0 place-items-center rounded-[var(--radius-pill)] border border-[var(--border-hairline)] text-violet-400">

@@ -40,7 +40,7 @@ export function Toc({ items }: { items: TocEntry[] }) {
         <a
           key={item.id}
           href={`#${item.id}`}
-          className={`doc-toc-link doc-toc-d${item.depth}${active === item.id ? ' is-on' : ''}`}
+          className={`doc-toc-link doc-toc-d${item.depth}${active === item.id ? 'is-on' : ''}`}
         >
           {item.text}
         </a>

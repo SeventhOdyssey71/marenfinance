@@ -55,6 +55,14 @@ export interface AmountProps {
   hidden?: boolean;
   /** Suppress the semantic colour where the surrounding row already carries it. */
   plain?: boolean;
+  /**
+   * Grey the fractional part (the ".24" in "$42,890.24") so the eye lands on the whole
+   * number first — the reference wallet's hero-numeral treatment. Defaults on at the two
+   * hero sizes (`numericXl`/`numericLg`) and off everywhere else, so a row of small
+   * figures does not get a second colour it did not ask for. Opt in explicitly at
+   * `numericMd` where a balance is still the loudest thing on its card.
+   */
+  dimFraction?: boolean;
 }
 
 /**
@@ -69,6 +77,7 @@ export function Amount({
   unitTone,
   hidden = false,
   align = 'right',
+  dimFraction,
 }: {
   /** Already formatted by an @maren/sdk formatter, unit included. */
   value: string;
@@ -76,9 +85,21 @@ export function Amount({
   unitTone: 'btc' | 'musd' | 'muted' | 'primary';
   hidden?: boolean;
   align?: 'left' | 'right';
+  dimFraction?: boolean;
 }) {
   const shown = hidden ? mask(value) : value;
   const [numeral, unit] = splitUnit(shown);
+
+  // Default the treatment on at the hero sizes, off below them. A masked value has no
+  // decimal point to dim, so it falls through splitFraction unchanged either way.
+  const dim = (dimFraction ?? (size === 'numericXl' || size === 'numericLg')) && !hidden;
+  const [intPart, fracPart] = dim ? splitFraction(numeral) : [numeral, null];
+  /**
+   * The greyed run must still be legible, so which grey it takes follows the WCAG split
+   * in tokens.ts: `subtle` (#82828C) only clears 3:1, so it is used at the two sizes that
+   * are large text (≥24px); everything smaller takes `muted`, which clears 4.5:1.
+   */
+  const fractionTone = size === 'numericXl' || size === 'numericLg' ? 'subtle' : 'muted';
 
   return (
     <View
@@ -87,7 +108,12 @@ export function Amount({
       accessibilityLabel={spoken(value, hidden)}
     >
       <Num size={size} tone="primary" accessibilityElementsHidden>
-        {numeral}
+        {intPart}
+        {fracPart ? (
+          <Num size={size} tone={fractionTone} accessibilityElementsHidden>
+            {fracPart}
+          </Num>
+        ) : null}
       </Num>
       {unit ? (
         <Num size={unitSizeFor[size]} tone={unitTone} accessibilityElementsHidden>
@@ -105,6 +131,7 @@ export function Btc({
   hidden = false,
   plain = false,
   align,
+  dimFraction,
 }: AmountProps & { align?: 'left' | 'right' }) {
   return (
     <Amount
@@ -113,6 +140,7 @@ export function Btc({
       unitTone={plain ? 'muted' : 'btc'}
       hidden={hidden}
       align={align}
+      dimFraction={dimFraction}
     />
   );
 }
@@ -124,6 +152,7 @@ export function Musd({
   hidden = false,
   plain = false,
   align,
+  dimFraction,
 }: AmountProps & { align?: 'left' | 'right' }) {
   return (
     <Amount
@@ -132,6 +161,7 @@ export function Musd({
       unitTone={plain ? 'muted' : 'musd'}
       hidden={hidden}
       align={align}
+      dimFraction={dimFraction}
     />
   );
 }
@@ -203,6 +233,20 @@ function splitUnit(value: string): [string, string | null] {
   if (at < 0) return [value, null];
   const tail = value.slice(at + 1);
   return /^[A-Za-z]+$/.test(tail) ? [value.slice(0, at), tail] : [value, null];
+}
+
+/**
+ * Split a numeral into its integer part and its fractional tail, including the point:
+ * "1,234.56" → ["1,234", ".56"], "$31,358.50" → ["$31,358", ".50"], "42" → ["42", null].
+ *
+ * Splits on the LAST '.', so a thousands separator that is a dot in some locales would
+ * still leave the true fraction alone — the SDK formatters use a comma, so this is belt
+ * and braces rather than a live concern.
+ */
+function splitFraction(numeral: string): [string, string | null] {
+  const at = numeral.lastIndexOf('.');
+  if (at < 0) return [numeral, null];
+  return [numeral.slice(0, at), numeral.slice(at)];
 }
 
 function mask(value: string): string {

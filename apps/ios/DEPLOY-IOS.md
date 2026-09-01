@@ -21,14 +21,14 @@ Expo's macOS machines in the cloud, so you do not need Xcode or a Mac to produce
 
 ## What is free and what needs the paid Apple account
 
-| Step | Cost |
-| --- | --- |
-| Install EAS CLI, `eas login`, `eas build:configure` | Free (needs a free Expo account) |
-| `eas build --profile development` (simulator build) | Free of Apple; runs on EAS |
-| Apple Developer Program enrolment | **Paid: 99 USD per year** |
-| `eas build --profile production` (signed, real device) | Needs the paid Apple account |
-| `eas submit --profile production` (upload to TestFlight) | Needs the paid Apple account |
-| Adding testers in TestFlight | Free once enrolled |
+| Step                                                     | Cost                             |
+| -------------------------------------------------------- | -------------------------------- |
+| Install EAS CLI, `eas login`, `eas build:configure`      | Free (needs a free Expo account) |
+| `eas build --profile development` (simulator build)      | Free of Apple; runs on EAS       |
+| Apple Developer Program enrolment                        | **Paid: 99 USD per year**        |
+| `eas build --profile production` (signed, real device)   | Needs the paid Apple account     |
+| `eas submit --profile production` (upload to TestFlight) | Needs the paid Apple account     |
+| Adding testers in TestFlight                             | Free once enrolled               |
 
 The Apple Developer Program is the only paid piece. Everything on the Expo side is free
 for the volume a handful of TestFlight testers needs.

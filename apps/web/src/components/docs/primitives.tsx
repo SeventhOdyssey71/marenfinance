@@ -30,7 +30,12 @@ export function Card({
     const external = /^https?:/.test(rewritten);
     if (external) {
       return (
-        <a className="doc-card doc-card-link" href={rewritten} target="_blank" rel="noreferrer noopener">
+        <a
+          className="doc-card doc-card-link"
+          href={rewritten}
+          target="_blank"
+          rel="noreferrer noopener"
+        >
           {inner}
         </a>
       );
@@ -165,7 +170,11 @@ export function ParamField(props: {
   children?: ReactNode;
 }) {
   const name = props.name ?? props.query ?? props.path ?? props.body;
-  return <Field name={name} type={props.type} required={props.required} defaultValue={props.default}>{props.children}</Field>;
+  return (
+    <Field name={name} type={props.type} required={props.required} defaultValue={props.default}>
+      {props.children}
+    </Field>
+  );
 }
 
 /* -------------------------------------------------------------------------- */
@@ -205,7 +214,16 @@ export function Accordion({
       <summary className="doc-acc-summary">
         {icon ? <DocIcon name={icon} className="doc-acc-icon" /> : null}
         <span className="doc-acc-title">{title}</span>
-        <svg className="doc-acc-chev" viewBox="0 0 24 24" width="16" height="16" aria-hidden fill="none" stroke="currentColor" strokeWidth={2}>
+        <svg
+          className="doc-acc-chev"
+          viewBox="0 0 24 24"
+          width="16"
+          height="16"
+          aria-hidden
+          fill="none"
+          stroke="currentColor"
+          strokeWidth={2}
+        >
           <path d="m9 6 6 6-6 6" />
         </svg>
       </summary>

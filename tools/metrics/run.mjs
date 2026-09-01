@@ -288,6 +288,8 @@ async function main() {
 
 main().catch((error) => {
   console.error(`\nmetrics scan failed: ${error.message}`);
-  console.error('This is a real failure (transport or config), not an empty result. Nothing was fabricated.');
+  console.error(
+    'This is a real failure (transport or config), not an empty result. Nothing was fabricated.',
+  );
   exit(1);
 });

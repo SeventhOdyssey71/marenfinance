@@ -1,19 +1,33 @@
 import { useState } from 'react';
-import { Pressable, StyleSheet, TextInput, View } from 'react-native';
+import { Modal, Pressable, Share, StyleSheet, TextInput, View } from 'react-native';
 import { useQuery } from '@tanstack/react-query';
 import { useLocalSearchParams, useRouter } from 'expo-router';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as Clipboard from 'expo-clipboard';
 import QRCode from 'react-native-qrcode-svg';
 import { formatMusd, shortAddress } from '@maren/sdk';
 
-import { Musd } from '../../src/components/Money';
+import { Amount, Musd } from '../../src/components/Money';
+import { AmountPad } from '../../src/components/AmountPad';
 import { Card } from '../../src/components/Card';
 import { Icon } from '../../src/components/Icon';
 import { PillButton } from '../../src/components/PillButton';
+import { StatRow } from '../../src/components/Row';
 import { Screen } from '../../src/components/Screen';
 import { Label, Num, Txt } from '../../src/components/Text';
 import { TxSheet, useTxRunner } from '../../src/components/TxSheet';
-import { base, brand, radius, semanticText, space, text } from '../../src/design/tokens';
+import { isSponsored } from '../../src/chain/actions';
+import {
+  base,
+  brand,
+  hit,
+  modalShadow,
+  radius,
+  semantic,
+  semanticText,
+  space,
+  text,
+} from '../../src/design/tokens';
 import { fonts } from '../../src/design/type';
 import { resolveHandle } from '../../src/data/source';
 import type { Handle } from '../../src/data/types';
@@ -27,15 +41,16 @@ type Tab = 'send' | 'request';
 /**
  * Pay — send MUSD to a @handle or address, request, and scan to pay.
  *
- * The gasless claim is made once, prominently, and it is specific: the relayer pays the
- * BTC gas, so the user pays none. TALISE-BLUEPRINT §7 #36 is explicit that we must
- * decide between "say $0 truthfully" and "show gas in sats" — every payment goes through
- * MarenForwarder, so $0 is the true statement here.
+ * Send is a stepper, ported from the reference wallet's choreography: Amount → Recipient
+ * → Review, then the shared TxSheet's Submitting → Delivered/Declined/Failed. The stepper
+ * only gathers and confirms; it never signs or reads a receipt itself. The one commit
+ * goes through the existing `useTxRunner`/`submitAction` pipeline, which is the single
+ * place a receipt is checked (R15) — so this screen cannot invent a success the chain did
+ * not return.
  *
- * It is true *here*. It is not true of the first deposit, which is payable and therefore
- * cannot be relayed, and the Vault screen says so just as plainly. Both screens read
- * their wording from `gasCopy` and their sponsorship from `isSponsored`, so neither can
- * quietly start promising the other's terms.
+ * The gasless claim is made on Review, once, from `gasCopy` and gated on the SAME
+ * `isSponsored` the submit path routes by. A send goes through MarenPay on the relayer's
+ * allowlist, so it is truthfully gasless here; the copy would flip if the routing did.
  */
 export default function Pay() {
   const params = useLocalSearchParams<{ to?: string; amount?: string }>();
@@ -84,6 +99,8 @@ export default function Pay() {
   );
 }
 
+type SendStep = 'amount' | 'recipient' | 'review';
+
 function SendPanel({
   initialTo,
   initialAmount,
@@ -94,34 +111,44 @@ function SendPanel({
   onScan: () => void;
 }) {
   const { data: balances } = useBalances();
-  const runner = useTxRunner();
+  const handle = useAppStore((s) => s.handle);
 
   const [to, setTo] = useState(initialTo ?? '');
   const [amount, setAmount] = useState(initialAmount ?? '');
   const [memo, setMemo] = useState('');
+  // A deep-linked recipient (a scan, or a link back into Pay) opens straight on the
+  // Recipient step so the resolved name is what the user confirms first.
+  const [step, setStep] = useState<SendStep>(initialTo ? 'recipient' : 'amount');
+
+  // A delivered send resets the flow, so returning from the sheet lands on a clean Amount
+  // screen rather than the just-sent figures. Only fires on 'delivered'; the runner leaves
+  // the pre-transaction state in place for every other outcome.
+  const runner = useTxRunner(() => {
+    setStep('amount');
+    setAmount('');
+    setTo('');
+    setMemo('');
+  });
 
   /**
    * Deep-linked values from the scanner arrive after mount.
    *
-   * Adjusted during render against the previous prop rather than in an effect. React's
-   * own guidance for "reset state when a prop changes" is this pattern; the effect
-   * version renders once with the stale value and then again with the new one, which is
-   * the cascading render the purity rules are pointing at.
+   * Adjusted during render against the previous prop rather than in an effect — React's
+   * own guidance for "reset state when a prop changes". A scanned code carries a real
+   * recipient (and sometimes an amount), so it lands the user on the Recipient step with
+   * the resolved name in view, which is exactly where a scan should confirm who is paid.
    */
   const [seenParams, setSeenParams] = useState({ to: initialTo, amount: initialAmount });
   if (seenParams.to !== initialTo || seenParams.amount !== initialAmount) {
     setSeenParams({ to: initialTo, amount: initialAmount });
     if (initialTo) setTo(initialTo);
     if (initialAmount) setAmount(initialAmount);
+    if (initialTo) setStep('recipient');
   }
 
   /**
-   * Handle resolution through MarenRegistry.
-   *
-   * A query rather than an effect plus two useStates. It is a keyed async read of remote
-   * data, which is what the rest of the app already uses TanStack Query for — and it
-   * removes the manual `alive` flag, the loading boolean, and the synchronous setState
-   * in an effect that came with hand-rolling it.
+   * Handle resolution through MarenRegistry. A keyed async read, so it is a query rather
+   * than an effect plus two useStates — the same shape the rest of the app uses.
    */
   const handleQuery = to.trim();
   const isHandle = handleQuery.startsWith('@') && handleQuery.length > 1;
@@ -139,37 +166,169 @@ function SendPanel({
   const isAddress = /^0x[0-9a-fA-F]{40}$/.test(to.trim());
   const recipientOk = isAddress || resolved !== null;
   const overBalance = balances !== undefined && amountWei > balances.musdWei;
-  const canSend = recipientOk && amountWei > 0n && !overBalance;
-
-  // MarenPay caps the on-chain memo at 80 BYTES, not characters — one emoji is four.
-  // Computed directly rather than via TextEncoder, whose availability under Hermes
-  // varies by version and which would silently mis-count if it were missing.
-  const memoBytes = utf8Length(memo);
+  const amountOk = amountWei > 0n && !overBalance;
 
   return (
     <>
-      {/*
-        Gasless, stated up front — and stated from `gasCopy`, not typed here, so this
-        screen cannot drift from what the relayer actually does.
+      {step === 'amount' ? (
+        <AmountStep
+          amount={amount}
+          setAmount={setAmount}
+          balances={balances}
+          overBalance={overBalance}
+          canContinue={amountOk}
+          onContinue={() => setStep('recipient')}
+        />
+      ) : null}
 
-        The affirmation is violet, not green. Green is a health colour, and BRAND.md §2
-        allows health colours "only when they carry meaning"; "we pay the gas" is a
-        product fact, not a position state. Violet is the brand accent and, per §2, the
-        one saturated colour a default screen is allowed.
-      */}
-      <View
-        style={styles.gasBanner}
-        accessible
-        accessibilityLabel={`${gasCopy.sponsoredTitle}. ${gasCopy.sponsoredBody}`}
-      >
-        <Icon name="shield" size={16} color={brand.violet400} />
-        <View style={styles.gasBannerBody}>
-          <Txt variant="small">{gasCopy.sponsoredTitle}</Txt>
-          <Txt variant="small" tone="muted" style={styles.gasBannerCaption}>
-            {gasCopy.sponsoredBody}
+      {step === 'recipient' ? (
+        <RecipientStep
+          to={to}
+          setTo={setTo}
+          memo={memo}
+          setMemo={setMemo}
+          resolved={resolved}
+          resolving={resolving}
+          isAddress={isAddress}
+          canContinue={recipientOk}
+          onScan={onScan}
+          onBack={() => setStep('amount')}
+          onContinue={() => setStep('review')}
+        />
+      ) : null}
+
+      {step === 'review' ? (
+        <ReviewStep
+          amountWei={amountWei}
+          fromHandle={handle}
+          recipientName={resolved?.handle ?? shortAddress(to.trim())}
+          recipientAddress={resolved?.address ?? to.trim()}
+          memo={memo}
+          onBack={() => setStep('recipient')}
+          onConfirm={() =>
+            runner.run(
+              { type: 'send', musdWei: amountWei, to: resolved?.address ?? to.trim(), memo },
+              `Send ${formatMusd(amountWei)} to ${resolved?.handle ?? shortAddress(to.trim())}`,
+            )
+          }
+        />
+      ) : null}
+
+      <TxSheet runner={runner} />
+    </>
+  );
+}
+
+/* ─── Amount ─────────────────────────────────────────────────────────────── */
+
+function AmountStep({
+  amount,
+  setAmount,
+  balances,
+  overBalance,
+  canContinue,
+  onContinue,
+}: {
+  amount: string;
+  setAmount: (next: string) => void;
+  balances: { musdWei: bigint } | undefined;
+  overBalance: boolean;
+  canContinue: boolean;
+  onContinue: () => void;
+}) {
+  // The in-progress input, given the Money hero treatment: whole number in ink, the
+  // fractional tail greyed (`dimFraction`), the unit small beside it. It is the same
+  // component a balance renders through, so a typed figure and a read one look identical.
+  const display = amount === '' ? '0' : amount;
+
+  return (
+    <>
+      <View style={styles.amountHero}>
+        <Amount
+          value={`${display} MUSD`}
+          size="numericXl"
+          unitTone="musd"
+          dimFraction
+          align="left"
+        />
+        {overBalance ? (
+          <Txt
+            variant="small"
+            style={[styles.overNote, { color: semanticText.danger }]}
+            accessibilityRole="alert"
+          >
+            More than your MUSD balance.
           </Txt>
-        </View>
+        ) : null}
       </View>
+
+      <Pressable
+        onPress={() =>
+          balances && setAmount(formatMusd(balances.musdWei, { unit: false }).replace(/,/g, ''))
+        }
+        accessibilityRole="button"
+        accessibilityLabel="Use your full MUSD balance"
+        style={styles.walletPill}
+        hitSlop={8}
+      >
+        <View style={styles.walletDot} />
+        <Txt variant="small" tone="muted">
+          Available
+        </Txt>
+        <Txt variant="small" tone="subtle">
+          ·
+        </Txt>
+        {balances ? <Musd wei={balances.musdWei} size="numericSm" plain /> : null}
+      </Pressable>
+
+      <View style={styles.padWrap}>
+        <AmountPad value={amount} onChange={setAmount} />
+      </View>
+
+      <PillButton
+        label="Continue"
+        onPress={onContinue}
+        disabled={!canContinue}
+        badge={<Icon name="arrowRight" size={15} color={base.onAccent} />}
+        accessibilityHint="Go to choosing who to pay."
+      />
+    </>
+  );
+}
+
+/* ─── Recipient ──────────────────────────────────────────────────────────── */
+
+function RecipientStep({
+  to,
+  setTo,
+  memo,
+  setMemo,
+  resolved,
+  resolving,
+  isAddress,
+  canContinue,
+  onScan,
+  onBack,
+  onContinue,
+}: {
+  to: string;
+  setTo: (next: string) => void;
+  memo: string;
+  setMemo: (next: string) => void;
+  resolved: Handle | null;
+  resolving: boolean;
+  isAddress: boolean;
+  canContinue: boolean;
+  onScan: () => void;
+  onBack: () => void;
+  onContinue: () => void;
+}) {
+  const memoBytes = utf8Length(memo);
+  const typedHandle = to.trim().startsWith('@') && to.trim().length > 1;
+
+  return (
+    <>
+      <StepHeader title="Send to" onBack={onBack} backLabel="Back to amount" />
 
       <Card style={styles.panel}>
         <Label>To</Label>
@@ -210,7 +369,7 @@ function SendPanel({
               {shortAddress(resolved.address)}
             </Num>
           </View>
-        ) : to.trim().startsWith('@') && to.trim().length > 1 ? (
+        ) : typedHandle ? (
           <Txt variant="small" style={[styles.resolveNote, { color: semanticText.danger }]}>
             No such handle on this network.
           </Txt>
@@ -221,50 +380,6 @@ function SendPanel({
               Valid address
             </Txt>
           </View>
-        ) : null}
-
-        <View style={styles.divider} />
-
-        <Label>Amount</Label>
-        <View style={styles.amountRow}>
-          <TextInput
-            value={amount}
-            onChangeText={setAmount}
-            placeholder="0.00"
-            placeholderTextColor={text.subtle}
-            keyboardType="decimal-pad"
-            style={styles.amountInput}
-            accessibilityLabel="Amount in MUSD"
-          />
-          <Num size="numericSm" tone="musd">
-            MUSD
-          </Num>
-        </View>
-
-        <View style={styles.balanceRow}>
-          <Txt variant="small" tone="muted">
-            Available
-          </Txt>
-          <Pressable
-            onPress={() =>
-              balances && setAmount(formatMusd(balances.musdWei, { unit: false }).replace(/,/g, ''))
-            }
-            accessibilityRole="button"
-            accessibilityLabel="Use full balance"
-            hitSlop={8}
-          >
-            {balances ? <Musd wei={balances.musdWei} size="numericSm" /> : null}
-          </Pressable>
-        </View>
-
-        {overBalance ? (
-          <Txt
-            variant="small"
-            style={[styles.resolveNote, { color: semanticText.danger }]}
-            accessibilityRole="alert"
-          >
-            More than your MUSD balance.
-          </Txt>
         ) : null}
 
         <View style={styles.divider} />
@@ -286,20 +401,125 @@ function SendPanel({
       </Card>
 
       <PillButton
-        label={amountWei > 0n ? `Send ${formatMusd(amountWei)}` : 'Send'}
-        onPress={() =>
-          runner.run(
-            { type: 'send', musdWei: amountWei, to: resolved?.address ?? to.trim(), memo },
-            `Send ${formatMusd(amountWei)} to ${resolved?.handle ?? shortAddress(to.trim())}`,
-          )
+        label="Continue"
+        onPress={onContinue}
+        disabled={!canContinue}
+        badge={<Icon name="arrowRight" size={15} color={base.onAccent} />}
+        accessibilityHint="Go to reviewing the payment before you send it."
+      />
+    </>
+  );
+}
+
+/* ─── Review ─────────────────────────────────────────────────────────────── */
+
+function ReviewStep({
+  amountWei,
+  fromHandle,
+  recipientName,
+  recipientAddress,
+  memo,
+  onBack,
+  onConfirm,
+}: {
+  amountWei: bigint;
+  fromHandle: string | null;
+  recipientName: string;
+  recipientAddress: string;
+  memo: string;
+  onBack: () => void;
+  onConfirm: () => void;
+}) {
+  // The gas statement is derived, never typed: it reads the same predicate the submit path
+  // routes by. A send is on the relayer's allowlist, so it is truthfully sponsored; if the
+  // routing ever changed, this line would change with it rather than lying.
+  const sponsored = isSponsored({ type: 'send', musdWei: amountWei, to: recipientAddress, memo });
+
+  return (
+    <>
+      <StepHeader title="Review" onBack={onBack} backLabel="Back to recipient" />
+
+      <Card style={styles.reviewCard}>
+        <Label>{fromHandle ? `From ${fromHandle}` : 'From you'}</Label>
+        <View style={styles.reviewAmount}>
+          <Musd wei={amountWei} size="numericLg" dimFraction align="left" />
+        </View>
+      </Card>
+
+      <View style={styles.arrowDisc}>
+        <Icon name="arrowDown" size={16} color={text.muted} />
+      </View>
+
+      <Card style={styles.reviewCard}>
+        <Label>To</Label>
+        <Txt variant="h3" style={styles.reviewTo} numberOfLines={1}>
+          {recipientName}
+        </Txt>
+        <Num size="numericSm" tone="muted">
+          {shortAddress(recipientAddress)}
+        </Num>
+        {memo ? (
+          <View style={styles.memoReview}>
+            <Label>Memo</Label>
+            <Txt variant="small" tone="muted">
+              {memo}
+            </Txt>
+          </View>
+        ) : null}
+      </Card>
+
+      <View
+        style={styles.feeLine}
+        accessible
+        accessibilityLabel={
+          sponsored
+            ? `${gasCopy.sponsoredTitle}. ${gasCopy.sponsoredBody}`
+            : 'You pay the BTC gas for this transaction.'
         }
-        disabled={!canSend}
+      >
+        <Icon name="shield" size={15} color={sponsored ? brand.violet400 : semanticText.warning} />
+        <Txt variant="small" tone="muted" style={styles.feeText}>
+          {sponsored
+            ? 'Gasless. You sign; Maren’s relayer submits it and pays the BTC gas.'
+            : 'This transaction is not relayed, so you pay the BTC gas yourself.'}
+        </Txt>
+      </View>
+
+      <PillButton
+        label={`Send ${formatMusd(amountWei)}`}
+        onPress={onConfirm}
         badge={<Icon name="arrowUpRight" size={15} color={base.onAccent} />}
         accessibilityHint="Requires Face ID, then waits for an on-chain receipt."
       />
-
-      <TxSheet runner={runner} />
     </>
+  );
+}
+
+/** The stepper's back affordance and step title. A tab panel, so it steps rather than pushes. */
+function StepHeader({
+  title,
+  onBack,
+  backLabel,
+}: {
+  title: string;
+  onBack: () => void;
+  backLabel: string;
+}) {
+  return (
+    <View style={styles.stepHeader}>
+      <Pressable
+        onPress={onBack}
+        accessibilityRole="button"
+        accessibilityLabel={backLabel}
+        style={({ pressed }) => [styles.backDisc, pressed && styles.pressed]}
+        hitSlop={8}
+      >
+        <Icon name="chevronLeft" size={18} color={text.primary} />
+      </Pressable>
+      <Label style={styles.stepTitle}>{title}</Label>
+      {/* A spacer the width of the disc, so the title reads optically centred. */}
+      <View style={styles.backDiscSpacer} />
+    </View>
   );
 }
 
@@ -307,53 +527,12 @@ function RequestPanel() {
   const address = useAppStore((s) => s.address);
   const handle = useAppStore((s) => s.handle);
   const [amount, setAmount] = useState('');
-  const [copied, setCopied] = useState(false);
+  const [open, setOpen] = useState(false);
 
   const amountWei = parseMusd(amount);
-  /**
-   * The payload a scanner reads. An https URL rather than a `maren://` deep link, for
-   * the same reason auth uses a universal link (R12): an https payload opens the real
-   * app through a domain Apple verified, and degrades to a web page rather than to
-   * nothing on a device without Maren installed.
-   *
-   * Built by the same module the scanner parses with, so the two cannot drift apart.
-   */
-  const payload = buildPaymentPayload(handle ?? address ?? '', amountWei > 0n ? amount : undefined);
-
-  const copy = async () => {
-    await Clipboard.setStringAsync(address ?? '');
-    setCopied(true);
-    setTimeout(() => setCopied(false), 1_800);
-  };
 
   return (
     <>
-      <Card style={styles.qrCard}>
-        <View style={styles.qrFrame}>
-          <QRCode
-            value={payload}
-            size={196}
-            backgroundColor={base.onAccent}
-            color={text.primary}
-            quietZone={12}
-          />
-        </View>
-
-        <Txt variant="h3" style={styles.qrHandle}>
-          {handle ?? 'Your account'}
-        </Txt>
-        {address ? (
-          <Num size="numericSm" tone="muted" style={styles.qrAddress}>
-            {shortAddress(address, 10, 8)}
-          </Num>
-        ) : null}
-
-        <Txt variant="small" tone="muted" style={styles.qrCaption}>
-          Anyone with Maren can scan this and pay you. They pay no BTC gas either, because the
-          relayer covers both sides.
-        </Txt>
-      </Card>
-
       <Card style={styles.panel}>
         <Label>Request a specific amount (optional)</Label>
         <View style={styles.amountRow}>
@@ -370,20 +549,161 @@ function RequestPanel() {
             MUSD
           </Num>
         </View>
-        {amountWei > 0n ? (
-          <Txt variant="small" tone="muted" style={styles.memoCount}>
-            The QR code above now carries {formatMusd(amountWei)}.
-          </Txt>
-        ) : null}
+        <Txt variant="small" tone="muted" style={styles.memoCount}>
+          {amountWei > 0n
+            ? `Your code will request ${formatMusd(amountWei)}.`
+            : 'Leave blank to let the sender choose the amount.'}
+        </Txt>
       </Card>
 
       <PillButton
-        label={copied ? 'Address copied' : 'Copy my address'}
-        variant="secondary"
-        onPress={copy}
-        accessibilityHint="Copies your full Mezo address to the clipboard."
+        label="Show my receive code"
+        onPress={() => setOpen(true)}
+        badge={<Icon name="scan" size={15} color={base.onAccent} />}
+        accessibilityHint="Opens a sheet with your QR code, handle and address."
+      />
+
+      <ReceiveSheet
+        visible={open}
+        onClose={() => setOpen(false)}
+        handle={handle}
+        address={address}
+        amount={amountWei > 0n ? amount : undefined}
       />
     </>
+  );
+}
+
+/**
+ * The receive sheet — the request flow raised into a bottom sheet, matching the reference
+ * "Receive" screen. Grabber, centred title, the QR enlarged in a clean white field, an
+ * info card of real values, and a pill action row.
+ *
+ * `Save QR` is deliberately absent: there is no honest one without pulling in a
+ * media-library dependency and a photos permission, and the brief is explicit that a
+ * stubbed action is worse than a missing one. Copy and Share both do exactly what they
+ * say — Share hands off the very payload the QR encodes, built by the same module the
+ * scanner parses with, so the two can never drift.
+ */
+function ReceiveSheet({
+  visible,
+  onClose,
+  handle,
+  address,
+  amount,
+}: {
+  visible: boolean;
+  onClose: () => void;
+  handle: string | null;
+  address: string | null;
+  amount?: string;
+}) {
+  const insets = useSafeAreaInsets();
+  const network = useAppStore((s) => s.network);
+  const [copied, setCopied] = useState(false);
+
+  const payload = buildPaymentPayload(handle ?? address ?? '', amount);
+  // Mezo's testnet is named Matsnet; the label is the real network, not a placeholder.
+  const networkLabel = network === 'mainnet' ? 'Mezo Mainnet' : 'Mezo Matsnet';
+
+  const copyAddress = async () => {
+    await Clipboard.setStringAsync(address ?? '');
+    setCopied(true);
+    setTimeout(() => setCopied(false), 1_800);
+  };
+
+  const shareQr = async () => {
+    try {
+      await Share.share({ message: payload });
+    } catch {
+      // The user dismissed the system share sheet; nothing to recover.
+    }
+  };
+
+  return (
+    <Modal transparent visible={visible} animationType="slide" onRequestClose={onClose}>
+      <Pressable
+        style={styles.sheetBackdrop}
+        onPress={onClose}
+        accessibilityRole="button"
+        accessibilityLabel="Close receive sheet"
+      >
+        {/* Inner press is swallowed so a tap on the sheet body does not dismiss it. */}
+        <Pressable
+          style={[styles.sheet, { paddingBottom: insets.bottom + space.xl }]}
+          onPress={() => {}}
+          accessibilityViewIsModal
+        >
+          <View style={styles.grabber} />
+
+          <Txt variant="h3" style={styles.sheetTitle}>
+            Receive MUSD
+          </Txt>
+          <Txt variant="small" tone="muted" style={styles.sheetSubtitle}>
+            {handle
+              ? `Anyone with Maren can scan this to pay ${handle}.`
+              : 'Anyone with Maren can scan this to pay you.'}
+          </Txt>
+
+          <View style={styles.qrField}>
+            <QRCode
+              value={payload}
+              size={200}
+              backgroundColor={base.onAccent}
+              color={text.primary}
+              quietZone={8}
+            />
+          </View>
+
+          <Card tone="inset" padded={false} style={styles.receiveInfo}>
+            <StatRow label="Network" value={<Txt variant="small">{networkLabel}</Txt>} />
+            {handle ? (
+              <StatRow label="Handle" value={<Txt variant="small">{handle}</Txt>} last={!address} />
+            ) : null}
+            {address ? (
+              <StatRow
+                label="Address"
+                value={
+                  <Num size="numericSm" tone="muted">
+                    {shortAddress(address, 10, 8)}
+                  </Num>
+                }
+                last
+              />
+            ) : null}
+          </Card>
+
+          {amount ? (
+            <Txt variant="small" tone="muted" style={styles.receiveAmountNote}>
+              This code requests {formatMusd(parseMusd(amount))}.
+            </Txt>
+          ) : null}
+
+          <View style={styles.receiveActions}>
+            <PillButton
+              label={copied ? 'Copied' : 'Copy address'}
+              variant="secondary"
+              block={false}
+              style={styles.receiveAction}
+              onPress={copyAddress}
+              accessibilityHint="Copies your full Mezo address to the clipboard."
+            />
+            <PillButton
+              label="Share QR"
+              variant="secondary"
+              block={false}
+              style={styles.receiveAction}
+              onPress={shareQr}
+              accessibilityHint="Opens the system share sheet with your payment link."
+            />
+          </View>
+
+          <Txt variant="small" tone="muted" style={styles.qrCaption}>
+            They pay no BTC gas either, because the relayer covers both sides.
+          </Txt>
+        </Pressable>
+      </Pressable>
+    </Modal>
   );
 }
 
@@ -430,19 +750,59 @@ const styles = StyleSheet.create({
     borderRadius: radius.pill,
   },
   segmentActive: { backgroundColor: base.surfaceRaised },
-  gasBanner: {
+
+  // ── Stepper chrome ────────────────────────────────────────────────────────
+  stepHeader: {
     flexDirection: 'row',
-    gap: space.md,
-    padding: space.lg,
-    borderRadius: radius.card,
-    backgroundColor: base.surfaceInset,
-    borderWidth: StyleSheet.hairlineWidth,
-    // Violet hairline to match the violet mark; §2 keeps green for health states.
-    borderColor: 'rgba(91,61,245,0.28)',
+    alignItems: 'center',
+    justifyContent: 'space-between',
     marginBottom: space.lg,
   },
-  gasBannerBody: { flex: 1 },
-  gasBannerCaption: { marginTop: space.xs },
+  backDisc: {
+    width: hit.min,
+    height: hit.min,
+    borderRadius: radius.pill,
+    backgroundColor: base.surfaceRaised,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: base.border,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  backDiscSpacer: { width: hit.min, height: hit.min },
+  stepTitle: { textAlign: 'center' },
+
+  // ── Amount step ───────────────────────────────────────────────────────────
+  amountHero: {
+    alignItems: 'center',
+    marginTop: space.xxl,
+    marginBottom: space.lg,
+    minHeight: 56,
+    justifyContent: 'center',
+  },
+  overNote: { marginTop: space.md },
+  walletPill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    alignSelf: 'center',
+    gap: space.sm,
+    minHeight: 36,
+    paddingHorizontal: space.lg,
+    borderRadius: radius.pill,
+    backgroundColor: base.surfaceInset,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: base.border,
+    marginBottom: space.xl,
+  },
+  walletDot: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+    // A quiet cue that this figure is your spendable MUSD; a 6px fill, so 3:1 is the bar.
+    backgroundColor: semantic.musd,
+  },
+  padWrap: { marginBottom: space.xl },
+
+  // ── Recipient step ────────────────────────────────────────────────────────
   panel: { marginBottom: space.xl },
   recipientRow: { flexDirection: 'row', alignItems: 'center', gap: space.md, marginTop: space.sm },
   recipientInput: {
@@ -469,6 +829,48 @@ const styles = StyleSheet.create({
     backgroundColor: base.border,
     marginVertical: space.lg,
   },
+  memoInput: {
+    minHeight: 44,
+    color: text.primary,
+    fontFamily: fonts.regular,
+    fontSize: 15,
+    marginTop: space.sm,
+  },
+  memoCount: { marginTop: space.xs },
+
+  // ── Review step ───────────────────────────────────────────────────────────
+  reviewCard: { marginBottom: space.md, gap: space.sm },
+  reviewAmount: { marginTop: space.xs },
+  reviewTo: { marginTop: space.xs },
+  memoReview: {
+    marginTop: space.md,
+    paddingTop: space.md,
+    borderTopWidth: StyleSheet.hairlineWidth,
+    borderTopColor: base.border,
+    gap: space.xs,
+  },
+  arrowDisc: {
+    width: 34,
+    height: 34,
+    borderRadius: radius.pill,
+    backgroundColor: base.surfaceInset,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: base.border,
+    alignItems: 'center',
+    justifyContent: 'center',
+    alignSelf: 'center',
+    marginBottom: space.md,
+  },
+  feeLine: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: space.sm,
+    marginBottom: space.xl,
+    paddingHorizontal: space.xs,
+  },
+  feeText: { flex: 1 },
+
+  // ── Request panel ─────────────────────────────────────────────────────────
   amountRow: { flexDirection: 'row', alignItems: 'baseline', gap: space.sm, marginTop: space.sm },
   amountInput: {
     flex: 1,
@@ -479,28 +881,55 @@ const styles = StyleSheet.create({
     letterSpacing: -0.8,
     minHeight: 52,
   },
-  balanceRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginTop: space.md,
-  },
-  memoInput: {
-    minHeight: 44,
-    color: text.primary,
-    fontFamily: fonts.regular,
-    fontSize: 15,
-    marginTop: space.sm,
-  },
-  memoCount: { marginTop: space.xs },
-  qrCard: { alignItems: 'center', marginBottom: space.lg },
-  qrFrame: {
-    padding: space.md,
-    borderRadius: radius.card,
-    backgroundColor: base.onAccent,
-  },
-  qrHandle: { marginTop: space.xl },
-  qrAddress: { marginTop: space.xs },
   qrCaption: { textAlign: 'center', marginTop: space.lg, maxWidth: 300 },
   pressed: { opacity: 0.6 },
+
+  // ── Receive sheet ─────────────────────────────────────────────────────────
+  sheetBackdrop: {
+    flex: 1,
+    // The same near-black scrim TxSheet uses — the one place near-black survives on the
+    // light theme, because a light scrim over a light page does not push it back.
+    backgroundColor: 'rgba(23,20,41,0.45)',
+    justifyContent: 'flex-end',
+  },
+  sheet: {
+    backgroundColor: base.surfaceRaised,
+    borderTopLeftRadius: 28,
+    borderTopRightRadius: 28,
+    paddingHorizontal: space.xl,
+    paddingTop: space.md,
+    alignItems: 'center',
+    ...modalShadow,
+  },
+  grabber: {
+    width: 40,
+    height: 4,
+    borderRadius: radius.pill,
+    backgroundColor: base.borderStrong,
+    marginBottom: space.lg,
+  },
+  sheetTitle: { textAlign: 'center' },
+  sheetSubtitle: { textAlign: 'center', marginTop: space.xs, maxWidth: 300 },
+  /** A clean white rounded field the QR sits centred in, per the reference. */
+  qrField: {
+    marginTop: space.xl,
+    padding: space.lg,
+    borderRadius: radius.card,
+    backgroundColor: base.onAccent,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: base.border,
+  },
+  receiveInfo: {
+    alignSelf: 'stretch',
+    marginTop: space.xl,
+    paddingHorizontal: space.lg,
+  },
+  receiveAmountNote: { textAlign: 'center', marginTop: space.md },
+  receiveActions: {
+    flexDirection: 'row',
+    gap: space.md,
+    marginTop: space.xl,
+    alignSelf: 'stretch',
+  },
+  receiveAction: { flex: 1 },
 });

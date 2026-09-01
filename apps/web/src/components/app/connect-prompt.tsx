@@ -3,7 +3,7 @@
 import type { ReactNode } from 'react';
 
 import { AppCard, EmptyState } from './primitives';
-import { ConnectButton } from './wallet';
+import { SignIn } from './sign-in';
 
 /**
  * What every screen shows before a wallet is connected.
@@ -32,7 +32,7 @@ export function ConnectPrompt({
 }) {
   return (
     <AppCard className="p-5">
-      <EmptyState icon={icon} title={title} action={<ConnectButton />}>
+      <EmptyState icon={icon} title={title} action={<SignIn />}>
         {children}
       </EmptyState>
     </AppCard>

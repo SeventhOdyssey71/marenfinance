@@ -12,12 +12,7 @@
  *      fails over across the endpoint list the SDK verified (primary first, drpc fallback
  *      second), per the warnings in `chains.ts`.
  */
-import {
-  MEZO_MAX_LOG_RANGE,
-  getChain,
-  getDeploymentBlock,
-  getMarenAddresses,
-} from '@maren/sdk';
+import { MEZO_MAX_LOG_RANGE, getChain, getDeploymentBlock, getMarenAddresses } from '@maren/sdk';
 import { createPublicClient, fallback, http } from 'viem';
 
 import { EARN_EVENTS, PAY_EVENTS, REGISTRY_EVENTS, VAULT_EVENTS } from './events.mjs';

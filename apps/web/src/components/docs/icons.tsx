@@ -9,7 +9,13 @@ import type { ReactNode, SVGProps } from 'react';
  * instead of crashing.
  */
 
-const P = { fill: 'none', stroke: 'currentColor', strokeWidth: 1.8, strokeLinecap: 'round', strokeLinejoin: 'round' } as const;
+const P = {
+  fill: 'none',
+  stroke: 'currentColor',
+  strokeWidth: 1.8,
+  strokeLinecap: 'round',
+  strokeLinejoin: 'round',
+} as const;
 
 const ICONS: Record<string, ReactNode> = {
   rocket: <path d="M4.5 16.5 3 21l4.5-1.5M9 15l6-6M14 4l6 6-9 3-3-3 3-6z" />,
@@ -26,7 +32,9 @@ const ICONS: Record<string, ReactNode> = {
       <path d="M12 2v3M12 19v3M2 12h3M19 12h3M5 5l2 2M17 17l2 2M19 5l-2 2M7 17l-2 2" />
     </>
   ),
-  'file-contract': <path d="M14 3v5h5M8 3H6a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8l-5-5H8zM9 13h6M9 17h6" />,
+  'file-contract': (
+    <path d="M14 3v5h5M8 3H6a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8l-5-5H8zM9 13h6M9 17h6" />
+  ),
   'shield-halved': <path d="M12 2 4 5v6c0 5 3.5 8 8 11 4.5-3 8-6 8-11V5l-8-3zM12 8v8" />,
   terminal: (
     <>
@@ -48,7 +56,9 @@ const ICONS: Record<string, ReactNode> = {
     </>
   ),
   'chart-line': <path d="M3 3v18h18M7 14l4-4 3 3 5-6" />,
-  'gas-pump': <path d="M13 5H8a1 1 0 0 0-1 1v14h7V6a1 1 0 0 0-1-1zM7 11h6M15 9l2 2v6a2 2 0 0 0 4 0v-8l-3-3" />,
+  'gas-pump': (
+    <path d="M13 5H8a1 1 0 0 0-1 1v14h7V6a1 1 0 0 0-1-1zM7 11h6M15 9l2 2v6a2 2 0 0 0 4 0v-8l-3-3" />
+  ),
   'piggy-bank': (
     <>
       <path d="M19 9c0-3-3-5-7-5S5 6 5 9c0 1.5.8 2.6 2 3.5V17l2-1 2 1 2-1 2 1v-4.5c1.2-.9 2-2 2-3.5z" />
@@ -89,7 +99,9 @@ const ICONS: Record<string, ReactNode> = {
       <path d="M20 4 8.5 15.5M14 14l6 6M8.5 8.5 11 11" />
     </>
   ),
-  'scale-unbalanced': <path d="M12 4v16M6 20h12M6 7 3 13a3 3 0 0 0 6 0L6 7zM18 5l3 6a3 3 0 0 1-6 0l3-6zM6 7l12-2" />,
+  'scale-unbalanced': (
+    <path d="M12 4v16M6 20h12M6 7 3 13a3 3 0 0 0 6 0L6 7zM18 5l3 6a3 3 0 0 1-6 0l3-6zM6 7l12-2" />
+  ),
   ruler: <path d="m3 8 5-5 13 13-5 5L3 8zM7 7l2 2M10 4l2 2M13 7l2 2M16 10l2 2" />,
   robot: (
     <>
@@ -98,7 +110,9 @@ const ICONS: Record<string, ReactNode> = {
       <circle cx="12" cy="3.5" r="1" />
     </>
   ),
-  receipt: <path d="M5 3v18l2-1 2 1 2-1 2 1 2-1 2 1V3l-2 1-2-1-2 1-2-1-2 1-2-1zM8 8h8M8 12h8M8 16h5" />,
+  receipt: (
+    <path d="M5 3v18l2-1 2 1 2-1 2 1 2-1 2 1V3l-2 1-2-1-2 1-2-1-2 1-2-1zM8 8h8M8 12h8M8 16h5" />
+  ),
   plus: <path d="M12 5v14M5 12h14" />,
   'node-js': (
     <>
@@ -126,7 +140,9 @@ const ICONS: Record<string, ReactNode> = {
       <circle cx="12" cy="10" r="2.5" />
     </>
   ),
-  'list-check': <path d="M10 6h10M10 12h10M10 18h10M3 6l1.5 1.5L7 5M3 12l1.5 1.5L7 11M3 18l1.5 1.5L7 17" />,
+  'list-check': (
+    <path d="M10 6h10M10 12h10M10 18h10M3 6l1.5 1.5L7 5M3 12l1.5 1.5L7 11M3 18l1.5 1.5L7 17" />
+  ),
   'layer-group': <path d="m12 3 9 5-9 5-9-5 9-5zM3 13l9 5 9-5M3 17l9 5 9-5" />,
   key: (
     <>
@@ -142,8 +158,12 @@ const ICONS: Record<string, ReactNode> = {
       <path d="M13 7 4 16a2 2 0 0 0 0 3l1 1a2 2 0 0 0 3 0l9-9" />
     </>
   ),
-  'file-shield': <path d="M14 3v5h5M8 3H6a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h4M14 3l5 5M17 12l3 1v2.5c0 2-1.5 3-3 3.5-1.5-.5-3-1.5-3-3.5V13l3-1z" />,
-  'file-code': <path d="M14 3v5h5M8 3H6a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8l-5-5H8zM10 12l-2 2 2 2M14 12l2 2-2 2" />,
+  'file-shield': (
+    <path d="M14 3v5h5M8 3H6a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h4M14 3l5 5M17 12l3 1v2.5c0 2-1.5 3-3 3.5-1.5-.5-3-1.5-3-3.5V13l3-1z" />
+  ),
+  'file-code': (
+    <path d="M14 3v5h5M8 3H6a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8l-5-5H8zM10 12l-2 2 2 2M14 12l2 2-2 2" />
+  ),
   'clipboard-check': (
     <>
       <rect x="5" y="4" width="14" height="17" rx="2" />
@@ -172,7 +192,9 @@ const ICONS: Record<string, ReactNode> = {
     </>
   ),
   note: <path d="M4 4h16v12l-4 4H4V4zM16 20v-4h4M8 9h8M8 13h5" />,
-  tip: <path d="M9 18h6M10 21h4M12 3a6 6 0 0 0-4 10.5c.8.8 1 1.4 1 2.5h6c0-1.1.2-1.7 1-2.5A6 6 0 0 0 12 3z" />,
+  tip: (
+    <path d="M9 18h6M10 21h4M12 3a6 6 0 0 0-4 10.5c.8.8 1 1.4 1 2.5h6c0-1.1.2-1.7 1-2.5A6 6 0 0 0 12 3z" />
+  ),
 };
 
 export function DocIcon({ name, ...props }: { name: string } & SVGProps<SVGSVGElement>) {
@@ -222,7 +244,18 @@ export function IconGithub(props: SVGProps<SVGSVGElement>) {
 
 export function IconChevron(props: SVGProps<SVGSVGElement>) {
   return (
-    <svg viewBox="0 0 24 24" width="16" height="16" aria-hidden fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" {...props}>
+    <svg
+      viewBox="0 0 24 24"
+      width="16"
+      height="16"
+      aria-hidden
+      fill="none"
+      stroke="currentColor"
+      strokeWidth={2}
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      {...props}
+    >
       <path d="m9 6 6 6-6 6" />
     </svg>
   );

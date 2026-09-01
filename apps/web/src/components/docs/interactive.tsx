@@ -35,7 +35,7 @@ export function Tabs({ children }: { children?: ReactNode }) {
             type="button"
             role="tab"
             aria-selected={i === active}
-            className={`doc-tabbtn${i === active ? ' is-active' : ''}`}
+            className={`doc-tabbtn${i === active ? 'is-active' : ''}`}
             onClick={() => setActive(i)}
           >
             {tab.props.title ?? `Tab ${i + 1}`}
@@ -130,14 +130,16 @@ export function CodeGroup({ children }: { children?: ReactNode }) {
             type="button"
             role="tab"
             aria-selected={i === active}
-            className={`doc-tabbtn${i === active ? ' is-active' : ''}`}
+            className={`doc-tabbtn${i === active ? 'is-active' : ''}`}
             onClick={() => setActive(i)}
           >
             {tabLabel(block, i)}
           </button>
         ))}
       </div>
-      {blocks[active] ? cloneElement(blocks[active], { inGroup: true } as Partial<PreElement['props']>) : null}
+      {blocks[active]
+        ? cloneElement(blocks[active], { inGroup: true } as Partial<PreElement['props']>)
+        : null}
     </div>
   );
 }

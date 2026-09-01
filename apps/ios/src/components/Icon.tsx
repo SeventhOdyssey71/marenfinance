@@ -32,7 +32,8 @@ export type IconName =
   | 'earn'
   | 'activity'
   | 'settings'
-  | 'faceid';
+  | 'faceid'
+  | 'backspace';
 
 export interface IconProps {
   name: IconName;
@@ -134,6 +135,12 @@ export function Icon({ name, size = 20, color = text.primary }: IconProps) {
             {...s}
           />
           <Path d="M9 9.8v1.4M15 9.8v1.4M12 9.8v3.4h-1M9.4 15.6a4 4 0 0 0 5.2 0" {...s} />
+        </>
+      )}
+      {name === 'backspace' && (
+        <>
+          <Path d="M9.5 5h9A1.5 1.5 0 0 1 20 6.5v11A1.5 1.5 0 0 1 18.5 19h-9L3.5 12z" {...s} />
+          <Path d="M12.5 9.5l4 5M16.5 9.5l-4 5" {...s} />
         </>
       )}
     </Svg>

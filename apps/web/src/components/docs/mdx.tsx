@@ -28,7 +28,13 @@ import { rewriteDocsHref } from './link';
  */
 function remarkCodeMeta() {
   return (tree: unknown) => {
-    const visit = (node: { type?: string; lang?: string; meta?: string; data?: Record<string, unknown>; children?: unknown[] }) => {
+    const visit = (node: {
+      type?: string;
+      lang?: string;
+      meta?: string;
+      data?: Record<string, unknown>;
+      children?: unknown[];
+    }) => {
       if (node.type === 'code') {
         node.data = node.data ?? {};
         node.data.hProperties = {

@@ -11,9 +11,11 @@ import { AmountField, Segmented } from '@/components/app/controls';
 import { HandleRegistration } from '@/components/app/handle-registration';
 import { Musd } from '@/components/app/money';
 import { ActionButton, Info, Label, Note, Panel } from '@/components/app/primitives';
+import { ReceivePanel } from '@/components/app/receive-panel';
+import { SendFlow } from '@/components/app/send-flow';
 import { TxSheet, useTxRunner, type TxIntent, type TxRunner } from '@/components/app/tx';
 import { ArrowUpRight, LinkIcon, PayIcon } from '@/components/ui/icons';
-import { parseUnitsSafe, utf8Length } from '@/lib/copy';
+import { parseUnitsSafe } from '@/lib/copy';
 import { preflightMusdSpend } from '@/lib/chain/preflight';
 import { actionIsRelayable } from '@/lib/chain/relay';
 import {
@@ -26,10 +28,11 @@ import {
 } from '@/lib/chain/write';
 import { useBalances, useDataSource, useResolvedHandle } from '@/lib/data/source';
 
-type Tab = 'send' | 'request' | 'link' | 'handle';
+type Tab = 'send' | 'receive' | 'request' | 'link' | 'handle';
 
 const TABS = [
   { key: 'send' as const, label: 'Send' },
+  { key: 'receive' as const, label: 'Receive' },
   { key: 'request' as const, label: 'Request' },
   { key: 'link' as const, label: 'Link' },
   { key: 'handle' as const, label: 'Handle' },
@@ -81,7 +84,8 @@ export default function PayPage() {
 
       <Segmented options={TABS} value={tab} onChange={setTab} label="Payment type" />
 
-      {tab === 'send' ? <SendPanel runner={runner} /> : null}
+      {tab === 'send' ? <SendFlow runner={runner} /> : null}
+      {tab === 'receive' ? <ReceivePanel /> : null}
       {tab === 'request' ? <RequestPanel runner={runner} /> : null}
       {tab === 'link' ? <LinkPanel runner={runner} /> : null}
       {tab === 'handle' ? <HandleRegistration runner={runner} /> : null}
@@ -117,244 +121,6 @@ function GasLine() {
     <p className="text-text-subtle text-xs leading-relaxed">
       {gasLine(actionIsRelayable('payAddress'), relayer)}
     </p>
-  );
-}
-
-const ADDRESS_RE = /^0x[0-9a-fA-F]{40}$/;
-
-function SendPanel({ runner }: { runner: TxRunner }) {
-  const { data: balances } = useBalances();
-  const writes = useMarenWrites({ onSimulated: runner.onSimulated });
-  const relayer = useRelayerStatus();
-  const [to, setTo] = useState('');
-  const [amount, setAmount] = useState('');
-  const [memo, setMemo] = useState('');
-
-  const trimmed = to.trim();
-  const isAddress = ADDRESS_RE.test(trimmed);
-  const isHandle = trimmed.startsWith('@') && trimmed.length > 1;
-  const { data: resolved, isFetching } = useResolvedHandle(trimmed);
-
-  const amountWei = parseUnitsSafe(amount);
-  const balance = balances?.musdWei ?? 0n;
-  const recipient = isAddress ? (trimmed as Address) : (resolved?.address ?? null);
-  const memoBytes = utf8Length(memo);
-
-  const {
-    allowanceWei,
-    needed: needsApproval,
-    refetch: refetchAllowance,
-  } = useMusdAllowance(SPENDERS.pay, amountWei);
-
-  /**
-   * A payment moves MUSD out of this wallet, so it has the same precondition Earn and the
-   * Link escrow do, and it is failing for everybody right now for a reason that has
-   * nothing to do with them: the pooled trove is under its floor, so nobody can borrow the
-   * MUSD in the first place. Stated at the button rather than discovered inside MUSD's own
-   * `ERC20InsufficientBalance`, which names no product and suggests no next step.
-   */
-  const funds = preflightMusdSpend(balances, amountWei, { verb: 'send', noun: 'Send' });
-  const canSend = funds.ok && recipient !== null && memoBytes <= 80 && writes.ready;
-
-  const approvalIntent = (): TxIntent => ({
-    title: `Approve ${formatMusd(amountWei)} for MarenPay`,
-    successTitle: `Approved ${formatMusd(amountWei)}`,
-    changes: [
-      {
-        label: 'MarenPay allowance',
-        before: <Musd wei={allowanceWei ?? 0n} />,
-        after: <Musd wei={amountWei} />,
-      },
-    ],
-    details: [
-      { label: 'Token', value: <span className="text-text-muted">MUSD</span> },
-      { label: 'Amount', value: <Musd wei={amountWei} /> },
-      {
-        label: 'Spender',
-        value: <span className="num text-text-subtle break-all text-xs">{SPENDERS.pay}</span>,
-      },
-    ],
-    gas: {
-      sponsored: false,
-      note: 'Approves exactly this amount, not an unlimited allowance. You pay the Bitcoin gas.',
-    },
-    confirmLabel: 'Approve',
-    submit: writes.ready
-      ? async () => {
-          const hash = await writes.approveMusd(SPENDERS.pay, amountWei);
-          refetchAllowance();
-          return hash;
-        }
-      : undefined,
-  });
-
-  const intent = (): TxIntent => ({
-    title: `Send ${formatMusd(amountWei)}`,
-    successTitle: `Sent ${formatMusd(amountWei)}`,
-    changes: [
-      {
-        label: 'MUSD in your wallet',
-        before: <Musd wei={balance} />,
-        after: <Musd wei={balance > amountWei ? balance - amountWei : 0n} />,
-      },
-    ],
-    details: [
-      { label: 'Amount', value: <Musd wei={amountWei} /> },
-      {
-        label: 'To',
-        value: (
-          <span>
-            {isHandle && resolved ? (
-              <>
-                <span className="text-text block">{resolved.handle}</span>
-                <span className="num text-text-subtle block text-xs">{resolved.address}</span>
-              </>
-            ) : (
-              <span className="num text-text-subtle break-all text-xs">{recipient}</span>
-            )}
-          </span>
-        ),
-      },
-      ...(memo ? [{ label: 'Memo', value: <span className="text-text-muted">{memo}</span> }] : []),
-    ],
-    gas: gasNote(
-      actionIsRelayable(isHandle ? 'payHandle' : 'payAddress'),
-      'The memo is written on-chain and is publicly readable by anyone, forever.',
-      relayer,
-    ),
-    confirmLabel: 'Send',
-    /**
-     * A handle is paid through `payToHandle`, which re-resolves it INSIDE the transaction,
-     * rather than through the address this browser resolved a moment ago. If the handle
-     * changed hands between the read and the signature, the contract's answer is the one
-     * that should win — and if it no longer exists, the payment reverts with
-     * `HandleNotRegistered` instead of going to whoever holds it now.
-     */
-    submit: writes.ready
-      ? () =>
-          isHandle && resolved
-            ? writes.payHandle(resolved.handle, amountWei, memo)
-            : writes.payAddress(recipient as Address, amountWei, memo)
-      : undefined,
-  });
-
-  return (
-    <Panel title="Send">
-      <div className="px-5 py-5">
-        <div className="mt-6 max-w-xl">
-          <label htmlFor="pay-to" className="t-label text-text-subtle block">
-            To
-          </label>
-          <input
-            id="pay-to"
-            value={to}
-            onChange={(event) => setTo(event.target.value)}
-            placeholder="@handle or 0x address"
-            autoComplete="off"
-            spellCheck={false}
-            aria-describedby="pay-to-status"
-            className="num text-text placeholder:text-text-subtle/60 mt-3 w-full border-b border-[var(--border-hairline)] bg-transparent pb-3 text-lg outline-none focus:border-[var(--border-strong)]"
-          />
-
-          {/* The resolved address, always, before anything is signed. */}
-          <div id="pay-to-status" className="mt-3 min-h-[1.25rem] text-sm" role="status">
-            {isHandle && isFetching ? (
-              <span className="text-text-subtle">Resolving handle…</span>
-            ) : isHandle && resolved ? (
-              <span className="flex flex-wrap items-center gap-2">
-                <span aria-hidden className="bg-success size-1.5 rounded-[var(--radius-pill)]" />
-                <span className="text-text-muted">{resolved.handle} resolves to</span>
-                <span className="num text-text text-[0.8125rem]">{resolved.address}</span>
-              </span>
-            ) : isHandle ? (
-              <span className="text-danger">No such handle on this network.</span>
-            ) : isAddress ? (
-              <span className="text-text-muted">Valid address.</span>
-            ) : trimmed.length > 0 ? (
-              <span className="text-text-subtle">Enter an @handle or a 0x address.</span>
-            ) : (
-              <span className="text-text-subtle">Enter an @handle or a 0x address.</span>
-            )}
-          </div>
-        </div>
-
-        <div className="mt-8 max-w-xl">
-          <AmountField
-            value={amount}
-            onChange={setAmount}
-            unit="MUSD"
-            label="Amount"
-            max={<Musd wei={balance} size="sm" />}
-            maxLabel="Available"
-            onMax={() => setAmount(formatMusd(balance, { unit: false }).replace(/,/g, ''))}
-            error={
-              funds.blocker && funds.blocker.scope === 'wallet' && amountWei > 0n
-                ? funds.blocker.title
-                : null
-            }
-          />
-        </div>
-
-        <div className="mt-8 max-w-xl">
-          <label htmlFor="pay-memo" className="t-label text-text-subtle block">
-            Memo (optional)
-          </label>
-          <input
-            id="pay-memo"
-            value={memo}
-            onChange={(event) => setMemo(event.target.value)}
-            placeholder="What is this for?"
-            aria-describedby="pay-memo-count"
-            className="text-text placeholder:text-text-subtle/60 mt-3 w-full border-b border-[var(--border-hairline)] bg-transparent pb-3 text-[0.9375rem] outline-none focus:border-[var(--border-strong)]"
-          />
-          <p id="pay-memo-count" className="text-text-subtle mt-2 text-xs">
-            <span className="num">{memoBytes}</span>/80 bytes · public on-chain
-            {memoBytes > 80 ? <span className="text-danger"> · too long</span> : null}
-          </p>
-        </div>
-
-        {funds.rangeDead && funds.blocker ? (
-          <div className="mt-8">
-            <BlockedNote blocker={funds.blocker} id="send-blocked" />
-          </div>
-        ) : null}
-
-        {funds.ok && needsApproval && amountWei > 0n ? (
-          <div className="mt-6">
-            <Note>
-              MarenPay needs an allowance for {formatMusd(amountWei)} first. That is a separate
-              transaction, shown here rather than slipped in behind the payment.
-            </Note>
-          </div>
-        ) : null}
-
-        <div className="mt-8">
-          <GasLine />
-        </div>
-
-        <div className="mt-4 flex flex-wrap gap-3">
-          {needsApproval && amountWei > 0n ? (
-            <ActionButton
-              onClick={() => runner.request(approvalIntent())}
-              disabled={!writes.ready || !funds.ok}
-              aria-describedby="send-blocked"
-              icon={<ArrowUpRight className="size-4" />}
-            >
-              Approve {formatMusd(amountWei)}
-            </ActionButton>
-          ) : null}
-          <ActionButton
-            variant={needsApproval && amountWei > 0n ? 'secondary' : 'primary'}
-            onClick={() => runner.request(intent())}
-            disabled={!canSend || (needsApproval && amountWei > 0n)}
-            aria-describedby="send-blocked"
-            icon={<ArrowUpRight className="size-4" />}
-          >
-            {amountWei > 0n ? `Send ${formatMusd(amountWei)}` : 'Send'}
-          </ActionButton>
-        </div>
-      </div>
-    </Panel>
   );
 }
 

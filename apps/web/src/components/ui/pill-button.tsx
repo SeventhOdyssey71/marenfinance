@@ -120,7 +120,8 @@ export function PillButton({
   );
 
   const box = shape === 'bare' ? bareSizing[size] : sizing[size];
-  const classes = `group inline-flex items-center justify-between rounded-[var(--radius-pill)] transition-colors duration-[120ms] ease-out ${box} ${variants[variant]} ${className}`;
+  // Press-scale, matching PillAction: a link should feel as physical as a button.
+  const classes = `group inline-flex items-center justify-between rounded-[var(--radius-pill)] transition-[color,background-color,border-color,transform] duration-[120ms] ease-out active:scale-[0.97] ${box} ${variants[variant]} ${className}`;
 
   if (external) {
     return (
@@ -210,7 +211,7 @@ export function TextPill({
   return (
     <Link
       href={href}
-      className={`bg-surface-raised text-text inline-flex h-11 items-center rounded-[var(--radius-pill)] border border-[var(--border-hairline)] px-5 text-sm font-medium transition-colors duration-[120ms] ease-out hover:border-[var(--border-strong)] ${className}`}
+      className={`bg-surface-raised text-text inline-flex h-11 items-center rounded-[var(--radius-pill)] border border-[var(--border-hairline)] px-5 text-sm font-medium transition-[color,background-color,border-color,transform] duration-[120ms] ease-out hover:border-[var(--border-strong)] active:scale-[0.97] ${className}`}
     >
       {children}
     </Link>

@@ -15,7 +15,8 @@ export function ThemeToggle() {
 
   useEffect(() => {
     const attr = document.documentElement.getAttribute('data-theme') as Theme | null;
-    const initial = attr ?? (window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light');
+    const initial =
+      attr ?? (window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light');
     setTheme(initial);
   }, []);
 
@@ -31,7 +32,13 @@ export function ThemeToggle() {
   }
 
   return (
-    <button type="button" className="doc-tbtn" onClick={toggle} aria-label="Toggle light or dark theme" title="Toggle light or dark">
+    <button
+      type="button"
+      className="doc-tbtn"
+      onClick={toggle}
+      aria-label="Toggle light or dark theme"
+      title="Toggle light or dark"
+    >
       {theme === 'dark' ? <IconSun /> : <IconMoon />}
     </button>
   );

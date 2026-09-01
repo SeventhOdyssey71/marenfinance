@@ -35,15 +35,15 @@ endpoint).
 
 ## What it computes
 
-| Metric | Meaning |
-| --- | --- |
-| Funded positions | Distinct addresses with live `collateral(addr) > 0`. The core adoption number. |
-| MUSD borrowed | Gross MUSD drawn via the vault over all history. The demand-creation number. |
-| Payments | Count and MUSD volume of `pay` / `payToHandle`, plus requests created vs settled. |
+| Metric               | Meaning                                                                                       |
+| -------------------- | --------------------------------------------------------------------------------------------- |
+| Funded positions     | Distinct addresses with live `collateral(addr) > 0`. The core adoption number.                |
+| MUSD borrowed        | Gross MUSD drawn via the vault over all history. The demand-creation number.                  |
+| Payments             | Count and MUSD volume of `pay` / `payToHandle`, plus requests created vs settled.             |
 | Money links / claims | Links created vs claimed, and claims by addresses brand new to Maren. The growth-loop signal. |
-| Handles registered | Distinct handles on MarenRegistry. |
-| Earn | Live TVL (`totalAssets`) and current depositor count. |
-| **Spend ratio** | Of addresses that borrowed, how many then sent a payment. **THE demand-test metric.** |
+| Handles registered   | Distinct handles on MarenRegistry.                                                            |
+| Earn                 | Live TVL (`totalAssets`) and current depositor count.                                         |
+| **Spend ratio**      | Of addresses that borrowed, how many then sent a payment. **THE demand-test metric.**         |
 
 ### The spend ratio, defined
 

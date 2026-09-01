@@ -1,9 +1,43 @@
-import type { Hash, TransactionReceipt } from 'viem';
+import {
+  createWalletClient,
+  encodeFunctionData,
+  getAddress,
+  type Chain,
+  type Hash,
+  type Hex,
+  type TransactionReceipt,
+} from 'viem';
+import {
+  getChain,
+  getMarenAddresses,
+  marenEarnAbi,
+  marenPayAbi,
+  marenVaultAbi,
+  MEZO_CHAIN_IDS,
+  type MezoNetwork,
+} from '@maren/sdk';
 
 import { getDataSource, mutate } from '../data/source';
+import { requireAccount } from '../data/context';
 import { isSponsoredKind as isSponsoredKindImpl } from './sponsorship';
 import { accessKey } from '../wallet/keystore';
 import { confirmTransaction, type TxOutcome } from './receipt';
+import { getReadClient, mezoTransport } from './transport';
+import { hintsForDelta } from './hints';
+import {
+  buildForwardRequest,
+  forwarderDomain,
+  forwarderNoncesAbi,
+  FORWARD_REQUEST_TYPES,
+  isRelayerConfigured,
+  postRelay,
+  RelayRefused,
+  relayGasLimit,
+  relayRequestBody,
+  RELAYER_URL,
+} from './relay';
+import { privateKeyToAccount } from 'viem/accounts';
+import type { LocalAccount } from 'viem/accounts';
 
 /**
  * Every value-moving action in the app.
@@ -19,6 +53,9 @@ import { confirmTransaction, type TxOutcome } from './receipt';
  * Local state is mutated *after* step 3 and only in the 'delivered' branch. That
  * ordering is the entire point: a reverted transaction must leave the UI showing the
  * pre-transaction balance, not an optimistic one it then has to walk back.
+ *
+ * THERE ARE TWO SUBMIT TRANSPORTS, and which one runs is decided by `dataSource` and
+ * whether a relayer is configured — never faked. See `submitAction`.
  */
 
 export type ActionResult =
@@ -49,30 +86,334 @@ export function isSponsored(action: ActionKind): boolean {
 }
 
 /**
- * The sentence this build is allowed to say about writes.
+ * The sentence this build says when it CANNOT sign to Mezo.
  *
- * The READ path now goes to matsnet: Home, Vault, Earn, Pay and Activity are contract
- * reads. The WRITE path below is still the simulated one, and the two must not be mixed.
- * `submitMock` returns a hash derived from a clock, and the transaction sheet renders a
- * hash as a tappable explorer link — so letting it run while the app is showing live
- * figures would put a link to a transaction that does not exist next to a set of numbers
- * that do. A reviewer taps it, finds nothing on chain, and is then right to disbelieve
- * the real figures beside it. That is the single most expensive thing a chain app can do,
- * and it is why the guard below is a refusal rather than a warning banner.
+ * This is shown only when the reads are live but no relayer is configured. `submitMock`
+ * returns a hash derived from a clock, and the transaction sheet renders a hash as a
+ * tappable explorer link — so letting it run while the app is showing live figures would
+ * put a link to a transaction that does not exist next to a set of numbers that do. A
+ * reviewer taps it, finds nothing on chain, and is then right to disbelieve the real
+ * figures beside it. That is the single most expensive thing a chain app can do, and it is
+ * why the guard is a refusal rather than a warning banner.
  *
- * So writes are available in demo mode, where every figure on screen is already labelled
- * as invented and the simulated hash is consistent with everything around it, and they
- * are declined in live mode with the reason stated plainly. The user sees an honest "not
- * in this build" rather than a fabricated success.
+ * Once a relayer URL IS configured, the live path below signs and submits for real, and
+ * this message is never reached in live mode.
  */
 const LIVE_WRITES_UNAVAILABLE =
-  'This build reads Mezo but does not yet sign to it. Signing is wired to a simulator, so submitting here would produce a receipt and a transaction hash that do not exist on chain. Switch to demo data in Settings to walk the flow.';
+  'This build reads Mezo but has no relayer configured to sign to it, so submitting here would produce a receipt and a transaction hash that do not exist on chain. Set EXPO_PUBLIC_RELAYER_URL, or switch to demo data in Settings to walk the flow.';
 
+/**
+ * Route the submission.
+ *
+ *   - demo data           → the simulator, exactly as before. This is the default source.
+ *   - live + relayer set  → the real path: relayed gasless actions, direct BTC deposit.
+ *   - live + no relayer   → declined honestly. We do not pretend live writes work.
+ */
 export async function submitAction(action: ActionKind): Promise<ActionResult> {
   if (getDataSource() === 'live') {
-    return { kind: 'declined', reason: LIVE_WRITES_UNAVAILABLE };
+    if (!isRelayerConfigured() || RELAYER_URL === null) {
+      return { kind: 'declined', reason: LIVE_WRITES_UNAVAILABLE };
+    }
+    return submitLive(action, RELAYER_URL);
+  }
+  return submitSimulated(action);
+}
+
+// ── live transport ─────────────────────────────────────────────────────────
+
+/** What a live action becomes on-chain, resolved once and used by every path below. */
+interface LiveCall {
+  readonly to: `0x${string}`;
+  readonly data: Hex;
+  /** Non-zero only for the payable BTC deposit; a relayed call must carry no value. */
+  readonly value?: bigint;
+  /** True when `MarenRelayHub` will forward this exact call. Decides relay vs self-submit. */
+  readonly relayable: boolean;
+  /** True when the relayer pays the gas — so `confirmTransaction` reports zero user gas. */
+  readonly sponsored: boolean;
+}
+
+/**
+ * The live submit path: Face ID, build the call, route it, confirm it.
+ *
+ * The routing here mirrors the web's `write.ts` but is decided by the CONTRACT'S allowlist,
+ * not by the interface's sponsorship copy:
+ *
+ *   - the payable `deposit` goes DIRECT from a walletClient carrying BTC value, because the
+ *     hub reverts `ValueNotRelayable` on any value and always will;
+ *   - `borrow` / `repay` / `withdraw` / `pay` are on the hub's allowlist and are RELAYED as
+ *     signed `ForwardRequest`s, costing the user nothing;
+ *   - Earn is NOT on the hub's allowlist (`MarenEarn` is absent from
+ *     `Deploy.s.sol:_allowlistRelayableCalls`), so it self-submits from the user's wallet
+ *     even though `sponsorship.ts` marks it sponsored. Relaying it would earn a
+ *     `CallNotAllowed` revert that Maren pays to discover. This divergence is called out as
+ *     a follow-up rather than papered over.
+ */
+async function submitLive(action: ActionKind, relayerUrl: string): Promise<ActionResult> {
+  // 1 — Face ID on every signing action, without exception.
+  const key = await accessKey();
+  if (key.kind === 'denied') return { kind: 'declined', reason: key.reason };
+  if (key.kind === 'missing') {
+    return { kind: 'declined', reason: 'No signing key is available on this device.' };
   }
 
+  // The account and network the read layer is bound to. `requireAccount` throws the stated
+  // "no account is loaded" error rather than letting a null address reach the chain.
+  const { network, account: loadedAddress } = requireAccount();
+  const account = privateKeyToAccount(key.privateKey);
+  if (getAddress(account.address) !== getAddress(loadedAddress)) {
+    // The Keychain key does not derive the loaded address. Signing would produce a valid
+    // transaction from the WRONG account, which is worse than not signing at all.
+    return {
+      kind: 'declined',
+      reason: 'The signing key on this device does not match the loaded account.',
+    };
+  }
+
+  let call: LiveCall;
+  try {
+    call = await buildLiveCall(action, network, account.address);
+  } catch (error) {
+    return { kind: 'declined', reason: describeSubmitError(error) };
+  }
+
+  // 2 — Submit, yielding a hash. Each transport throws on failure; none returns a fake hash.
+  let hash: Hash;
+  try {
+    hash =
+      call.value !== undefined
+        ? await submitDirect(network, account, call)
+        : call.relayable
+          ? await submitRelayed(network, account, call, relayerUrl)
+          : await submitDirect(network, account, call);
+  } catch (error) {
+    if (error instanceof RelayRefused) {
+      return { kind: 'declined', reason: error.reason.detail };
+    }
+    return { kind: 'declined', reason: describeSubmitError(error) };
+  }
+
+  // 3 — The R15 checkpoint. Nothing bypasses this. A relayed call reports zero user gas.
+  const outcome = await confirmTransaction(getReadClient(network), hash, {
+    sponsored: call.sponsored,
+  });
+  if (outcome.kind !== 'delivered') return { kind: 'failed', outcome };
+
+  // The chain has moved; the next read is the truth, so no optimistic local mutation.
+  return { kind: 'ok', outcome };
+}
+
+/**
+ * Encode the calldata for an action and record how it must be routed.
+ *
+ * Vault operations carry sorted-list hints derived off-chain (`hintsForDelta`, read-only,
+ * never allowed to fail the transaction). The deltas are the pooled trove's, and the sign
+ * of each is stated here at the call site rather than hidden in the hint helper.
+ */
+async function buildLiveCall(
+  action: ActionKind,
+  network: MezoNetwork,
+  from: `0x${string}`,
+): Promise<LiveCall> {
+  const maren = getMarenAddresses(network);
+
+  switch (action.type) {
+    case 'deposit': {
+      // Collateral goes in; the trove's debt is untouched. Payable, so never relayable.
+      const { upper, lower } = await hintsForDelta(network, {
+        collDelta: action.btcWei,
+        debtDelta: 0n,
+      });
+      return {
+        to: maren.marenVault,
+        data: encodeFunctionData({ abi: marenVaultAbi, functionName: 'deposit', args: [upper, lower] }),
+        value: action.btcWei,
+        relayable: false,
+        sponsored: false,
+      };
+    }
+    case 'withdraw': {
+      const { upper, lower } = await hintsForDelta(network, {
+        collDelta: -action.btcWei,
+        debtDelta: 0n,
+      });
+      return {
+        to: maren.marenVault,
+        data: encodeFunctionData({
+          abi: marenVaultAbi,
+          functionName: 'withdraw',
+          args: [action.btcWei, upper, lower],
+        }),
+        relayable: true,
+        sponsored: true,
+      };
+    }
+    case 'borrow': {
+      // Worst case for the hint: the whole amount is drawn as new trove debt. Over-stating
+      // moves the hint one way along the list, which the on-chain walk corrects.
+      const { upper, lower } = await hintsForDelta(network, {
+        collDelta: 0n,
+        debtDelta: action.musdWei,
+      });
+      return {
+        to: maren.marenVault,
+        data: encodeFunctionData({
+          abi: marenVaultAbi,
+          functionName: 'borrow',
+          args: [action.musdWei, upper, lower],
+        }),
+        relayable: true,
+        sponsored: true,
+      };
+    }
+    case 'repay': {
+      const { upper, lower } = await hintsForDelta(network, {
+        collDelta: 0n,
+        debtDelta: -action.musdWei,
+      });
+      return {
+        to: maren.marenVault,
+        data: encodeFunctionData({
+          abi: marenVaultAbi,
+          functionName: 'repay',
+          args: [action.musdWei, upper, lower],
+        }),
+        relayable: true,
+        sponsored: true,
+      };
+    }
+    case 'send': {
+      // `to` is already an address here: the Pay screen resolves any handle before it
+      // builds the action. `getAddress` throws on anything that is not one, which is caught
+      // and declined rather than sent.
+      return {
+        to: maren.marenPay,
+        data: encodeFunctionData({
+          abi: marenPayAbi,
+          functionName: 'pay',
+          args: [getAddress(action.to), action.musdWei, action.memo ?? ''],
+        }),
+        relayable: true,
+        sponsored: true,
+      };
+    }
+    case 'earn-deposit': {
+      // Not on the hub allowlist — self-submitted, user pays. See `submitLive`.
+      return {
+        to: maren.marenEarn,
+        data: encodeFunctionData({
+          abi: marenEarnAbi,
+          functionName: 'deposit',
+          args: [action.musdWei, from],
+        }),
+        relayable: false,
+        sponsored: false,
+      };
+    }
+    case 'earn-withdraw': {
+      return {
+        to: maren.marenEarn,
+        data: encodeFunctionData({
+          abi: marenEarnAbi,
+          functionName: 'withdraw',
+          args: [action.musdWei, from, from],
+        }),
+        relayable: false,
+        sponsored: false,
+      };
+    }
+  }
+}
+
+/**
+ * Sign the call as an EIP-712 `ForwardRequest` and hand it to the relayer.
+ *
+ * The nonce is `MarenRelayHub.nonces(from)`, read on-chain and never guessed — it is inside
+ * the signed struct, so no one can correct a wrong one afterwards. The gas is a direct-call
+ * estimate: a gas limit we cannot estimate is a gas limit we will not sign, so an estimate
+ * failure throws here and the action is declined rather than a guess being paid for.
+ */
+async function submitRelayed(
+  network: MezoNetwork,
+  account: LocalAccount,
+  call: LiveCall,
+  relayerUrl: string,
+): Promise<Hash> {
+  const hub = getMarenAddresses(network).marenForwarder;
+  const chainId = MEZO_CHAIN_IDS[network];
+  const client = getReadClient(network);
+
+  const [estimate, nonce] = await Promise.all([
+    client.estimateGas({ account: account.address, to: call.to, data: call.data }),
+    client.readContract({
+      address: hub,
+      abi: forwarderNoncesAbi,
+      functionName: 'nonces',
+      args: [account.address],
+    }),
+  ]);
+
+  const message = buildForwardRequest({
+    from: account.address,
+    to: call.to,
+    data: call.data,
+    gas: relayGasLimit(estimate),
+    nonce,
+    nowSeconds: Math.floor(Date.now() / 1000),
+  });
+
+  const signature = await account.signTypedData({
+    domain: forwarderDomain(chainId, hub),
+    types: FORWARD_REQUEST_TYPES,
+    primaryType: 'ForwardRequest',
+    message,
+  });
+
+  const accepted = await postRelay(relayerUrl, relayRequestBody(message, signature));
+  // A hash, not an outcome — `confirmTransaction` above puts it through the receipt check.
+  return accepted.hash;
+}
+
+/**
+ * Broadcast the call from the user's own wallet. Used for the payable BTC deposit (which
+ * carries `value`) and for Earn, which the hub will not forward.
+ */
+async function submitDirect(
+  network: MezoNetwork,
+  account: LocalAccount,
+  call: LiveCall,
+): Promise<Hash> {
+  const chain = getChain(network) as unknown as Chain;
+  const walletClient = createWalletClient({ account, chain, transport: mezoTransport(chain) });
+  return walletClient.sendTransaction({
+    account,
+    chain,
+    to: call.to,
+    data: call.data,
+    value: call.value,
+  });
+}
+
+/** Turn a thrown submit error into one honest sentence. Never a raw viem/native stack. */
+function describeSubmitError(error: unknown): string {
+  const raw = error instanceof Error ? error.message : String(error);
+  if (/No account is loaded/i.test(raw)) {
+    return 'No account is loaded, so there is nothing to sign with.';
+  }
+  if (/invalid address|getAddress/i.test(raw)) {
+    return 'The recipient is not a valid Mezo address, so nothing was submitted.';
+  }
+  return 'The transaction could not be prepared, so nothing was submitted and no gas was spent.';
+}
+
+// ── simulated transport ──────────────────────────────────────────────────────
+//
+// The demo path, used whenever `dataSource` is 'mock'. `submitMock` is deliberately shaped
+// around the same `Pick<PublicClient, 'waitForTransactionReceipt'>` that confirmTransaction
+// accepts. Local state IS mutated here after the receipt check, because in demo mode the
+// in-memory ledger is the only source of truth there is.
+
+async function submitSimulated(action: ActionKind): Promise<ActionResult> {
   // 1 — Face ID on every signing action, without exception.
   const key = await accessKey();
   if (key.kind === 'denied') return { kind: 'declined', reason: key.reason };
@@ -82,7 +423,7 @@ export async function submitAction(action: ActionKind): Promise<ActionResult> {
 
   const sponsored = isSponsored(action);
 
-  // 2 — Submit. Replaced by walletClient.writeContract / a POST to the relayer.
+  // 2 — Submit.
   const hash = await submitMock(action);
 
   // 3 — The R15 checkpoint. Nothing bypasses this.
@@ -112,12 +453,6 @@ function applyLocalEffect(action: ActionKind): void {
       return mutate.earnWithdraw(action.musdWei);
   }
 }
-
-// ── mock transport ───────────────────────────────────────────────────────────
-//
-// Stands in for viem's PublicClient. It is deliberately shaped as the narrow
-// `Pick<PublicClient, 'waitForTransactionReceipt'>` that confirmTransaction accepts, so
-// dropping in a real client is a one-line change in this file.
 
 async function submitMock(action: ActionKind): Promise<Hash> {
   await delay(900);

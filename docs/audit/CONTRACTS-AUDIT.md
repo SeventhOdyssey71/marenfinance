@@ -652,15 +652,15 @@ Comments, all correcting claims that were false:
 
 Tests, 7 added, whole suite green at 309:
 
-| test                                                                     | file       | pins               |
-| ------------------------------------------------------------------------ | ---------- | ------------------ |
-| `test_redemption_recognisedShortfallIsNotReReadAsAFreshRedemption`       | redemption | H-1, fails pre-fix |
-| `test_redemption_afterAShortfallIsStillMeasuredExactly`                  | redemption | H-1, fails pre-fix |
-| `test_redemption_reliefBeyondUserDebtIsAbsorbedByTheProtocolNotUsers`    | redemption | H-2, fails pre-fix |
-| `test_withdrawProtocolCollateral_paysNobodyAndOnlySkimRecoversIt`        | vault      | M-1                |
-| `test_frozenTroveStrandsIdleBtcWithNoAdminPathOut`                       | vault      | M-3                |
-| `test_skim_cannotBeReenteredFromAWithdrawal`                             | vault      | I-2                |
-| `test_depositAndBorrow_revertParityBreaksInExactlyTwoOrderings`          | composed   | I-1                |
+| test                                                                  | file       | pins               |
+| --------------------------------------------------------------------- | ---------- | ------------------ |
+| `test_redemption_recognisedShortfallIsNotReReadAsAFreshRedemption`    | redemption | H-1, fails pre-fix |
+| `test_redemption_afterAShortfallIsStillMeasuredExactly`               | redemption | H-1, fails pre-fix |
+| `test_redemption_reliefBeyondUserDebtIsAbsorbedByTheProtocolNotUsers` | redemption | H-2, fails pre-fix |
+| `test_withdrawProtocolCollateral_paysNobodyAndOnlySkimRecoversIt`     | vault      | M-1                |
+| `test_frozenTroveStrandsIdleBtcWithNoAdminPathOut`                    | vault      | M-3                |
+| `test_skim_cannotBeReenteredFromAWithdrawal`                          | vault      | I-2                |
+| `test_depositAndBorrow_revertParityBreaksInExactlyTwoOrderings`       | composed   | I-1                |
 
 The three that pin known limits assert the current behaviour including the part that is wrong,
 so that the day each is fixed the test inverts rather than silently continuing to pass.
