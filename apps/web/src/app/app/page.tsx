@@ -162,8 +162,106 @@ export default function PortfolioPage() {
         </Panel>
       )}
 
-      <RecentActivity />
+      {/* The secondary area: two real reads side by side on desktop so the wide canvas
+          reads as a dashboard, not a lone card. Left is what your MUSD is doing (Earn +
+          spendable), right is what just happened. Both are contract reads — no invented
+          figure, no sparkline, and each carries its own honest empty state. */}
+      <div className="grid grid-cols-1 items-start gap-4 lg:grid-cols-2">
+        <EarnSnapshot earn={earn} balances={balances} />
+        <RecentActivity />
+      </div>
     </div>
+  );
+}
+
+/**
+ * What your MUSD is doing, honestly — the ERC-4626 Earn value and the spendable balance,
+ * both real reads. Stability-Pool yield is liquidation gains only: lumpy, sometimes zero
+ * for months, and never an APY we may quote — so the footnote states what was realised over
+ * the observed window and nothing more. When there is neither Earn nor spendable MUSD it is
+ * an empty state pointing at Earn, never a zero dressed up as a number.
+ */
+function EarnSnapshot({
+  earn,
+  balances,
+}: {
+  earn: ReturnType<typeof useEarn>['data'];
+  balances: ReturnType<typeof useBalances>['data'];
+}) {
+  const loaded = earn !== undefined && balances !== undefined;
+  const empty = loaded && earn.assetsWei === 0n && balances.musdWei === 0n;
+
+  if (empty)
+    return (
+      <Panel title="Earn">
+        <div className="px-5 py-5">
+          <EmptyState
+            icon={<EarnIcon className="size-5" />}
+            title="Nothing set aside yet"
+            action={
+              <ActionLink href="/app/finance?section=earn" icon={<ArrowRight className="size-4" />}>
+                Put MUSD to work
+              </ActionLink>
+            }
+          >
+            Deposit MUSD into the Stability Pool to earn from liquidations. The return is not
+            guaranteed and can be zero for long stretches.
+          </EmptyState>
+        </div>
+      </Panel>
+    );
+
+  return (
+    <Panel
+      title="Earn"
+      meta={
+        <Link
+          href="/app/finance?section=earn"
+          className="text-text-muted hover:text-text inline-flex items-center gap-1 text-xs transition-colors duration-[120ms] ease-out"
+        >
+          Open Earn
+          <ArrowUpRight className="size-3.5" />
+        </Link>
+      }
+    >
+      <PanelBody>
+        <StatRow
+          label="In Earn"
+          value={earn ? <Musd wei={earn.assetsWei} size="lg" tone="musd" /> : <Dash size="lg" />}
+        />
+        <StatRow
+          label="Spendable MUSD"
+          value={balances ? <Musd wei={balances.musdWei} size="lg" /> : <Dash size="lg" />}
+          last
+        />
+      </PanelBody>
+      <div className="border-t border-[var(--border-hairline)] px-5 py-3">
+        <EarnTrailingNote earn={earn} />
+      </div>
+    </Panel>
+  );
+}
+
+/** The backward-looking yield line — realised gains only, labelled as such, never an APY. */
+function EarnTrailingNote({ earn }: { earn: ReturnType<typeof useEarn>['data'] }) {
+  if (!earn) return <p className="text-text-subtle text-xs">Reading your Earn history…</p>;
+
+  const { realisedWei, windowDays, liquidationEvents } = earn.trailing;
+
+  if (realisedWei === 0n)
+    return (
+      <p className="text-text-subtle text-xs leading-relaxed">
+        No liquidation gains in the last {windowDays} days. Stability-Pool yield is lumpy and can be
+        zero for long stretches.
+      </p>
+    );
+
+  return (
+    <p className="text-text-muted text-xs leading-relaxed">
+      Realised <Musd wei={realisedWei} size="sm" tone="musd" /> over the last {windowDays} days,
+      from {liquidationEvents} liquidation{liquidationEvents === 1 ? '' : 's'}. Backward-looking,
+      not a forecast.
+    </p>
   );
 }
 

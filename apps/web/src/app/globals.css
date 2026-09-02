@@ -142,6 +142,23 @@
         0 6px 18px -6px rgba(140, 90, 255, 0.5);
     }
   }
+
+  /* Nav rail rows (NavSidebar): only the colour transitions — the active pill and
+     accent bar are springed by motion behind the text. Hover is a quiet ink lift on
+     inactive rows, gated to real pointers so a tap never leaves a row looking selected. */
+  [data-app-theme='light'] .nav-row {
+    transition: color 120ms ease-out;
+  }
+  @media (hover: hover) {
+    [data-app-theme='light'] .nav-row:not([aria-current='page']):hover {
+      color: var(--color-text);
+    }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    [data-app-theme='light'] .nav-row {
+      transition: none;
+    }
+  }
 }
 
 @layer base {

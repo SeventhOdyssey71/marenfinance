@@ -11,6 +11,7 @@ import {
   ProfileIcon,
 } from '@/components/ui/icons';
 import { ChainStatus, VaultProvenance } from '@/components/app/chain-status';
+import { NavSidebar } from '@/components/app/nav-sidebar';
 import { ConnectButton, NetworkGuard } from '@/components/app/wallet';
 
 /**
@@ -96,28 +97,7 @@ export function AppShell({ children }: { children: ReactNode }) {
           </span>
         </Link>
 
-        <nav aria-label="App sections" className="flex flex-col gap-1">
-          {NAV.map(({ href, label, Icon }) => {
-            const active = isActive(pathname, href);
-            return (
-              <Link
-                key={href}
-                href={href}
-                aria-current={active ? 'page' : undefined}
-                className={`group flex items-center gap-3 rounded-[var(--radius-input)] px-3 py-2.5 text-sm transition-colors duration-[120ms] ease-out ${
-                  active
-                    ? 'bg-surface-inset text-text font-medium'
-                    : 'text-text-muted hover:text-text'
-                }`}
-              >
-                <Icon
-                  className={`size-[18px] shrink-0 ${active ? 'text-violet-500' : ''}`}
-                />
-                {label}
-              </Link>
-            );
-          })}
-        </nav>
+        <NavSidebar items={NAV} />
 
         {/* Account and disclosure sit at the foot of the rail. */}
         <div className="mt-auto flex flex-col gap-5 pt-6">
