@@ -2,10 +2,8 @@ import './landing.css';
 
 import { Nav } from '@/components/nav';
 import { Hero } from '@/components/hero';
-import { Ribbon } from '@/components/ribbon';
 import { Surfaces } from '@/components/surfaces';
 import { HowItWorks } from '@/components/how-it-works';
-import { BuiltOnMezo } from '@/components/built-on-mezo';
 import { Faq } from '@/components/faq';
 import { Footer } from '@/components/footer';
 
@@ -28,10 +26,8 @@ export default function HomePage() {
 
       <main id="main">
         <Hero />
-        <Ribbon />
         <Surfaces />
         <HowItWorks />
-        <BuiltOnMezo />
         <Faq />
       </main>
 

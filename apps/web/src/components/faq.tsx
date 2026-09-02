@@ -124,66 +124,6 @@ const items: readonly Item[] = [
       </>
     ),
   },
-  {
-    q: 'How is this different from just opening a trove on Mezo?',
-    a: (
-      <>
-        <p>
-          If you hold more than roughly 0.079 BTC, it partly is not, and Maren will tell you to open
-          a direct trove, because that avoids pooling risk entirely. What Maren adds there is gasless
-          execution and a payments surface.
-        </p>
-        <p>
-          If you hold less, Mezo has nothing for you today. The 1,800 MUSD minimum net debt is the
-          wall, and pooled credit is the way through it at 0.001 BTC.
-        </p>
-      </>
-    ),
-  },
-  {
-    q: 'Where does the yield in Earn come from?',
-    a: (
-      <>
-        <p>
-          From MUSD’s Stability Pool, through an ERC-4626 vault. When a trove is liquidated, the pool
-          absorbs its debt and receives its BTC collateral at a discount. Maren sweeps those BTC
-          gains, converts them, and compounds them back into MUSD.
-        </p>
-        <p>
-          There are <strong className="font-bold text-[color:var(--ink)]">no token emissions</strong>.
-          Yield is liquidation gains only, which makes it lumpy and impossible to honestly quote as a
-          fixed APY. Maren shows trailing realised yield, clearly labelled as backward-looking, and
-          never advertises a rate it cannot guarantee.
-        </p>
-      </>
-    ),
-  },
-  {
-    q: 'Can I get my collateral out?',
-    a: (
-      <p>
-        Yes. Repay your share of the debt and withdraw your collateral, at any time. If the pooled
-        trove ever approaches Maren’s internal policy limit, borrowing is halted before withdrawal
-        is. Exits stay open when entries close.
-      </p>
-    ),
-  },
-  {
-    q: 'What if the price feed goes down?',
-    a: (
-      <>
-        <p>
-          Mezo’s price feed is a native chain precompile fed by the validator set, and it reverts if
-          the price is more than 60 seconds stale. That means borrow, adjust and liquidate calls can
-          fail for reasons that have nothing to do with you.
-        </p>
-        <p>
-          Maren has an explicit “price feed unavailable” state in both the web and iOS apps. We never
-          render a stale price as though it were live.
-        </p>
-      </>
-    ),
-  },
 ];
 
 function AccordionItem({

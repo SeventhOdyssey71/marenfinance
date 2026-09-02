@@ -194,10 +194,13 @@
 .landing .u-btn-glow {
   background: var(--card);
   color: var(--ink);
+  /* A crisp, vivid pink ring hugging the pill, then a tight bloom — the
+     ugly.cash "Get the APP" halo, not a soft lavender blur. */
   box-shadow:
-    0 0 0 1px rgba(16, 16, 19, 0.06),
-    0 8px 30px -6px rgba(250, 0, 255, 0.45),
-    0 4px 14px -6px rgba(140, 90, 255, 0.5);
+    0 0 0 1.5px rgba(250, 0, 255, 0.9),
+    0 0 0 4px rgba(250, 0, 255, 0.16),
+    0 0 16px 1px rgba(250, 0, 255, 0.5),
+    0 6px 20px -8px rgba(250, 0, 255, 0.45);
 }
 @media (hover: hover) {
   .landing .u-btn:hover {

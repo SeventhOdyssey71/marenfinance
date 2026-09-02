@@ -1,12 +1,10 @@
 import { Reveal } from './ui/reveal';
 import { Tag } from './ugly-ui';
-import { BoltIcon } from './ui/icons';
 
 /**
  * How it works — three big numbered sticker cards: deposit, draw, spend. Honest
- * throughout: the first-deposit-costs-gas caveat is stated on step 01, the
- * 140/110 buffer on step 02, and a plain gasless note at the foot says no
- * relayer is running yet.
+ * throughout: the first-deposit-costs-gas caveat is stated on step 01 and the
+ * 140/110 buffer on step 02. (The gasless caveat lives in the FAQ.)
  */
 
 const STEPS: readonly { n: string; title: string; body: string; fill: string }[] = [
@@ -64,18 +62,6 @@ export function HowItWorks() {
             </p>
           </article>
         ))}
-      </Reveal>
-
-      {/* Honest gasless note */}
-      <Reveal className="mt-5 flex items-start gap-3.5 rounded-[16px] bg-[color:var(--graphite)] p-5 text-[color:var(--card)]">
-        <span className="u-chip size-9 shrink-0 bg-white/10 text-[color:var(--lime)]">
-          <BoltIcon className="size-4" />
-        </span>
-        <p className="text-[14px] font-medium leading-[1.5]">
-          <span className="font-bold text-[color:var(--card)]">Gasless is by design, not a claim about today.</span>{' '}
-          No relayer is running yet, so for now your own wallet submits — and every screen says so
-          before you sign.
-        </p>
       </Reveal>
     </section>
   );
