@@ -1,5 +1,6 @@
 'use client';
 
+import type { ReactNode } from 'react';
 import Link from 'next/link';
 import {
   MAREN_POLICY,
@@ -28,8 +29,6 @@ import {
   EmptyState,
   Info,
   Label,
-  Metric,
-  MetricStrip,
   Note,
   Panel,
   PanelBody,
@@ -37,7 +36,6 @@ import {
 } from '@/components/app/primitives';
 import { ConnectPrompt } from '@/components/app/connect-prompt';
 import { ProtocolPanel } from '@/components/app/protocol-panel';
-import { SocialVaultPanel } from '@/components/app/social-vault';
 import { LivePulseFrame } from '@/components/shaders/live-pulse';
 import {
   ArrowDown,
@@ -61,24 +59,22 @@ import {
 import type { ActivityItem } from '@/lib/data/types';
 
 /**
- * Portfolio — the home screen.
+ * Home — the position at a glance.
  *
- * WHAT CHANGED IN THIS PASS. This screen used to read like documentation with inputs in
- * it: five titled cards, each with an `h3`, a paragraph of prose, and a grid of figures
- * with two-line rows underneath. Every group of four numbers carried the visual weight of
- * a chapter heading, and the numbers were the smallest thing on their own card.
+ * WHAT CHANGED IN THIS PASS. This screen had drifted into a lending terminal: the
+ * collateral ratio was the hero, a six-mark gauge sat under it, and three more panels —
+ * liquidation math, the social-vault mechanics, and a borrowing-capacity table naming
+ * "Mezo's ceiling" and "drawn" — carried equal weight below. Every expert figure shouted
+ * at once, which is fine for a trader and wrong for someone who just wants to know what
+ * they have and whether it is safe.
  *
- * It is now laid out the way a lending interface is laid out. Panels have a `t-label`
- * column-header bar rather than a headline. Facts sit in one-line rows with values
- * right-aligned in mono. The figures a user makes a decision from — ratio, liquidation
- * price, drop tolerance, capacity — sit in a divided strip across the top of the panel
- * they belong to, at the size that says they are the subject. Balances and capacity, which
- * are read together, sit side by side rather than one below the other.
- *
- * WHAT DID NOT CHANGE. Position health is still the hero, the only coloured element is
- * still the health chip (BRAND.md §2), every disclosure is still on the screen, and no
- * figure was invented to fill a column. What was cut is prose, not facts: the sentences
- * that explained why a card existed rather than what the number in it meant.
+ * It now leads with plain language: a one-line safety statement, then three facts anyone
+ * reads without a glossary — what is locked, what is borrowed, what is left to borrow.
+ * Everything the old screen showed is still here and still exact; the ratio, the
+ * liquidation price, the interest, the ceiling mechanics and the shared-vault risk have
+ * moved one tap down into "Position details". Nothing was deleted — a screen that hides a
+ * real risk would be worse than a dense one — it was demoted, and the risk stays prominent
+ * on Finance, where you actually borrow.
  *
  * When the price feed is not live the health block is replaced by the price state. There
  * is no "last known health" rendering, because a health figure computed from a stale price
@@ -94,24 +90,9 @@ export default function PortfolioPage() {
 
   const livePrice = price.state === 'live' ? price.priceWei : null;
 
-  // Disconnected is a first-class state now, not a gap filled with demo data.
   if (!source.connected) return <NotConnected />;
 
-  /**
-   * The empty account. `debtWei === 0n && collateralWei === 0n` rather than
-   * `route === 'none'`, because a user who has deposited but not yet borrowed also has
-   * no health to show and must not be quoted a liquidation price.
-   */
   const empty = position !== undefined && position.collateralWei === 0n && position.debtWei === 0n;
-
-  /**
-   * Deposited but not yet borrowed. This account has collateral and zero debt, which
-   * means it has NO health figure: no ratio (it would be infinite), no liquidation
-   * price (nothing can be liquidated), no distance-to-anything. Rendering the gauge
-   * here produced an infinity symbol, two dashes, and a marker pinned to the end of a
-   * scale that measures nothing — a dashboard of placeholders where the only real fact
-   * is "you have Bitcoin deposited and you could borrow against it".
-   */
   const debtFree = position !== undefined && !empty && position.debtWei === 0n;
 
   const health =
@@ -131,14 +112,13 @@ export default function PortfolioPage() {
 
       <ActionPills />
 
-      {/* ---------------------------------------------------------------- Hero */}
       {debtFree && position ? (
-        <Panel title="Position" meta={<span className="t-label text-text-subtle">No debt</span>}>
+        <Panel title="Your position" meta={<span className="t-label text-text-subtle">No debt</span>}>
           <div className="px-5 py-5">
             <div className="flex flex-wrap items-baseline gap-3">
               <Btc wei={position.collateralWei} size="xl" />
               <span className="text-text-subtle text-sm">
-                deposited
+                locked
                 {collateralUsd !== null ? (
                   <>
                     {' '}
@@ -147,95 +127,34 @@ export default function PortfolioPage() {
                 ) : null}
               </span>
             </div>
-
             <p className="text-text-muted mt-3 max-w-[64ch] text-sm leading-relaxed">
-              Nothing borrowed, so there is no collateral ratio and no liquidation price. Your
-              Bitcoin cannot be liquidated while your debt is zero.
+              You have not borrowed anything, so there is nothing at risk. Your Bitcoin cannot be
+              liquidated while your debt is zero.
             </p>
           </div>
-
           <div className="border-t border-[var(--border-hairline)] px-5 py-3">
             <ActionLink href="/app/vault" icon={<ArrowRight className="size-4" />}>
               Borrow MUSD against it
             </ActionLink>
           </div>
         </Panel>
-      ) : health && position ? (
-        <LivePulseFrame colors={toneShaderColors[healthTone[health.status]]}>
-          <Panel
-            title="Position"
-            labelledBy="position-health"
-            meta={<HealthChip status={health.status} />}
-          >
-            <div className="px-5 pb-5 pt-5">
-              <div className="flex flex-wrap items-baseline gap-3">
-                <Ratio cr={health.collateralRatio} size="xl" />
-                <span className="text-text-subtle text-sm">collateral ratio</span>
-              </div>
-              <HealthScale collateralRatio={health.collateralRatio} status={health.status} />
-            </div>
-
-            {/* The three derived figures, on a rule. `Metric` clips rather than letting a
-                long value set the column's minimum width — the failure that once rendered
-                two of these labels on top of one another. */}
-            <div className="border-t border-[var(--border-hairline)]">
-              <MetricStrip>
-                <Metric
-                  className="px-5 py-4"
-                  label="Liquidation price"
-                  value={
-                    <LiquidationPrice
-                      wei={health.liquidationPrice}
-                      debtWei={position.debtWei}
-                      size="lg"
-                    />
-                  }
-                  caption="protocol liquidates at 110%"
-                />
-                <Metric
-                  className="px-5 py-4"
-                  label="Bitcoin can fall"
-                  value={
-                    <DropToLiquidation
-                      bps={health.priceDropToLiquidationBps}
-                      debtWei={position.debtWei}
-                      size="lg"
-                    />
-                  }
-                  caption="from today’s price"
-                />
-                <Metric
-                  className="px-5 py-4"
-                  label="Outstanding debt"
-                  value={<Musd wei={position.debtWei} size="lg" />}
-                  caption={`${formatMusd(position.interestWei)} interest`}
-                />
-              </MetricStrip>
-            </div>
-
-            {!health.canBorrow ? (
-              <p
-                className="text-text-muted border-t border-[var(--border-hairline)] px-5 py-3 text-sm"
-                role="status"
-              >
-                Borrowing is closed below {policyRatio(MAREN_POLICY.minHealthyCr)}. Repay or add
-                collateral in the{' '}
-                <Link href="/app/vault" className="text-violet-400 hover:text-violet-400/80">
-                  Vault
-                </Link>
-                .
-              </p>
-            ) : null}
-          </Panel>
-        </LivePulseFrame>
+      ) : health && position && livePrice ? (
+        <PositionCard
+          position={position}
+          health={health}
+          balances={balances}
+          earn={earn}
+          collateralUsd={collateralUsd}
+          livePrice={livePrice}
+        />
       ) : (
-        <Panel title="Position" labelledBy="position-health">
+        <Panel title="Your position" labelledBy="position-health">
           <div className="p-5">
             <PriceBanner feed={price} />
             {position && price.state !== 'loading' ? (
               <p className="text-text-subtle mt-4 max-w-[68ch] text-sm leading-relaxed">
                 You hold {formatBtc(position.collateralWei)} against {formatMusd(position.debtWei)}{' '}
-                of debt. Health is not shown because it would have to be computed from a price the
+                of debt. Safety is not shown because it would have to be computed from a price the
                 protocol itself would refuse.
               </p>
             ) : null}
@@ -243,75 +162,175 @@ export default function PortfolioPage() {
         </Panel>
       )}
 
-      {/* WHERE THIS POSITION ACTUALLY LIVES, said in the product's own words rather than
-          left to the reader to infer from a "pooled route" tag. Only for an account that
-          is in the vault: a user with a trove of their own shares nothing and has nothing
-          to be told here. */}
-      {position?.route === 'pooled' ? <SocialVaultPanel variant="compact" /> : null}
-
-      {/* Read together, so laid out together, at equal height. */}
-      <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
-        <Panel
-          title="Balances"
-          meta={
-            <Link
-              href="/app/vault"
-              className="text-text-muted hover:text-text text-xs transition-colors duration-[120ms] ease-out"
-            >
-              Manage
-            </Link>
-          }
-        >
-          <PanelBody>
-            <StatRow
-              label="Bitcoin collateral"
-              value={position ? <Btc wei={position.collateralWei} size="lg" /> : <Dash size="lg" />}
-              sub={collateralUsd !== null ? <Usd wei={collateralUsd} size="sm" /> : null}
-            />
-            <StatRow
-              label="MUSD"
-              hint="spendable"
-              value={balances ? <Musd wei={balances.musdWei} size="lg" /> : <Dash size="lg" />}
-            />
-            <StatRow
-              label="In Earn"
-              hint="valued in MUSD"
-              value={earn ? <Musd wei={earn.assetsWei} size="lg" /> : <Dash size="lg" />}
-            />
-            <StatRow
-              label="Debt"
-              hint={
-                position?.route === 'direct'
-                  ? 'includes the 200 MUSD reserve'
-                  : 'no reserve, social vault'
-              }
-              value={position ? <Musd wei={position.debtWei} size="lg" /> : <Dash size="lg" />}
-              last
-            />
-          </PanelBody>
-        </Panel>
-
-        <BorrowingCapacity />
-      </div>
-
       <RecentActivity />
     </div>
   );
 }
 
 /**
- * The four things you launch from Home — the Talise pattern, adapted.
+ * The position, in plain language, with the expert detail one tap down.
  *
- * Send and Receive open the Pay hub (a flow, not a nav peer); Borrow opens the Vault;
- * Earn opens the Stability Pool. Receive deep-links the Pay hub's Receive tab through a
- * URL hash, which `PayPage` reads on mount — no new state and no logic touched.
+ * The hero is a sentence, not a ratio: "your Bitcoin can fall X% before it could be
+ * liquidated" is the thing a borrower actually wants to know, and the health chip carries
+ * the healthy/caution/danger state as the only coloured element (BRAND.md §2). Three rows
+ * follow — locked, borrowed, left to borrow — the last being the real, ceiling-aware
+ * number the Vault slider is bounded by, so Home never quotes a figure a borrow would
+ * reject. `Position details` holds everything the old dense layout showed.
+ */
+function PositionCard({
+  position,
+  health,
+  balances,
+  earn,
+  collateralUsd,
+  livePrice,
+}: {
+  position: NonNullable<ReturnType<typeof usePosition>['data']>;
+  health: NonNullable<ReturnType<typeof assessHealth>>;
+  balances: ReturnType<typeof useBalances>['data'];
+  earn: ReturnType<typeof useEarn>['data'];
+  collateralUsd: bigint | null;
+  livePrice: bigint;
+}) {
+  const limits = borrowCeiling(position, livePrice);
+  const available = limits?.amountWei ?? null;
+  const ceiling = position.maxBorrowingCapacityWei;
+  const pooled = position.route === 'pooled';
+
+  return (
+    <LivePulseFrame colors={toneShaderColors[healthTone[health.status]]}>
+      <Panel
+        title="Your position"
+        labelledBy="position-health"
+        meta={<HealthChip status={health.status} />}
+      >
+        {/* Plain-language safety line — the one thing a borrower is here to check. */}
+        <div className="px-5 pt-5">
+          <p className="text-text max-w-[52ch] text-[1.0625rem] leading-snug">
+            Your Bitcoin can fall{' '}
+            <DropToLiquidation
+              bps={health.priceDropToLiquidationBps}
+              debtWei={position.debtWei}
+              size="md"
+            />{' '}
+            before it could be liquidated.
+          </p>
+        </div>
+
+        {/* The three facts anyone reads without a glossary. */}
+        <PanelBody className="mt-3">
+          <StatRow
+            label="Bitcoin locked"
+            value={<Btc wei={position.collateralWei} size="lg" />}
+            sub={collateralUsd !== null ? <Usd wei={collateralUsd} size="sm" /> : null}
+          />
+          <StatRow label="Borrowed" value={<Musd wei={position.debtWei} size="lg" />} />
+          <StatRow
+            label="Left to borrow"
+            value={available === null ? <Dash size="lg" /> : <Musd wei={available} size="lg" />}
+            last
+          />
+        </PanelBody>
+
+        <div className="border-t border-[var(--border-hairline)] px-5 py-3">
+          {!health.canBorrow ? (
+            <div className="mb-3">
+              <Note tone="warning" role="status">
+                Borrowing is closed below {policyRatio(MAREN_POLICY.minHealthyCr)}. Repay or add
+                collateral on{' '}
+                <Link href="/app/finance" className="text-violet-400 hover:text-violet-400/80">
+                  Finance
+                </Link>
+                .
+              </Note>
+            </div>
+          ) : null}
+
+          {/* Everything the old dense layout showed, kept and demoted — never deleted. */}
+          <Info summary="Position details">
+            <div className="flex flex-col gap-4">
+              <div>
+                <div className="flex items-baseline gap-2">
+                  <Ratio cr={health.collateralRatio} size="md" />
+                  <span className="text-text-subtle">collateral ratio</span>
+                </div>
+                <div className="mt-2">
+                  <HealthScale collateralRatio={health.collateralRatio} status={health.status} />
+                </div>
+              </div>
+
+              <dl className="grid grid-cols-1 gap-x-6 gap-y-2 sm:grid-cols-2">
+                <DetailRow label="Liquidation price">
+                  <LiquidationPrice
+                    wei={health.liquidationPrice}
+                    debtWei={position.debtWei}
+                    size="sm"
+                  />
+                  <span className="text-text-subtle"> · protocol liquidates at 110%</span>
+                </DetailRow>
+                <DetailRow label="Interest owed">
+                  <Musd wei={position.interestWei} size="sm" />
+                </DetailRow>
+                <DetailRow label="Spendable MUSD">
+                  {balances ? <Musd wei={balances.musdWei} size="sm" /> : <Dash size="sm" />}
+                </DetailRow>
+                <DetailRow label="In Earn">
+                  {earn ? <Musd wei={earn.assetsWei} size="sm" /> : <Dash size="sm" />}
+                </DetailRow>
+                <DetailRow label="Borrowing ceiling">
+                  <Musd wei={ceiling} size="sm" />
+                  <span className="text-text-subtle"> · fixed when the trove opened</span>
+                </DetailRow>
+                <DetailRow label="Route">
+                  {pooled ? 'Shared social vault' : 'Your own trove'}
+                </DetailRow>
+              </dl>
+
+              <p className="leading-relaxed">
+                {pooled ? (
+                  <>
+                    You share one trove with everyone else in the social vault. Your Bitcoin is
+                    segregated in accounting, not custody, so a fall faster than the keeper can act
+                    could socialise losses. Adding collateral does not raise the shared ceiling.{' '}
+                  </>
+                ) : (
+                  <>
+                    Mezo fixes this trove’s borrowing ceiling at the price it opened at. Adding
+                    collateral does not raise it — only a refinance does, at today’s price for a
+                    fee.{' '}
+                  </>
+                )}
+                <Link href="/app/finance" className="text-violet-400 hover:text-violet-400/80">
+                  Manage on Finance
+                </Link>
+              </p>
+            </div>
+          </Info>
+        </div>
+      </Panel>
+    </LivePulseFrame>
+  );
+}
+
+/** A label/value pair inside the details disclosure. */
+function DetailRow({ label, children }: { label: string; children: ReactNode }) {
+  return (
+    <div className="flex items-baseline justify-between gap-3 py-0.5">
+      <dt className="text-text-subtle">{label}</dt>
+      <dd className="text-text-muted text-right">{children}</dd>
+    </div>
+  );
+}
+
+/**
+ * The four things you launch from Home — the Talise pattern, adapted.
  */
 function ActionPills() {
   const actions = [
     { href: '/app/pay', label: 'Send', Icon: PayIcon },
     { href: '/app/pay#receive', label: 'Receive', Icon: ArrowDown },
-    { href: '/app/vault', label: 'Borrow', Icon: VaultIcon },
-    { href: '/app/earn', label: 'Earn', Icon: EarnIcon },
+    { href: '/app/finance', label: 'Borrow', Icon: VaultIcon },
+    { href: '/app/finance?section=earn', label: 'Earn', Icon: EarnIcon },
   ] as const;
 
   return (
@@ -337,10 +356,8 @@ function ActionPills() {
 
 /**
  * A short window on the ledger, so Home answers "what just happened" without a trip to
- * Activity. Real decoded logs only — the same `useActivity` read Activity uses — capped
- * at the four newest rows, with the full history one tap away. When there is nothing to
- * show (no history, a scan still in flight, or a failed read) this renders nothing and
- * leaves the accounting to the Activity screen, which states each of those honestly.
+ * Activity. Real decoded logs only, capped at four, with the full history one tap away.
+ * Renders nothing when there is nothing honest to show.
  */
 function RecentActivity() {
   const { data: window } = useActivity();
@@ -424,120 +441,7 @@ function AccountHeader({
 }
 
 /**
- * Borrowing capacity — the Mezo-specific trap, stated.
- *
- * MUSD fixes a per-trove borrowing ceiling at the price the trove opened at, and adding
- * collateral does NOT raise it; only `refinance()` does. So a user whose Bitcoin has
- * doubled sees better health and still cannot draw more. Showing an ICR-derived headroom
- * as "available to borrow" would be a number that fails on submission with an opaque
- * revert, which is why both figures are shown and the binding one is named.
- */
-function BorrowingCapacity() {
-  const { data: position } = usePosition();
-  const price = usePrice();
-  const livePrice = price.state === 'live' ? price.priceWei : null;
-
-  if (!position) {
-    return (
-      <Panel title="Borrowing capacity">
-        <p className="text-text-subtle px-5 py-4 text-sm">Reading your position.</p>
-      </Panel>
-    );
-  }
-
-  const ceiling = position.maxBorrowingCapacityWei;
-  const drawn = position.principalWei;
-
-  // The same computation the Vault's slider is bounded by — one implementation, so the
-  // two screens can never quote a user different limits.
-  const limits = livePrice === null ? null : borrowCeiling(position, livePrice);
-  const mezoHeadroom = limits?.mezoHeadroomWei ?? (ceiling > drawn ? ceiling - drawn : 0n);
-  const available = limits?.amountWei ?? null;
-  const binding = limits?.binding ?? null;
-
-  return (
-    <Panel
-      title="Borrowing capacity"
-      meta={
-        <span className="t-label text-text-subtle">
-          {position.route === 'pooled' ? 'In the social vault' : 'Your own trove'}
-        </span>
-      }
-    >
-      <MetricStrip>
-        <Metric
-          className="px-5 py-4"
-          label="Available"
-          value={available === null ? <Dash size="lg" /> : <Musd wei={available} size="lg" />}
-          caption={
-            binding === null
-              ? 'needs a live price'
-              : binding === 'ceiling'
-                ? 'capped by Mezo’s ceiling'
-                : binding === 'ratio'
-                  ? 'capped by the 180% floor'
-                  : 'nothing to draw'
-          }
-        />
-        <Metric
-          className="px-5 py-4"
-          label="Mezo’s ceiling"
-          value={<Musd wei={ceiling} size="lg" />}
-          caption="fixed when this trove opened"
-        />
-        <Metric
-          className="px-5 py-4"
-          label="Drawn"
-          value={<Musd wei={drawn} size="lg" />}
-          caption={`${formatMusd(mezoHeadroom)} under the ceiling`}
-        />
-      </MetricStrip>
-
-      <div className="border-t border-[var(--border-hairline)] px-5 py-3">
-        {/* Nothing on the surface. The mechanism — which contract call the ceiling comes
-            from, and why adding collateral does not move it — is true, is the single most
-            surprising thing about borrowing on Mezo, and is three sentences long, so it
-            sits behind the affordance rather than in the panel. */}
-        <Info summary="Why the ceiling does not move">
-          {position.route === 'pooled' ? (
-            <>
-              This ceiling belongs to the social vault’s trove and is shared by everyone in it. Your
-              own limit is Maren’s 180% floor on your share; whichever binds first stops the
-              transaction.
-            </>
-          ) : (
-            <>
-              Mezo fixes a per-trove ceiling at the price the trove opened at, and reports it from{' '}
-              <span className="num">TroveManager.getTroveMaxBorrowingCapacity()</span> rather than
-              deriving it from your collateral ratio. Adding collateral does not raise it: only a
-              refinance does, which re-fixes the ceiling at today’s price for a fee and is blocked
-              while the system is in Recovery Mode.
-            </>
-          )}
-        </Info>
-
-        {position.route === 'direct' && mezoHeadroom === 0n ? (
-          <div className="mt-3">
-            <Note>
-              You are at Mezo’s ceiling. Your ratio may look healthy and the next borrow will still
-              revert; a refinance re-fixes it at today’s price.
-            </Note>
-          </div>
-        ) : null}
-      </div>
-    </Panel>
-  );
-}
-
-/**
- * The screen a brand-new wallet sees.
- *
- * This is the default state for everyone Mezo sends here, so it is the one that most has
- * to look deliberate. No health panel, no capacity strip, no balance rows reading 0.00
- * three times — none of those figures exist yet, and rendering their skeletons would be a
- * grid of dashes pretending to be a dashboard.
- *
- * What is left is one instruction and the three places to go.
+ * The screen a brand-new wallet sees: one instruction and where to go.
  */
 function NoPosition({
   handle,
@@ -551,15 +455,13 @@ function NoPosition({
   return (
     <div className="flex flex-col gap-4">
       <AccountHeader handle={handle} account={account} price={price} />
-
       <ActionPills />
-
       <AppCard className="p-5">
         <EmptyState
           icon={<VaultIcon className="size-6" />}
           title="No position yet"
           action={
-            <ActionLink href="/app/vault" icon={<ArrowRight className="size-4" />}>
+            <ActionLink href="/app/finance" icon={<ArrowRight className="size-4" />}>
               Deposit Bitcoin
             </ActionLink>
           }
@@ -571,15 +473,7 @@ function NoPosition({
   );
 }
 
-/**
- * The screen with no wallet attached.
- *
- * Previously this state did not exist: `source.ts` fell back to a demo account, so an
- * anonymous visitor saw a full portfolio belonging to nobody — a health ratio, a
- * liquidation price, a history of payments to invented people. Removing that leaves a
- * hole, and the hole is filled with things that are actually true and actually public:
- * the oracle price and the pooled trove, straight from the contracts.
- */
+/** The screen with no wallet attached. */
 function NotConnected() {
   return (
     <div className="flex flex-col gap-4">
@@ -587,12 +481,10 @@ function NotConnected() {
         <Label>Account</Label>
         <h1 className="t-h3 mt-1.5">Your position</h1>
       </div>
-
       <ConnectPrompt icon={<VaultIcon className="size-6" />} title="No wallet connected">
         Maren shows you your own position and nothing else. Connect and every figure on this screen
         becomes a contract read you can check on the explorer.
       </ConnectPrompt>
-
       <ProtocolPanel />
     </div>
   );
