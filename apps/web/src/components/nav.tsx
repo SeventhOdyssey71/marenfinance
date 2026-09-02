@@ -67,7 +67,7 @@ export function Nav() {
           <div className="flex items-center gap-2.5">
             <StickerButton
               href="/app"
-              variant="cta"
+              variant="glow"
               className="hidden !min-h-[38px] !px-4 sm:inline-flex"
             >
               Launch app
@@ -114,7 +114,7 @@ export function Nav() {
         >
           <ul className="flex flex-col">
             {links.map((l) => (
-              <li key={l.href} className="border-b border-[color:var(--ink)]/10 last:border-b-0">
+              <li key={l.href} className="border-b border-[color:var(--border-hairline)] last:border-b-0">
                 <a
                   href={l.href}
                   onClick={() => setOpen(false)}
@@ -127,7 +127,7 @@ export function Nav() {
             <li className="pt-3">
               <StickerButton
                 href="/app"
-                variant="cta"
+                variant="glow"
                 className="w-full"
               >
                 Launch app

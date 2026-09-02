@@ -16,17 +16,17 @@ import { PayIcon, Check } from './ui/icons';
 function PhoneMock() {
   return (
     <div
-      className="u-peel u-peel-lime relative w-[300px] shrink-0 rounded-[46px] border border-[color:var(--ink)] bg-[color:var(--hardware)] p-2.5 sm:w-[320px]"
+      className="u-glow-wrap relative w-[300px] shrink-0 rounded-[46px] bg-[color:var(--hardware)] p-2.5 sm:w-[320px]"
       style={{ transform: 'rotate(-3deg)' }}
     >
       {/* Screen */}
-      <div className="overflow-hidden rounded-[38px] border border-[color:var(--ink)] bg-[color:var(--card)]">
+      <div className="overflow-hidden rounded-[38px] bg-[color:var(--card)]">
         {/* Status strip */}
-        <div className="flex items-center justify-between border-b border-[color:var(--ink)] bg-[color:var(--khaki)] px-5 py-3">
+        <div className="flex items-center justify-between bg-[color:var(--khaki)] px-5 py-3">
           <span className="text-[13px] font-bold uppercase tracking-[-0.01em] text-[color:var(--ink)]">
             Vault
           </span>
-          <span className="rounded-[9px] border border-[color:var(--ink)] bg-[color:var(--card)] px-2 py-0.5 text-[10px] font-bold uppercase tracking-[0.04em] text-[color:var(--ink)]">
+          <span className="u-sticker bg-[color:var(--lime)]" style={{ transform: 'rotate(3deg)' }}>
             Illustrative
           </span>
         </div>
@@ -44,7 +44,7 @@ function PhoneMock() {
               <div className="text-[10px] font-bold uppercase tracking-[0.06em] text-[color:var(--muted)]">
                 Collateral
               </div>
-              <div className="num mt-1 text-[15px] font-bold text-[color:var(--ink)]">0.0500 BTC</div>
+              <div className="num mt-1 text-[15px] font-bold text-[color:var(--ink)]">0<span className="dec">.0500</span> BTC</div>
               <div className="num mt-0.5 text-[11px] text-[color:var(--placeholder)]">≈ $3,150</div>
             </div>
             <div className="u-card !rounded-[12px] bg-[color:var(--cyan)] p-3">
@@ -58,7 +58,7 @@ function PhoneMock() {
 
           {/* Ratio rail — fill is headroom above the 140% liquidation marker. */}
           <div className="mt-4">
-            <div className="relative h-3 overflow-hidden rounded-[8px] border border-[color:var(--ink)] bg-[color:var(--card)]">
+            <div className="relative h-3 overflow-hidden rounded-[8px] bg-[color:var(--soft-fill)]">
               <div className="h-full w-[72%] bg-[color:var(--lime)]" />
               <span
                 aria-hidden
@@ -135,7 +135,7 @@ export function Hero() {
         delay={220}
         className="mt-8 flex flex-wrap items-center justify-center gap-3"
       >
-        <StickerButton href="/app" variant="cta">
+        <StickerButton href="/app" variant="glow">
           Launch app
         </StickerButton>
         <StickerButton href="#how" variant="ghost">

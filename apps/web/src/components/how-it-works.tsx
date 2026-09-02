@@ -48,10 +48,10 @@ export function HowItWorks() {
         {STEPS.map((s) => (
           <article
             key={s.n}
-            className="flex flex-col rounded-[16px] border border-[color:var(--ink)] bg-[color:var(--card)] p-6"
+            className="u-card flex flex-col p-6"
           >
             <span
-              className="u-display grid size-16 place-items-center rounded-[12px] border border-[color:var(--ink)] text-[30px] leading-none text-[color:var(--ink)]"
+              className="u-display grid size-16 place-items-center rounded-[12px] text-[30px] leading-none text-[color:var(--ink)]"
               style={{ background: s.fill }}
             >
               {s.n}
@@ -67,8 +67,8 @@ export function HowItWorks() {
       </Reveal>
 
       {/* Honest gasless note */}
-      <Reveal className="mt-5 flex items-start gap-3.5 rounded-[16px] border border-[color:var(--ink)] bg-[color:var(--graphite)] p-5 text-[color:var(--card)]">
-        <span className="u-chip size-9 shrink-0 !border-[color:var(--card)] bg-transparent text-[color:var(--lime)]">
+      <Reveal className="mt-5 flex items-start gap-3.5 rounded-[16px] bg-[color:var(--graphite)] p-5 text-[color:var(--card)]">
+        <span className="u-chip size-9 shrink-0 bg-white/10 text-[color:var(--lime)]">
           <BoltIcon className="size-4" />
         </span>
         <p className="text-[14px] font-medium leading-[1.5]">

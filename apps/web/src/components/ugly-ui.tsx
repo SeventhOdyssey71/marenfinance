@@ -2,20 +2,22 @@ import Link from 'next/link';
 import type { ReactNode } from 'react';
 
 /**
- * UGLYCASH primitives for the Maren landing — the sticker button and the
- * eyebrow tag. All paint lives in `src/app/landing.css`, scoped under
- * `.landing`. Borders are the structure; there are no shadows.
+ * UGLYCASH primitives for the Maren landing — the pill button and the eyebrow
+ * tag. All paint lives in `src/app/landing.css`, scoped under `.landing`.
+ * Surfaces are soft and borderless; the primary "glow" pill carries a pink→
+ * violet glassmorphic halo, quiet buttons a soft grey fill.
  */
 
-type ButtonVariant = 'cta' | 'ghost' | 'dark';
+type ButtonVariant = 'glow' | 'cta' | 'ghost' | 'dark';
 
 const VARIANT_CLASS: Record<ButtonVariant, string> = {
-  cta: 'u-btn-cta',
-  ghost: 'u-btn-ghost',
+  glow: 'u-btn-glow', // primary — soft pink/violet halo
+  cta: 'u-btn-cta', // lime
+  ghost: '', // base soft-grey pill
   dark: 'u-btn-dark',
 };
 
-/** Sticker button — 1px black border, 16px radius, Inter 14/700 black. */
+/** A borderless pill. `glow` for the primary CTA, `ghost` for a quiet action. */
 export function StickerButton({
   href,
   children,

@@ -14,14 +14,14 @@ import { VaultIcon, PayIcon, EarnIcon } from './ui/icons';
  */
 
 const MOCK_TAG = (
-  <span className="rounded-[8px] border border-[color:var(--ink)] bg-[color:var(--card)] px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-[0.04em] text-[color:var(--ink)]">
+  <span className="u-sticker bg-[color:var(--lime)]" style={{ transform: 'rotate(3deg)' }}>
     Illustrative
   </span>
 );
 
 function VaultCard() {
   return (
-    <article className="flex flex-col rounded-[16px] border border-[color:var(--ink)] bg-[color:var(--pink)] p-6">
+    <article className="flex flex-col rounded-[16px] bg-[color:var(--pink)] p-6">
       <div className="flex items-center gap-3">
         <span className="u-chip size-10">
           <VaultIcon className="size-5" />
@@ -42,7 +42,7 @@ function VaultCard() {
         <div className="num mt-1 text-[26px] font-extrabold leading-none tracking-[-0.03em] text-[color:var(--ink)]">
           1,200 <span className="text-[color:var(--muted)]">MUSD</span>
         </div>
-        <dl className="mt-4 grid grid-cols-3 gap-2 border-t border-[color:var(--ink)]/12 pt-3">
+        <dl className="mt-4 grid grid-cols-3 gap-2 border-t border-[color:var(--border-hairline)] pt-3">
           {[
             ['Floor', '0.001 BTC'],
             ['Maren CR', '140%'],
@@ -72,7 +72,7 @@ function PayCard() {
     ['claim link', 'no BTC to receive', '$40'],
   ];
   return (
-    <article className="flex flex-col rounded-[16px] border border-[color:var(--ink)] bg-[color:var(--cyan)] p-6">
+    <article className="flex flex-col rounded-[16px] bg-[color:var(--cyan)] p-6">
       <div className="flex items-center gap-3">
         <span className="u-chip size-10">
           <PayIcon className="size-5" />
@@ -94,7 +94,7 @@ function PayCard() {
           {rows.map(([to, meta, amt]) => (
             <li
               key={to}
-              className="flex items-center justify-between gap-3 rounded-[10px] border border-[color:var(--ink)] px-3 py-2"
+              className="u-well flex items-center justify-between gap-3 px-3 py-2"
             >
               <div className="min-w-0">
                 <div className="text-[12.5px] font-bold text-[color:var(--ink)]">{to}</div>
@@ -116,7 +116,7 @@ function PayCard() {
 
 function EarnCard() {
   return (
-    <article className="flex flex-col rounded-[16px] border border-[color:var(--ink)] bg-[color:var(--khaki)] p-6">
+    <article className="flex flex-col rounded-[16px] bg-[color:var(--khaki)] p-6">
       <div className="flex items-center gap-3">
         <span className="u-chip size-10">
           <EarnIcon className="size-5" />
@@ -137,7 +137,7 @@ function EarnCard() {
         <div className="mt-2 text-[15px] font-extrabold tracking-[-0.02em] text-[color:var(--ink)]">
           Paid in seized BTC
         </div>
-        <div className="mt-3 inline-flex items-center rounded-[8px] border border-[color:var(--ink)] bg-[color:var(--paper)] px-2 py-1 text-[10px] font-bold uppercase tracking-[0.04em] text-[color:var(--ink)]">
+        <div className="u-sticker mt-3 bg-[color:var(--cyan)]" style={{ transform: 'rotate(-3deg)' }}>
           No APY quoted
         </div>
       </div>

@@ -1,63 +1,64 @@
 /*
- * ── Maren landing — "UGLYCASH" sticker-brutalist ────────────────────────────
+ * ── Maren landing — "UGLYCASH" clean sticker-pop ────────────────────────────
  *
- * A paper-cream canvas where the structure IS the border: a 1px solid black
- * hairline wraps every card, button, panel and phone frame, and depth comes
- * from those borders plus an optional offset "peel" frame — never a drop
- * shadow. Saturated sticker fills (Riot Pink, Voltage Cyan, Toxic Lime,
- * Sticker Khaki) appear ONLY as full-bleed panel backgrounds; Toxic Lime is
- * the one filled CTA colour. Anton carries the ultra-condensed black
- * headlines, Inter everything else, Caveat one handwritten accent.
+ * Corrected read of the real ugly.cash: the structure is NOT a black hairline
+ * around everything (that reads as busy). Surfaces are soft WHITE rounded cards
+ * on a paper-cream canvas, separated by tone and a whisper of shadow — no black
+ * outlines. The loud energy comes from the huge black condensed type, saturated
+ * colour FILLS (used full-bleed, not as thin accents), small tilted sticker
+ * badges, and glassmorphic glowing pills on the primary CTAs. Anton carries the
+ * ultra-condensed headlines, Inter everything else, Caveat one handwritten note.
  *
- * Everything is scoped under `.landing` so it never touches the product
- * (`/app`), the docs (`/docs`), or the shared @theme tokens in globals.css.
- * The Anton / Inter / Caveat variables come from next/font on <html>.
+ * Everything is scoped under `.landing` so it never touches `/app`, `/docs`, or
+ * the shared @theme tokens. Anton / Inter / Caveat come from next/font on <html>.
  */
 
 .landing {
   /* ── Surfaces ── */
   --paper: #f2f2f2; /* canvas / paper cream */
   --card: #ffffff; /* card fill */
-  --graphite: #3a3a3a; /* dark panel */
-  --hardware: #000100; /* near-black hardware panel */
+  --soft-fill: #ececef; /* quiet button / chip fill (borderless) */
+  --graphite: #262629; /* dark panel */
+  --hardware: #0b0b0d; /* near-black hardware panel */
 
   /* ── Ink ── */
-  --ink: #000000; /* all text, all borders, all icon strokes */
+  --ink: #101013; /* headings and body */
   --muted: #6e6e6e; /* secondary text (AA on paper + card) */
-  --placeholder: #888888; /* tertiary / placeholder */
+  --placeholder: #9a9aa2; /* tertiary / greyed decimals */
 
-  /* ── Saturated sticker fills (backgrounds only) ── */
+  /* ── Saturated fills (full-bleed backgrounds only) ── */
   --pink: #fa00ff; /* Riot Pink */
   --cyan: #02bbff; /* Voltage Cyan */
-  --lime: #adff02; /* Toxic Lime — the only filled CTA colour */
+  --lime: #adff02; /* Toxic Lime */
   --khaki: #e7e3bf; /* Sticker Khaki */
 
-  /* ── Structure ── */
-  --hair: 1px solid var(--ink);
-  --r-card: 16px;
-  --r-hero: 42px;
+  /* ── Structure: soft, not outlined ── */
+  --r-card: 24px;
+  --r-btn: 16px;
+  --r-hero: 40px;
+  --soft: 0 1px 2px rgba(16, 16, 19, 0.04), 0 14px 34px -16px rgba(16, 16, 19, 0.14);
+  --soft-sm: 0 1px 2px rgba(16, 16, 19, 0.05), 0 6px 16px -10px rgba(16, 16, 19, 0.12);
 
   /* ── Type ── */
   --display: var(--font-anton), 'Arial Narrow', 'Roboto Condensed', sans-serif;
   --body: var(--font-inter), ui-sans-serif, system-ui, -apple-system, 'Segoe UI', sans-serif;
   --hand: var(--font-caveat), ui-sans-serif, cursive;
 
-  /* Re-map the shared text tokens for this scope only, so any reused honest
-     copy that still carries a `text-text` / `text-text-muted` utility resolves
-     to black ink on paper here instead of the dark /app values. Touches
-     nothing in @theme. */
+  /* Re-map shared text/border tokens for this scope only, so any carried-over
+     honest copy still using `text-text*` / `border-hairline` resolves to the
+     light-canvas values here — and hairlines become a faint tone, never black.
+     Touches nothing in @theme. */
   --color-text: var(--ink);
   --color-text-muted: var(--muted);
   --color-text-subtle: var(--placeholder);
-  --border-hairline: var(--ink);
-  --border-strong: var(--ink);
+  --border-hairline: rgba(16, 16, 19, 0.08);
+  --border-strong: rgba(16, 16, 19, 0.16);
 
   position: relative;
   min-height: 100svh;
   color: var(--ink);
   background: var(--paper);
   font-family: var(--body);
-  font-feature-settings: 'cv11' 1;
   letter-spacing: -0.02em;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
@@ -67,13 +68,15 @@
   text-wrap: pretty;
 }
 
-/* Numerals: tabular Inter (keeps the surface to two families, per spec) —
-   overrides the global mono `.num`. */
+/* Numerals: tabular Inter, with greyed trailing decimals available via `.dec`. */
 .landing .num {
   font-family: var(--body);
   font-variant-numeric: tabular-nums;
   font-feature-settings: 'tnum' 1;
   letter-spacing: -0.01em;
+}
+.landing .dec {
+  color: var(--placeholder);
 }
 
 /* ── Display headline ─────────────────────────────────────────────────────── */
@@ -83,11 +86,10 @@
   text-transform: uppercase;
   color: var(--ink);
   line-height: 0.88;
-  letter-spacing: -0.033em;
+  letter-spacing: -0.035em;
   text-wrap: balance;
 }
 
-/* One handwritten accent — used once, on the hero. */
 .landing .u-hand {
   font-family: var(--hand);
   font-weight: 700;
@@ -99,12 +101,11 @@
 .landing :focus-visible {
   outline: 2px solid var(--ink);
   outline-offset: 3px;
-  border-radius: 4px;
+  border-radius: 6px;
 }
-
 .landing ::selection {
   background: var(--lime);
-  color: var(--ink);
+  color: #000;
 }
 
 /* ── Centred content column ───────────────────────────────────────────────── */
@@ -120,41 +121,40 @@
   }
 }
 
-/* ── Card / panel ─────────────────────────────────────────────────────────── */
+/* ── Card: soft white, no outline ─────────────────────────────────────────── */
 .landing .u-card {
   background: var(--card);
-  border: var(--hair);
   border-radius: var(--r-card);
+  box-shadow: var(--soft);
+}
+.landing .u-card-sm {
+  background: var(--card);
+  border-radius: 18px;
+  box-shadow: var(--soft-sm);
+}
+/* A quiet inset well (e.g. list rows inside a card) — tone, not a border. */
+.landing .u-well {
+  background: var(--soft-fill);
+  border-radius: 14px;
 }
 
-/* Peeled-sticker depth: an offset duplicate frame sitting behind the element.
-   The host must be `position: relative` and carry its own opaque background;
-   the peel inherits the host radius and never intercepts clicks. */
-.landing .u-peel {
+/* Ambient colour glow behind an element (phone mock, hero), replacing the old
+   black offset "peel" frame. Soft, blurred, never intercepts clicks. */
+.landing .u-glow-wrap {
   position: relative;
 }
-.landing .u-peel::before {
+.landing .u-glow-wrap::before {
   content: '';
   position: absolute;
-  inset: 0;
-  border: var(--hair);
-  border-radius: inherit;
-  background: var(--paper);
-  transform: translate(10px, 10px);
+  inset: -8% -6%;
   z-index: -1;
+  border-radius: 50%;
+  background: radial-gradient(closest-side, rgba(250, 0, 255, 0.5), rgba(140, 90, 255, 0.28), transparent 72%);
+  filter: blur(48px);
   pointer-events: none;
 }
-.landing .u-peel-pink::before {
-  background: var(--pink);
-}
-.landing .u-peel-cyan::before {
-  background: var(--cyan);
-}
-.landing .u-peel-lime::before {
-  background: var(--lime);
-}
 
-/* ── Sticker button ───────────────────────────────────────────────────────── */
+/* ── Buttons: borderless pills ────────────────────────────────────────────── */
 .landing .u-btn {
   position: relative;
   display: inline-flex;
@@ -163,44 +163,57 @@
   gap: 8px;
   min-height: 46px;
   padding-inline: 22px;
-  border: var(--hair);
-  border-radius: var(--r-card);
-  background: var(--card);
+  border: 0;
+  border-radius: var(--r-btn);
+  background: var(--soft-fill);
   color: var(--ink);
   font-family: var(--body);
   font-size: 14px;
   font-weight: 700;
   letter-spacing: -0.01em;
-  text-transform: none;
   cursor: pointer;
-  /* Named properties only — never `transition: all`. */
   transition:
     background-color 200ms ease,
+    box-shadow 200ms ease,
     color 200ms ease,
-    scale 200ms ease-out;
+    scale 160ms ease-out;
 }
 .landing .u-btn:active {
   scale: 0.97;
 }
-.landing .u-btn-cta {
-  background: var(--lime); /* the one filled CTA colour */
-}
-.landing .u-btn-ghost {
-  background: var(--card);
-}
 .landing .u-btn-dark {
   background: var(--ink);
-  color: var(--card);
+  color: #fff;
+}
+.landing .u-btn-cta {
+  background: var(--lime);
+  color: #101013;
+}
+/* Glassmorphic glow — the primary "launch" pill. A soft pink→violet halo sits
+   behind a clean pill, matching the ugly.cash "Get the APP" treatment. */
+.landing .u-btn-glow {
+  background: var(--card);
+  color: var(--ink);
+  box-shadow:
+    0 0 0 1px rgba(16, 16, 19, 0.06),
+    0 8px 30px -6px rgba(250, 0, 255, 0.45),
+    0 4px 14px -6px rgba(140, 90, 255, 0.5);
 }
 @media (hover: hover) {
-  .landing .u-btn-cta:hover {
-    background: color-mix(in srgb, var(--lime) 82%, #ffffff);
-  }
-  .landing .u-btn-ghost:hover {
-    background: var(--paper);
+  .landing .u-btn:hover {
+    background: #e2e2e7;
   }
   .landing .u-btn-dark:hover {
     background: var(--graphite);
+  }
+  .landing .u-btn-cta:hover {
+    background: color-mix(in srgb, var(--lime) 84%, #fff);
+  }
+  .landing .u-btn-glow:hover {
+    box-shadow:
+      0 0 0 1px rgba(16, 16, 19, 0.08),
+      0 10px 36px -6px rgba(250, 0, 255, 0.6),
+      0 6px 18px -6px rgba(140, 90, 255, 0.6);
   }
 }
 @media (max-width: 640px) {
@@ -210,35 +223,47 @@
   }
 }
 
-/* ── Icon chip ────────────────────────────────────────────────────────────── */
+/* ── Icon chip / eyebrow tag: soft fill, no border ────────────────────────── */
 .landing .u-chip {
   display: grid;
   place-items: center;
-  border: var(--hair);
   border-radius: 12px;
-  background: var(--card);
+  background: rgba(16, 16, 19, 0.06);
   color: var(--ink);
 }
-
-/* ── Eyebrow tag ──────────────────────────────────────────────────────────── */
 .landing .u-tag {
   display: inline-flex;
   align-items: center;
   gap: 8px;
-  border: var(--hair);
-  border-radius: var(--r-card);
-  background: var(--card);
-  padding: 7px 12px;
+  border-radius: 999px;
+  background: var(--soft-fill);
+  padding: 8px 14px;
   font-size: 12px;
   font-weight: 700;
   text-transform: uppercase;
   letter-spacing: 0.02em;
+  color: var(--ink);
 }
 .landing .u-tag-dot {
-  width: 9px;
-  height: 9px;
-  border: 1px solid var(--ink);
-  border-radius: 3px;
+  width: 8px;
+  height: 8px;
+  background: var(--pink);
+  border-radius: 999px;
+}
+
+/* ── Sticker badge: small, tilted, colour-filled accent ───────────────────── */
+.landing .u-sticker {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  border-radius: 8px;
+  padding: 5px 9px;
+  font-size: 11px;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.02em;
+  color: #101013;
+  box-shadow: var(--soft-sm);
 }
 
 /* ── FAQ accordion body (grid-rows height animation) ──────────────────────── */
@@ -281,9 +306,7 @@
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .landing .u-btn {
-    transition: none;
-  }
+  .landing .u-btn,
   .landing .u-faq-body {
     transition: none;
   }

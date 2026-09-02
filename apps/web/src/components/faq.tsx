@@ -202,7 +202,7 @@ function AccordionItem({
   const panelId = `faq-panel-${id}`;
 
   return (
-    <div className="overflow-hidden rounded-[16px] border border-[color:var(--ink)] bg-[color:var(--card)]">
+    <div className="u-card overflow-hidden">
       <h3>
         <button
           type="button"
@@ -223,8 +223,8 @@ function AccordionItem({
           </span>
           <span
             aria-hidden
-            className={`grid size-9 shrink-0 place-items-center rounded-[10px] border border-[color:var(--ink)] transition-colors duration-[200ms] ease-out ${
-              open ? 'bg-[color:var(--lime)]' : 'bg-[color:var(--card)]'
+            className={`grid size-9 shrink-0 place-items-center rounded-[10px] transition-colors duration-[200ms] ease-out ${
+              open ? 'bg-[color:var(--lime)]' : 'bg-[color:var(--soft-fill)]'
             } text-[color:var(--ink)]`}
           >
             {open ? <Minus className="size-4" /> : <Plus className="size-4" />}

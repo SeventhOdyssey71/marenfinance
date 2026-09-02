@@ -48,7 +48,7 @@ export function Footer() {
     <footer className="u-wrap pb-10 pt-24 sm:pt-28">
       {/* Closing CTA — lime sticker panel */}
       <Reveal>
-        <div className="u-peel u-peel-cyan rounded-[42px] border border-[color:var(--ink)] bg-[color:var(--lime)] p-8 text-center sm:p-14">
+        <div className="u-glow-wrap rounded-[42px] bg-[color:var(--lime)] p-8 text-center sm:p-14">
           <h2 className="u-display mx-auto max-w-[14ch] text-[clamp(40px,8vw,110px)]">
             Spend Bitcoin. Never sell it.
           </h2>
@@ -65,7 +65,7 @@ export function Footer() {
       </Reveal>
 
       {/* Link table */}
-      <div className="mt-14 grid grid-cols-1 gap-6 border-t border-[color:var(--ink)] pt-10 md:grid-cols-[1.6fr_1fr_1fr_1fr]">
+      <div className="mt-14 grid grid-cols-1 gap-6 border-t border-[color:var(--border-hairline)] pt-10 md:grid-cols-[1.6fr_1fr_1fr_1fr]">
         <div>
           <span className="text-[20px] font-extrabold uppercase tracking-[-0.03em] text-[color:var(--ink)]">
             Maren
@@ -123,13 +123,13 @@ export function Footer() {
       </div>
 
       {/* Copyright */}
-      <div className="mt-10 flex flex-col items-start justify-between gap-2 border-t border-[color:var(--ink)] pt-6 sm:flex-row sm:items-center">
+      <div className="mt-10 flex flex-col items-start justify-between gap-2 border-t border-[color:var(--border-hairline)] pt-6 sm:flex-row sm:items-center">
         <span className="text-[12.5px] font-medium leading-[1.5] text-[color:var(--muted)]">
           © {new Date().getFullYear()} Maren Finance. Pre-audit software. Deposit only what you can
           afford to lose.
         </span>
         <span className="inline-flex items-center gap-2.5 text-[12.5px] font-bold uppercase tracking-[0.06em] text-[color:var(--ink)]">
-          <span aria-hidden className="size-2 rounded-[3px] border border-[color:var(--ink)] bg-[color:var(--lime)]" />
+          <span aria-hidden className="size-2 rounded-[3px] bg-[color:var(--lime)]" />
           Built on Mezo
           <span className="num font-medium text-[color:var(--muted)]">31612 · 31611</span>
         </span>

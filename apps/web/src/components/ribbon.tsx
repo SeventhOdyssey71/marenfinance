@@ -34,7 +34,7 @@ function Row({ hidden = false }: { hidden?: boolean }) {
 
 export function Ribbon() {
   return (
-    <div className="u-marquee border-y border-[color:var(--ink)] bg-[color:var(--ink)]">
+    <div className="u-marquee bg-[color:var(--ink)]">
       <Row />
       <Row hidden />
     </div>

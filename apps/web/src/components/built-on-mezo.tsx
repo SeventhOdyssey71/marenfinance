@@ -56,7 +56,7 @@ export function BuiltOnMezo() {
   return (
     <section id="facts" className="u-wrap scroll-mt-28 pt-24 sm:pt-28">
       <Reveal>
-        <div className="rounded-[42px] border border-[color:var(--ink)] bg-[color:var(--graphite)] p-6 sm:p-10">
+        <div className="rounded-[42px] bg-[color:var(--graphite)] p-6 sm:p-10">
           <div className="max-w-[52ch]">
             <span className="u-tag">
               <span aria-hidden className="u-tag-dot" />
@@ -79,7 +79,7 @@ export function BuiltOnMezo() {
             {FACTS.map((f) => (
               <div
                 key={f.label}
-                className="grid grid-cols-1 gap-2 rounded-[16px] border border-[color:var(--ink)] bg-[color:var(--card)] p-4 sm:grid-cols-[13rem_1fr] sm:items-baseline sm:gap-6 sm:p-5"
+                className="u-card grid grid-cols-1 gap-2 p-4 sm:grid-cols-[13rem_1fr] sm:items-baseline sm:gap-6 sm:p-5"
               >
                 <dt className="flex items-baseline justify-between gap-3 sm:block">
                   <span className="text-[11px] font-bold uppercase tracking-[0.04em] text-[color:var(--muted)]">
@@ -97,7 +97,7 @@ export function BuiltOnMezo() {
           </dl>
 
           {/* Risk strip — stated plainly, in the loud style. */}
-          <div className="mt-2.5 rounded-[16px] border border-[color:var(--ink)] bg-[color:var(--lime)] p-5">
+          <div className="mt-2.5 rounded-[16px] bg-[color:var(--lime)] p-5">
             <div className="text-[11px] font-bold uppercase tracking-[0.06em] text-[color:var(--ink)]">
               Read this first
             </div>
