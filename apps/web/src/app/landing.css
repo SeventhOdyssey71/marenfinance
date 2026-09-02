@@ -308,9 +308,86 @@
   }
 }
 
+/* ── Scroll-progress indicator (rare-ui, restyled) ────────────────────────── */
+/* A soft, borderless white pill floating bottom-centre: ink text, pink `--pink`
+   progress ring, shared `--soft` shadow. Colour only — layout stays in the JSX.
+   Sits at z-40, below the z-50 nav pill, and at the opposite edge, so the two
+   never collide. */
+.landing .sp-root {
+  color: var(--ink);
+  font-family: var(--body);
+}
+.landing .sp-surface {
+  background: color-mix(in srgb, var(--card) 84%, transparent);
+  box-shadow: var(--soft);
+  -webkit-backdrop-filter: blur(12px);
+  backdrop-filter: blur(12px);
+}
+.landing .sp-track {
+  stroke: rgba(16, 16, 19, 0.14);
+}
+.landing .sp-fill {
+  stroke: var(--pink);
+}
+.landing .sp-item {
+  color: rgba(16, 16, 19, 0.55);
+}
+.landing .sp-item-on {
+  color: var(--ink);
+}
+.landing .sp-active {
+  background: rgba(16, 16, 19, 0.06);
+}
+.landing .sp-dot-on {
+  background: var(--pink);
+}
+.landing .sp-dot-off {
+  background: rgba(16, 16, 19, 0.3);
+}
+@media (hover: hover) {
+  .landing .sp-item:hover {
+    color: rgba(16, 16, 19, 0.82);
+  }
+}
+
+/* ── Gravity-letters "pour" accent ────────────────────────────────────────── */
+/* One small, bounded lime panel of black finance glyphs — hold to pour, tilt to
+   avalanche. A playful section break, never a hero moment. */
+.landing .u-pour {
+  position: relative;
+  height: 176px;
+  border-radius: var(--r-card);
+  background: var(--lime);
+  box-shadow: var(--soft);
+  cursor: grab;
+}
+.landing .u-pour:active {
+  cursor: grabbing;
+}
+.landing .u-pour-hint {
+  position: absolute;
+  inset: 16px 16px auto 16px;
+  z-index: 1;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  font-size: 11px;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: rgba(16, 16, 19, 0.62);
+  pointer-events: none;
+}
+
 @media (prefers-reduced-motion: reduce) {
   .landing .u-btn,
   .landing .u-faq-body {
     transition: none;
+  }
+  /* Calm static state: no grab affordance implying motion. */
+  .landing .u-pour,
+  .landing .u-pour:active {
+    cursor: default;
   }
 }
