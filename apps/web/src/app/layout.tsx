@@ -1,6 +1,6 @@
 import type { Metadata, Viewport } from 'next';
 import type { ReactNode } from 'react';
-import { satoshi, geistMono } from './fonts';
+import { satoshi, geistMono, anton, inter, caveat } from './fonts';
 import './globals.css';
 
 const title = 'Maren Finance: Spend Bitcoin. Never sell it.';
@@ -50,7 +50,10 @@ export const dynamic = 'force-dynamic';
 
 export default function RootLayout({ children }: Readonly<{ children: ReactNode }>) {
   return (
-    <html lang="en" className={`${satoshi.variable} ${geistMono.variable}`}>
+    <html
+      lang="en"
+      className={`${satoshi.variable} ${geistMono.variable} ${anton.variable} ${inter.variable} ${caveat.variable}`}
+    >
       <body className="bg-bg text-text antialiased">{children}</body>
     </html>
   );
