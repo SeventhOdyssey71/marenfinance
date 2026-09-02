@@ -1,8 +1,7 @@
 'use client';
 
 import { useId, useState, type ReactNode } from 'react';
-import { Section, Eyebrow } from './ui/section';
-import { Reveal } from './ui/reveal';
+import { Counter, Kicker, Ticks } from './landing/ui';
 import { Plus, Minus } from './ui/icons';
 import { RELAYER_CONFIGURED } from '@/lib/chain/relay';
 
@@ -201,7 +200,7 @@ function AccordionItem({
   const panelId = `faq-panel-${id}`;
 
   return (
-    <li className="hairline-t">
+    <div className="border-b border-[color:var(--l-line)]">
       <h3>
         <button
           type="button"
@@ -209,25 +208,20 @@ function AccordionItem({
           aria-expanded={open}
           aria-controls={panelId}
           onClick={onToggle}
-          className="flex w-full items-start justify-between gap-6 py-6 text-left transition-colors duration-[120ms] ease-out hover:text-violet-400 md:py-7"
+          className="flex w-full items-center gap-4 py-5 text-left"
         >
-          <span className="flex min-w-0 items-start gap-5 md:gap-8">
-            <span
-              aria-hidden
-              className="num text-text-subtle mt-1 hidden shrink-0 text-xs sm:block"
-            >
-              {String(index + 1).padStart(2, '0')}
-            </span>
-            <span className="text-balance text-[1.0625rem] font-medium tracking-[-0.01em] md:text-lg">
-              {item.q}
-            </span>
+          <span aria-hidden className="l-mono shrink-0 text-[12px] text-[var(--l-dim)]">
+            {String(index + 1).padStart(2, '0')}
+          </span>
+          <span className="flex-1 text-balance text-[1.0625rem] font-semibold tracking-[-0.01em] text-[var(--l-ink)]">
+            {item.q}
           </span>
           <span
             aria-hidden
-            className={`mt-0.5 grid size-8 shrink-0 place-items-center rounded-[var(--radius-pill)] border transition-colors duration-[240ms] ease-out ${
+            className={`grid size-8 shrink-0 place-items-center transition-colors duration-[240ms] ease-out ${
               open
-                ? 'bg-violet-500/12 border-violet-500/40 text-violet-400'
-                : 'bg-surface-raised text-text-muted border-[var(--border-hairline)]'
+                ? 'bg-[var(--l-accent)] text-white'
+                : 'border border-[color:var(--l-line)] bg-[var(--l-white)] text-[var(--l-ink)]'
             }`}
           >
             {open ? <Minus className="size-4" /> : <Plus className="size-4" />}
@@ -235,18 +229,19 @@ function AccordionItem({
         </button>
       </h3>
 
-      <div
-        id={panelId}
-        role="region"
-        aria-labelledby={buttonId}
-        hidden={!open}
-        className="pb-8 sm:pl-[3.25rem] md:pl-16"
-      >
-        <div className="prose-measure text-text-muted space-y-4 text-[0.9375rem] leading-relaxed">
-          {item.a}
+      <div className={`l-faq-body ${open ? 'is-open' : ''}`}>
+        <div>
+          <div
+            id={panelId}
+            role="region"
+            aria-labelledby={buttonId}
+            className="prose-measure text-text-muted space-y-4 pb-6 pl-9 text-[14.5px] leading-relaxed"
+          >
+            {item.a}
+          </div>
         </div>
       </div>
-    </li>
+    </div>
   );
 }
 
@@ -254,36 +249,40 @@ export function Faq() {
   const [open, setOpen] = useState<number | null>(0);
 
   return (
-    <Section id="faq" labelledBy="faq-title" className="hairline-t">
-      <div className="container-maren">
-        <div className="grid grid-cols-1 gap-12 lg:grid-cols-12">
-          <Reveal className="lg:col-span-4">
-            <Eyebrow>FAQ</Eyebrow>
-            <h2 id="faq-title" className="t-h1 mt-6 text-balance">
-              The awkward
-              <br className="hidden sm:block" /> <span className="text-text-muted">questions.</span>
-            </h2>
-            <p className="text-text-muted mt-6 max-w-sm text-base leading-relaxed">
-              We are handling people&rsquo;s Bitcoin. Risk gets stated plainly or it is not stated
-              at all.
-            </p>
-          </Reveal>
+    <section
+      id="faq"
+      className="l-frame relative scroll-mt-24 border-t border-[color:var(--l-line)] px-5 pt-20 sm:px-8"
+    >
+      <Ticks />
+      <div className="grid grid-cols-1 gap-10 lg:grid-cols-[0.8fr_1.2fr] lg:gap-16">
+        <div className="lg:sticky lg:top-24 lg:self-start">
+          <Kicker>The awkward questions</Kicker>
+          <h2 className="mt-7 max-w-[12ch] text-[clamp(26px,3.4vw,42px)] font-bold leading-[1.08] tracking-[-0.025em] text-[var(--l-ink)]">
+            Risk, stated plainly.
+          </h2>
+          <p className="mt-5 max-w-[38ch] text-[15px] leading-[1.55] text-[var(--l-muted)]">
+            We are handling people&rsquo;s Bitcoin. Risk gets stated plainly, or it is not stated at
+            all.
+          </p>
+        </div>
 
-          <div className="lg:col-span-7 lg:col-start-6">
-            <ul>
-              {items.map((item, i) => (
-                <AccordionItem
-                  key={item.q}
-                  item={item}
-                  index={i}
-                  open={open === i}
-                  onToggle={() => setOpen(open === i ? null : i)}
-                />
-              ))}
-            </ul>
-          </div>
+        <div className="border-t border-[color:var(--l-line)]">
+          {items.map((item, i) => (
+            <AccordionItem
+              key={item.q}
+              item={item}
+              index={i}
+              open={open === i}
+              onToggle={() => setOpen(open === i ? null : i)}
+            />
+          ))}
         </div>
       </div>
-    </Section>
+
+      <div className="l-hatch mt-16 h-16" />
+      <div className="pb-8">
+        <Counter n="05" label="FAQ" />
+      </div>
+    </section>
   );
 }

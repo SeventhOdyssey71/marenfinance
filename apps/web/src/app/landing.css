@@ -1,0 +1,285 @@
+/*
+ * ── Maren landing — engineering-blueprint editorial, light-violet brand ──────
+ *
+ * A near-white blueprint canvas framed by hairline construction rails and `+`
+ * corner ticks, diagonal-hatch spacer bands, bracket-cornered mono buttons,
+ * uppercase mono microtype, Satoshi display headings, and a single violet
+ * accent (#5B3DF5, the brand token). Structure follows Talise's v3 landing;
+ * brand, colour and copy are Maren's own.
+ *
+ * Everything is scoped under `.landing` so it never touches the product
+ * (`/app`), the docs (`/docs`), or the shared @theme tokens in globals.css.
+ * The violet accent is taken straight from the existing `--color-violet-500`
+ * token rather than a new hex, per the brand guardrail.
+ */
+
+.landing {
+  /* Light canvas — a near-white with a faint violet undertone, so it reads as
+     part of the same family as the light /app, not a flat clinical grey. */
+  --l-canvas: #f4f2fb;
+  --l-panel: #faf9fe;
+  --l-white: #ffffff;
+  --l-ink: #17171b; /* matches the light /app text */
+  --l-muted: #55555e; /* AA on the canvas */
+  --l-dim: #82828c;
+  --l-line: rgba(20, 18, 35, 0.1);
+  --l-line-soft: rgba(20, 18, 35, 0.05);
+  --l-accent: var(--color-violet-500); /* #5B3DF5 — the brand token */
+  --l-accent-ink: #4a2be0; /* violet-600, for text on light where 500 is a touch bright */
+  --l-accent-soft: color-mix(in srgb, var(--color-violet-500) 12%, #ffffff);
+  --l-on-accent: #ffffff;
+
+  /* Redefine the shared hairline tokens inside the landing scope only, so any
+     Tailwind `border-*` utility resolves to the light hairline instead of the
+     dark one globals.css sets on `*`. */
+  --border-hairline: var(--l-line);
+  --border-strong: rgba(20, 18, 35, 0.18);
+
+  /* Re-derive the shared text/accent tokens for the light canvas — scoped to
+     the landing only, exactly as [data-app-theme='light'] does for the /app,
+     and touching nothing in @theme. This lets reused honest copy (the FAQ
+     answers) keep its `text-text` / `text-violet-400` utilities and still read
+     as dark ink on white instead of near-white on white. */
+  --color-text: var(--l-ink);
+  --color-text-muted: var(--l-muted);
+  --color-text-subtle: var(--l-dim);
+  --color-violet-400: var(--l-accent);
+
+  position: relative;
+  min-height: 100svh;
+  color: var(--l-ink);
+  background: var(--l-canvas);
+  font-family: var(--font-sans);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* Body copy sits a hair tighter and never runs past a comfortable measure. */
+.landing p {
+  text-wrap: pretty;
+}
+
+/* Headings — Satoshi display, negative tracking, balanced. */
+.landing h1,
+.landing h2,
+.landing h3 {
+  font-family: var(--font-sans);
+  text-wrap: balance;
+}
+
+/* Mono microtype helper — kickers, counters, labels, numerals. */
+.landing .l-mono {
+  font-family: var(--font-mono);
+  font-feature-settings: 'tnum' 1;
+  font-variant-numeric: tabular-nums;
+}
+
+/* Keyboard focus, scoped: the global ring uses violet-400, which is a pale
+   #8b77ff on this light canvas. Use the solid brand violet here instead. */
+.landing :focus-visible {
+  outline: 2px solid var(--l-accent);
+  outline-offset: 3px;
+  border-radius: 4px;
+}
+
+.landing ::selection {
+  background: var(--l-accent-soft);
+  color: var(--l-ink);
+}
+
+/* ── Construction frame ──────────────────────────────────────────────────── */
+/* Centred content column with vertical hairline rails, echoing the container. */
+.landing .l-frame {
+  position: relative;
+  margin-inline: auto;
+  max-width: 1200px;
+  border-inline: 1px solid var(--l-line);
+}
+
+.landing .l-rule {
+  border-top: 1px solid var(--l-line);
+}
+
+/* `+` corner tick — a small crosshair centred on a grid corner. Parent must be
+   positioned; drop <Tick/> with an edge class. Decorative. */
+.landing .l-tick {
+  position: absolute;
+  z-index: 3;
+  width: 11px;
+  height: 11px;
+  pointer-events: none;
+}
+.landing .l-tick::before,
+.landing .l-tick::after {
+  content: '';
+  position: absolute;
+  background: var(--l-accent);
+}
+.landing .l-tick::before {
+  left: 5px;
+  top: 0;
+  width: 1px;
+  height: 11px;
+}
+.landing .l-tick::after {
+  top: 5px;
+  left: 0;
+  height: 1px;
+  width: 11px;
+}
+.landing .l-tick-tl {
+  left: 0;
+  top: 0;
+  transform: translate(-50%, -50%);
+}
+.landing .l-tick-tr {
+  right: 0;
+  top: 0;
+  transform: translate(50%, -50%);
+}
+.landing .l-tick-bl {
+  left: 0;
+  bottom: 0;
+  transform: translate(-50%, 50%);
+}
+.landing .l-tick-br {
+  right: 0;
+  bottom: 0;
+  transform: translate(50%, 50%);
+}
+
+/* ── Diagonal-hatch spacer band ──────────────────────────────────────────── */
+.landing .l-hatch {
+  background-image: repeating-linear-gradient(
+    -45deg,
+    transparent 0,
+    transparent 7px,
+    var(--l-line-soft) 7px,
+    var(--l-line-soft) 8px
+  );
+}
+
+/* ── Dotted accent field (hero product band) ─────────────────────────────── */
+.landing .l-dotfield {
+  background-color: var(--l-accent-soft);
+  background-image: radial-gradient(
+    circle,
+    color-mix(in srgb, var(--l-accent) 34%, transparent) 1.1px,
+    transparent 1.1px
+  );
+  background-size: 15px 15px;
+}
+
+/* ── Bracket-cornered button ─────────────────────────────────────────────── */
+.landing .l-btn {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  height: 46px;
+  padding-inline: 22px;
+  font-family: var(--font-mono);
+  font-size: 13px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  /* Named properties only — never `transition: all`. */
+  transition:
+    background-color 200ms ease,
+    color 200ms ease,
+    transform 200ms ease-out;
+}
+.landing .l-btn:active {
+  transform: scale(0.97);
+}
+.landing .l-btn-solid {
+  background: var(--l-accent);
+  color: var(--l-on-accent);
+}
+.landing .l-btn-ghost {
+  background: var(--l-white);
+  color: var(--l-ink);
+  box-shadow: inset 0 0 0 1px var(--l-line);
+}
+@media (hover: hover) {
+  .landing .l-btn-solid:hover {
+    background: var(--l-accent-ink);
+  }
+  .landing .l-btn-ghost:hover {
+    background: var(--l-panel);
+  }
+}
+@media (max-width: 640px) {
+  .landing .l-btn {
+    height: 44px;
+    padding-inline: 18px;
+    font-size: 12px;
+    gap: 6px;
+  }
+}
+/* The four crop brackets sitting just outside the button. Decoration only, so
+   they are pulled out of flow and the label stays optically centred. */
+.landing .l-bracket,
+.landing .l-bracket-2 {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+.landing .l-bracket::before,
+.landing .l-bracket::after,
+.landing .l-bracket-2::before,
+.landing .l-bracket-2::after {
+  content: '';
+  position: absolute;
+  width: 12px;
+  height: 12px;
+  border-color: var(--l-accent);
+  border-style: solid;
+  border-width: 0;
+}
+.landing .l-bracket::before {
+  left: -4px;
+  top: -4px;
+  border-left-width: 1.5px;
+  border-top-width: 1.5px;
+}
+.landing .l-bracket::after {
+  right: -4px;
+  bottom: -4px;
+  border-right-width: 1.5px;
+  border-bottom-width: 1.5px;
+}
+.landing .l-bracket-2::before {
+  right: -4px;
+  top: -4px;
+  border-right-width: 1.5px;
+  border-top-width: 1.5px;
+}
+.landing .l-bracket-2::after {
+  left: -4px;
+  bottom: -4px;
+  border-left-width: 1.5px;
+  border-bottom-width: 1.5px;
+}
+
+/* ── FAQ accordion body: height animation via grid-rows ──────────────────── */
+.landing .l-faq-body {
+  display: grid;
+  grid-template-rows: 0fr;
+  transition: grid-template-rows 320ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+.landing .l-faq-body.is-open {
+  grid-template-rows: 1fr;
+}
+.landing .l-faq-body > div {
+  overflow: hidden;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .landing .l-btn {
+    transition: none;
+  }
+  .landing .l-faq-body {
+    transition: none;
+  }
+}
