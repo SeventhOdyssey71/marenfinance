@@ -44,6 +44,24 @@ const tones: Record<NumTone, string> = {
   inherit: '',
 };
 
+/**
+ * On the big display sizes, grey everything from the decimal point on — the
+ * fractional digits and any trailing unit — so the eye lands on the whole
+ * figure that matters. The soft-UGLYCASH balance treatment, applied in the one
+ * place every large figure passes through. Only plain-string children qualify;
+ * `∞`, an em dash or already-composed nodes pass through untouched.
+ */
+function greyDecimals(text: string): ReactNode {
+  const dot = text.indexOf('.');
+  if (dot === -1) return text;
+  return (
+    <>
+      {text.slice(0, dot)}
+      <span className="text-text-subtle">{text.slice(dot)}</span>
+    </>
+  );
+}
+
 export function Num({
   children,
   size = 'md',
@@ -58,12 +76,16 @@ export function Num({
   title?: string;
   className?: string;
 }) {
+  const body =
+    (size === 'lg' || size === 'xl') && typeof children === 'string'
+      ? greyDecimals(children)
+      : children;
   return (
     <span
       className={`num ${sizes[size]} ${tones[tone]} ${className}`}
       {...(title ? { title } : {})}
     >
-      {children}
+      {body}
     </span>
   );
 }

@@ -89,7 +89,7 @@ export function DemoNotice() {
       accessible
       accessibilityLabel="Demo data. These figures are invented and are not read from Mezo."
     >
-      <Icon name="alert" size={15} color={brand.violet400} />
+      <Icon name="alert" size={15} color={brand.violet600} />
       <Txt variant="small" tone="muted" style={styles.demoText}>
         Demo data. These figures are invented, not read from Mezo. Turn it off in Settings under
         Developer.
@@ -114,7 +114,7 @@ const styles = StyleSheet.create({
   body: { flex: 1 },
   alertTitle: { color: semanticText.warning },
   detail: { marginTop: space.xs },
-  retry: { color: brand.violet400, marginTop: space.sm },
+  retry: { color: brand.violet600, marginTop: space.sm },
   demo: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -124,7 +124,7 @@ const styles = StyleSheet.create({
     borderRadius: radius.card,
     backgroundColor: brand.violet900,
     borderWidth: StyleSheet.hairlineWidth,
-    borderColor: 'rgba(91,61,245,0.55)',
+    borderColor: 'rgba(250,0,255,0.45)',
     marginBottom: space.lg,
   },
   demoText: { flex: 1 },

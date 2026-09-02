@@ -18,7 +18,6 @@ import { StatRow } from '../../src/components/Row';
 import { Screen } from '../../src/components/Screen';
 import { Sparkline } from '../../src/components/Sparkline';
 import { Label, Num, Txt } from '../../src/components/Text';
-import { TraceOutline } from '../../src/components/TraceOutline';
 import {
   base,
   brand,
@@ -142,11 +141,10 @@ export default function Home() {
       {/* Hero: position health */}
       <Card style={styles.hero}>
         {/*
-          The one trace-outline accent in the app, on the one card the whole screen is
-          built around. Kept quiet — a low-alpha violet dash, slowly marching — so it reads
-          as a highlight rather than a warning. Under reduce-motion it renders static.
+          The dashed marching-ants trace was retired here: on the soft UGLYCASH canvas a
+          single white card with a soft drop is the whole feel, and a dashed outline on top
+          fights it. The card's own shadow carries the emphasis now.
         */}
-        <TraceOutline color="rgba(91,61,245,0.35)" cornerRadius={13} inset={5} animated />
         <View style={styles.heroTop}>
           <Label>Position health</Label>
           {health ? (
@@ -308,7 +306,7 @@ export default function Home() {
       */}
       <Card tone="inset" style={styles.gasNote}>
         <View style={styles.gasHead}>
-          <Icon name="shield" size={16} color={brand.violet400} />
+          <Icon name="shield" size={16} color={brand.violet600} />
           <Txt variant="small">No gas after your first deposit</Txt>
         </View>
         <Txt variant="small" tone="muted" style={styles.gasBody}>
@@ -485,8 +483,6 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     backgroundColor: base.surfaceInset,
     borderRadius: radius.pill,
-    borderWidth: StyleSheet.hairlineWidth,
-    borderColor: base.border,
     padding: 6,
     marginBottom: space.xl,
     ...cardShadow,

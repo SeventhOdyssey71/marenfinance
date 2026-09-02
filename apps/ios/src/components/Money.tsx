@@ -95,9 +95,10 @@ export function Amount({
   const dim = (dimFraction ?? (size === 'numericXl' || size === 'numericLg')) && !hidden;
   const [intPart, fracPart] = dim ? splitFraction(numeral) : [numeral, null];
   /**
-   * The greyed run must still be legible, so which grey it takes follows the WCAG split
-   * in tokens.ts: `subtle` (#82828C) only clears 3:1, so it is used at the two sizes that
-   * are large text (≥24px); everything smaller takes `muted`, which clears 4.5:1.
+   * The greyed run is the UGLYCASH trailing-decimal treatment: `subtle` (#9A9AA2) at the
+   * two hero sizes (≥24px large text), a deliberately light grey so the eye lands on the
+   * whole number first; everything smaller takes `muted`, which stays legible at body
+   * scale.
    */
   const fractionTone = size === 'numericXl' || size === 'numericLg' ? 'subtle' : 'muted';
 

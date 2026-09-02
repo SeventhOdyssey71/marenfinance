@@ -354,7 +354,7 @@ const styles = StyleSheet.create({
     borderColor: base.border,
     minHeight: 44,
   },
-  networkCardActive: { borderColor: 'rgba(91,61,245,0.55)', backgroundColor: brand.violet900 },
+  networkCardActive: { borderColor: 'rgba(250,0,255,0.45)', backgroundColor: brand.violet900 },
   networkHead: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
   chainId: { marginTop: space.xs },
   networkNote: { marginTop: space.md },

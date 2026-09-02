@@ -35,12 +35,14 @@ const badgeSizing: Record<Size, string> = {
   lg: 'size-9',
 };
 
+// Soft-UGLYCASH pills: primary is a clean surface pill wrapped in a pink glow
+// (`app-pill-glow`, defined in globals under the light app); secondary is a
+// borderless soft-grey pill; ghost is quiet. No pill carries a visible outline —
+// separation is the glow, the fill or the text weight.
 const variants: Record<Variant, string> = {
-  primary:
-    'bg-text text-bg hover:bg-text/90 active:bg-text/80 font-medium border border-transparent',
-  secondary:
-    'bg-text/[0.06] text-text border border-text/[0.10] backdrop-blur-md hover:bg-text/[0.10] hover:border-text/[0.15] font-medium',
-  ghost: 'bg-transparent text-text-muted hover:text-text border border-transparent font-medium',
+  primary: 'bg-surface text-text app-pill-glow font-medium',
+  secondary: 'bg-surface-inset text-text hover:bg-text/[0.08] font-medium',
+  ghost: 'bg-transparent text-text-muted hover:text-text font-medium',
 };
 
 /**
@@ -53,15 +55,17 @@ const variants: Record<Variant, string> = {
  * 25% on `surface` is below AA, which is why primary keeps a 40% fill.
  */
 const disabledVariants: Record<Variant, string> = {
-  primary: 'disabled:bg-white/40 disabled:text-[#08080A]/70',
-  secondary: 'disabled:text-text-subtle disabled:border-[var(--border-hairline)]',
+  // The glow drops on a disabled primary (globals: `.app-pill-glow:disabled`), so
+  // the pill falls back to a quiet grey well that reads as "not available".
+  primary: 'disabled:bg-surface-inset disabled:text-text-subtle',
+  secondary: 'disabled:text-text-subtle',
   ghost: 'disabled:text-text-subtle',
 };
 
 const badgeVariants: Record<Variant, string> = {
   primary: 'bg-violet-500 text-white',
-  secondary: 'bg-white/[0.06] text-text-muted border border-[var(--border-hairline)]',
-  ghost: 'bg-white/[0.06] text-text-muted',
+  secondary: 'bg-text/[0.06] text-text-muted',
+  ghost: 'bg-text/[0.06] text-text-muted',
 };
 
 /** A violet outline disc rather than a solid one. */
@@ -211,7 +215,7 @@ export function TextPill({
   return (
     <Link
       href={href}
-      className={`bg-surface-raised text-text inline-flex h-11 items-center rounded-[var(--radius-pill)] border border-[var(--border-hairline)] px-5 text-sm font-medium transition-[color,background-color,border-color,transform] duration-[120ms] ease-out hover:border-[var(--border-strong)] active:scale-[0.97] ${className}`}
+      className={`bg-surface-inset text-text hover:bg-text/[0.08] inline-flex h-11 items-center rounded-[var(--radius-pill)] px-5 text-sm font-medium transition-[color,background-color,transform] duration-[120ms] ease-out active:scale-[0.97] ${className}`}
     >
       {children}
     </Link>

@@ -83,7 +83,7 @@ export function AppShell({ children }: { children: ReactNode }) {
   return (
     <div className="min-h-screen">
       {/* ── Desktop sidebar (lg+) ── */}
-      <aside className="fixed inset-y-0 left-0 z-40 hidden w-60 flex-col border-r border-[var(--border-hairline)] bg-bg px-4 py-6 lg:flex">
+      <aside className="fixed inset-y-0 left-0 z-40 hidden w-60 flex-col bg-bg px-4 py-6 lg:flex">
         <Link
           href="/"
           aria-label="Maren Finance home"
@@ -156,7 +156,7 @@ export function AppShell({ children }: { children: ReactNode }) {
         aria-label="App sections"
         className="fixed inset-x-0 bottom-0 z-40 flex justify-center px-4 pb-4 lg:hidden"
       >
-        <ul className="flex items-center gap-1 rounded-[var(--radius-pill)] border border-[var(--border-hairline)] bg-surface-raised/85 p-1.5 backdrop-blur-xl">
+        <ul className="flex items-center gap-1 rounded-[var(--radius-pill)] bg-surface-raised/90 p-1.5 shadow-[0_1px_2px_rgba(16,16,19,0.05),0_12px_32px_-12px_rgba(16,16,19,0.28)] backdrop-blur-xl">
           {NAV.map(({ href, label, Icon }) => {
             const active = isActive(pathname, href);
             return (

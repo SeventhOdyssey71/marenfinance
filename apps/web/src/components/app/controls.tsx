@@ -26,7 +26,7 @@ export function Segmented<T extends string>({
     <div
       role="tablist"
       aria-label={label}
-      className="bg-surface-inset inline-flex w-full max-w-xl gap-1 rounded-[var(--radius-pill)] border border-[var(--border-hairline)] p-1"
+      className="bg-surface-inset inline-flex w-full max-w-xl gap-1 rounded-[var(--radius-pill)] p-1"
     >
       {options.map((option) => {
         const active = option.key === value;
@@ -38,7 +38,9 @@ export function Segmented<T extends string>({
             aria-selected={active}
             onClick={() => onChange(option.key)}
             className={`h-10 flex-1 rounded-[var(--radius-pill)] px-4 text-sm transition-colors duration-[120ms] ease-out ${
-              active ? 'bg-surface-raised text-text' : 'text-text-muted hover:text-text'
+              active
+                ? 'bg-surface-raised text-text font-medium shadow-[0_1px_2px_rgba(16,16,19,0.06),0_4px_10px_-6px_rgba(16,16,19,0.18)]'
+                : 'text-text-muted hover:text-text'
             }`}
           >
             {option.label}
@@ -126,7 +128,7 @@ export function AmountField({
               key={preset.label}
               type="button"
               onClick={() => onChange(preset.value)}
-              className="bg-surface-inset text-text-muted hover:text-text inline-flex h-11 items-center rounded-[var(--radius-pill)] border border-[var(--border-hairline)] px-4 text-sm transition-colors duration-[120ms] ease-out hover:border-[var(--border-strong)]"
+              className="bg-surface-inset text-text-muted hover:text-text hover:bg-text/[0.08] inline-flex h-11 items-center rounded-[var(--radius-pill)] px-4 text-sm transition-colors duration-[120ms] ease-out"
             >
               {preset.label}
             </button>

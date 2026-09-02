@@ -28,7 +28,9 @@ const toneColor: Record<Exclude<Tone, 'inherit'>, string> = {
   subtle: textColors.subtle,
   btc: semanticText.btc,
   musd: semanticText.musd,
-  violet: brand.violet500,
+  // The accent AS TEXT takes the darker pink (violet600, 5:1 on white). Neon #FA00FF is
+  // the fill/glow value and is only 3.2:1 — fine for a glyph, illegible as a small label.
+  violet: brand.violet600,
 };
 
 export interface MarenTextProps extends TextProps {
@@ -55,25 +57,16 @@ export function Txt({
 /**
  * §3 Label — uppercase, tracked, 12px. Used for every field and section caption.
  *
- * Defaults to `muted`, not `subtle`, and that is a deliberate deviation from the tone
- * BRAND.md's table implies for "tertiary" text. The palette is the web light set,
- * unchanged — `subtle` is exactly #82828C — but it is not used for text that carries
- * information, because at 12px it does not meet WCAG AA on any Maren surface.
+ * Defaults to `muted`, not `subtle`. `subtle` (#9A9AA2) is the light greyed-decimal tone
+ * — it is deliberately below AA and must never carry a 12px label. `muted` (#6E6E6E) is
+ * the informational-text tone: ~5.1 on a card, ~4.6 on the canvas — legible with room,
+ * so every field caption and label takes it. BRAND.md's preamble settles the conflict:
+ * "quiet, expensive, and legible before it is decorative." A label a user cannot read is
+ * not quiet, it is broken.
  *
- * The theme move did not fix this on its own. It is the same shortfall, relocated:
- *
- *     was   #6B6B75 on #08080A  3.80:1     now   #82828C on #F7F6FB  3.54:1
- *           #6B6B75 on #101013  3.60:1           #82828C on #FFFFFF  3.80:1
- *           #6B6B75 on #0C0C0F  3.71:1           #82828C on #EFEDF6  3.28:1
- *           #6B6B75 on #17171B  3.39:1
- *
- * `muted` clears it with room to spare on all three light surfaces — #55555E is 6.86 on
- * the page, 7.38 on a card, 6.36 on an inset panel — so that is what informational text
- * gets. BRAND.md's own preamble settles the conflict: "quiet, expensive, and legible
- * before it is decorative." A label a user cannot read is not quiet, it is broken.
- *
- * `subtle` survives for the two jobs where 3:1 is the bar rather than 4.5:1: non-text
- * ornament, and text at 24px and above. Both clear it. Nothing else may use it.
+ * `subtle` is reserved for the two decorative jobs where its lightness is the point: the
+ * greyed trailing decimals of a hero balance, and quiet ornament (a disclosure chevron).
+ * Nothing that carries information may use it.
  */
 export function Label({ style, tone = 'muted', ...rest }: MarenTextProps) {
   return <Txt variant="label" tone={tone} style={style} {...rest} />;

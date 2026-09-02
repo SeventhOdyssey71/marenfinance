@@ -53,7 +53,7 @@ export default function Profile() {
       {/* Identity */}
       <Card style={styles.identity}>
         <View style={styles.avatar}>
-          <Icon name="person" size={26} color={brand.violet500} />
+          <Icon name="person" size={26} color={brand.violet600} />
         </View>
         <View style={styles.identityBody}>
           <Txt variant="h3" numberOfLines={1}>

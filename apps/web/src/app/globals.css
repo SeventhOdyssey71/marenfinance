@@ -59,16 +59,27 @@
      hold AA on #F7F6FB; violet-400 collapses onto violet-500 because the
      lighter tint only ever existed to survive a dark background.
   ------------------------------------------------------------------------- */
+  /* The app is the light "soft UGLYCASH" world: a paper-cream canvas, soft-white
+     cards separated by tone and a whisper of shadow (never an outline), ink type
+     with greyed tertiary/decimals, and a Riot-Pink brand accent. These are the
+     ugly.cash surface/ink values the landing already uses, re-pointed onto the
+     product's existing semantic tokens so the whole /app subtree reskins through
+     them. The dark :root and the .landing scope are untouched. */
   [data-app-theme='light'] {
-    --color-bg: #f7f6fb;
-    --color-surface: #ffffff;
+    --color-bg: #f2f2f2; /* paper-cream canvas */
+    --color-surface: #ffffff; /* soft-white card */
     --color-surface-raised: #ffffff;
-    --color-surface-inset: #efedf6;
-    --color-text: #17171b;
-    --color-text-muted: #55555e;
-    --color-text-subtle: #82828c;
-    --color-violet-400: #5b3df5;
-    --color-violet-900: #ece8ff;
+    --color-surface-inset: #ececef; /* quiet grey well — tone, not a border */
+    --color-text: #101013; /* ink */
+    --color-text-muted: #6e6e6e; /* secondary (AA on paper + card) */
+    --color-text-subtle: #9a9aa2; /* tertiary / greyed decimals */
+    /* Brand accent is now Riot Pink. violet-400 is the TEXT-safe accent (links,
+       focus, active labels) and stays a deep magenta that holds AA on white;
+       violet-500 is the vivid pink used for fills, dots, badges and the CTA glow,
+       where the bar is 3:1 UI-contrast rather than 4.5:1 text. */
+    --color-violet-400: #b5179e;
+    --color-violet-500: #fa00ff;
+    --color-violet-900: #ffe3ff;
     /* BTC orange as TEXT fails on the light page (2.14:1); this is the darkened
        text-safe value the iOS theme derived (5.41:1 on the worst surface). */
     --color-btc: #9a5300;
@@ -76,32 +87,60 @@
     --color-warning: #b45309;
     --color-danger: #dc2626;
     --color-musd: #0d9e70;
-    --border-hairline: rgba(20, 18, 35, 0.08);
-    --border-strong: rgba(20, 18, 35, 0.16);
+    --border-hairline: rgba(16, 16, 19, 0.07);
+    --border-strong: rgba(16, 16, 19, 0.12);
     background-color: var(--color-bg);
     color: var(--color-text);
   }
 
-  /* On dark, a card is a hairline and nothing else. On light, the hairline
-     alone reads as an unfinished wireframe — the card IS a white surface with
-     a soft drop, which is the whole consumer feel in one rule. */
+  /* On dark, a card is a hairline and nothing else. On light it is a soft-white
+     surface with a generous 22px radius and a whisper of shadow — separation is
+     tone + drop, never an outline. That is the whole soft-UGLYCASH feel in one
+     rule, and it cascades to every `.card` in the subtree. */
   [data-app-theme='light'] .card {
     background-color: var(--color-surface);
     border-color: transparent;
+    border-radius: 22px;
     box-shadow:
-      0 1px 2px rgba(23, 20, 41, 0.05),
-      0 8px 24px -12px rgba(23, 20, 41, 0.14);
+      0 1px 2px rgba(16, 16, 19, 0.04),
+      0 14px 34px -16px rgba(16, 16, 19, 0.14);
   }
 
   [data-app-theme='light'] .card-modal {
+    border-color: transparent;
+    border-radius: 24px;
     box-shadow:
-      0 4px 12px rgba(23, 20, 41, 0.08),
-      0 24px 64px -16px rgba(23, 20, 41, 0.28);
+      0 4px 12px rgba(16, 16, 19, 0.08),
+      0 24px 64px -16px rgba(16, 16, 19, 0.24);
   }
 
   [data-app-theme='light'] ::selection {
-    background-color: color-mix(in srgb, var(--color-violet-500) 25%, transparent);
+    background-color: color-mix(in srgb, var(--color-violet-500) 22%, transparent);
     color: var(--color-text);
+  }
+
+  /* The primary CTA pill in the app: a clean pill wrapped in a crisp Riot-Pink
+     ring and a tight bloom — the ugly.cash "Get the APP" halo. The pink lives
+     entirely in the shadow, so the pill face stays high-contrast and the glow
+     never intercepts clicks. Applied by the shared pill primitives; scoped to
+     the light app so the dark marketing pills are unaffected. */
+  [data-app-theme='light'] .app-pill-glow {
+    box-shadow:
+      0 0 0 1.5px rgba(250, 0, 255, 0.85),
+      0 0 0 4px rgba(250, 0, 255, 0.14),
+      0 0 16px 1px rgba(250, 0, 255, 0.42),
+      0 6px 20px -8px rgba(250, 0, 255, 0.4);
+  }
+  [data-app-theme='light'] .app-pill-glow:disabled {
+    box-shadow: none;
+  }
+  @media (hover: hover) {
+    [data-app-theme='light'] .app-pill-glow:not(:disabled):hover {
+      box-shadow:
+        0 0 0 1.5px rgba(250, 0, 255, 0.95),
+        0 10px 34px -6px rgba(250, 0, 255, 0.52),
+        0 6px 18px -6px rgba(140, 90, 255, 0.5);
+    }
   }
 }
 

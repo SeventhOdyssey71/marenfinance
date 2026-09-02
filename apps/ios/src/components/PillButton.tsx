@@ -13,20 +13,18 @@ import { fonts, type } from '../design/type';
 import { Txt } from './Text';
 
 /**
- * BRAND.md §4: "Buttons are pills."
+ * Buttons are pills — the soft, borderless UGLYCASH set.
  *
- *   Primary   — near-black fill, page-coloured text, circular violet icon badge right.
- *   Secondary — white fill, hairline border, near-black text.
+ *   Primary   — the one glowing accent: pink fill, white label, a soft pink glow, and a
+ *               near-black circular icon chip on the right so the white glyph reads.
+ *   Secondary — quiet soft-grey pill, no border, near-black text.
  *   Both      — 44px min height for touch.
  *
- * The primary pill inverted with the theme rather than staying white, which is exactly
- * what the web does: its class is `bg-text text-bg`, so the fill is whatever the text
- * colour is and the label is whatever the page is. On dark that was a white pill with
- * near-black text; on light it is a near-black pill on an off-white page, 16.62:1.
+ * The pink primary is the single saturated CTA a screen is allowed (§2); everything else
+ * is grey and quiet, so the accent never has to compete. No pill carries an outline.
  *
- * `danger` is not in BRAND.md as a button style; destructive actions use `secondary`
- * with danger-toned label text, so that the only saturated fill on a screen stays the
- * violet badge (§2).
+ * `danger` is not a fill style; destructive actions use `secondary` with danger-toned
+ * label text, so the only saturated fill on a screen stays the one pink CTA (§2).
  */
 export type PillVariant = 'primary' | 'secondary' | 'ghost';
 
@@ -91,7 +89,7 @@ export function PillButton({
         {loading ? (
           <ActivityIndicator
             size="small"
-            color={variant === 'primary' ? base.bg : text.primary}
+            color={text.primary}
             style={styles.spinner}
           />
         ) : null}
@@ -139,30 +137,34 @@ const styles = StyleSheet.create({
     flex: 1,
     paddingVertical: space.md,
   },
-  primary: { backgroundColor: text.primary, paddingRight: 6 },
-  primaryPressed: { backgroundColor: '#2E2E36' },
+  /** The one glowing accent: pink fill under a soft pink drop. */
+  primary: {
+    backgroundColor: brand.violet500,
+    paddingRight: 6,
+    shadowColor: brand.violet500,
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.35,
+    shadowRadius: 16,
+    elevation: 4,
+  },
+  primaryPressed: { backgroundColor: brand.violet600 },
   /**
    * A disabled primary is NOT a dimmed pill.
    *
    * `opacity: 0.4` over the fill produced a large mid-grey slab — the loudest object on
-   * the screen, in a colour that is in no palette, telling the user they cannot act. A
-   * disabled control should recede. This is the recessed surface with a hairline, so it
-   * reads as an outline of the button that will exist once the form is valid. It uses
-   * `surfaceInset` rather than `surfaceRaised` because a raised pill is now #FFFFFF and
-   * would vanish on the white card most of these sit on.
+   * the screen, telling the user they cannot act. A disabled control should recede. This
+   * is the quiet soft-grey surface with no glow, so it reads as the ghost of the pink
+   * button that will exist once the form is valid.
    */
   primaryInert: {
     backgroundColor: base.surfaceInset,
-    borderWidth: StyleSheet.hairlineWidth,
-    borderColor: base.border,
     paddingRight: 6,
   },
+  /** The quiet action: soft grey, no border. */
   secondary: {
-    backgroundColor: base.surfaceRaised,
-    borderWidth: StyleSheet.hairlineWidth,
-    borderColor: base.borderStrong,
+    backgroundColor: base.surfaceInset,
   },
-  secondaryPressed: { backgroundColor: base.surfaceInset },
+  secondaryPressed: { backgroundColor: base.borderStrong },
   ghost: { backgroundColor: 'transparent' },
   inert: { opacity: 0.4 },
   label: {
@@ -170,8 +172,12 @@ const styles = StyleSheet.create({
     fontSize: type.small.fontSize,
     letterSpacing: 0,
   },
-  /** Named for the web class it mirrors, `text-bg`: the page colour on the text colour. */
-  labelOnWhite: { color: base.bg },
+  /**
+   * Near-black label on the pink accent fill. White on #FA00FF is only 3.2:1 and fails
+   * AA for a 14px label; near-black is 5.9:1 and reads cleanly, and the dark label pairs
+   * with the near-black icon chip so the pink pill carries two dark marks, not a wash.
+   */
+  labelOnWhite: { color: text.primary },
   labelInert: { color: text.muted },
   /**
    * A ghost button is the quietest action on the screen and must read that way. At full
@@ -183,22 +189,19 @@ const styles = StyleSheet.create({
   labelOnDark: { color: text.primary },
   labelDanger: { color: semanticText.danger },
   spinner: { marginRight: space.sm },
-  /** The circular violet icon badge from the reference design. */
+  /**
+   * The circular icon chip on the right of the pink pill. It is near-black, not pink —
+   * a pink chip on a pink pill would vanish — so the white glyph the callers pass reads
+   * at full contrast and the chip becomes the pill's one dark detail.
+   */
   badge: {
     width: 32,
     height: 32,
     borderRadius: radius.pill,
-    backgroundColor: brand.violet500,
+    backgroundColor: text.primary,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  /**
-   * The badge loses its saturation with the button — §2 keeps violet for live CTAs.
-   *
-   * A translucent scrim was the dark theme's answer and does not survive the move: over
-   * an #EFEDF6 pill it lands on a near-white grey, and the white glyph inside it would
-   * disappear. `text-subtle` is the desaturated fill that still holds the glyph at
-   * 3.80:1, which is the bar for a graphical object.
-   */
+  /** On a disabled (grey) pill the chip recedes to subtle grey, still holding the glyph. */
   badgeInert: { backgroundColor: text.subtle },
 });

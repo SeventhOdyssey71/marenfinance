@@ -207,7 +207,9 @@ const styles = StyleSheet.create({
     top: 0,
     bottom: 0,
     borderRadius: radius.pill,
-    backgroundColor: brand.violet500,
+    // The darker pink, not the neon fill: this bar is the value indicator on a grey
+    // track, where #FA00FF is 2.7:1. violet600 clears the 3:1 graphical bar.
+    backgroundColor: brand.violet600,
   },
   marker: {
     position: 'absolute',
@@ -224,7 +226,7 @@ const styles = StyleSheet.create({
     borderRadius: radius.pill,
     backgroundColor: base.onAccent,
     borderWidth: 3,
-    borderColor: brand.violet500,
+    borderColor: brand.violet600,
   },
   thumbLift: {},
   thumbDisabled: { borderColor: text.subtle },

@@ -52,8 +52,8 @@ export function StatRow({
         {value}
         {sub ? <View style={styles.sub}>{sub}</View> : null}
       </View>
-      {/* A disclosure chevron is a graphical object, so 3:1 is the bar and `subtle`
-          clears it at 3.80 on a card. Nothing that reads as copy uses this tone. */}
+      {/* A disclosure chevron is quiet ornament that repeats the row's own tappability,
+          so it takes the light `subtle` grey. Nothing that reads as copy uses this tone. */}
       {onPress ? <Icon name="chevronRight" size={16} color={text.subtle} /> : null}
     </View>
   );

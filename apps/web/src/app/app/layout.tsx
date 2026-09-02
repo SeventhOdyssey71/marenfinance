@@ -29,7 +29,7 @@ export default function AppLayout({ children }: { children: ReactNode }) {
           re-derives every colour token for this whole subtree (globals.css), and the
           inline body rule keeps overscroll rubber-banding light instead of flashing
           the marketing background behind it. */}
-      <style>{`body:has([data-app-theme='light']){background-color:#f7f6fb}`}</style>
+      <style>{`body:has([data-app-theme='light']){background-color:#f2f2f2}`}</style>
       <div data-app-theme="light" className="bg-bg text-text min-h-screen">
         <AppShell>{children}</AppShell>
       </div>

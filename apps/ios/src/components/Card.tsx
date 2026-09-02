@@ -4,8 +4,8 @@ import { StyleSheet, View, type ViewProps, type ViewStyle } from 'react-native';
 import { base, cardShadow, radius, space } from '../design/tokens';
 
 /**
- * BRAND.md §4 Card, as the light app renders it: white fill, 16px radius, 24px padding,
- * and a soft drop.
+ * BRAND.md §4 Card, as the soft UGLYCASH app renders it: white fill, 20px radius, 24px
+ * padding, and a soft drop — no hairline.
  *
  * The web rule states the reason in one line: "On dark, a card is a hairline and nothing
  * else. On light, the hairline alone reads as an unfinished wireframe — the card IS a

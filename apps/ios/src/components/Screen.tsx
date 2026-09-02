@@ -6,16 +6,16 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { base, gradients, space } from '../design/tokens';
 
 /**
- * The page shell. Off-white canvas, safe-area aware, with an optional static gradient
- * wash at the top.
+ * The page shell. Soft grey UGLYCASH canvas, safe-area aware, with an optional static
+ * gradient wash at the top — the subtle pink ambient glow.
  *
  * BRAND.md §5 is explicit: "Never mount a shader above the fold on the iOS app — use a
- * static gradient there." So this is expo-linear-gradient with the same violet →
- * violet-900 → bg stops the web MeshGradient uses, and nothing animates.
+ * static gradient there." So this is expo-linear-gradient with a pink → pale-pink →
+ * canvas ramp, and nothing animates.
  */
 export interface ScreenProps {
   children: ReactNode;
-  /** Render the violet hero wash behind the top of the page. */
+  /** Render the pink ambient glow behind the top of the page. */
   wash?: boolean;
   scroll?: boolean;
   /** Extra bottom padding, e.g. to clear a pinned action bar. */
@@ -60,7 +60,7 @@ export function Screen({
           showsVerticalScrollIndicator={false}
           keyboardShouldPersistTaps="handled"
           // Keeps the rubber-band overscroll on the canvas colour rather than on the
-          // system default, which is white and reads a shade off against #F7F6FB.
+          // system default, which is white and reads a shade off against #F2F2F2.
           contentInsetAdjustmentBehavior="never"
         >
           {body}

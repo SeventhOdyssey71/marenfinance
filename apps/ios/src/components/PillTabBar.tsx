@@ -11,10 +11,10 @@ import { Txt } from './Text';
  * Ported from the reference wallet's shell as a PATTERN only: a capsule that floats over
  * the page rather than a full-width strip welded to the bottom edge, so the four surfaces
  * read as a control the thumb reaches for rather than system chrome. Its colours are
- * Maren's, not the reference's dark glass: the capsule is a white surface with the card's
- * own soft drop (tokens.cardShadow), a hairline border, and the active tab sits in a
- * tinted `surfaceInset` pill with a violet glyph and label. Violet is the one saturated
- * colour on the chrome, exactly as the old strip had it (BRAND.md §2).
+ * Maren's, not the reference's dark glass: the capsule is a borderless white surface with
+ * the card's own soft drop (tokens.cardShadow), and the active tab sits in a soft-grey
+ * `surfaceInset` pill with a pink glyph and label. Pink is the one saturated colour on
+ * the chrome (§2).
  */
 
 /**
@@ -65,7 +65,10 @@ export function PillTabBar({ state, navigation }: TabBarProps) {
             });
             if (!focused && !event.defaultPrevented) navigation.navigate(route.name);
           };
-          const tint = focused ? brand.violet500 : text.muted;
+          // The darker pink (violet600), not the neon fill: the active glyph and its 11px
+          // label sit on the soft-grey pill, where #FA00FF is only 2.7:1. violet600 clears
+          // it for both the label and the icon.
+          const tint = focused ? brand.violet600 : text.muted;
           return (
             <Pressable
               key={route.key}
@@ -95,8 +98,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     backgroundColor: base.surface,
     borderRadius: radius.pill,
-    borderWidth: StyleSheet.hairlineWidth,
-    borderColor: base.border,
     paddingHorizontal: 6,
     gap: 4,
     ...cardShadow,

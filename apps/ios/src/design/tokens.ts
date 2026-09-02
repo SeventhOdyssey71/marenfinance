@@ -14,39 +14,49 @@
  *      see components/Card.tsx, which mirrors the web `.card` rule exactly.
  */
 
-/** §2 Base, light. Page is off-white; cards are pure white; the inset is the page tinted. */
+/**
+ * §2 Base — the soft UGLYCASH surface set. Canvas is a plain neutral grey; cards are
+ * pure white and float on a soft drop with no hairline; the inset is a soft neutral grey.
+ *
+ * The theme moved off the violet-tinted light set onto the clean, calm UGLYCASH look:
+ * a #F2F2F2 cream-grey canvas under borderless white cards. `surfaceInset` is the same
+ * soft grey the quiet pill uses (#ECECEF), so a recessed panel, a segmented track and a
+ * quiet action all read as one material.
+ */
 export const base = {
-  bg: '#F7F6FB',
+  bg: '#F2F2F2',
   surface: '#FFFFFF',
   /**
-   * Web collapses surface-raised onto #FFFFFF. Kept as its own token because the iOS
-   * app uses it for the selected segment of a control sitting on `surfaceInset`, where
-   * white-on-tinted is exactly the affordance we want.
+   * Kept as its own token because the iOS app uses it for the selected segment of a
+   * control sitting on `surfaceInset`, where white-on-grey is exactly the affordance we
+   * want.
    */
   surfaceRaised: '#FFFFFF',
-  surfaceInset: '#EFEDF6',
-  border: 'rgba(20,18,35,0.08)',
-  borderStrong: 'rgba(20,18,35,0.16)',
+  surfaceInset: '#ECECEF',
+  border: 'rgba(16,16,19,0.07)',
+  borderStrong: 'rgba(16,16,19,0.14)',
   /**
-   * Text and glyphs that sit ON a saturated fill — the violet CTA badge, the label of
-   * the near-black primary pill. Not a surface; it is the only place white appears now.
+   * Text and glyphs that sit ON a saturated fill — the white glyph in the pink accent
+   * badge, the label of the pink primary pill. Not a surface.
    */
   onAccent: '#FFFFFF',
 } as const;
 
 /**
- * §2 Brand. Violet is the ONLY saturated colour on a default screen.
+ * §2 Brand — the one glowing accent. Pink is the ONLY saturated colour on a default
+ * screen.
  *
- * violet-400 collapses onto violet-500 on light: the lighter tint only ever existed to
- * survive a near-black background, and at #8B77FF it is 2.6:1 on white. violet-900 flips
- * from a near-black plum to the palest violet, because its job is "the violet end of a
- * wash that falls off into the page" and the page is now light.
+ * The brand accent moved from violet to UGLYCASH pink (#FA00FF): the pink primary pill,
+ * the accent badge, the active tab, the ambient top glow. The token names are kept
+ * (`violet*`) so every call site cascades on the value change alone — the values are
+ * pink. `violet600` is the pressed/darker pink; `violet900` is the palest pink, the end
+ * of a wash that falls off into the page and the fill of a soft accent chip.
  */
 export const brand = {
-  violet400: '#5B3DF5',
-  violet500: '#5B3DF5',
-  violet600: '#4A2BE0',
-  violet900: '#ECE8FF',
+  violet400: '#FA00FF',
+  violet500: '#FA00FF',
+  violet600: '#C400C9',
+  violet900: '#FCE3FF',
 } as const;
 
 /**
@@ -85,7 +95,8 @@ export const semantic = {
  *   warning  #A34A08   5.52 / 5.93 / 5.12
  *   danger   #C81E1E   5.34 / 5.74 / 4.95
  *
- * (bg #F7F6FB / surface #FFFFFF / inset #EFEDF6.)
+ * (bg #F2F2F2 / surface #FFFFFF / inset #ECECEF; the surfaces only got marginally
+ * lighter/darker, so each still clears 4.5:1 with room.)
  */
 export const semanticText = {
   btc: '#9A5300',
@@ -105,9 +116,15 @@ export const semanticText = {
  * still legitimately used.
  */
 export const text = {
-  primary: '#17171B',
-  muted: '#55555E',
-  subtle: '#82828C',
+  primary: '#101013',
+  muted: '#6E6E6E',
+  /**
+   * The greyed trailing decimals of a hero balance (#9A9AA2) — the UGLYCASH numeral
+   * treatment — and quiet graphical ornament (a disclosure chevron, a disabled badge).
+   * At ≥24px large text it clears 3:1; it is never used for informational copy below
+   * that size, which takes `muted`.
+   */
+  subtle: '#9A9AA2',
 } as const;
 
 export const colors = {
@@ -132,10 +149,10 @@ export const space = {
   section: 96,
 } as const;
 
-/** §4 Radius. Exactly three values exist. */
+/** §4 Radius. Cards are softened toward the rounder UGLYCASH card (~20). */
 export const radius = {
-  input: 8,
-  card: 16,
+  input: 10,
+  card: 20,
   pill: 999,
 } as const;
 
@@ -158,10 +175,10 @@ export const hit = {
  * would be invisible, and the elevation now comes from the drop.
  */
 export const cardShadow = {
-  shadowColor: '#171429',
-  shadowOffset: { width: 0, height: 6 },
-  shadowOpacity: 0.1,
-  shadowRadius: 16,
+  shadowColor: '#101013',
+  shadowOffset: { width: 0, height: 8 },
+  shadowOpacity: 0.07,
+  shadowRadius: 20,
   /** Android parity; harmless on iOS. */
   elevation: 3,
 } as const;
@@ -195,12 +212,12 @@ export const motion = {
  * screen of white cards on off-white has somewhere to start.
  */
 export const gradients = {
-  /** Hero wash behind the portfolio header. Violet core → violet-900 mid → bg. */
-  hero: ['rgba(91,61,245,0.05)', 'rgba(236,232,255,0.22)', 'rgba(247,246,251,0)'] as const,
+  /** The subtle ambient glow behind the top of the page. Pink core → pale pink → canvas. */
+  hero: ['rgba(250,0,255,0.05)', 'rgba(252,227,255,0.20)', 'rgba(242,242,242,0)'] as const,
   /** The closing CTA band on onboarding. */
-  ctaBand: ['rgba(91,61,245,0.06)', 'rgba(236,232,255,0.18)', 'rgba(247,246,251,0)'] as const,
+  ctaBand: ['rgba(250,0,255,0.06)', 'rgba(252,227,255,0.16)', 'rgba(242,242,242,0)'] as const,
   /** Neutral card sheen used on the balance hero card only. */
-  cardSheen: ['rgba(91,61,245,0.05)', 'rgba(255,255,255,0)'] as const,
+  cardSheen: ['rgba(250,0,255,0.04)', 'rgba(255,255,255,0)'] as const,
 } as const;
 
 export type HealthTone = 'neutral' | 'success' | 'warning' | 'danger';

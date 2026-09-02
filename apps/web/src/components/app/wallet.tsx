@@ -77,7 +77,7 @@ function AccountMenu({
         onClick={() => setOpen((v) => !v)}
         aria-expanded={open}
         aria-haspopup="menu"
-        className="bg-surface-raised inline-flex h-11 items-center gap-2.5 rounded-[var(--radius-pill)] border border-[var(--border-hairline)] px-4 text-sm transition-colors duration-[120ms] ease-out hover:border-[var(--border-strong)]"
+        className="bg-surface-inset hover:bg-text/[0.08] inline-flex h-11 items-center gap-2.5 rounded-[var(--radius-pill)] px-4 text-sm transition-colors duration-[120ms] ease-out"
       >
         <span aria-hidden className="bg-success size-1.5 rounded-[var(--radius-pill)]" />
         <span className="num text-text">{shortAddress(address)}</span>
@@ -85,7 +85,7 @@ function AccountMenu({
       {open ? (
         <div
           role="menu"
-          className="bg-surface-raised absolute right-0 z-50 mt-2 w-64 rounded-[var(--radius-card)] border border-[var(--border-hairline)] p-2"
+          className="bg-surface-raised absolute right-0 z-50 mt-2 w-64 rounded-[18px] p-2 shadow-[0_1px_2px_rgba(16,16,19,0.05),0_18px_44px_-16px_rgba(16,16,19,0.28)]"
         >
           {identity ? (
             <div className="border-b border-[var(--border-hairline)] px-4 pb-2.5 pt-1.5">
@@ -146,7 +146,7 @@ function WagmiConnectButton() {
       {open ? (
         <div
           role="menu"
-          className="bg-surface-raised absolute right-0 z-50 mt-2 w-64 rounded-[var(--radius-card)] border border-[var(--border-hairline)] p-2"
+          className="bg-surface-raised absolute right-0 z-50 mt-2 w-64 rounded-[18px] p-2 shadow-[0_1px_2px_rgba(16,16,19,0.05),0_18px_44px_-16px_rgba(16,16,19,0.28)]"
         >
           {connectors.map((connector) => (
             <button

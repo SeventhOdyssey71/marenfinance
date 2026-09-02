@@ -355,7 +355,7 @@ const styles = StyleSheet.create({
     height: 52,
     borderRadius: radius.pill,
     borderWidth: StyleSheet.hairlineWidth,
-    borderColor: 'rgba(91,61,245,0.35)',
+    borderColor: 'rgba(250,0,255,0.35)',
     alignItems: 'center',
     justifyContent: 'center',
     marginBottom: space.sm,

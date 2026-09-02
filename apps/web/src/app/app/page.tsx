@@ -339,7 +339,7 @@ function ActionPills() {
         <Link
           key={label}
           href={href}
-          className="card group flex flex-col items-center gap-2 px-2 py-4 transition-colors duration-[120ms] ease-out hover:border-[var(--border-strong)]"
+          className="card group flex flex-col items-center gap-2 px-2 py-4 transition-shadow duration-[120ms] ease-out hover:shadow-[0_2px_4px_rgba(16,16,19,0.05),0_18px_40px_-18px_rgba(16,16,19,0.22)]"
         >
           <span
             aria-hidden

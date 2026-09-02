@@ -254,7 +254,7 @@ export function EmptyState({
     // up, and the card is a strip.
     <div className="flex flex-col items-start gap-4 sm:flex-row sm:items-center sm:gap-6">
       {icon ? (
-        <span className="bg-surface-inset grid size-11 shrink-0 place-items-center rounded-[var(--radius-pill)] border border-[var(--border-hairline)] text-violet-400">
+        <span className="bg-surface-inset grid size-11 shrink-0 place-items-center rounded-[var(--radius-pill)] text-violet-500">
           {icon}
         </span>
       ) : null}
@@ -282,9 +282,8 @@ export function ActionLink({
   variant?: 'primary' | 'secondary';
 }) {
   const variants = {
-    primary: 'bg-text text-bg hover:bg-text/90',
-    secondary:
-      'bg-surface-raised text-text border border-[var(--border-hairline)] hover:border-[var(--border-strong)]',
+    primary: 'bg-surface text-text app-pill-glow',
+    secondary: 'bg-surface-inset text-text hover:bg-text/[0.08]',
   } as const;
   const badges = {
     primary: 'bg-violet-500 text-white',
@@ -294,7 +293,7 @@ export function ActionLink({
   return (
     <a
       href={href}
-      className={`group inline-flex h-12 items-center justify-between gap-4 rounded-[var(--radius-pill)] pl-6 pr-2 text-[0.9375rem] font-medium transition-[color,background-color,border-color,transform] duration-[120ms] ease-out active:scale-[0.97] ${variants[variant]}`}
+      className={`group inline-flex h-12 items-center justify-between gap-4 rounded-[var(--radius-pill)] pl-6 pr-2 text-[0.9375rem] font-medium transition-[color,background-color,transform] duration-[120ms] ease-out active:scale-[0.97] ${variants[variant]}`}
     >
       <span className="whitespace-nowrap">{children}</span>
       {icon ? (
@@ -319,11 +318,13 @@ export function Note({
   tone?: 'neutral' | 'warning';
   role?: 'alert' | 'status';
 }) {
-  const border = tone === 'warning' ? 'border-warning/30' : 'border-[var(--border-hairline)]';
+  // Neutral notes are a soft grey well — tone, not an outline. A warning keeps its
+  // amber hairline because there the border carries meaning.
+  const border = tone === 'warning' ? 'border border-warning/30' : '';
   return (
     <div
       {...(role ? { role } : {})}
-      className={`rounded-[var(--radius-input)] border ${border} bg-surface-inset text-text-muted p-4 text-sm leading-relaxed`}
+      className={`rounded-[14px] ${border} bg-surface-inset text-text-muted p-4 text-sm leading-relaxed`}
     >
       {children}
     </div>

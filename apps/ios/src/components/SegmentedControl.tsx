@@ -76,8 +76,6 @@ const styles = StyleSheet.create({
     backgroundColor: base.surfaceInset,
     borderRadius: radius.pill,
     padding: 4,
-    borderWidth: StyleSheet.hairlineWidth,
-    borderColor: base.border,
   },
   segment: {
     flex: 1,
@@ -91,5 +89,11 @@ const styles = StyleSheet.create({
   segmentActive: {
     backgroundColor: base.surfaceRaised,
     minHeight: hit.min - 4,
+    // A soft drop lifts the chosen pill off the grey track — the raised white affordance.
+    shadowColor: '#101013',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.08,
+    shadowRadius: 6,
+    elevation: 2,
   },
 });
