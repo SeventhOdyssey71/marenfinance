@@ -4,7 +4,6 @@ import type { ReactNode } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 
-import { Wordmark } from '@/components/ui/wordmark';
 import {
   ActivityIcon,
   FinanceIcon,
@@ -89,7 +88,12 @@ export function AppShell({ children }: { children: ReactNode }) {
           aria-label="Maren Finance home"
           className="-m-2 mb-8 inline-flex w-fit rounded-[var(--radius-pill)] p-2"
         >
-          <Wordmark className="h-[18px] w-auto" />
+          <span
+            className="text-[22px] uppercase leading-none tracking-[-0.03em] text-[color:var(--color-text)]"
+            style={{ fontFamily: 'var(--font-anton), Arial Narrow, sans-serif' }}
+          >
+            Maren
+          </span>
         </Link>
 
         <nav aria-label="App sections" className="flex flex-col gap-1">
@@ -129,7 +133,12 @@ export function AppShell({ children }: { children: ReactNode }) {
           aria-label="Maren Finance home"
           className="-m-2 inline-flex rounded-[var(--radius-pill)] p-2"
         >
-          <Wordmark className="h-[18px] w-auto" />
+          <span
+            className="text-[22px] uppercase leading-none tracking-[-0.03em] text-[color:var(--color-text)]"
+            style={{ fontFamily: 'var(--font-anton), Arial Narrow, sans-serif' }}
+          >
+            Maren
+          </span>
         </Link>
         <ConnectButton />
       </header>

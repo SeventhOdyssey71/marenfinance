@@ -303,6 +303,44 @@
     letter-spacing: -0.02em;
   }
 
+  /* ── App voice: UGLYCASH loud, scoped to the product ─────────────────────
+     The /app was wearing Satoshi + Geist Mono, which reads calm and corporate.
+     UGLYCASH is Inter body/numbers with a condensed-black Anton SHOUT on the
+     headers and hero numbers. Scoped to `[data-app-theme='light']` so /docs and
+     the marketing landing keep their own type. Higher specificity than the base
+     `.t-*` rules above, so it wins in-layer. */
+  [data-app-theme='light'] {
+    font-family: var(--font-inter), ui-sans-serif, system-ui, -apple-system, 'Segoe UI', sans-serif;
+    letter-spacing: -0.02em;
+  }
+  [data-app-theme='light'] .t-display,
+  [data-app-theme='light'] .t-h1,
+  [data-app-theme='light'] .t-h2,
+  [data-app-theme='light'] .t-h3 {
+    font-family: var(--font-anton), 'Arial Narrow', 'Roboto Condensed', sans-serif;
+    font-weight: 400; /* Anton ships one heavy cut */
+    text-transform: uppercase;
+    letter-spacing: -0.03em;
+  }
+  [data-app-theme='light'] .t-h3 {
+    font-size: 1.5rem;
+    line-height: 1.02;
+    letter-spacing: -0.02em;
+  }
+  [data-app-theme='light'] .num {
+    font-family: var(--font-inter), ui-sans-serif, system-ui, sans-serif;
+    font-variant-numeric: tabular-nums;
+    letter-spacing: -0.01em;
+  }
+  [data-app-theme='light'] .t-numeric-xl {
+    font-family: var(--font-anton), 'Arial Narrow', 'Roboto Condensed', sans-serif;
+    font-weight: 400;
+    letter-spacing: -0.02em;
+  }
+  [data-app-theme='light'] .t-label {
+    font-family: var(--font-inter), ui-sans-serif, system-ui, sans-serif;
+  }
+
   .prose-measure {
     max-width: 68ch;
   }
