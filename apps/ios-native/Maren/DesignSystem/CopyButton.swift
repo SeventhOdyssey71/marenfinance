@@ -50,7 +50,7 @@ struct CopyButton: View {
                 glyph
                 Text(copied ? "Copied" : title)
             }
-            .font(.system(size: 15, weight: .semibold))
+            .font(.system(size: 16, weight: .semibold))
             .foregroundStyle(Theme.Palette.ink)
             .frame(maxWidth: .infinity, minHeight: 48)
             .background(Theme.Palette.inset, in: Capsule())

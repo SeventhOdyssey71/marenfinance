@@ -96,7 +96,7 @@ struct SingleAmountFlow: View {
                         .frame(maxWidth: .infinity, minHeight: 44)
                         .background(Theme.Palette.inset, in: Capsule())
                 }
-                .buttonStyle(.plain)
+                .buttonStyle(PressableStyle())
                 .accessibilityLabel("Use \(figure(preset)) \(unitLabel(config.unit))")
             }
             if let available = config.available {
@@ -109,7 +109,7 @@ struct SingleAmountFlow: View {
                         .frame(maxWidth: .infinity, minHeight: 44)
                         .background(Theme.Palette.inset, in: Capsule())
                 }
-                .buttonStyle(.plain)
+                .buttonStyle(PressableStyle())
                 .accessibilityLabel("Use the maximum")
             }
         }

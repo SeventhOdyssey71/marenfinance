@@ -81,6 +81,38 @@ private struct GlowModifier: ViewModifier {
     }
 }
 
+// MARK: - PressableStyle
+//
+// The shared press-dip for tappable surfaces that aren't a PillButton or ActionTile —
+// preset chips, "Add recipient", the Activity rows. Same 0.97 scale + Reduce-Motion
+// discipline, so every touchable thing dips the same instead of some feeling dead.
+
+struct PressableStyle: ButtonStyle {
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+
+    func makeBody(configuration: Configuration) -> some View {
+        configuration.label
+            .scaleEffect((configuration.isPressed && !reduceMotion) ? 0.97 : 1)
+            .animation(reduceMotion ? nil : .easeOut(duration: 0.2), value: configuration.isPressed)
+    }
+}
+
+// MARK: - pillLabel
+//
+// The PillButton face as a modifier, for `ShareLink` / `Link` — system controls that can't
+// be a PillButton but should read identically to one. `dark` gives the ink face with white
+// text; otherwise the quiet grey face. Mirrors PillButton's type, padding and radius.
+
+extension View {
+    func pillLabel(dark: Bool = true) -> some View {
+        self
+            .font(.system(size: 16, weight: .semibold))
+            .foregroundStyle(dark ? Color.white : Theme.Palette.ink)
+            .frame(maxWidth: .infinity, minHeight: 48)
+            .background(dark ? Theme.Palette.ink : Theme.Palette.inset, in: Capsule())
+    }
+}
+
 // MARK: - ActionTile
 //
 // The Home action row: a soft-white square card with an icon well and a label. Same

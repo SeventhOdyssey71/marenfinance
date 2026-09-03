@@ -14,6 +14,7 @@ struct HomeView: View {
             VStack(alignment: .leading, spacing: Theme.Space.lg) {
                 header
                 positionCard
+                priceNote
                 actionRow
                 payRow
                 Spacer(minLength: Theme.Space.md)
@@ -112,6 +113,15 @@ struct HomeView: View {
         }
     }
 
+    /// When the oracle isn't live, the same visible banner Finance uses — so the *why*
+    /// behind the unavailable collateral value is reachable on touch, not lost to a
+    /// desktop-only tooltip.
+    @ViewBuilder private var priceNote: some View {
+        if case .unavailable = model.priceFeed {
+            PriceNote(feed: model.priceFeed)
+        }
+    }
+
     /// The USD value of locked BTC. When the price feed is unavailable this is an
     /// explicit unavailable state — the honest gap, never a fabricated dollar figure.
     @ViewBuilder private var collateralValueLine: some View {
@@ -122,9 +132,8 @@ struct HomeView: View {
             Spacer()
             if let usd = model.collateralUsd {
                 MoneyText(text: MoneyFormat.usd(usd), size: 17, weight: .semibold)
-            } else if case let .unavailable(reason) = model.priceFeed {
+            } else if case .unavailable = model.priceFeed {
                 Unavailable(label: "Price unavailable")
-                    .help(reason)
             } else {
                 Unavailable()
             }

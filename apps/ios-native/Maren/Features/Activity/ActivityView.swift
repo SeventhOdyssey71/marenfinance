@@ -48,7 +48,7 @@ struct ActivityView: View {
                     Button { selected = item } label: {
                         ActivityRow(item: item, showsDivider: index < items.count - 1)
                     }
-                    .buttonStyle(.plain)
+                    .buttonStyle(PressableStyle())
                     .accessibilityHint("Opens the receipt")
                 }
             }
@@ -122,6 +122,8 @@ private struct ActivityRow: View {
                     .font(.figure(15, weight: .semibold))
                     .foregroundStyle(item.status == .failed ? Theme.Palette.tertiary : Theme.Palette.ink)
                     .strikethrough(item.status == .failed)
+                    .lineLimit(1)
+                    .fixedSize(horizontal: true, vertical: false)
             }
             .padding(.vertical, 12)
             if showsDivider {
@@ -192,8 +194,7 @@ struct ReceiptDetail: View {
                 HStack(spacing: 6) {
                     Text("View on explorer"); Image(systemName: "arrow.up.right.square")
                 }
-                .font(.system(size: 16, weight: .semibold)).foregroundStyle(.white)
-                .frame(maxWidth: .infinity, minHeight: 48).background(Theme.Palette.ink, in: Capsule())
+                .pillLabel()
             }
             .accessibilityLabel("View this transaction on the Mezo explorer")
             CopyButton(value: hash, describes: "the transaction hash",

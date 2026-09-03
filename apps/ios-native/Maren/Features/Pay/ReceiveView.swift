@@ -29,11 +29,7 @@ struct ReceiveView: View {
                 copyCard(label: "Your address", value: account.address, copyValue: account.address, show: true)
 
                 ShareLink(item: link) {
-                    Text("Share payment link")
-                        .font(.system(size: 16, weight: .semibold))
-                        .foregroundStyle(.white)
-                        .frame(maxWidth: .infinity, minHeight: 48)
-                        .background(Theme.Palette.ink, in: Capsule())
+                    Text("Share payment link").pillLabel()
                 }
                 .accessibilityLabel("Share your payment link")
             } else {

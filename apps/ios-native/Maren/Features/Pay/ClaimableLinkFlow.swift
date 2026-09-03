@@ -111,9 +111,7 @@ struct ClaimableLinkFlow: View {
             HStack(spacing: Theme.Space.sm) {
                 CopyButton(value: link, describes: "the claim link", style: .filled)
                 ShareLink(item: link) {
-                    Label("Share", systemImage: "square.and.arrow.up")
-                        .font(.system(size: 15, weight: .semibold)).foregroundStyle(.white)
-                        .frame(maxWidth: .infinity, minHeight: 48).background(Theme.Palette.ink, in: Capsule())
+                    Label("Share", systemImage: "square.and.arrow.up").pillLabel()
                 }
                 .accessibilityLabel("Share the claim link")
             }

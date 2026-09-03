@@ -14,35 +14,15 @@ struct FinanceView: View {
 
     var body: some View {
         @Bindable var router = router
-        return ScrollView {
-            VStack(alignment: .leading, spacing: Theme.Space.lg) {
-                header
-                Segmented(options: [(FinanceTab.vault, "Vault"), (FinanceTab.earn, "Earn")],
-                          selection: $router.financeTab)
-                switch router.financeTab {
-                case .vault: VaultSection(model: model)
-                case .earn: EarnSection(model: model)
-                }
-                Spacer(minLength: Theme.Space.md)
+        return Screen(title: "FINANCE", badge: !actions.canSettle) {
+            Segmented(options: [(FinanceTab.vault, "Vault"), (FinanceTab.earn, "Earn")],
+                      selection: $router.financeTab)
+            switch router.financeTab {
+            case .vault: VaultSection(model: model)
+            case .earn: EarnSection(model: model)
             }
-            .padding(.horizontal, Theme.Space.md)
-            .padding(.top, Theme.Space.sm)
-            .padding(.bottom, Theme.Space.xl)
         }
-        .background(Theme.Palette.canvas)
         .task { await model.load(using: client) }
-    }
-
-    private var header: some View {
-        HStack(alignment: .center) {
-            Text("FINANCE")
-                .font(.display(40))
-                .tracking(-0.5)
-                .foregroundStyle(Theme.Palette.ink)
-            Spacer()
-            if !actions.canSettle { DemoBadge() }
-        }
-        .padding(.top, Theme.Space.xs)
     }
 }
 

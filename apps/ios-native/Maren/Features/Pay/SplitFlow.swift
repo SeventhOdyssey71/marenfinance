@@ -69,12 +69,14 @@ struct SplitFlow: View {
                         .foregroundStyle(Theme.Palette.ink)
                         .textInputAutocapitalization(.never)
                         .autocorrectionDisabled()
+                        .accessibilityLabel("Recipient")
                     Divider().overlay(Theme.Palette.ink.opacity(0.07))
                     HStack {
                         TextField("0", text: $leg.amount)
                             .font(.figure(20, weight: .semibold))
                             .foregroundStyle(Theme.Palette.ink)
                             .keyboardType(.decimalPad)
+                            .accessibilityLabel("Amount in MUSD")
                         Text("MUSD").font(.figure(15, weight: .semibold)).foregroundStyle(Theme.Palette.tertiary)
                     }
                 }
@@ -85,11 +87,9 @@ struct SplitFlow: View {
             legs.append(Leg())
         } label: {
             Label("Add recipient", systemImage: "plus")
-                .font(.system(size: 15, weight: .semibold))
-                .foregroundStyle(Theme.Palette.ink)
-                .frame(maxWidth: .infinity, minHeight: 48)
-                .background(Theme.Palette.inset, in: Capsule())
+                .pillLabel(dark: false)
         }
+        .buttonStyle(PressableStyle())
         .accessibilityLabel("Add another recipient")
 
         GasNote(mode: .sponsored)

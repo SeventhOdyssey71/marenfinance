@@ -52,11 +52,7 @@ struct RequestFlow: View {
         }
         .frame(maxWidth: .infinity)
         ShareLink(item: link) {
-            Text("Share request")
-                .font(.system(size: 16, weight: .semibold))
-                .foregroundStyle(.white)
-                .frame(maxWidth: .infinity, minHeight: 48)
-                .background(Theme.Palette.ink, in: Capsule())
+            Text("Share request").pillLabel()
         }
         .accessibilityLabel("Share this payment request")
         PillButton(title: "New request", variant: .quiet) { built = false; amountText = "" }
