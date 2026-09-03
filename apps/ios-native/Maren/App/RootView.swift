@@ -59,7 +59,7 @@ struct RootView: View {
         case "earn": router.goToEarn()
         case "activity": router.tab = .activity
         case "profile": router.tab = .profile
-        case "send": launchDestination = .send
+        case "send", "sendamount", "sendloading": launchDestination = .send
         case "receive": launchDestination = .receive
         case "link": launchDestination = .link
         default: break

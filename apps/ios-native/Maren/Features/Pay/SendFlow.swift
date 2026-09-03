@@ -1,96 +1,216 @@
 import SwiftUI
 
-// MARK: - Send
+// MARK: - Send (full screen)
 //
-// Amount → recipient (@handle or 0x) → review → submit. Relayed, so gasless. The recipient is
-// validated to the same allowlist the scanner uses; a malformed one blocks Review rather than
-// being passed through unchecked.
+// Recipient → amount (custom keypad, big animated figure) → submit (glossy coin loader) →
+// honest outcome. Relayed, so gasless. The recipient is validated to the same allowlist the
+// scanner uses; the amount is typed on the app's own keypad, never the system one.
 
 struct SendFlow: View {
     var prefill: PaymentLinks.PaymentPayload? = nil
     @Environment(\.marenActions) private var actions
+    @Environment(\.marenClient) private var client
     @Environment(\.dismiss) private var dismiss
 
-    private enum Stage: Equatable { case entry, review, submitting, done }
-    @State private var stage: Stage = .entry
-    @State private var amountText = ""
+    private enum Stage { case recipient, amount, submitting, done }
+    @State private var stage: Stage = .recipient
     @State private var recipient = ""
-    @State private var memo = ""
+    @State private var raw = ""            // the amount as typed
+    @State private var balance: Decimal?
     @State private var outcome: SubmitOutcome?
+    @State private var loaded = false
 
-    private var amount: Decimal? { Amount.parse(amountText) }
-    private var recipientValid: Bool { PaymentLinks.isRecipient(recipient.trimmingCharacters(in: .whitespaces)) }
-    private var canProceed: Bool { amount != nil && recipientValid }
+    private var trimmedRecipient: String { recipient.trimmingCharacters(in: .whitespaces) }
+    private var recipientValid: Bool { PaymentLinks.isRecipient(trimmedRecipient) }
+    private var amount: Decimal? { Decimal(string: raw.isEmpty ? "0" : raw) }
+    private var amountValid: Bool { (amount ?? 0) > 0 }
+    private var overBalance: Bool { if let a = amount, let b = balance { return a > b }; return false }
 
     var body: some View {
-        FlowScreen(title: "Send") {
+        VStack(spacing: 0) {
             switch stage {
-            case .entry: entry
-            case .review, .submitting: review
-            case .done: outcomeView
+            case .recipient:  recipientStage
+            case .amount:     amountStage
+            case .submitting: submittingStage
+            case .done:       doneStage
             }
         }
-        .onAppear {
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
+        .background(Theme.Palette.canvas)
+        .task {
+            guard !loaded else { return }
+            loaded = true
+            balance = try? await client.balances().musd
+            // Screenshot/testing hook: jump straight to a stage. Inert in normal use.
+            switch ProcessInfo.processInfo.environment["MAREN_SCREEN"] {
+            case "sendamount", "sendloading":
+                recipient = "0x7094000000000000000000000000000000002242"
+                raw = "3"
+                stage = ProcessInfo.processInfo.environment["MAREN_SCREEN"] == "sendloading" ? .submitting : .amount
+                return
+            default: break
+            }
             if let prefill {
                 recipient = prefill.to
-                if let amount = prefill.amount { amountText = amount }
+                if let a = prefill.amount { raw = a }
+                if recipientValid { stage = .amount }
             }
         }
     }
 
-    @ViewBuilder private var entry: some View {
-        AmountField(unit: "MUSD", text: $amountText)
-        TextEntryCard(
-            label: "To",
-            placeholder: "@handle or 0x address",
-            text: $recipient,
-            footnote: recipient.isEmpty || recipientValid ? nil : "Not a valid @handle or 0x address."
-        )
-        TextEntryCard(label: "Memo", placeholder: "Optional note (on-chain)", text: $memo,
-                      autocapitalization: .sentences)
-        GasNote(mode: .sponsored)
-        SubmitBar(title: "Review", enabled: canProceed) { stage = .review }
-    }
+    // MARK: header
 
-    @ViewBuilder private var review: some View {
-        if let amount {
-            MCard {
-                VStack(alignment: .leading, spacing: 4) {
-                    Text("Sending")
-                        .labelStyle()
-                    MoneyText(text: MoneyFormat.musd(amount), size: 34, weight: .bold)
+    private func header(title: String, pill: String? = nil, onPill: (() -> Void)? = nil) -> some View {
+        HStack(spacing: Theme.Space.sm) {
+            Text(title)
+                .font(.display(24, weight: .medium))
+                .foregroundStyle(Theme.Palette.ink)
+            if let pill {
+                Button { onPill?() } label: {
+                    Text(pill)
+                        .font(.figure(14, weight: .medium))
+                        .foregroundStyle(Theme.Palette.ink)
+                        .padding(.horizontal, 12).padding(.vertical, 7)
+                        .background(Theme.Palette.inset, in: Capsule())
                 }
+                .buttonStyle(.plain)
+                .accessibilityLabel("Recipient \(pill), tap to change")
             }
-            ReviewList(rows: reviewRows(amount))
+            Spacer()
+            Button { dismiss() } label: {
+                Image(systemName: "xmark")
+                    .font(.system(size: 16, weight: .semibold))
+                    .foregroundStyle(Theme.Palette.muted)
+                    .frame(width: 44, height: 44)
+            }
+            .accessibilityLabel("Close")
+        }
+        .padding(.horizontal, Theme.Space.md)
+        .padding(.top, Theme.Space.sm)
+    }
+
+    // MARK: recipient
+
+    private var recipientStage: some View {
+        VStack(alignment: .leading, spacing: Theme.Space.lg) {
+            header(title: "Send")
+            Text("Who are you paying?").font(.display(28, weight: .medium)).foregroundStyle(Theme.Palette.ink)
+                .padding(.horizontal, Theme.Space.md)
+            TextEntryCard(
+                label: "Send to",
+                placeholder: "@handle or 0x address",
+                text: $recipient,
+                footnote: recipient.isEmpty || recipientValid ? nil : "Not a valid @handle or 0x address."
+            )
+            .padding(.horizontal, Theme.Space.md)
+            Spacer()
+            PillButton(title: "Continue", variant: .primary) { stage = .amount }
+                .disabled(!recipientValid)
+                .opacity(recipientValid ? 1 : 0.5)
+                .padding(.horizontal, Theme.Space.md)
+                .padding(.bottom, Theme.Space.md)
+        }
+    }
+
+    // MARK: amount
+
+    private var amountStage: some View {
+        VStack(spacing: Theme.Space.md) {
+            header(title: "Send to", pill: shortRecipient) { stage = .recipient }
+            Spacer(minLength: 0)
+            AmountReadout(raw: raw, unitLabel: "MUSD", onToggle: {})
+            if overBalance {
+                Text("More than your balance").font(.text(13, weight: .medium)).foregroundStyle(Theme.Palette.warning)
+            }
+            Spacer(minLength: 0)
+            assetCard
+            AmountKeypad(onDigit: digit, onDot: dot, onDelete: del)
+                .padding(.horizontal, Theme.Space.sm)
             GasNote(mode: .sponsored)
-            SubmitBar(title: "Send \(MoneyFormat.musd(amount, unit: false)) MUSD", submitting: stage == .submitting) {
-                Task { await submit(amount) }
-            }
-            if stage != .submitting {
-                PillButton(title: "Back", variant: .quiet) { stage = .entry }
-            }
+                .padding(.horizontal, Theme.Space.md)
+            PillButton(title: "Continue", variant: .primary) { Task { await submit() } }
+                .disabled(!amountValid || overBalance)
+                .opacity(amountValid && !overBalance ? 1 : 0.5)
+                .padding(.horizontal, Theme.Space.md)
+                .padding(.bottom, Theme.Space.md)
         }
     }
 
-    private func reviewRows(_ amount: Decimal) -> [ReviewRow] {
-        var rows = [ReviewRow(label: "To", value: recipient.trimmingCharacters(in: .whitespaces), plain: true)]
-        let trimmedMemo = memo.trimmingCharacters(in: .whitespaces)
-        if !trimmedMemo.isEmpty {
-            rows.append(ReviewRow(label: "Memo", value: "“\(trimmedMemo)”", plain: true))
+    private var assetCard: some View {
+        HStack(spacing: Theme.Space.sm) {
+            ZStack {
+                Circle().fill(LinearGradient(colors: [Theme.Palette.accent, Theme.Palette.accentText],
+                                             startPoint: .topLeading, endPoint: .bottomTrailing))
+                    .frame(width: 38, height: 38)
+                Text("$").font(.system(size: 18, weight: .bold, design: .rounded)).foregroundStyle(.white)
+            }
+            VStack(alignment: .leading, spacing: 1) {
+                Text("MUSD").font(.text(15, weight: .medium)).foregroundStyle(Theme.Palette.ink)
+                Text(balance.map { "\(MoneyFormat.musd($0, unit: false)) available" } ?? "Balance unavailable")
+                    .font(.text(13)).foregroundStyle(Theme.Palette.tertiary)
+            }
+            Spacer()
+            Button { useMax() } label: {
+                Text("Use Max").font(.text(14, weight: .medium)).foregroundStyle(Theme.Palette.ink)
+                    .padding(.horizontal, 16).padding(.vertical, 9)
+                    .background(Theme.Palette.card, in: Capsule())
+            }
+            .buttonStyle(PressableStyle())
+            .disabled(balance == nil)
         }
-        return rows
+        .padding(Theme.Space.sm)
+        .background(Theme.Palette.inset, in: RoundedRectangle(cornerRadius: Theme.Radius.pill, style: .continuous))
+        .padding(.horizontal, Theme.Space.md)
     }
 
-    private func submit(_ amount: Decimal) async {
+    // MARK: submitting + done
+
+    private var submittingStage: some View {
+        VStack(spacing: Theme.Space.lg) {
+            header(title: "Send to", pill: shortRecipient)
+            Spacer()
+            LogoLoader()
+            Text("Sending \(MoneyFormat.musd(amount ?? 0, unit: false)) MUSD…")
+                .font(.text(16, weight: .medium)).foregroundStyle(Theme.Palette.muted)
+            Spacer()
+        }
+    }
+
+    private var doneStage: some View {
+        VStack(alignment: .leading, spacing: Theme.Space.lg) {
+            header(title: "Send")
+            if let outcome {
+                OutcomeView(outcome: outcome, network: .testnet) { dismiss() }
+                    .padding(.horizontal, Theme.Space.md)
+            }
+            Spacer()
+        }
+    }
+
+    // MARK: keypad logic
+
+    private func digit(_ d: String) {
+        if raw == "0" { raw = d; return }
+        if let dot = raw.firstIndex(of: "."), raw.distance(from: dot, to: raw.endIndex) > 2 { return }  // max 2 dp
+        if raw.count >= 12 { return }
+        raw += d
+    }
+    private func dot() { if !raw.contains(".") { raw = raw.isEmpty ? "0." : raw + "." } }
+    private func del() { if !raw.isEmpty { raw.removeLast() } }
+    private func useMax() {
+        guard let balance else { return }
+        raw = MoneyFormat.musd(balance, unit: false).replacingOccurrences(of: ",", with: "")
+    }
+
+    private var shortRecipient: String {
+        trimmedRecipient.hasPrefix("@") ? trimmedRecipient : MarenSession.shortAddress(trimmedRecipient)
+    }
+
+    private func submit() async {
+        guard let amount else { return }
         stage = .submitting
-        let trimmedMemo = memo.trimmingCharacters(in: .whitespaces)
-        let intent = Intent(kind: .send(to: recipient.trimmingCharacters(in: .whitespaces), memo: trimmedMemo),
-                            amount: amount, unit: .musd)
+        let intent = Intent(kind: .send(to: trimmedRecipient, memo: ""), amount: amount, unit: .musd)
         outcome = await actions.submit(intent)
         stage = .done
-    }
-
-    @ViewBuilder private var outcomeView: some View {
-        if let outcome { OutcomeView(outcome: outcome, network: .testnet) { dismiss() } }
     }
 }

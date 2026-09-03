@@ -39,6 +39,24 @@ struct SectionHeader: View {
     }
 }
 
+// MARK: - MarenGlyph
+//
+// The Maren mark as a Shape: a rising swoosh/wing. Filled, so it scales crisply at any size.
+// Used by the submit loader.
+
+struct MarenGlyph: Shape {
+    func path(in rect: CGRect) -> Path {
+        let w = rect.width, h = rect.height
+        var p = Path()
+        p.move(to: CGPoint(x: w * 0.10, y: h * 0.76))
+        p.addQuadCurve(to: CGPoint(x: w * 0.50, y: h * 0.40),
+                       control: CGPoint(x: w * 0.24, y: h * 0.46))
+        p.addQuadCurve(to: CGPoint(x: w * 0.90, y: h * 0.26),
+                       control: CGPoint(x: w * 0.70, y: h * 0.66))
+        return p.strokedPath(StrokeStyle(lineWidth: w * 0.14, lineCap: .round, lineJoin: .round))
+    }
+}
+
 // MARK: - HugeIcon
 //
 // A HugeIcons glyph, bundled as a template SVG in Assets.xcassets (hgi-<name>). Template
