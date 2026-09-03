@@ -17,25 +17,32 @@ struct OutcomeBadge: View {
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @State private var shown = false
 
+    // A lighter, fresher green for the success mark than the darker status token.
+    private static let successGreen = Color(hex: 0x45C08E)
+
+    private var discFill: LinearGradient {
+        isSuccess
+            ? LinearGradient(colors: [Self.successGreen, Color(hex: 0x2FAD7C)], startPoint: .top, endPoint: .bottom)
+            : LinearGradient(colors: [tone.opacity(0.16), tone.opacity(0.16)], startPoint: .top, endPoint: .bottom)
+    }
+
     var body: some View {
         ZStack {
-            // Soft halo — the only flourish.
+            // Soft halo — dialled right down; a whisper, not a spotlight.
             Circle()
-                .fill(RadialGradient(colors: [tone.opacity(isSuccess ? 0.22 : 0.10), .clear],
-                                     center: .center, startRadius: size * 0.2, endRadius: size * 0.95))
+                .fill(RadialGradient(colors: [(isSuccess ? Self.successGreen : tone).opacity(isSuccess ? 0.05 : 0.02), .clear],
+                                     center: .center, startRadius: size * 0.28, endRadius: size * 0.95))
                 .frame(width: size * 1.8, height: size * 1.8)
 
             Circle()
-                .fill(isSuccess
-                      ? LinearGradient(colors: [tone.opacity(0.92), tone], startPoint: .top, endPoint: .bottom)
-                      : LinearGradient(colors: [tone.opacity(0.16), tone.opacity(0.16)], startPoint: .top, endPoint: .bottom))
+                .fill(discFill)
                 .frame(width: size, height: size)
 
             Image(systemName: symbol)
                 .font(.system(size: size * 0.44, weight: .bold))
                 .foregroundStyle(isSuccess ? Color.white : tone)
         }
-        .shadow(color: tone.opacity(isSuccess ? 0.28 : 0), radius: 20, x: 0, y: 10)
+        .shadow(color: (isSuccess ? Self.successGreen : .clear).opacity(isSuccess ? 0.06 : 0), radius: 14, x: 0, y: 8)
         .scaleEffect(shown ? 1 : 0.6)
         .opacity(shown ? 1 : 0)
         .accessibilityHidden(true)
