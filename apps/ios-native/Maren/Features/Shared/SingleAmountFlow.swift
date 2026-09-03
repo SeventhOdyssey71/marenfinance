@@ -128,17 +128,34 @@ struct SingleAmountFlow: View {
                             }
                         }
                         ReviewList(rows: config.reviewRows(amount))
-                        GasNote(mode: config.gas, detail: config.gasDetail)
                     }
                     .padding(.horizontal, Theme.Space.md)
                 }
                 VStack(spacing: Theme.Space.sm) {
+                    HStack { Spacer(); gasTag }
+                        .padding(.horizontal, 4)
                     PillButton(title: config.submitTitle, variant: .primary) { Task { await submit(amount) } }
                     PillButton(title: "Back", variant: .quiet) { stage = .amount }
                 }
                 .padding(.horizontal, Theme.Space.md).padding(.bottom, Theme.Space.md)
             }
         }
+    }
+
+    // A subtle gas tag above the submit button — "Gasless" for relayed actions, "Costs BTC
+    // gas" for self-paid ones. A quiet chip, not the old full-width card.
+    private var gasTag: some View {
+        let sponsored: Bool = { if case .sponsored = config.gas { return true } else { return false } }()
+        return HStack(spacing: 4) {
+            Image(systemName: sponsored ? "sparkles" : "fuelpump.fill")
+                .font(.system(size: 10, weight: .semibold))
+            Text(config.gas.title)
+                .font(.text(12, weight: .medium))
+        }
+        .foregroundStyle(sponsored ? Theme.Palette.accentText : Theme.Palette.muted)
+        .padding(.horizontal, 10).padding(.vertical, 5)
+        .background(sponsored ? Theme.Palette.accentWash : Theme.Palette.inset, in: Capsule())
+        .accessibilityLabel(sponsored ? "Gasless, Maren pays the BTC gas" : "You pay a little BTC gas")
     }
 
     // MARK: submitting + done

@@ -133,6 +133,43 @@ private struct VaultSection: View {
     // Re-reads after a flow closes go through the environment client; captured indirectly.
     @Environment(\.marenClient) private var clientForReload
 
+    // The collateral ratio at (collateralBtc, debtMusd): from the live oracle price when we
+    // have it, otherwise PROJECTED from the current on-chain ratio. Collateral value per BTC is
+    // fixed, so scaling the known ratio by the change in collateral and debt needs no price at
+    // all. Nil only when there is neither a price nor a rated current position to scale from.
+    private func projectedRatio(collateral: Decimal, debt: Decimal) -> Decimal? {
+        guard debt > 0, collateral > 0 else { return nil }
+        if case let .available(usdPerBtc, _) = model.priceFeed {
+            return collateral * usdPerBtc / debt * 100
+        }
+        guard let ratio = model.position?.collateralRatioPercent,
+              let coll0 = model.position?.bitcoinLocked, coll0 > 0,
+              let debt0 = model.position?.borrowed, debt0 > 0 else { return nil }
+        return ratio * debt0 * collateral / (coll0 * debt)
+    }
+
+    // The BTC price at which (collateralBtc, debtMusd) hits the 110% Mezo liquidation cliff —
+    // price-independent: liqPrice = debt × 1.10 / collateral, in USD per BTC. Matches the same
+    // threshold buildPosition uses for drop-to-liquidation.
+    private func liquidationPrice(collateral: Decimal, debt: Decimal) -> Decimal? {
+        guard collateral > 0, debt > 0 else { return nil }
+        return debt * MarenPolicy.mezoLiquidationPercent / 100 / collateral
+    }
+
+    private func ratioRow(collateral: Decimal, debt: Decimal) -> ReviewRow {
+        if let ratio = projectedRatio(collateral: collateral, debt: debt) {
+            return ReviewRow(label: "Resulting ratio", value: MoneyFormat.percent(ratio))
+        }
+        return ReviewRow(label: "Resulting ratio", value: "", unavailable: true)
+    }
+
+    private func liquidationRow(collateral: Decimal, debt: Decimal) -> ReviewRow {
+        if let liq = liquidationPrice(collateral: collateral, debt: debt) {
+            return ReviewRow(label: "Liquidation price", value: MoneyFormat.usd(liq) + " / BTC")
+        }
+        return ReviewRow(label: "Liquidation price", value: "", unavailable: true)
+    }
+
     private func config(for flow: Flow) -> AmountFlowConfig {
         let p = model.position
         switch flow {
@@ -167,11 +204,13 @@ private struct VaultSection: View {
                 makeIntent: { Intent(kind: .borrow, amount: $0, unit: .musd) },
                 reviewRows: { amt in
                     var rows = [ReviewRow(label: "Borrowing", value: MoneyFormat.musd(amt))]
-                    if let borrowed = p?.borrowed {
-                        rows.append(ReviewRow(label: "New borrowed total", value: MoneyFormat.musd(borrowed + amt)))
+                    let newDebt = (p?.borrowed ?? 0) + amt
+                    let coll = p?.bitcoinLocked ?? 0
+                    if p?.borrowed != nil {
+                        rows.append(ReviewRow(label: "New borrowed total", value: MoneyFormat.musd(newDebt)))
                     }
-                    rows.append(ReviewRow(label: "Resulting ratio", value: "", unavailable: true))
-                    rows.append(ReviewRow(label: "Liquidation price", value: "", unavailable: true))
+                    rows.append(self.ratioRow(collateral: coll, debt: newDebt))
+                    rows.append(self.liquidationRow(collateral: coll, debt: newDebt))
                     return rows
                 }
             )
@@ -208,11 +247,13 @@ private struct VaultSection: View {
                 makeIntent: { Intent(kind: .withdraw, amount: $0, unit: .btc) },
                 reviewRows: { amt in
                     var rows = [ReviewRow(label: "Withdrawing", value: MoneyFormat.btc(amt))]
-                    if let locked = p?.bitcoinLocked {
-                        let remaining = locked > amt ? locked - amt : 0
-                        rows.append(ReviewRow(label: "Collateral after", value: MoneyFormat.btc(remaining)))
+                    let newColl = max(0, (p?.bitcoinLocked ?? 0) - amt)
+                    let debt = p?.borrowed ?? 0
+                    if p?.bitcoinLocked != nil {
+                        rows.append(ReviewRow(label: "Collateral after", value: MoneyFormat.btc(newColl)))
                     }
-                    rows.append(ReviewRow(label: "Resulting ratio", value: "", unavailable: true))
+                    rows.append(self.ratioRow(collateral: newColl, debt: debt))
+                    rows.append(self.liquidationRow(collateral: newColl, debt: debt))
                     return rows
                 }
             )
