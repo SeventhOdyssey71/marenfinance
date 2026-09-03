@@ -126,12 +126,14 @@ struct LiveMarenActions: MarenActions {
             guard let wei = Amount.toWei(intent.amount) else {
                 return .declined(reason: "That amount could not be read, so nothing was submitted.")
             }
-            // A @handle needs a registry lookup before it can be paid; not wired in this build,
-            // so an address is required for a live send.
-            guard PaymentLinks.isAddress(to) else {
-                return .declined(reason: "Live send needs a 0x address in this build. Handle resolution is not wired yet, so nothing was submitted.")
+            // A @handle is resolved to its address via MarenRegistry before paying; a 0x
+            // address passes straight through. An unregistered handle declines cleanly.
+            switch await mezo.resolveRecipient(to) {
+            case let .ok(address):
+                return Self.outcome(await mezo.send(loadedAddress: loadedAddress, to: address, amountWei: wei, memo: memo))
+            case let .fail(reason):
+                return .declined(reason: reason)
             }
-            return Self.outcome(await mezo.send(loadedAddress: loadedAddress, to: to, amountWei: wei, memo: memo))
 
         // Relayed (gasless) vault writes.
         case .borrow:   return await vaultWrite("borrow", intent, mezo)
@@ -166,8 +168,12 @@ struct LiveMarenActions: MarenActions {
             guard recipients.count == amounts.count, !recipients.isEmpty else {
                 return .declined(reason: "That split could not be read, so nothing was submitted.")
             }
-            for r in recipients where !PaymentLinks.isAddress(r) {
-                return .declined(reason: "Live split needs 0x addresses in this build. Handle resolution is not wired yet, so nothing was submitted.")
+            var resolvedRecipients: [String] = []
+            for r in recipients {
+                switch await mezo.resolveRecipient(r) {
+                case let .ok(address): resolvedRecipients.append(address)
+                case let .fail(reason): return .declined(reason: reason)
+                }
             }
             var amountsWei: [BigUInt] = []
             for a in amounts {
@@ -177,7 +183,7 @@ struct LiveMarenActions: MarenActions {
                 amountsWei.append(wei)
             }
             let total = amountsWei.reduce(BigUInt(0), +)
-            return Self.outcome(await mezo.split(loadedAddress: loadedAddress, recipients: recipients,
+            return Self.outcome(await mezo.split(loadedAddress: loadedAddress, recipients: resolvedRecipients,
                                                  amountsWei: amountsWei, totalWei: total, memo: ""))
 
         default:

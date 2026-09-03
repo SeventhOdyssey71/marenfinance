@@ -186,6 +186,21 @@ struct MezoRPC: Sendable {
         return Self.word(out, 0)
     }
 
+    /// Resolve a `@handle` to its address via `MarenRegistry.tryResolve(string)`. Mirrors the
+    /// web app's `resolveHandle`: `tryResolve` returns `address(0)` rather than reverting for an
+    /// unregistered handle, so `nil` here means "no such handle", not a transport failure — the
+    /// caller declines cleanly instead of paying anyone the zero address.
+    func resolveHandle(_ handle: String) async throws -> String? {
+        let clean = handle.hasPrefix("@") ? String(handle.dropFirst()) : handle
+        let enc = ABIFunctionEncoder("tryResolve")
+        try enc.encode(clean)
+        let out = try await call(to: MarenAddresses.of(chain.network).marenRegistry, data: try enc.encoded())
+        guard out.count >= 32 else { return nil }
+        let addr = out.subdata(in: 12..<32) // low 20 bytes of the 32-byte word
+        if addr.allSatisfy({ $0 == 0 }) { return nil }
+        return "0x" + addr.map { String(format: "%02x", $0) }.joined()
+    }
+
     // MARK: word decoding
     //
     // eth_call returns ABI-encoded 32-byte words. These pull one word by index; a request for

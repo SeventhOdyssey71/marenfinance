@@ -55,6 +55,30 @@ struct MezoActions {
         return try account.signMessage(message: inner)
     }
 
+    // MARK: recipient resolution
+
+    /// A resolved recipient, or an honest reason it could not be resolved. `String` does not
+    /// conform to `Error`, so this mirrors `KeyOutcome` rather than using `Result<_, String>`.
+    enum RecipientOutcome { case ok(String); case fail(String) }
+
+    /// Resolve a recipient the user typed — a `0x` address or an `@handle` — to a `0x` address.
+    /// Handles go through `MarenRegistry.tryResolve`; an unregistered one is a clean decline
+    /// rather than a silent send to the zero address. Send and Split call this first, so their
+    /// golden-tested encoders always receive a real address.
+    func resolveRecipient(_ recipient: String) async -> RecipientOutcome {
+        let trimmed = recipient.trimmingCharacters(in: .whitespaces)
+        if PaymentLinks.isAddress(trimmed) { return .ok(trimmed) }
+        guard PaymentLinks.isHandle(trimmed) else {
+            return .fail("“\(trimmed)” isn’t a 0x address or an @handle, so nothing was submitted.")
+        }
+        do {
+            if let address = try await rpc.resolveHandle(trimmed) { return .ok(address) }
+            return .fail("\(trimmed) isn’t registered yet, so nothing was submitted.")
+        } catch {
+            return .fail("Couldn’t reach the registry to resolve \(trimmed), so nothing was submitted.")
+        }
+    }
+
     // MARK: relayed submit
 
     /// The gas cap to sign into a ForwardRequest, from a direct-call estimate. A generous
