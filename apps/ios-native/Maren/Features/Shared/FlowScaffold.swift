@@ -242,68 +242,110 @@ struct SubmitBar: View {
 struct OutcomeView: View {
     let outcome: SubmitOutcome
     let network: MezoNetwork
+    var detail: OutcomeDetail? = nil
     var onDone: () -> Void
 
+    @Environment(\.openURL) private var openURL
+
     var body: some View {
-        VStack(alignment: .leading, spacing: Theme.Space.lg) {
-            header
-            body(for: outcome)
-            PillButton(title: "Done", variant: .quiet, action: onDone)
-        }
-    }
+        VStack(spacing: Theme.Space.lg) {
+            Spacer(minLength: Theme.Space.md)
 
-    @ViewBuilder private var header: some View {
-        HStack(spacing: Theme.Space.sm) {
-            ZStack {
-                Circle().fill(tone.opacity(0.14)).frame(width: 44, height: 44)
-                Image(systemName: symbol)
-                    .font(.system(size: 20, weight: .bold))
-                    .foregroundStyle(tone)
-            }
-            .accessibilityHidden(true)
-            Text(headline)
-                .font(.system(size: 22, weight: .bold))
-                .foregroundStyle(Theme.Palette.ink)
-                .fixedSize(horizontal: false, vertical: true)
-        }
-    }
+            OutcomeBadge(tone: tone, symbol: symbol, isSuccess: isSuccess)
 
-    @ViewBuilder private func body(for outcome: SubmitOutcome) -> some View {
-        MCard {
-            VStack(alignment: .leading, spacing: Theme.Space.sm) {
-                Text(message)
-                    .font(.system(size: 15))
-                    .foregroundStyle(Theme.Palette.muted)
+            VStack(spacing: Theme.Space.xs) {
+                Text(headline)
+                    .font(.display(26, weight: .semibold))
+                    .foregroundStyle(Theme.Palette.ink)
+                    .multilineTextAlignment(.center)
                     .fixedSize(horizontal: false, vertical: true)
-                if case let .delivered(d) = outcome {
-                    Divider().overlay(Theme.Palette.ink.opacity(0.07))
-                    StatRow(label: "Gas", showsDivider: false) {
-                        Text(d.sponsored ? "Paid by Maren" : "You paid BTC")
-                            .font(.figure(15, weight: .semibold))
-                            .foregroundStyle(Theme.Palette.ink)
-                    }
-                    Link(destination: explorerURL(d.hash)) {
-                        HStack(spacing: 6) {
-                            Text("View on explorer")
-                            Image(systemName: "arrow.up.right.square")
-                        }
-                        .font(.system(size: 15, weight: .semibold))
-                        .foregroundStyle(Theme.Palette.accentText)
-                    }
-                    .accessibilityLabel("View this transaction on the Mezo explorer")
+                if let caption = detail?.caption {
+                    Text(caption).font(.text(14)).foregroundStyle(Theme.Palette.tertiary)
                 }
-                if case let .failed(outcome) = outcome, let hash = failedHash(outcome) {
-                    Link(destination: explorerURL(hash)) {
-                        HStack(spacing: 6) {
-                            Text("Check on explorer")
-                            Image(systemName: "arrow.up.right.square")
-                        }
-                        .font(.system(size: 15, weight: .semibold))
-                        .foregroundStyle(Theme.Palette.accentText)
+                if let hero = detail?.hero {
+                    Text(hero)
+                        .font(.figure(34, weight: .bold))
+                        .foregroundStyle(Theme.Palette.ink)
+                        .monospacedDigit()
+                }
+            }
+
+            Text(message)
+                .font(.text(14))
+                .foregroundStyle(Theme.Palette.muted)
+                .multilineTextAlignment(.center)
+                .fixedSize(horizontal: false, vertical: true)
+
+            if !rows.isEmpty { detailCard }
+
+            Spacer(minLength: Theme.Space.md)
+
+            footer
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .padding(.horizontal, Theme.Space.md)
+    }
+
+    // The detail card — icon-led rows with hairline separators, like a receipt.
+    private var detailCard: some View {
+        MCard {
+            VStack(spacing: 0) {
+                ForEach(Array(rows.enumerated()), id: \.element.id) { index, row in
+                    HStack(spacing: Theme.Space.sm) {
+                        Image(systemName: row.icon)
+                            .font(.system(size: 13, weight: .semibold))
+                            .foregroundStyle(Theme.Palette.tertiary)
+                            .frame(width: 18)
+                        Text(row.label).font(.text(14)).foregroundStyle(Theme.Palette.muted)
+                        Spacer(minLength: Theme.Space.sm)
+                        Text(row.value)
+                            .font(.figure(14, weight: .semibold))
+                            .foregroundStyle(Theme.Palette.ink)
+                            .lineLimit(1).truncationMode(.middle)
+                    }
+                    .padding(.vertical, 11)
+                    if index < rows.count - 1 {
+                        Rectangle().fill(Theme.Palette.ink.opacity(0.06)).frame(height: 1)
                     }
                 }
             }
         }
+    }
+
+    private var footer: some View {
+        Group {
+            if let hash = explorerHash {
+                HStack(spacing: Theme.Space.sm) {
+                    PillButton(title: "Explorer", variant: .quiet) { openURL(explorerURL(hash)) }
+                    PillButton(title: "Done", variant: .primary, action: onDone)
+                }
+            } else {
+                PillButton(title: "Done", variant: .primary, action: onDone)
+            }
+        }
+    }
+
+    private var isSuccess: Bool {
+        if case .delivered = outcome { return true }
+        return false
+    }
+
+    private var explorerHash: String? {
+        if case let .delivered(d) = outcome { return d.hash }
+        if case let .failed(o) = outcome { return failedHash(o) }
+        return nil
+    }
+
+    // Context rows from the flow, plus Network + Gas once a receipt exists.
+    private var rows: [OutcomeRow] {
+        var out = detail?.rows ?? []
+        if case let .delivered(d) = outcome {
+            out.append(OutcomeRow(icon: "link", label: "Network",
+                                  value: network == .testnet ? "Mezo testnet" : "Mezo"))
+            out.append(OutcomeRow(icon: "fuelpump.fill", label: "Gas",
+                                  value: d.sponsored ? "Paid by Maren" : "You paid BTC"))
+        }
+        return out
     }
 
     private func explorerURL(_ hash: String) -> URL {

@@ -114,29 +114,43 @@ private struct KeypadKeyStyle: ButtonStyle {
 // MARK: LogoLoader — a glossy, glassmorphic coin that flips while a submit is in flight
 
 struct LogoLoader: View {
-    var size: CGFloat = 96
-    @State private var flip = false
+    var size: CGFloat = 84
+    @State private var spin = false
+    @State private var pulse = false
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     var body: some View {
         ZStack {
+            // Indeterminate ring — an arc sweeping around the coin, not a full spinner.
             Circle()
-                .fill(AngularGradient(colors: [Theme.Palette.accent, Theme.Palette.accentText, Theme.Palette.accent],
-                                      center: .center))
-            // Glassy specular highlight — the gloss.
+                .trim(from: 0, to: 0.7)
+                .stroke(
+                    AngularGradient(colors: [Theme.Palette.accent.opacity(0), Theme.Palette.accent],
+                                    center: .center),
+                    style: StrokeStyle(lineWidth: 4, lineCap: .round)
+                )
+                .frame(width: size + 22, height: size + 22)
+                .rotationEffect(.degrees(spin ? 360 : 0))
+
+            // The brand coin, glossy but calm — no 3D flip.
             Circle()
-                .fill(RadialGradient(colors: [.white.opacity(0.65), .clear],
-                                     center: .topLeading, startRadius: 0, endRadius: size * 0.7))
+                .fill(LinearGradient(colors: [Theme.Palette.accent, Theme.Palette.accentText],
+                                     startPoint: .topLeading, endPoint: .bottomTrailing))
+                .frame(width: size, height: size)
+            Circle()
+                .fill(RadialGradient(colors: [.white.opacity(0.40), .clear],
+                                     center: .init(x: 0.34, y: 0.28), startRadius: 0, endRadius: size * 0.6))
+                .frame(width: size, height: size)
             MarenGlyph()
                 .fill(Color.white)
-                .frame(width: size * 0.5, height: size * 0.5)
+                .frame(width: size * 0.44, height: size * 0.44)
         }
-        .frame(width: size, height: size)
-        .rotation3DEffect(.degrees(flip ? 360 : 0), axis: (x: 0, y: 1, z: 0))
-        .shadow(color: Theme.Palette.accent.opacity(0.40), radius: 24, x: 0, y: 8)
+        .scaleEffect(pulse ? 1 : 0.97)
+        .shadow(color: Theme.Palette.accent.opacity(0.25), radius: 18, x: 0, y: 10)
         .onAppear {
             guard !reduceMotion else { return }
-            withAnimation(.easeInOut(duration: 1.4).repeatForever(autoreverses: false)) { flip = true }
+            withAnimation(.linear(duration: 0.9).repeatForever(autoreverses: false)) { spin = true }
+            withAnimation(.easeInOut(duration: 1.1).repeatForever(autoreverses: true)) { pulse = true }
         }
         .accessibilityLabel("Submitting")
     }

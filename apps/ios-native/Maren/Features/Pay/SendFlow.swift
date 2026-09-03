@@ -207,24 +207,34 @@ struct SendFlow: View {
 
     private var submittingStage: some View {
         VStack(spacing: Theme.Space.lg) {
-            header(title: "Send to", pill: shortRecipient)
             Spacer()
             LogoLoader()
-            Text("Sending \(MoneyFormat.musd(amount ?? 0, unit: false)) MUSD…")
-                .font(.text(16, weight: .medium)).foregroundStyle(Theme.Palette.muted)
+            VStack(spacing: 4) {
+                Text("Sending \(MoneyFormat.musd(amount ?? 0, unit: false)) MUSD")
+                    .font(.display(20, weight: .semibold)).foregroundStyle(Theme.Palette.ink)
+                Text("to \(shortRecipient)")
+                    .font(.text(14)).foregroundStyle(Theme.Palette.tertiary)
+            }
             Spacer()
         }
     }
 
     private var doneStage: some View {
-        VStack(alignment: .leading, spacing: Theme.Space.lg) {
-            header(title: "Send")
+        Group {
             if let outcome {
-                OutcomeView(outcome: outcome, network: .testnet) { dismiss() }
-                    .padding(.horizontal, Theme.Space.md)
+                OutcomeView(outcome: outcome, network: .testnet, detail: outcomeDetail(for: outcome)) { dismiss() }
             }
-            Spacer()
         }
+    }
+
+    private func outcomeDetail(for outcome: SubmitOutcome) -> OutcomeDetail? {
+        guard case .delivered = outcome, let amount else { return nil }
+        return OutcomeDetail(
+            caption: "You sent",
+            hero: "\(MoneyFormat.musd(amount, unit: false)) MUSD",
+            rows: [OutcomeRow(icon: trimmedRecipient.hasPrefix("@") ? "at" : "person.fill",
+                              label: "To", value: shortRecipient)]
+        )
     }
 
     // MARK: keypad logic
