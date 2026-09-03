@@ -110,15 +110,11 @@ struct ActionTile: View {
 
     var body: some View {
         Button(action: action) {
-            VStack(spacing: 10) {
-                ZStack {
-                    Circle()
-                        .fill(emphasized ? Theme.Palette.accentWash : Theme.Palette.inset)
-                        .frame(width: 46, height: 46)
-                    Image(systemName: icon)
-                        .font(.system(size: 19, weight: .semibold))
-                        .foregroundStyle(emphasized ? Theme.Palette.accentText : Theme.Palette.ink)
-                }
+            VStack(spacing: 8) {
+                Image(systemName: icon)
+                    .font(.system(size: 20, weight: .regular))
+                    .foregroundStyle(emphasized ? Theme.Palette.accent : Theme.Palette.ink)
+                    .frame(height: 26)
                 Text(title)
                     .font(.system(size: 13, weight: .medium, design: .rounded))
                     .foregroundStyle(Theme.Palette.ink)

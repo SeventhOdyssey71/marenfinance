@@ -70,6 +70,8 @@ struct MoneyText: View {
     let text: String
     var size: CGFloat = 34
     var weight: Font.Weight = .bold
+    /// Letter spacing. Large balances read tighter (negative) so the digits group cleanly.
+    var tracking: CGFloat = 0
     /// The whole-number colour. Fraction + unit always fall to the tertiary tone.
     var tint: Color = Theme.Palette.ink
 
@@ -80,6 +82,7 @@ struct MoneyText: View {
             + Text(tail).foregroundColor(Theme.Palette.tertiary)
         )
         .font(.figure(size, weight: weight))
+        .tracking(tracking)
     }
 
     /// Split at the first decimal point. Everything from the point on (decimals and a

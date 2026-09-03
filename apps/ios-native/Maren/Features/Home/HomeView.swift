@@ -81,19 +81,18 @@ struct HomeView: View {
     // MARK: balance hero — one big number, in dollars, centered
 
     private var balanceHero: some View {
-        VStack(spacing: Theme.Space.sm) {
+        VStack(spacing: Theme.Space.xs) {
             Text("Balance").labelStyle()
             if let musd = model.balances?.musd {
-                MoneyText(text: MoneyFormat.usd(musd), size: 44, weight: .bold)
+                MoneyText(text: MoneyFormat.usd(musd), size: 38, weight: .bold, tracking: -2)
             } else {
                 Unavailable(label: "Balance unavailable")
             }
             Text("In MUSD · Mezo")
-                .font(.body(14))
+                .font(.body(13))
                 .foregroundStyle(Theme.Palette.tertiary)
         }
         .frame(maxWidth: .infinity)
-        .padding(.vertical, Theme.Space.xs)
     }
 
     private var actionPills: some View {
