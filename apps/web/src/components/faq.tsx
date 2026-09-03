@@ -70,7 +70,7 @@ const items: readonly Item[] = [
             NEXT_PUBLIC_RELAYER_URL at build time, so it is the same value on the
             server and in the browser and this paragraph cannot flicker. It says
             what is true of THIS deployment; neither branch promises the relayer
-            is accepting work right now — the app answers that per action, at the
+            is accepting work right now. The app answers that per action, at the
             point of signing, from a live health probe. */}
         {RELAYER_CONFIGURED ? (
           <p>

@@ -53,7 +53,7 @@ export function Footer() {
           </h2>
           <p className="mx-auto mt-5 max-w-[48ch] text-[16px] font-semibold leading-[1.5] text-[color:var(--ink)] sm:text-[18px]">
             Deposit from 0.001 BTC, draw MUSD, and spend it without keeping a gas balance. Maren is
-            pre-audit — start small.
+            pre-audit, so start small.
           </p>
           <div className="mt-8 flex justify-center">
             <StickerButton href="/app" variant="dark">

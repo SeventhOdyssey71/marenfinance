@@ -2,13 +2,12 @@
 
 import Link from 'next/link';
 import { useEffect, useState } from 'react';
-import { StickerButton } from './ugly-ui';
 
 /**
- * Floating nav pill — white, 1px black, 16px radius, centred at the top of the
- * page rather than a full-width bar. Wordmark left, section links centre, a
- * ghost "Launch app" sticker button right. The whole pill lifts a touch off
- * the top edge and stays put on scroll.
+ * Nav — a clean, transparent bar: the Maren mark + wordmark on the left with the
+ * section links beside it, a quiet "Sign in" and a dark pill CTA on the right. No
+ * boxed pill, no sticker chrome. A subtle blur keeps it legible over content on
+ * scroll. Collapses to a menu button + sheet under lg.
  */
 
 type NavLink = { href: string; label: string };
@@ -40,37 +39,32 @@ export function Nav() {
   }, [open]);
 
   return (
-    <header className="sticky top-0 z-50 pt-4 sm:pt-5">
+    <header className="sticky top-0 z-50 nav-bar">
       <div className="u-wrap">
-        <div className="u-card mx-auto flex max-w-[1000px] items-center justify-between gap-4 py-2.5 pl-4 pr-2.5 sm:pl-5">
-          <Link
-            href="/"
-            aria-label="Maren Finance, home"
-            className="shrink-0 text-[19px] font-extrabold uppercase tracking-[-0.03em] text-[color:var(--ink)]"
-          >
-            Maren
-          </Link>
+        <div className="flex h-[68px] items-center justify-between gap-4">
+          <div className="flex items-center gap-9">
+            <Link href="/" aria-label="Maren Finance, home" className="nav-logo">
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img src="/brand/maren-mark.png" alt="" className="nav-logo-mark" />
+              <span>Maren</span>
+            </Link>
 
-          <nav aria-label="Primary" className="hidden items-center gap-6 lg:flex">
-            {links.map((l) => (
-              <a
-                key={l.href}
-                href={l.href}
-                className="text-[14px] font-semibold text-[color:var(--muted)] transition-colors duration-[120ms] ease-out hover:text-[color:var(--ink)]"
-              >
-                {l.label}
-              </a>
-            ))}
-          </nav>
+            <nav aria-label="Primary" className="nav-links hidden lg:flex">
+              {links.map((l) => (
+                <a key={l.href} href={l.href}>
+                  {l.label}
+                </a>
+              ))}
+            </nav>
+          </div>
 
-          <div className="flex items-center gap-2.5">
-            <StickerButton
-              href="/app"
-              variant="glow"
-              className="hidden !min-h-[38px] !px-4 sm:inline-flex"
-            >
-              Launch app
-            </StickerButton>
+          <div className="flex items-center gap-3">
+            <a href="/app" className="nav-signin hidden sm:inline-flex">
+              Sign in
+            </a>
+            <a href="/app" className="nav-cta">
+              Open app
+            </a>
 
             <button
               type="button"
@@ -109,7 +103,7 @@ export function Nav() {
         <div
           id="mobile-nav"
           hidden={!open}
-          className="u-card mx-auto mt-3 max-w-[1000px] p-3 lg:hidden"
+          className="u-card mx-auto mt-2 p-3 lg:hidden"
         >
           <ul className="flex flex-col">
             {links.map((l) => (
@@ -117,20 +111,16 @@ export function Nav() {
                 <a
                   href={l.href}
                   onClick={() => setOpen(false)}
-                  className="flex h-12 items-center px-2 text-[16px] font-semibold text-[color:var(--ink)]"
+                  className="flex h-12 items-center px-2 text-[16px] font-medium text-[color:var(--ink)]"
                 >
                   {l.label}
                 </a>
               </li>
             ))}
             <li className="pt-3">
-              <StickerButton
-                href="/app"
-                variant="glow"
-                className="w-full"
-              >
-                Launch app
-              </StickerButton>
+              <a href="/app" className="nav-cta flex w-full justify-center">
+                Open app
+              </a>
             </li>
           </ul>
         </div>

@@ -11,7 +11,7 @@ const STEPS: readonly { n: string; title: string; body: string; fill: string }[]
   {
     n: '01',
     title: 'Deposit BTC',
-    body: 'Connect any EVM wallet and deposit from 0.001 BTC. Your first deposit sends Bitcoin, so it costs gas — and always will.',
+    body: 'Connect any EVM wallet and deposit from 0.001 BTC. Your first deposit sends Bitcoin, so it costs gas, and always will.',
     fill: 'var(--lime)',
   },
   {

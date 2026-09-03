@@ -1,6 +1,6 @@
 import type { Metadata, Viewport } from 'next';
 import type { ReactNode } from 'react';
-import { satoshi, geistMono, anton, inter, caveat } from './fonts';
+import { satoshi, geistMono, anton, inter, caveat, neueMontreal, sfProRounded } from './fonts';
 import './globals.css';
 
 const title = 'Maren Finance: Spend Bitcoin. Never sell it.';
@@ -52,7 +52,7 @@ export default function RootLayout({ children }: Readonly<{ children: ReactNode 
   return (
     <html
       lang="en"
-      className={`${satoshi.variable} ${geistMono.variable} ${anton.variable} ${inter.variable} ${caveat.variable}`}
+      className={`${satoshi.variable} ${geistMono.variable} ${anton.variable} ${inter.variable} ${caveat.variable} ${neueMontreal.variable} ${sfProRounded.variable}`}
     >
       <body className="bg-bg text-text antialiased">{children}</body>
     </html>
