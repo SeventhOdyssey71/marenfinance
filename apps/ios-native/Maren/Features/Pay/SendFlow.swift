@@ -147,9 +147,13 @@ struct SendFlow: View {
                     .font(.text(13)).foregroundStyle(Theme.Palette.tertiary)
             } else if let resolvedAddress {
                 Image(systemName: "checkmark.circle.fill")
-                    .font(.system(size: 13)).foregroundStyle(Theme.Palette.success)
-                Text(MarenSession.shortAddress(resolvedAddress))
-                    .font(.figure(13, weight: .medium)).foregroundStyle(Theme.Palette.muted)
+                    .font(.system(size: 12)).foregroundStyle(Theme.Palette.success)
+                Text(resolvedAddress)
+                    .font(.text(12))
+                    .foregroundStyle(Theme.Palette.muted)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.7)
+                    .truncationMode(.middle)
             } else {
                 Text("\(trimmedRecipient) isn’t registered yet.")
                     .font(.text(13)).foregroundStyle(Theme.Palette.tertiary)

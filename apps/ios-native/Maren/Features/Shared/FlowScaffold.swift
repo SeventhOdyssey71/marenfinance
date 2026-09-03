@@ -299,7 +299,7 @@ struct OutcomeView: View {
                         Text(row.label).font(.text(14)).foregroundStyle(Theme.Palette.muted)
                         Spacer(minLength: Theme.Space.sm)
                         Text(row.value)
-                            .font(.figure(14, weight: .semibold))
+                            .font(.text(14, weight: .medium))
                             .foregroundStyle(Theme.Palette.ink)
                             .lineLimit(1).truncationMode(.middle)
                     }

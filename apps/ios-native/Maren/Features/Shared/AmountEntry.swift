@@ -121,7 +121,7 @@ struct LogoLoader: View {
 
     var body: some View {
         ZStack {
-            // Indeterminate ring — an arc sweeping around the coin, not a full spinner.
+            // Indeterminate ring — an arc sweeping around the mark, not a full spinner.
             Circle()
                 .trim(from: 0, to: 0.7)
                 .stroke(
@@ -132,21 +132,13 @@ struct LogoLoader: View {
                 .frame(width: size + 22, height: size + 22)
                 .rotationEffect(.degrees(spin ? 360 : 0))
 
-            // The brand coin, glossy but calm — no 3D flip.
-            Circle()
-                .fill(LinearGradient(colors: [Theme.Palette.accent, Theme.Palette.accentText],
-                                     startPoint: .topLeading, endPoint: .bottomTrailing))
-                .frame(width: size, height: size)
-            Circle()
-                .fill(RadialGradient(colors: [.white.opacity(0.40), .clear],
-                                     center: .init(x: 0.34, y: 0.28), startRadius: 0, endRadius: size * 0.6))
-                .frame(width: size, height: size)
-            MarenGlyph()
-                .fill(Color.white)
-                .frame(width: size * 0.44, height: size * 0.44)
+            // The actual Maren logo, breathing gently.
+            Image("MarenMark")
+                .resizable()
+                .scaledToFit()
+                .frame(width: size * 0.66)
+                .scaleEffect(pulse ? 1 : 0.9)
         }
-        .scaleEffect(pulse ? 1 : 0.97)
-        .shadow(color: Theme.Palette.accent.opacity(0.25), radius: 18, x: 0, y: 10)
         .onAppear {
             guard !reduceMotion else { return }
             withAnimation(.linear(duration: 0.9).repeatForever(autoreverses: false)) { spin = true }
