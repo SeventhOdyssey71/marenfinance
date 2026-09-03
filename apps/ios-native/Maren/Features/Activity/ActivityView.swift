@@ -97,13 +97,7 @@ private struct ActivityRow: View {
     var body: some View {
         VStack(spacing: 0) {
             HStack(spacing: Theme.Space.sm) {
-                ZStack {
-                    Circle().fill(Theme.Palette.inset).frame(width: 40, height: 40)
-                    Image(systemName: item.icon)
-                        .font(.system(size: 16, weight: .semibold))
-                        .foregroundStyle(Theme.Palette.ink)
-                }
-                .accessibilityHidden(true)
+                TokenCoin(isBtc: item.isBtc, size: 40)
                 VStack(alignment: .leading, spacing: 2) {
                     Text(item.title)
                         .font(.system(size: 15, weight: .medium))
@@ -121,7 +115,7 @@ private struct ActivityRow: View {
                 Spacer(minLength: Theme.Space.sm)
                 Text(item.amount)
                     .font(.figure(15, weight: .semibold))
-                    .foregroundStyle(item.status == .failed ? Theme.Palette.tertiary : Theme.Palette.ink)
+                    .foregroundStyle(item.status == .failed ? Theme.Palette.tertiary : item.amountColor)
                     .strikethrough(item.status == .failed)
                     .lineLimit(1)
                     .fixedSize(horizontal: true, vertical: false)

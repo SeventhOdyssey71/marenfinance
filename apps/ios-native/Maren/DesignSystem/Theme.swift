@@ -39,6 +39,11 @@ enum Theme {
         static let warning = Color(hex: 0xB45309)
         static let danger = Color(hex: 0xDC2626)
 
+        // Money direction in ledgers — their own roles, not reused success/danger. A
+        // fresh green and a soft, desaturated red that sit easy on white.
+        static let moneyIn = Color(hex: 0x12A66F)
+        static let moneyOut = Color(hex: 0xE5484D)
+
         // Asset — BTC orange as text fails on the light page; this is the text-safe value.
         static let btc = Color(hex: 0x9A5300)
         static let musd = Color(hex: 0x0D9E70)

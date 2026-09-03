@@ -130,4 +130,15 @@ struct ActivityItem: Sendable, Equatable, Identifiable, Codable {
         case .earnWithdraw: return "arrow.up.left"
         }
     }
+
+    /// The token this row is denominated in, read from its own formatted amount.
+    var isBtc: Bool { amount.contains("BTC") }
+
+    /// Green for money in (+), red for money out (−), ink otherwise. Failed rows override
+    /// this in the row itself (greyed + struck through).
+    var amountColor: Color {
+        if amount.hasPrefix("+") { return Theme.Palette.moneyIn }
+        if amount.hasPrefix("-") || amount.hasPrefix("−") { return Theme.Palette.moneyOut }
+        return Theme.Palette.ink
+    }
 }

@@ -18,3 +18,19 @@ struct MusdCoin: View {
             .accessibilityLabel("MUSD")
     }
 }
+
+/// A token coin for ledger rows — the real Bitcoin or MUSD mark, clipped to a clean circle.
+/// Both source images are already circular, so this just sizes and masks them consistently.
+struct TokenCoin: View {
+    let isBtc: Bool
+    var size: CGFloat = 34
+
+    var body: some View {
+        Image(isBtc ? "BitcoinCoin" : "MusdCoin")
+            .resizable()
+            .scaledToFit()
+            .frame(width: size, height: size)
+            .clipShape(Circle())
+            .accessibilityHidden(true)
+    }
+}

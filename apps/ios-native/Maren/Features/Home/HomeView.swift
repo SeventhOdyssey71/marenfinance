@@ -164,11 +164,7 @@ struct HomeView: View {
     private func txRow(_ item: ActivityItem, showsDivider: Bool) -> some View {
         VStack(spacing: 0) {
             HStack(spacing: Theme.Space.sm) {
-                Image(systemName: item.icon)
-                    .font(.system(size: 17, weight: .regular))
-                    .foregroundStyle(Theme.Palette.ink)
-                    .frame(width: 26)
-                    .accessibilityHidden(true)
+                TokenCoin(isBtc: item.isBtc, size: 34)
                 VStack(alignment: .leading, spacing: 1) {
                     Text(item.title)
                         .font(.text(15, weight: .medium))
@@ -180,7 +176,7 @@ struct HomeView: View {
                 Spacer(minLength: Theme.Space.sm)
                 Text(item.amount)
                     .font(.figure(15, weight: .semibold))
-                    .foregroundStyle(Theme.Palette.ink)
+                    .foregroundStyle(item.amountColor)
                     .lineLimit(1)
                     .fixedSize(horizontal: true, vertical: false)
             }
