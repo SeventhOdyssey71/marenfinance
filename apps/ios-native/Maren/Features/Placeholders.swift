@@ -15,8 +15,7 @@ struct Screen<Content: View>: View {
             VStack(alignment: .leading, spacing: Theme.Space.lg) {
                 HStack(alignment: .center) {
                     Text(title)
-                        .font(.display(40))
-                        .tracking(-0.5)
+                        .font(.display(30, weight: .semibold))
                         .foregroundStyle(Theme.Palette.ink)
                     Spacer()
                     if badge { DemoBadge() }

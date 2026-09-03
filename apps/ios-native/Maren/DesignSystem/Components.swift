@@ -28,16 +28,38 @@ struct SectionHeader: View {
         HStack(alignment: .firstTextBaseline) {
             Text(title)
                 .font(.sectionDisplay())
-                .textCase(.uppercase)
-                .tracking(0.4)
-                .foregroundStyle(Theme.Palette.tertiary)
+                .foregroundStyle(Theme.Palette.ink)
             Spacer(minLength: Theme.Space.md)
             if let trailing {
                 Text(trailing)
-                    .font(.system(size: 13, weight: .medium))
+                    .font(.system(size: 13, weight: .medium, design: .rounded))
                     .foregroundStyle(Theme.Palette.muted)
             }
         }
+    }
+}
+
+// MARK: - DottedDivider
+//
+// The very slight dotted hairline from the reference — an airy separator under the header
+// and between sections, quieter than a solid rule.
+
+struct DottedDivider: View {
+    var body: some View {
+        HorizontalDottedLine()
+            .stroke(Theme.Palette.ink.opacity(0.16),
+                    style: StrokeStyle(lineWidth: 1, dash: [1.5, 4]))
+            .frame(height: 1)
+            .accessibilityHidden(true)
+    }
+}
+
+private struct HorizontalDottedLine: Shape {
+    func path(in rect: CGRect) -> Path {
+        var path = Path()
+        path.move(to: CGPoint(x: 0, y: rect.midY))
+        path.addLine(to: CGPoint(x: rect.maxX, y: rect.midY))
+        return path
     }
 }
 

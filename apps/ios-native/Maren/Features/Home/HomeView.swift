@@ -2,9 +2,10 @@ import SwiftUI
 
 // MARK: - Home
 //
-// A glanceable summary, kept deliberately simple: what you can spend (your MUSD balance,
-// shown in dollars), the health of your Bitcoin vault in one plain sentence, and the pay
-// shortcuts. The dense position table lives in the Finance tab — Home never repeats it.
+// Clean and light: a greeting header with your handle, one big balance in dollars, and the
+// pay shortcuts. Type is SF Pro Rounded at moderate weights (never heavy); numbers grey
+// their decimals; separators are the slight dotted hairline. The dense vault table lives on
+// the Finance tab — Home never repeats it.
 
 struct HomeView: View {
     @Environment(\.marenClient) private var client
@@ -17,7 +18,10 @@ struct HomeView: View {
         ScrollView {
             VStack(alignment: .leading, spacing: Theme.Space.lg) {
                 header
-                balanceCard
+                DottedDivider()
+                balanceHero
+                actionPills
+                DottedDivider()
                 vaultCard
                 payRow
                 Spacer(minLength: Theme.Space.md)
@@ -31,48 +35,63 @@ struct HomeView: View {
         .sheet(item: $destination) { $0.view }
     }
 
-    // MARK: header — the logo mark, scan, demo badge
+    // MARK: header — logo, greeting, handle, scan
 
     private var header: some View {
-        HStack(alignment: .center) {
-            Image("MarenMark")
-                .resizable()
-                .scaledToFit()
-                .frame(height: 30)
-                .accessibilityLabel("Maren")
-            Spacer()
-            Button { destination = .scan } label: {
-                Image(systemName: "qrcode.viewfinder")
-                    .font(.system(size: 20, weight: .semibold))
-                    .foregroundStyle(Theme.Palette.ink)
-                    .frame(width: 44, height: 44)
+        VStack(alignment: .leading, spacing: Theme.Space.sm) {
+            HStack(alignment: .center) {
+                Image("MarenMark")
+                    .resizable()
+                    .scaledToFit()
+                    .frame(height: 26)
+                    .accessibilityLabel("Maren")
+                Spacer()
+                Button { destination = .scan } label: {
+                    Image(systemName: "qrcode.viewfinder")
+                        .font(.system(size: 20, weight: .regular))
+                        .foregroundStyle(Theme.Palette.ink)
+                        .frame(width: 44, height: 44)
+                }
+                .accessibilityLabel("Scan a payment or claim code")
             }
-            .accessibilityLabel("Scan a payment or claim code")
-            if !actions.canSettle { DemoBadge() }
+            VStack(alignment: .leading, spacing: 3) {
+                Text("Good morning").labelStyle()
+                HStack(spacing: Theme.Space.sm) {
+                    Text(model.account?.handle ?? "…")
+                        .font(.display(20, weight: .medium))
+                        .foregroundStyle(Theme.Palette.ink)
+                        .overlay(alignment: .bottom) {
+                            DottedDivider().offset(y: 4)
+                        }
+                    if !actions.canSettle { DemoBadge() }
+                }
+            }
         }
         .padding(.top, Theme.Space.xs)
     }
 
-    // MARK: balance hero — the one big number, in dollars
+    // MARK: balance hero — one big number, in dollars, centered
 
-    private var balanceCard: some View {
-        MCard {
-            VStack(alignment: .leading, spacing: Theme.Space.md) {
-                Text("Balance").labelStyle()
-                if let musd = model.balances?.musd {
-                    MoneyText(text: MoneyFormat.usd(musd), size: 46, weight: .bold)
-                } else {
-                    Unavailable(label: "Balance unavailable")
-                }
-                Text("In MUSD · Mezo")
-                    .font(.system(size: 13))
-                    .foregroundStyle(Theme.Palette.tertiary)
-                HStack(spacing: Theme.Space.sm) {
-                    PillButton(title: "Send", icon: "arrow.up.right", variant: .primary) { destination = .send }
-                    PillButton(title: "Receive", icon: "arrow.down.left", variant: .quiet) { destination = .receive }
-                }
-                .padding(.top, 2)
+    private var balanceHero: some View {
+        VStack(spacing: Theme.Space.sm) {
+            Text("Balance").labelStyle()
+            if let musd = model.balances?.musd {
+                MoneyText(text: MoneyFormat.usd(musd), size: 46, weight: .bold)
+            } else {
+                Unavailable(label: "Balance unavailable")
             }
+            Text("In MUSD · Mezo")
+                .font(.body(14))
+                .foregroundStyle(Theme.Palette.tertiary)
+        }
+        .frame(maxWidth: .infinity)
+        .padding(.vertical, Theme.Space.xs)
+    }
+
+    private var actionPills: some View {
+        HStack(spacing: Theme.Space.sm) {
+            PillButton(title: "Send", icon: "arrow.up.right", variant: .primary) { destination = .send }
+            PillButton(title: "Receive", icon: "arrow.down.left", variant: .quiet) { destination = .receive }
         }
     }
 
@@ -95,17 +114,17 @@ struct HomeView: View {
     @ViewBuilder private var vaultLine: some View {
         if let line = model.safetyLine {
             Text(line)
-                .font(.system(size: 20, weight: .semibold))
+                .font(.body(19, weight: .medium))
                 .foregroundStyle(Theme.Palette.ink)
                 .fixedSize(horizontal: false, vertical: true)
         } else if model.position != nil {
             Text("No debt yet. Borrow MUSD against your Bitcoin whenever you’re ready.")
-                .font(.system(size: 20, weight: .semibold))
+                .font(.body(19, weight: .medium))
                 .foregroundStyle(Theme.Palette.ink)
                 .fixedSize(horizontal: false, vertical: true)
         } else {
             Text("Loading your position…")
-                .font(.system(size: 20, weight: .semibold))
+                .font(.body(19, weight: .medium))
                 .foregroundStyle(Theme.Palette.tertiary)
         }
     }

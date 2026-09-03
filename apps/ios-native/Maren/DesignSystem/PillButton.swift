@@ -24,7 +24,7 @@ struct PillButton: View {
                         .font(.system(size: 15, weight: .semibold))
                 }
                 Text(title)
-                    .font(.system(size: 16, weight: .semibold))
+                    .font(.system(size: 16, weight: .semibold, design: .rounded))
             }
             .foregroundStyle(foreground)
             .padding(.vertical, 15)
@@ -120,7 +120,7 @@ struct ActionTile: View {
                         .foregroundStyle(emphasized ? Theme.Palette.accentText : Theme.Palette.ink)
                 }
                 Text(title)
-                    .font(.system(size: 13, weight: .medium))
+                    .font(.system(size: 13, weight: .medium, design: .rounded))
                     .foregroundStyle(Theme.Palette.ink)
             }
             .frame(maxWidth: .infinity)

@@ -15,7 +15,7 @@ struct ProfileView: View {
     private let capability = Keystore.shared.capability()
 
     var body: some View {
-        Screen(title: "PROFILE", badge: !actions.canSettle) {
+        Screen(title: "Profile", badge: !actions.canSettle) {
             accountCard
             securityCard
             howItWorksCard

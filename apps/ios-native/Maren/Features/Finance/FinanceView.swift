@@ -14,7 +14,7 @@ struct FinanceView: View {
 
     var body: some View {
         @Bindable var router = router
-        return Screen(title: "FINANCE", badge: !actions.canSettle) {
+        return Screen(title: "Finance", badge: !actions.canSettle) {
             Segmented(options: [(FinanceTab.vault, "Vault"), (FinanceTab.earn, "Earn")],
                       selection: $router.financeTab)
             switch router.financeTab {

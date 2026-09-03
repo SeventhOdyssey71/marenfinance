@@ -17,7 +17,7 @@ struct ActivityView: View {
     @State private var selected: ActivityItem?
 
     var body: some View {
-        Screen(title: "ACTIVITY", badge: !actions.canSettle) {
+        Screen(title: "Activity", badge: !actions.canSettle) {
             switch phase {
             case .loading:
                 MCard { HStack { ProgressView().tint(Theme.Palette.tertiary); Text("Reading recent activity…").foregroundStyle(Theme.Palette.tertiary).font(.system(size: 15)) } }
