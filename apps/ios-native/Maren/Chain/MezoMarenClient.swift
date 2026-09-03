@@ -146,8 +146,10 @@ struct MezoMarenClient: MarenClient {
     }
 
     func balances() async throws -> Balances {
-        let wei = try await rpc.musdBalance(accountAddress)
-        return Balances(musd: Wei.toDecimal(wei) ?? 0)
+        async let musd = rpc.musdBalance(accountAddress)
+        async let btc = rpc.nativeBalance(accountAddress)
+        return Balances(musd: Wei.toDecimal(try await musd) ?? 0,
+                        btc: Wei.toDecimal(try await btc) ?? 0)
     }
 
     func earnBalance() async throws -> Decimal {

@@ -68,6 +68,7 @@ struct Position: Sendable, Equatable, Codable {
 
 struct Balances: Sendable, Equatable, Codable {
     let musd: Decimal                 // spendable MUSD in the wallet
+    let btc: Decimal                  // native BTC in the wallet (gas token), for deposits
 }
 
 /// R15 status wording. `pending` never reads as delivered, and `failed` says plainly that no

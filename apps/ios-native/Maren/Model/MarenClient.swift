@@ -56,7 +56,7 @@ struct StubMarenClient: MarenClient {
     }
 
     func balances() async throws -> Balances {
-        Balances(musd: 1_240.5)
+        Balances(musd: 1_240.5, btc: 0.4210)
     }
 
     func earnBalance() async throws -> Decimal { 512.40 }

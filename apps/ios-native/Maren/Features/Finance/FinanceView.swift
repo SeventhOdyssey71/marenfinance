@@ -179,6 +179,8 @@ private struct VaultSection: View {
                 unit: .btc,
                 explainer: "Adds collateral to your vault and raises your collateral ratio immediately. Adding collateral does not raise your Mezo borrow limit — only a refinance does.",
                 presets: [0.01, 0.05, 0.1],
+                available: model.balances?.btc,
+                availableLabel: "Your Bitcoin",
                 gas: .youPayBtc,
                 submitTitle: "Deposit Bitcoin",
                 makeIntent: { Intent(kind: .deposit, amount: $0, unit: .btc) },
