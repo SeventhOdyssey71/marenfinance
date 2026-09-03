@@ -161,6 +161,31 @@ struct MezoActions {
         } catch { return .declined(reason: prepFailed) }
     }
 
+    /// Claim a payment link (relayed). The claimer's key signs the ForwardRequest; the link's
+    /// own secret signs the claim digest that binds the payout to the claimer as recipient.
+    func claimLink(loadedAddress: String, linkId: UInt64, secretHex: String) async -> ActionResult {
+        let key: Data
+        switch await accessKey(loadedAddress) {
+        case .ok(let k): key = k
+        case .fail(let reason): return .declined(reason: reason)
+        }
+        let maren = MarenAddresses.of(chain.network)
+        guard let secret = Data(hex: secretHex) else {
+            return .declined(reason: "That claim link is malformed, so nothing was submitted.")
+        }
+        do {
+            let signature = try Self.signClaimLink(linkSecret: secret, chainId: chain.chainId,
+                                                   marenPay: maren.marenPay, linkId: BigUInt(linkId), recipient: loadedAddress)
+            guard let sigData = Data(hex: signature) else {
+                return .declined(reason: prepFailed)
+            }
+            let data = try MarenEncoding.claimLinkCalldata(linkId: BigUInt(linkId), recipient: loadedAddress, signature: sigData)
+            return await relayCall(privateKey: key, loadedAddress: loadedAddress, to: maren.marenPay, data: data)
+        } catch {
+            return .declined(reason: prepFailed)
+        }
+    }
+
     private func confirmSelfPaid(_ hash: String) async -> ActionResult {
         let client = EthereumHttpClient(url: chain.rpcURLs[0], network: .custom(String(chain.chainId)))
         let outcome = await Receipt.confirm(client: client, hash: hash, sponsored: false)

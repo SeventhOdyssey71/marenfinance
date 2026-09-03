@@ -92,6 +92,21 @@ enum MarenEncoding {
     }
 
     // ---------------------------------------------------------------------------
+    // MarenPay.claimLink(uint256 linkId, address recipient, bytes signature) calldata
+    // ---------------------------------------------------------------------------
+
+    /// Calldata for claiming a payment link. `signature` is the link key's ECDSA signature over
+    /// `linkClaimDigest(linkId, recipient)` (see `MezoActions.signClaimLink`), which binds the
+    /// payout to `recipient`.
+    static func claimLinkCalldata(linkId: BigUInt, recipient: String, signature: Data) throws -> Data {
+        let enc = ABIFunctionEncoder("claimLink")
+        try enc.encode(linkId)
+        try enc.encode(EthereumAddress(recipient))
+        try enc.encode(signature)
+        return try enc.encoded()
+    }
+
+    // ---------------------------------------------------------------------------
     // MarenPay.claimLink digest
     // ---------------------------------------------------------------------------
 

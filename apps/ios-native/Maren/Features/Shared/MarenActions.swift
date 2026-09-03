@@ -157,6 +157,10 @@ struct LiveMarenActions: MarenActions {
             }
             return Self.outcome(await mezo.earnWithdraw(loadedAddress: loadedAddress, assetsWei: wei))
 
+        // Relayed claim of a payment link (the link's own secret authorises the payout).
+        case let .claim(link):
+            return Self.outcome(await mezo.claimLink(loadedAddress: loadedAddress, linkId: link.linkId, secretHex: link.secret))
+
         default:
             return .declined(reason: MarenClientError.liveWritesUnavailable.errorDescription
                              ?? "This build has no relayer configured, so nothing was submitted.")

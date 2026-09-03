@@ -219,4 +219,19 @@ final class MarenEncodingGoldenTests: XCTestCase {
         let withdraw = try MarenEncoding.earnWithdrawCalldata(assets: amt, receiver: recipient, owner: recipient)
         XCTAssertEqual(withdraw.web3.hexString, "0xb460af94" + amtWord + addrWord + addrWord, "earn withdraw calldata must match cast")
     }
+
+    // cast calldata "claimLink(uint256,address,bytes)" 42 0x5419…1885 0x1111…03  (65-byte sig)
+    func testClaimLinkCalldataMatchesCast() throws {
+        let sig = Data(hex: "0x1111111111111111111111111111111111111111111111111111111111111111222222222222222222222222222222222222222222222222222222222222222203")!
+        let data = try MarenEncoding.claimLinkCalldata(linkId: 42, recipient: recipient, signature: sig)
+        let expected = "0xaf4be47b" +
+            "000000000000000000000000000000000000000000000000000000000000002a" +
+            "00000000000000000000000054196397d6f01b48739db3957257cb33cd341885" +
+            "0000000000000000000000000000000000000000000000000000000000000060" +
+            "0000000000000000000000000000000000000000000000000000000000000041" +
+            "1111111111111111111111111111111111111111111111111111111111111111" +
+            "2222222222222222222222222222222222222222222222222222222222222222" +
+            "0300000000000000000000000000000000000000000000000000000000000000"
+        XCTAssertEqual(data.web3.hexString, expected, "claimLink calldata must match cast")
+    }
 }
