@@ -70,8 +70,38 @@ struct Balances: Sendable, Equatable {
     let musd: Decimal                 // spendable MUSD in the wallet
 }
 
+/// R15 status wording. `pending` never reads as delivered, and `failed` says plainly that no
+/// funds moved rather than hiding behind "unsuccessful".
+enum ActivityStatus: Sendable, Equatable {
+    case pending, confirmed, failed
+
+    var label: String {
+        switch self {
+        case .pending: return "Awaiting receipt"
+        case .confirmed: return "Confirmed"
+        case .failed: return "Failed, no funds moved"
+        }
+    }
+
+    var tone: Color {
+        switch self {
+        case .pending: return Theme.Palette.warning
+        case .confirmed: return Theme.Palette.success
+        case .failed: return Theme.Palette.danger
+        }
+    }
+
+    var icon: String {
+        switch self {
+        case .pending: return "clock"
+        case .confirmed: return "checkmark.circle.fill"
+        case .failed: return "xmark.circle.fill"
+        }
+    }
+}
+
 struct ActivityItem: Sendable, Equatable, Identifiable {
-    enum Kind: Sendable { case send, receive, borrow, deposit }
+    enum Kind: Sendable { case send, receive, borrow, deposit, repay, withdraw, earnDeposit, earnWithdraw }
     let id: String
     let kind: Kind
     let title: String
@@ -79,12 +109,25 @@ struct ActivityItem: Sendable, Equatable, Identifiable {
     let amount: String                // pre-formatted, carries its own sign + unit
     let date: Date
 
+    // Optional receipt detail. Defaulted so the Chain client (which does not populate them yet)
+    // keeps compiling; a nil field renders as an honest gap in the receipt, never a fake value.
+    var status: ActivityStatus = .confirmed
+    var hash: String? = nil
+    var memo: String? = nil
+    var counterparty: String? = nil
+    /// True when a Maren relayer paid the BTC gas; nil when it is not known for this row.
+    var sponsored: Bool? = nil
+
     var icon: String {
         switch kind {
         case .send: return "arrow.up.right"
         case .receive: return "arrow.down.left"
         case .borrow: return "banknote"
         case .deposit: return "bitcoinsign"
+        case .repay: return "arrow.counterclockwise"
+        case .withdraw: return "arrow.up.bitcoinsign"
+        case .earnDeposit: return "leaf.fill"
+        case .earnWithdraw: return "arrow.up.left"
         }
     }
 }

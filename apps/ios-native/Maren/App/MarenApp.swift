@@ -25,23 +25,39 @@ extension EnvironmentValues {
 // stays the clearly-badged demo stub, and live is opt-in via `MAREN_READ_ADDRESS` in the
 // Info.plist (set it to an address to read that account live against testnet).
 enum MarenClientFactory {
-    static func make() -> any MarenClient {
-        if let addr = Bundle.main.object(forInfoDictionaryKey: "MAREN_READ_ADDRESS") as? String,
-           addr.hasPrefix("0x"), addr.count == 42 {
+    /// The live read address, if the build was pointed at one. When present, reads run live and
+    /// the write seam is the live runner; otherwise both are the clearly-badged demo pair.
+    private static var liveAddress: String? {
+        guard let addr = Bundle.main.object(forInfoDictionaryKey: "MAREN_READ_ADDRESS") as? String,
+              addr.hasPrefix("0x"), addr.count == 42 else { return nil }
+        return addr
+    }
+
+    static func makeClient() -> any MarenClient {
+        if let addr = liveAddress {
             return MezoMarenClient(network: .testnet, accountAddress: addr)
         }
         return StubMarenClient()
+    }
+
+    static func makeActions() -> any MarenActions {
+        if let addr = liveAddress {
+            return LiveMarenActions(network: .testnet, loadedAddress: addr)
+        }
+        return DemoMarenActions()
     }
 }
 
 @main
 struct MarenApp: App {
-    private let client: any MarenClient = MarenClientFactory.make()
+    private let client: any MarenClient = MarenClientFactory.makeClient()
+    private let actions: any MarenActions = MarenClientFactory.makeActions()
 
     var body: some Scene {
         WindowGroup {
             RootView()
                 .environment(\.marenClient, client)
+                .environment(\.marenActions, actions)
                 .tint(Theme.Palette.accent)
         }
     }

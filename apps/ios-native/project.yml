@@ -59,6 +59,7 @@ targets:
         INFOPLIST_KEY_UISupportedInterfaceOrientations: UIInterfaceOrientationPortrait
         INFOPLIST_KEY_UIUserInterfaceStyle: Light
         INFOPLIST_KEY_NSFaceIDUsageDescription: Maren uses Face ID to unlock your signing key before every transaction, so only you can move your money.
+        INFOPLIST_KEY_NSCameraUsageDescription: Maren uses the camera only to scan Maren payment and claim QR codes. Nothing is recorded or uploaded.
         SWIFT_STRICT_CONCURRENCY: complete
         ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
         ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME: AccentColor

@@ -4,7 +4,10 @@ import SwiftUI
 
 struct HomeView: View {
     @Environment(\.marenClient) private var client
+    @Environment(\.marenActions) private var actions
+    @Environment(AppRouter.self) private var router
     @State private var model = HomeModel()
+    @State private var destination: PayDestination?
 
     var body: some View {
         ScrollView {
@@ -12,6 +15,7 @@ struct HomeView: View {
                 header
                 positionCard
                 actionRow
+                payRow
                 Spacer(minLength: Theme.Space.md)
             }
             .padding(.horizontal, Theme.Space.md)
@@ -20,6 +24,7 @@ struct HomeView: View {
         }
         .background(Theme.Palette.canvas)
         .task { await model.load(using: client) }
+        .sheet(item: $destination) { $0.view }
     }
 
     // MARK: wordmark + account line
@@ -32,7 +37,14 @@ struct HomeView: View {
                     .tracking(-0.5)
                     .foregroundStyle(Theme.Palette.ink)
                 Spacer()
-                DemoBadge()
+                Button { destination = .scan } label: {
+                    Image(systemName: "qrcode.viewfinder")
+                        .font(.system(size: 20, weight: .semibold))
+                        .foregroundStyle(Theme.Palette.ink)
+                        .frame(width: 44, height: 44)
+                }
+                .accessibilityLabel("Scan a payment or claim code")
+                if !actions.canSettle { DemoBadge() }
             }
             Text(accountLine)
                 .font(.figure(15, weight: .medium))
@@ -133,19 +145,35 @@ struct HomeView: View {
         VStack(alignment: .leading, spacing: Theme.Space.sm) {
             SectionHeader(title: "Actions")
             HStack(spacing: Theme.Space.sm) {
-                ActionTile(title: "Send", icon: "arrow.up.right") {}
-                ActionTile(title: "Receive", icon: "arrow.down.left") {}
-                ActionTile(title: "Borrow", icon: "banknote", emphasized: true) {}
-                ActionTile(title: "Earn", icon: "leaf.fill") {}
+                ActionTile(title: "Send", icon: "arrow.up.right") { destination = .send }
+                ActionTile(title: "Receive", icon: "arrow.down.left") { destination = .receive }
+                ActionTile(title: "Borrow", icon: "banknote", emphasized: true) { router.goToVault() }
+                ActionTile(title: "Earn", icon: "leaf.fill") { router.goToEarn() }
+            }
+        }
+    }
+
+    private var payRow: some View {
+        VStack(alignment: .leading, spacing: Theme.Space.sm) {
+            SectionHeader(title: "Pay")
+            HStack(spacing: Theme.Space.sm) {
+                ActionTile(title: "Request", icon: "arrow.down.circle") { destination = .request }
+                ActionTile(title: "Split", icon: "person.2") { destination = .split }
+                ActionTile(title: "Link", icon: "link") { destination = .link }
+                ActionTile(title: "Claim", icon: "gift") { destination = .claim }
             }
         }
     }
 }
 
 #Preview("Home — price unavailable") {
-    HomeView().environment(\.marenClient, StubMarenClient())
+    HomeView()
+        .environment(\.marenClient, StubMarenClient())
+        .environment(AppRouter())
 }
 
 #Preview("Home — price wired") {
-    HomeView().environment(\.marenClient, StubMarenClient(priceWired: true))
+    HomeView()
+        .environment(\.marenClient, StubMarenClient(priceWired: true))
+        .environment(AppRouter())
 }
