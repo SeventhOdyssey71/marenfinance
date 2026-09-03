@@ -150,6 +150,10 @@ struct MezoMarenClient: MarenClient {
         return Balances(musd: Wei.toDecimal(wei) ?? 0)
     }
 
+    func earnBalance() async throws -> Decimal {
+        Wei.toDecimal(try await rpc.earnBalance(accountAddress)) ?? 0
+    }
+
     /// Activity from `eth_getLogs`, across all three Maren contracts and every event they
     /// emit — the same scan the web app runs (apps/web/src/lib/chain/logs.ts), so the two
     /// apps agree on a user's history. Vault (deposit/borrow/repay/withdraw), Pay

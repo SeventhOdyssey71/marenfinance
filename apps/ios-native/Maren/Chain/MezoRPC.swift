@@ -102,6 +102,20 @@ struct MezoRPC: Sendable {
         return Self.word(out, 0)
     }
 
+    /// The user's Earn balance in MUSD wei: MarenEarn (ERC-4626) `convertToAssets(balanceOf(user))`.
+    /// Reads the actual redeemable MUSD, with any realised Bitcoin gains already compounded in.
+    /// Zero shares short-circuits to zero.
+    func earnBalance(_ account: String) async throws -> BigUInt {
+        let earn = MarenAddresses.of(chain.network).marenEarn
+        let balEnc = ABIFunctionEncoder("balanceOf")
+        try balEnc.encode(EthereumAddress(account))
+        let shares = Self.word(try await call(to: earn, data: try balEnc.encoded()), 0)
+        if shares == 0 { return 0 }
+        let convEnc = ABIFunctionEncoder("convertToAssets")
+        try convEnc.encode(shares)
+        return Self.word(try await call(to: earn, data: try convEnc.encoded()), 0)
+    }
+
     /// MUSD `allowance(owner, spender)`, in wei — how much MUSD `spender` may pull via
     /// transferFrom. Read before a send so a first payment approves MarenPay once.
     func musdAllowance(owner: String, spender: String) async throws -> BigUInt {

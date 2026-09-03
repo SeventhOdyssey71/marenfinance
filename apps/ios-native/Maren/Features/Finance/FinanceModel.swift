@@ -14,6 +14,7 @@ final class FinanceModel {
     private(set) var phase: Phase = .loading
     private(set) var position: Position?
     private(set) var balances: Balances?
+    private(set) var earnBalance: Decimal?   // MUSD supplied to the Stability Pool, nil if unread
     private(set) var priceFeed: PriceFeed = .unavailable(reason: "Not loaded")
 
     var priceLive: Bool {
@@ -27,9 +28,13 @@ final class FinanceModel {
             async let position = client.position()
             async let balances = client.balances()
             async let price = client.priceFeed()
+            async let earn = client.earnBalance()
             self.position = try await position
             self.balances = try await balances
             self.priceFeed = try await price
+            // Independent + tolerant: a failed Earn read shows "unavailable", it never fails
+            // the whole screen or fabricates a pool balance.
+            self.earnBalance = try? await earn
             phase = .loaded
         } catch {
             phase = .failed(error.localizedDescription)

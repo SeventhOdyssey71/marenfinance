@@ -11,6 +11,7 @@ protocol MarenClient: Sendable {
     func priceFeed() async throws -> PriceFeed
     func position() async throws -> Position
     func balances() async throws -> Balances
+    func earnBalance() async throws -> Decimal
     func recentActivity() async throws -> [ActivityItem]
 }
 
@@ -57,6 +58,8 @@ struct StubMarenClient: MarenClient {
     func balances() async throws -> Balances {
         Balances(musd: 1_240.5)
     }
+
+    func earnBalance() async throws -> Decimal { 512.40 }
 
     func recentActivity() async throws -> [ActivityItem] {
         let now = Date()

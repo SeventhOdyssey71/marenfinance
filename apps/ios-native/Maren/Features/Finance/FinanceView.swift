@@ -239,15 +239,18 @@ private struct EarnSection: View {
     private var balanceCard: some View {
         MCard {
             VStack(alignment: .leading, spacing: Theme.Space.sm) {
-                Text("Your balance in Earn")
-                    .labelStyle()
-                // No Earn read is wired through MarenClient, so this is honestly unavailable
-                // rather than a fabricated pool balance.
-                Unavailable(label: "Not read on this build")
-                Text("Earn supplies MUSD to the Stability Pool. This build does not yet read your pool position, so it is shown as unavailable rather than guessed.")
-                    .font(.system(size: 14))
-                    .foregroundStyle(Theme.Palette.tertiary)
-                    .fixedSize(horizontal: false, vertical: true)
+                HStack(spacing: Theme.Space.sm) {
+                    MusdCoin(size: 34)
+                    Text("In Earn").labelStyle()
+                    Spacer()
+                }
+                if let balance = model.earnBalance {
+                    MoneyText(text: MoneyFormat.musd(balance), size: 34, weight: .bold)
+                    Text("Supplied to the Stability Pool")
+                        .font(.text(13)).foregroundStyle(Theme.Palette.tertiary)
+                } else {
+                    Unavailable(label: "Couldn’t read your pool balance")
+                }
             }
         }
     }
@@ -256,23 +259,18 @@ private struct EarnSection: View {
         MCard {
             VStack(alignment: .leading, spacing: Theme.Space.sm) {
                 HStack {
-                    Text("Realised yield")
-                        .labelStyle()
+                    Text("Realised yield").labelStyle()
                     Spacer()
                     HStack(spacing: 5) {
                         Image(systemName: "clock.arrow.circlepath").font(.system(size: 10, weight: .bold))
-                        Text("Backward-looking").font(.system(size: 12, weight: .semibold))
+                        Text("Backward-looking").font(.text(12, weight: .medium))
                     }
                     .foregroundStyle(Theme.Palette.muted)
                     .padding(.horizontal, 10).padding(.vertical, 5)
                     .background(Theme.Palette.inset, in: Capsule())
                 }
-                Text("This is MUSD actually realised in the past, not a rate and not a forecast. Maren does not display an APY for Earn because there is no reliable one to display.")
-                    .font(.system(size: 15))
-                    .foregroundStyle(Theme.Palette.muted)
-                    .fixedSize(horizontal: false, vertical: true)
-                Text("The Stability Pool has no token emissions. Its entire yield is the Bitcoin seized in liquidations, sold and compounded back into MUSD — so returns arrive in lumps and can be zero for months.")
-                    .font(.system(size: 15))
+                Text("Yield is Bitcoin from liquidations, sold into MUSD — lumpy and backward-looking, so there’s no APY to show.")
+                    .font(.text(14))
                     .foregroundStyle(Theme.Palette.muted)
                     .fixedSize(horizontal: false, vertical: true)
             }
@@ -282,11 +280,11 @@ private struct EarnSection: View {
     private var riskCard: some View {
         HStack(alignment: .top, spacing: Theme.Space.sm) {
             Image(systemName: "exclamationmark.shield")
-                .font(.system(size: 16, weight: .semibold))
+                .font(.system(size: 15, weight: .semibold))
                 .foregroundStyle(Theme.Palette.warning)
                 .accessibilityHidden(true)
-            Text("Stability Pool deposits absorb liquidated debt. In exchange for the BTC gains you take on the risk that your MUSD is used to close somebody else’s position. Historically profitable, not guaranteed, and not principal-protected.")
-                .font(.system(size: 14))
+            Text("Deposits absorb liquidated debt: you earn BTC gains, but your MUSD can be spent closing others’ positions. Not principal-protected.")
+                .font(.text(13))
                 .foregroundStyle(Theme.Palette.muted)
                 .fixedSize(horizontal: false, vertical: true)
         }
@@ -331,6 +329,8 @@ private struct EarnSection: View {
                 unit: .musd,
                 explainer: "Moves MUSD back to spendable. Your realised gains, if any, are already part of your Earn balance.",
                 presets: [100, 500],
+                available: model.earnBalance,
+                availableLabel: "Your Earn balance",
                 gas: .youPayBtc,
                 gasDetail: earnGasDetail,
                 submitTitle: "Withdraw from Earn",
