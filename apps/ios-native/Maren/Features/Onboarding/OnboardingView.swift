@@ -32,7 +32,7 @@ struct OnboardingView: View {
                         .font(.display(30, weight: .semibold))
                         .foregroundStyle(Theme.Palette.ink)
                     Text("Spend Bitcoin without selling it. Create a wallet or import one to begin — your key is stored on this device, behind your biometrics, and never leaves it.")
-                        .font(.body(15))
+                        .font(.text(15))
                         .foregroundStyle(Theme.Palette.muted)
                         .fixedSize(horizontal: false, vertical: true)
                 }
@@ -126,7 +126,7 @@ struct OnboardingView: View {
             Text(capability.available && capability.enrolled
                  ? "\(capability.displayName) is enrolled. Your key will be stored behind it."
                  : (capability.reason ?? "No biometrics enrolled. Your key will be held for this session only."))
-                .font(.body(14))
+                .font(.text(14))
                 .foregroundStyle(Theme.Palette.muted)
                 .fixedSize(horizontal: false, vertical: true)
         }
@@ -138,7 +138,7 @@ struct OnboardingView: View {
     private func errorNote(_ message: String) -> some View {
         HStack(spacing: 6) {
             Image(systemName: "exclamationmark.triangle").font(.system(size: 13, weight: .semibold))
-            Text(message).font(.body(14, weight: .medium))
+            Text(message).font(.text(14, weight: .medium))
         }
         .foregroundStyle(Theme.Palette.danger)
     }

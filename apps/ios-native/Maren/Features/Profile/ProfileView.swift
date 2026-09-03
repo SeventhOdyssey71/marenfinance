@@ -23,7 +23,7 @@ struct ProfileView: View {
             howItWorksCard
             if !actions.canSettle {
                 Text("Reads run live against Mezo testnet. Writing (sending, borrowing) waits on a relayer, which isn’t configured in this build — so those actions decline honestly rather than pretend to settle.")
-                    .font(.body(13)).foregroundStyle(Theme.Palette.tertiary)
+                    .font(.text(13)).foregroundStyle(Theme.Palette.tertiary)
                     .fixedSize(horizontal: false, vertical: true)
             }
             if session.address != nil {

@@ -42,7 +42,7 @@ struct HomeView: View {
             avatar
             VStack(alignment: .leading, spacing: 1) {
                 Text("Good morning")
-                    .font(.body(12))
+                    .font(.text(12))
                     .foregroundStyle(Theme.Palette.tertiary)
                 Text(session.greetingName)
                     .font(.display(18, weight: .medium))
@@ -89,7 +89,7 @@ struct HomeView: View {
                 Unavailable(label: "Balance unavailable")
             }
             Text("In MUSD · Mezo")
-                .font(.body(13))
+                .font(.text(13))
                 .foregroundStyle(Theme.Palette.tertiary)
         }
         .frame(maxWidth: .infinity)
@@ -121,17 +121,17 @@ struct HomeView: View {
     @ViewBuilder private var vaultLine: some View {
         if let line = model.safetyLine {
             Text(line)
-                .font(.body(19, weight: .medium))
+                .font(.text(19, weight: .medium))
                 .foregroundStyle(Theme.Palette.ink)
                 .fixedSize(horizontal: false, vertical: true)
         } else if model.position != nil {
             Text("No debt yet. Borrow MUSD against your Bitcoin whenever you’re ready.")
-                .font(.body(19, weight: .medium))
+                .font(.text(19, weight: .medium))
                 .foregroundStyle(Theme.Palette.ink)
                 .fixedSize(horizontal: false, vertical: true)
         } else {
             Text("Loading your position…")
-                .font(.body(19, weight: .medium))
+                .font(.text(19, weight: .medium))
                 .foregroundStyle(Theme.Palette.tertiary)
         }
     }
@@ -147,7 +147,7 @@ struct HomeView: View {
                 Spacer()
                 Button { router.tab = .activity } label: {
                     Text("View all")
-                        .font(.body(13, weight: .medium))
+                        .font(.text(13, weight: .medium))
                         .foregroundStyle(Theme.Palette.muted)
                         .overlay(alignment: .bottom) { DottedDivider().offset(y: 2) }
                 }
@@ -157,7 +157,7 @@ struct HomeView: View {
             MCard(padding: Theme.Space.md) {
                 if model.activity.isEmpty {
                     Text("No transactions yet.")
-                        .font(.body(15))
+                        .font(.text(15))
                         .foregroundStyle(Theme.Palette.tertiary)
                         .frame(maxWidth: .infinity, alignment: .leading)
                 } else {
@@ -182,10 +182,10 @@ struct HomeView: View {
                     .accessibilityHidden(true)
                 VStack(alignment: .leading, spacing: 1) {
                     Text(item.title)
-                        .font(.body(15, weight: .medium))
+                        .font(.text(15, weight: .medium))
                         .foregroundStyle(Theme.Palette.ink)
                     Text(item.subtitle)
-                        .font(.body(13))
+                        .font(.text(13))
                         .foregroundStyle(Theme.Palette.tertiary)
                 }
                 Spacer(minLength: Theme.Space.sm)

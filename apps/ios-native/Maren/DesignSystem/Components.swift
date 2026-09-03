@@ -32,7 +32,7 @@ struct SectionHeader: View {
             Spacer(minLength: Theme.Space.md)
             if let trailing {
                 Text(trailing)
-                    .font(.system(size: 13, weight: .medium, design: .rounded))
+                    .font(.text(13, weight: .medium))
                     .foregroundStyle(Theme.Palette.muted)
             }
         }
@@ -79,12 +79,12 @@ struct StatRow<Value: View>: View {
             HStack(alignment: .firstTextBaseline, spacing: Theme.Space.md) {
                 HStack(spacing: 5) {
                     Text(label)
-                        .font(.system(size: 15))
+                        .font(.text(15))
                         .foregroundStyle(Theme.Palette.muted)
                         .fixedSize(horizontal: true, vertical: false)
                     if let hint {
                         Text("· \(hint)")
-                            .font(.system(size: 15))
+                            .font(.text(15))
                             .foregroundStyle(Theme.Palette.tertiary)
                             .lineLimit(1)
                             .truncationMode(.tail)
@@ -121,7 +121,7 @@ struct HealthChip: View {
                 .fill(status.tone)
                 .frame(width: 7, height: 7)
             Text(status.label)
-                .font(.system(size: 13, weight: .semibold))
+                .font(.text(13, weight: .medium))
                 .foregroundStyle(status.tone)
         }
         .padding(.horizontal, 12)
@@ -140,7 +140,7 @@ struct DemoBadge: View {
             Image(systemName: "flask.fill")
                 .font(.system(size: 10, weight: .bold))
             Text("Demo data")
-                .font(.system(size: 12, weight: .semibold))
+                .font(.text(12, weight: .medium))
                 .tracking(0.3)
         }
         .foregroundStyle(Theme.Palette.accentText)
@@ -164,7 +164,7 @@ struct Unavailable: View {
             Image(systemName: "exclamationmark.triangle")
                 .font(.system(size: 11, weight: .semibold))
             Text(label)
-                .font(.figure(15, weight: .medium))
+                .font(.text(15, weight: .medium))
         }
         .foregroundStyle(Theme.Palette.tertiary)
         .accessibilityLabel("\(label). This value could not be loaded and is not shown as zero.")
