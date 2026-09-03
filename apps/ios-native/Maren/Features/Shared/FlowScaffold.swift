@@ -1,4 +1,5 @@
 import SwiftUI
+import UIKit
 
 // MARK: - Flow scaffolding
 //
@@ -86,12 +87,36 @@ struct TextEntryCard: View {
     @Binding var text: String
     var autocapitalization: TextInputAutocapitalization = .never
     var footnote: String? = nil
+    /// Shows a Paste button in the label row. On for fields you actually paste into (an
+    /// address, a key), so entry never depends on the keyboard's paste gesture — which is
+    /// unreliable in the Simulator.
+    var showsPaste: Bool = false
 
     var body: some View {
         MCard {
             VStack(alignment: .leading, spacing: Theme.Space.sm) {
-                Text(label)
-                    .labelStyle()
+                HStack(spacing: Theme.Space.sm) {
+                    Text(label).labelStyle()
+                    Spacer(minLength: 0)
+                    if showsPaste {
+                        Button {
+                            if let clip = UIPasteboard.general.string {
+                                text = clip.trimmingCharacters(in: .whitespacesAndNewlines)
+                            }
+                        } label: {
+                            HStack(spacing: 4) {
+                                Image(systemName: "doc.on.clipboard")
+                                Text("Paste")
+                            }
+                            .font(.text(13, weight: .medium))
+                            .foregroundStyle(Theme.Palette.accentText)
+                            .padding(.vertical, 8).padding(.horizontal, 6)
+                            .contentShape(Rectangle())
+                        }
+                        .buttonStyle(PressableStyle())
+                        .accessibilityLabel("Paste from clipboard")
+                    }
+                }
                 TextField(placeholder, text: $text, axis: .vertical)
                     .font(.figure(16, weight: .regular))
                     .foregroundStyle(Theme.Palette.ink)

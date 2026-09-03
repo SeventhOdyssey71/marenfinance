@@ -63,7 +63,8 @@ struct WalletSetupView: View {
         Text("Paste a 32-byte private key (with or without 0x). It is validated, stored behind your biometrics, and never shown again or logged.")
             .font(.system(size: 15)).foregroundStyle(Theme.Palette.muted).fixedSize(horizontal: false, vertical: true)
         TextEntryCard(label: "Private key", placeholder: "0x…", text: $importText,
-                      footnote: "Never paste a key you use with real funds into a pre-audit demo build.")
+                      footnote: "Never paste a key you use with real funds into a pre-audit demo build.",
+                      showsPaste: true)
         PillButton(title: "Import key", variant: .primary) { Task { await importKey() } }
             .disabled(working || importText.trimmingCharacters(in: .whitespaces).isEmpty)
         PillButton(title: "Back", variant: .quiet) { mode = .choose; error = nil }

@@ -109,7 +109,8 @@ struct SendFlow: View {
                 label: "Send to",
                 placeholder: "@handle or 0x address",
                 text: $recipient,
-                footnote: recipient.isEmpty || recipientValid ? nil : "Not a valid @handle or 0x address."
+                footnote: recipient.isEmpty || recipientValid ? nil : "Not a valid @handle or 0x address.",
+                showsPaste: true
             )
             .padding(.horizontal, Theme.Space.md)
             if isHandle { handlePreview.padding(.horizontal, Theme.Space.md) }
