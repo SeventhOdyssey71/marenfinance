@@ -137,12 +137,7 @@ struct SendFlow: View {
 
     private var assetCard: some View {
         HStack(spacing: Theme.Space.sm) {
-            ZStack {
-                Circle().fill(LinearGradient(colors: [Theme.Palette.accent, Theme.Palette.accentText],
-                                             startPoint: .topLeading, endPoint: .bottomTrailing))
-                    .frame(width: 38, height: 38)
-                Text("$").font(.system(size: 18, weight: .bold, design: .rounded)).foregroundStyle(.white)
-            }
+            MusdCoin(size: 38)
             VStack(alignment: .leading, spacing: 1) {
                 Text("MUSD").font(.text(15, weight: .medium)).foregroundStyle(Theme.Palette.ink)
                 Text(balance.map { "\(MoneyFormat.musd($0, unit: false)) available" } ?? "Balance unavailable")
