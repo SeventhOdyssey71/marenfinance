@@ -197,7 +197,6 @@ struct HomeView: View {
                 Spacer(minLength: Theme.Space.sm)
                 Text(item.amount)
                     .font(.text(15, weight: .medium))
-                    .tracking(-2)
                     .foregroundStyle(item.amountColor)
                     .lineLimit(1)
                     .fixedSize(horizontal: true, vertical: false)
