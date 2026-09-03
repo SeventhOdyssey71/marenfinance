@@ -37,7 +37,7 @@ struct HomeView: View {
             .padding(.bottom, 120)   // clear the floating glass tab bar
         }
         .background(Theme.Palette.canvas)
-        .task { await model.load(using: client) }
+        .task { await model.load(using: client, address: session.address) }
         .fullScreenCover(item: $fullFlow) { $0.view }
         .sheet(item: $overlayFlow) { $0.view }
     }

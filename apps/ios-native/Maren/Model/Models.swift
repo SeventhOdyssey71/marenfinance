@@ -18,19 +18,19 @@ enum MarenPolicy {
     static let fixedAprPercent: Decimal = 1.00
 }
 
-struct Account: Sendable, Equatable {
+struct Account: Sendable, Equatable, Codable {
     let handle: String       // e.g. "@demo"
     let address: String      // 0x… (truncated for display)
 }
 
 /// A read that can be genuinely absent. Honest-data discipline: the USD price feed is
 /// not wired in Wave 1, and the UI must show that rather than a fabricated number.
-enum PriceFeed: Sendable, Equatable {
+enum PriceFeed: Sendable, Equatable, Codable {
     case available(usdPerBtc: Decimal, asOf: Date)
     case unavailable(reason: String)
 }
 
-enum HealthStatus: String, Sendable, CaseIterable {
+enum HealthStatus: String, Sendable, CaseIterable, Codable {
     case none, healthy, caution, warning, danger, liquidatable
 
     var label: String {
@@ -57,7 +57,7 @@ enum HealthStatus: String, Sendable, CaseIterable {
 /// A borrow position. Protocol-native figures plus a plain-language safety read. The
 /// collateral ratio and drop-to-liquidation are optional: with no debt, there is no
 /// such thing, and the UI dashes rather than boasting infinity.
-struct Position: Sendable, Equatable {
+struct Position: Sendable, Equatable, Codable {
     let bitcoinLocked: Decimal        // BTC
     let borrowed: Decimal             // MUSD
     let leftToBorrow: Decimal         // MUSD, headroom under the 180% floor
@@ -66,13 +66,13 @@ struct Position: Sendable, Equatable {
     let health: HealthStatus
 }
 
-struct Balances: Sendable, Equatable {
+struct Balances: Sendable, Equatable, Codable {
     let musd: Decimal                 // spendable MUSD in the wallet
 }
 
 /// R15 status wording. `pending` never reads as delivered, and `failed` says plainly that no
 /// funds moved rather than hiding behind "unsuccessful".
-enum ActivityStatus: Sendable, Equatable {
+enum ActivityStatus: Sendable, Equatable, Codable {
     case pending, confirmed, failed
 
     var label: String {
@@ -100,8 +100,8 @@ enum ActivityStatus: Sendable, Equatable {
     }
 }
 
-struct ActivityItem: Sendable, Equatable, Identifiable {
-    enum Kind: Sendable { case send, receive, borrow, deposit, repay, withdraw, earnDeposit, earnWithdraw }
+struct ActivityItem: Sendable, Equatable, Identifiable, Codable {
+    enum Kind: Sendable, Codable { case send, receive, borrow, deposit, repay, withdraw, earnDeposit, earnWithdraw }
     let id: String
     let kind: Kind
     let title: String

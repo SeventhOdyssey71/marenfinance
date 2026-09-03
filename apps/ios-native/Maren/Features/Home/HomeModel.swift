@@ -18,22 +18,55 @@ final class HomeModel {
     private(set) var priceFeed: PriceFeed = .unavailable(reason: "Not loaded")
     private(set) var activity: [ActivityItem] = []
 
-    func load(using client: any MarenClient) async {
-        phase = .loading
-        // Each read is independent: one that fails leaves ITS field unavailable (nil), it does
-        // not nuke the others. A failed position read must never blank out a good balance.
+    private var hasData: Bool {
+        balances != nil || position != nil || account != nil || !activity.isEmpty
+    }
+
+    func load(using client: any MarenClient, address: String? = nil) async {
+        // Fast first paint: with nothing in memory, hydrate from the on-disk snapshot for this
+        // address so the balance and history show instantly. Only show the loading state when
+        // there is genuinely nothing to paint.
+        if !hasData {
+            if let address, let snapshot = HomeCache.load(address: address) {
+                apply(snapshot)
+                phase = .loaded
+            } else {
+                phase = .loading
+            }
+        }
+
+        // Refresh in the background. Each read is independent, and a read that FAILS keeps the
+        // last good value (cached or previous) rather than blanking the field — honest data
+        // means "stale but true", never a nil that erases a figure the user just saw.
         async let account = client.account()
         async let position = client.position()
         async let balances = client.balances()
         async let price = client.priceFeed()
         async let activity = client.recentActivity()
 
-        self.account = try? await account
-        self.position = try? await position
-        self.balances = try? await balances
-        self.priceFeed = (try? await price) ?? .unavailable(reason: "The price feed could not be read.")
-        self.activity = (try? await activity) ?? []
+        if let value = try? await account { self.account = value }
+        if let value = try? await position { self.position = value }
+        if let value = try? await balances { self.balances = value }
+        if let value = try? await price { self.priceFeed = value }
+        if let value = try? await activity { self.activity = value }
         phase = .loaded
+
+        // Persist the fresh snapshot for the next launch.
+        if let address {
+            HomeCache.save(
+                HomeSnapshot(account: self.account, position: self.position, balances: self.balances,
+                             priceFeed: self.priceFeed, activity: self.activity, savedAt: Date()),
+                address: address
+            )
+        }
+    }
+
+    private func apply(_ snapshot: HomeSnapshot) {
+        if let value = snapshot.account { account = value }
+        if let value = snapshot.position { position = value }
+        if let value = snapshot.balances { balances = value }
+        if let value = snapshot.priceFeed { priceFeed = value }
+        if !snapshot.activity.isEmpty { activity = snapshot.activity }
     }
 
     /// The plain-language safety line. Only stated when there is debt and a real drop
