@@ -150,29 +150,69 @@ struct MezoMarenClient: MarenClient {
         return Balances(musd: Wei.toDecimal(wei) ?? 0)
     }
 
-    /// Activity from `eth_getLogs`: MarenPay `Paid` events touching this account, over a
-    /// bounded recent window. An empty array means the scan succeeded and found nothing in the
-    /// window; a scan that fails THROWS rather than returning an empty history.
+    /// Activity from `eth_getLogs`, across all three Maren contracts and every event they
+    /// emit — the same scan the web app runs (apps/web/src/lib/chain/logs.ts), so the two
+    /// apps agree on a user's history. Vault (deposit/borrow/repay/withdraw), Pay
+    /// (send/receive/request/link) and Earn (supply/withdraw). Scans a bounded window back
+    /// from head in 10k-block pages (Mezo's `eth_getLogs` cap). An empty array means the scan
+    /// succeeded and found nothing; a scan that fails THROWS rather than faking an empty list.
+    /// A Sendable snapshot of a log, so the many `eth_getLogs` pages can be fetched
+    /// concurrently under strict concurrency — `EthereumLog` itself is not Sendable, so it
+    /// cannot cross a task boundary, but this can.
+    private struct RawLog: Sendable {
+        let topics: [String]
+        let data: String
+        let block: Int
+        let logIndex: Int
+        let txHash: String?
+    }
+
     func recentActivity() async throws -> [ActivityItem] {
         let maren = MarenAddresses.of(chain.network)
         guard maren.isDeployed else { return [] }
-        let paidTopic0 = "Paid(address,address,uint256,bytes32,string)".web3.keccak256.web3.hexString
-        let accountTopic = "0x" + String(accountAddress.dropFirst(2)).lowercased().leftPadded(to: 64)
+        let acct = "0x" + String(accountAddress.dropFirst(2)).lowercased().leftPadded(to: 64)
+        let names = Self.eventNamesByTopic
+        let contracts = [maren.marenVault, maren.marenPay, maren.marenEarn]
+        let chainId = chain.chainId
 
         var lastError = "no endpoints"
         for url in chain.rpcURLs {
             do {
-                let client = EthereumHttpClient(url: url, network: .custom(String(chain.chainId)))
-                let head = try await client.eth_blockNumber()
-                let from = max(0, head - Int(MEZO_MAX_LOG_RANGE))
-                let logs = try await client.eth_getLogs(
-                    addresses: [EthereumAddress(maren.marenPay)],
-                    topics: [paidTopic0],
-                    fromBlock: .Number(from),
-                    toBlock: .Latest
-                )
-                return logs.compactMap { decodePaid($0, accountTopic: accountTopic) }
-                    .sorted { $0.date > $1.date }
+                let head = try await EthereumHttpClient(url: url, network: .custom(String(chainId))).eth_blockNumber()
+                let floor = max(0, head - MEZO_MAX_LOG_RANGE * 4)
+
+                var windows: [(Int, Int)] = []
+                var from = floor
+                while from <= head {
+                    let to = min(head, from + MEZO_MAX_LOG_RANGE - 1)
+                    windows.append((from, to))
+                    from = to + 1
+                }
+
+                // Every (window × contract) page in parallel — each task builds its own client
+                // and returns Sendable RawLogs, so one round-trip's latency covers them all.
+                let raw = try await withThrowingTaskGroup(of: [RawLog].self) { group -> [RawLog] in
+                    for window in windows {
+                        for contract in contracts {
+                            group.addTask {
+                                try await Self.fetchLogs(url: url, chainId: chainId, address: contract,
+                                                         from: window.0, to: window.1)
+                            }
+                        }
+                    }
+                    var all: [RawLog] = []
+                    for try await page in group { all.append(contentsOf: page) }
+                    return all
+                }
+
+                let mine = raw
+                    .filter { Self.involves($0, account: acct, names: names) }
+                    .sorted { $0.block != $1.block ? $0.block > $1.block : $0.logIndex > $1.logIndex }
+                    .prefix(50)
+
+                let times = await Self.blockTimestamps(url: url, chainId: chainId,
+                                                       blocks: Array(Set(mine.map { $0.block })))
+                return mine.compactMap { decodeActivity($0, account: acct, names: names, times: times) }
             } catch {
                 lastError = String(describing: error)
                 continue
@@ -181,31 +221,117 @@ struct MezoMarenClient: MarenClient {
         throw MezoRPCError.allEndpointsFailed(lastError)
     }
 
-    // MARK: activity decode
-
-    private func decodePaid(_ log: EthereumLog, accountTopic: String) -> ActivityItem? {
-        guard log.topics.count >= 3 else { return nil }
-        let fromTopic = log.topics[1].lowercased()
-        let toTopic = log.topics[2].lowercased()
-        let isFrom = fromTopic == accountTopic
-        let isTo = toTopic == accountTopic
-        guard isFrom || isTo else { return nil }
-
-        // data = amount(32) + memo offset(32) + memo len(32) + memo bytes
-        guard let data = Data(hex: log.data) else { return nil }
-        let amountWei = MezoRPC.word(data, 0)
-        let amount = Wei.toDecimal(amountWei) ?? 0
-        let kind: ActivityItem.Kind = isTo ? .receive : .send
-        let sign = isTo ? "+" : "-"
-        let id = (log.transactionHash ?? UUID().uuidString) + "-" + String(log.logIndex ?? 0)
-        return ActivityItem(
-            id: id,
-            kind: kind,
-            title: isTo ? "Received MUSD" : "Sent MUSD",
-            subtitle: "MarenPay transfer",
-            amount: "\(sign)\(MoneyFormat.musd(amount, unit: false)) MUSD",
-            date: Date()  // block timestamp is a separate read; omitted rather than faked precisely
+    /// One contract's logs over one window, snapshotted to Sendable RawLogs. Static + its own
+    /// client, so it is safe to run in a task group.
+    private static func fetchLogs(url: URL, chainId: Int, address: String, from: Int, to: Int) async throws -> [RawLog] {
+        let client = EthereumHttpClient(url: url, network: .custom(String(chainId)))
+        let logs = try await client.eth_getLogs(
+            addresses: [EthereumAddress(address)], topics: nil,
+            fromBlock: .Number(from), toBlock: .Number(to)
         )
+        return logs.map {
+            RawLog(topics: $0.topics, data: $0.data, block: blockInt($0.blockNumber),
+                   logIndex: Int($0.logIndex ?? 0), txHash: $0.transactionHash)
+        }
+    }
+
+    /// Block timestamps for the rows about to render, read concurrently. A block we cannot
+    /// read leaves that row's date unknown rather than inventing one from an assumed interval.
+    private static func blockTimestamps(url: URL, chainId: Int, blocks: [Int]) async -> [Int: Date] {
+        await withTaskGroup(of: (Int, Date)?.self) { group -> [Int: Date] in
+            for block in blocks where block > 0 {
+                group.addTask {
+                    let client = EthereumHttpClient(url: url, network: .custom(String(chainId)))
+                    guard let info = try? await client.eth_getBlockByNumber(.Number(block)) else { return nil }
+                    return (block, info.timestamp)
+                }
+            }
+            var out: [Int: Date] = [:]
+            for await entry in group { if let entry { out[entry.0] = entry.1 } }
+            return out
+        }
+    }
+
+    /// The Int of an `EthereumBlock`, or 0 for a non-numeric case (never reached for a log).
+    private static func blockInt(_ block: EthereumBlock) -> Int {
+        if case let .Number(n) = block { return n }
+        return 0
+    }
+
+    // MARK: activity events + decode
+
+    /// Canonical signatures of every event the history renders — one copy, mirroring the
+    /// SDK's MAREN_*_EVENTS. topic0 = keccak(signature).
+    private static let activityEventSignatures = [
+        "Deposited(address,uint256,uint256,bool)",
+        "Withdrawn(address,uint256,uint256)",
+        "Borrowed(address,uint256,uint256,uint256,bool)",
+        "Repaid(address,uint256,uint256)",
+        "Paid(address,address,uint256,bytes32,string)",
+        "PaidToHandle(bytes32,address,address,uint256,string)",
+        "RequestCreated(uint256,address,address,uint256,string)",
+        "LinkCreated(uint256,address,address,uint256,uint64)",
+        "LinkClaimed(uint256,address,uint256)",
+        "Deposit(address,address,uint256,uint256)",
+        "Withdraw(address,address,address,uint256,uint256)",
+    ]
+
+    /// Lowercased topic0 → event name.
+    static let eventNamesByTopic: [String: String] = {
+        var map: [String: String] = [:]
+        for sig in activityEventSignatures {
+            let name = String(sig.prefix(while: { $0 != "(" }))
+            map[sig.web3.keccak256.web3.hexString.lowercased()] = name
+        }
+        return map
+    }()
+
+    /// Is this a known event, indexed by this account? The account is an indexed address in
+    /// every one of these events, so it appears in one of topics[1...]; that is the filter.
+    private static func involves(_ log: RawLog, account: String, names: [String: String]) -> Bool {
+        guard let t0 = log.topics.first?.lowercased(), names[t0] != nil else { return false }
+        return log.topics.dropFirst().contains { $0.lowercased() == account }
+    }
+
+    private func decodeActivity(_ log: RawLog, account: String, names: [String: String], times: [Int: Date]) -> ActivityItem? {
+        guard let t0 = log.topics.first?.lowercased(), let name = names[t0] else { return nil }
+        guard let data = Data(hex: log.data) else { return nil }
+        let amountWei = MezoRPC.word(data, 0)      // amount/assets is data word 0 in every one
+        let amount = Wei.toDecimal(amountWei) ?? 0
+        let topics = log.topics.map { $0.lowercased() }
+        let date = times[log.block] ?? Date(timeIntervalSince1970: 0)
+        let id = (log.txHash ?? UUID().uuidString) + "-" + String(log.logIndex)
+
+        func musd(_ sign: String) -> String { "\(sign)\(MoneyFormat.musd(amount, unit: false)) MUSD" }
+        func btc(_ sign: String) -> String { "\(sign)\(MoneyFormat.btc(amount, unit: false)) BTC" }
+        func row(_ kind: ActivityItem.Kind, _ title: String, _ subtitle: String, _ amountText: String) -> ActivityItem {
+            ActivityItem(id: id, kind: kind, title: title, subtitle: subtitle, amount: amountText, date: date)
+        }
+
+        switch name {
+        case "Deposited":   return row(.deposit, "Deposited Bitcoin", "Vault collateral", btc("+"))
+        case "Withdrawn":   return row(.withdraw, "Withdrew Bitcoin", "From your vault", btc("-"))
+        case "Borrowed":    return row(.borrow, "Borrowed MUSD", "Against BTC vault", musd("+"))
+        case "Repaid":      return row(.repay, "Repaid MUSD", "To your vault", musd("-"))
+        case "Paid":
+            // from = topic1, to = topic2.
+            let outgoing = topics.count > 1 && topics[1] == account
+            return row(outgoing ? .send : .receive,
+                       outgoing ? "Sent MUSD" : "Received MUSD", "MarenPay transfer",
+                       musd(outgoing ? "-" : "+"))
+        case "PaidToHandle":
+            // from = topic2, to = topic3.
+            let outgoing = topics.count > 2 && topics[2] == account
+            return row(outgoing ? .send : .receive,
+                       outgoing ? "Sent MUSD" : "Received MUSD", "MarenPay transfer",
+                       musd(outgoing ? "-" : "+"))
+        case "RequestCreated": return row(.receive, "Payment request", "MarenPay request", musd(""))
+        case "LinkCreated":    return row(.send, "Created a claim link", "Escrowed MUSD", musd("-"))
+        case "LinkClaimed":    return row(.receive, "Claim link claimed", "MarenPay link", musd("+"))
+        case "Deposit":        return row(.earnDeposit, "Supplied to Earn", "Stability Pool", musd("-"))
+        case "Withdraw":       return row(.earnWithdraw, "Withdrew from Earn", "Stability Pool", musd("+"))
+        default: return nil
+        }
     }
 
     private func shortAddress(_ addr: String) -> String {
