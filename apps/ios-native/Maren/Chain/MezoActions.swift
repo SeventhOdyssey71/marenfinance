@@ -124,6 +124,50 @@ struct MezoActions {
         }
     }
 
+    /// Supply MUSD to MarenEarn (ERC-4626). Self-paid: MarenEarn is not on the relay allowlist,
+    /// so the user pays the BTC gas. A first supply approves MarenEarn to pull MUSD (one-time),
+    /// then deposits `assets` to the user as receiver.
+    func earnSupply(loadedAddress: String, assetsWei: BigUInt) async -> ActionResult {
+        let key: Data
+        switch await accessKey(loadedAddress) {
+        case .ok(let k): key = k
+        case .fail(let reason): return .declined(reason: reason)
+        }
+        let earn = MarenAddresses.of(chain.network).marenEarn
+        if let approveDecline = await ensureMusdAllowance(privateKey: key, loadedAddress: loadedAddress,
+                                                          spender: earn, needed: assetsWei) {
+            return .declined(reason: approveDecline)
+        }
+        do {
+            let data = try MarenEncoding.earnDepositCalldata(assets: assetsWei, receiver: loadedAddress)
+            let hash = try await sendSelfPaid(privateKey: key, loadedAddress: loadedAddress,
+                                              to: earn, value: 0, data: data, gasLimit: 400_000)
+            return await confirmSelfPaid(hash)
+        } catch { return .declined(reason: prepFailed) }
+    }
+
+    /// Withdraw MUSD from MarenEarn. Self-paid; the user is both receiver and owner.
+    func earnWithdraw(loadedAddress: String, assetsWei: BigUInt) async -> ActionResult {
+        let key: Data
+        switch await accessKey(loadedAddress) {
+        case .ok(let k): key = k
+        case .fail(let reason): return .declined(reason: reason)
+        }
+        do {
+            let data = try MarenEncoding.earnWithdrawCalldata(assets: assetsWei, receiver: loadedAddress, owner: loadedAddress)
+            let hash = try await sendSelfPaid(privateKey: key, loadedAddress: loadedAddress,
+                                              to: MarenAddresses.of(chain.network).marenEarn, value: 0, data: data, gasLimit: 400_000)
+            return await confirmSelfPaid(hash)
+        } catch { return .declined(reason: prepFailed) }
+    }
+
+    private func confirmSelfPaid(_ hash: String) async -> ActionResult {
+        let client = EthereumHttpClient(url: chain.rpcURLs[0], network: .custom(String(chain.chainId)))
+        let outcome = await Receipt.confirm(client: client, hash: hash, sponsored: false)
+        if case .delivered(let d) = outcome { return .ok(d) }
+        return .failed(outcome)
+    }
+
     private var prepFailed: String {
         "The transaction could not be prepared, so nothing was submitted and no gas was spent."
     }

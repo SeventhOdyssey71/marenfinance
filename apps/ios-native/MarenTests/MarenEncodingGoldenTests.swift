@@ -205,4 +205,18 @@ final class MarenEncodingGoldenTests: XCTestCase {
             "0000000000000000000000000000000000000000000000000de0b6b3a7640000"
         XCTAssertEqual(data.web3.hexString, expected, "approve calldata must match cast")
     }
+
+    // cast calldata "deposit(uint256,address)"          1e18 0x5419…1885
+    // cast calldata "withdraw(uint256,address,address)" 1e18 0x5419…1885 0x5419…1885
+    func testEarnCalldataMatchesCast() throws {
+        let amt = BigUInt(10).power(18)
+        let amtWord = "0000000000000000000000000000000000000000000000000de0b6b3a7640000"
+        let addrWord = "00000000000000000000000054196397d6f01b48739db3957257cb33cd341885"
+
+        let deposit = try MarenEncoding.earnDepositCalldata(assets: amt, receiver: recipient)
+        XCTAssertEqual(deposit.web3.hexString, "0x6e553f65" + amtWord + addrWord, "earn deposit calldata must match cast")
+
+        let withdraw = try MarenEncoding.earnWithdrawCalldata(assets: amt, receiver: recipient, owner: recipient)
+        XCTAssertEqual(withdraw.web3.hexString, "0xb460af94" + amtWord + addrWord + addrWord, "earn withdraw calldata must match cast")
+    }
 }

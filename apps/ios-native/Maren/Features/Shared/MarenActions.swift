@@ -145,6 +145,18 @@ struct LiveMarenActions: MarenActions {
             }
             return Self.outcome(await mezo.deposit(loadedAddress: loadedAddress, valueWei: wei))
 
+        // Self-paid Earn (MarenEarn is off the relay allowlist).
+        case .earnSupply:
+            guard let wei = Amount.toWei(intent.amount) else {
+                return .declined(reason: "That amount could not be read, so nothing was submitted.")
+            }
+            return Self.outcome(await mezo.earnSupply(loadedAddress: loadedAddress, assetsWei: wei))
+        case .earnWithdraw:
+            guard let wei = Amount.toWei(intent.amount) else {
+                return .declined(reason: "That amount could not be read, so nothing was submitted.")
+            }
+            return Self.outcome(await mezo.earnWithdraw(loadedAddress: loadedAddress, assetsWei: wei))
+
         default:
             return .declined(reason: MarenClientError.liveWritesUnavailable.errorDescription
                              ?? "This build has no relayer configured, so nothing was submitted.")

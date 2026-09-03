@@ -69,6 +69,29 @@ enum MarenEncoding {
     }
 
     // ---------------------------------------------------------------------------
+    // MarenEarn — ERC-4626 deposit / withdraw of MUSD (self-paid)
+    // ---------------------------------------------------------------------------
+
+    /// Calldata for `MarenEarn.deposit(uint256 assets, address receiver)` — supply MUSD to the
+    /// Stability Pool. Needs a prior MUSD approval to MarenEarn (transferFrom).
+    static func earnDepositCalldata(assets: BigUInt, receiver: String) throws -> Data {
+        let enc = ABIFunctionEncoder("deposit")
+        try enc.encode(assets)
+        try enc.encode(EthereumAddress(receiver))
+        return try enc.encoded()
+    }
+
+    /// Calldata for `MarenEarn.withdraw(uint256 assets, address receiver, address owner)` —
+    /// take MUSD back out. `receiver` and `owner` are both the user.
+    static func earnWithdrawCalldata(assets: BigUInt, receiver: String, owner: String) throws -> Data {
+        let enc = ABIFunctionEncoder("withdraw")
+        try enc.encode(assets)
+        try enc.encode(EthereumAddress(receiver))
+        try enc.encode(EthereumAddress(owner))
+        return try enc.encoded()
+    }
+
+    // ---------------------------------------------------------------------------
     // MarenPay.claimLink digest
     // ---------------------------------------------------------------------------
 
