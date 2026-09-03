@@ -2,9 +2,9 @@ import SwiftUI
 
 // MARK: - Receive
 //
-// A QR of the user's own public payment link, plus the @handle and address to copy or share.
-// Everything here is public — there is no secret on this screen — so it is safe to render as a
-// code and to share.
+// A clean receive sheet: a centred prompt, the QR of the user's own public payment link, a
+// grouped network/address card, and copy/share actions. Everything here is public — there is
+// no secret on this screen — so it is safe to render as a code and to share.
 
 struct ReceiveView: View {
     @Environment(\.marenClient) private var client
@@ -14,51 +14,61 @@ struct ReceiveView: View {
         FlowScreen(title: "Receive") {
             if let account {
                 let link = PaymentLinks.buildPayment(to: primaryTarget(account))
-                VStack(spacing: Theme.Space.md) {
-                    QRCode(string: link, size: 220)
+                VStack(spacing: Theme.Space.lg) {
+                    header
+                    QRCode(string: link, size: 230)
                         .frame(maxWidth: .infinity)
-                        .padding(.vertical, Theme.Space.sm)
-                    Text("Scan to pay you in MUSD")
-                        .font(.system(size: 14))
-                        .foregroundStyle(Theme.Palette.tertiary)
+                        .padding(.vertical, Theme.Space.xs)
+                    infoCard(account)
+                    actions(link: link, address: account.address)
                 }
-                .frame(maxWidth: .infinity)
-
-                copyCard(label: "Your handle", value: account.handle, copyValue: account.handle,
-                         show: account.handle.hasPrefix("@"))
-                copyCard(label: "Your address", value: account.address, copyValue: account.address, show: true)
-
-                ShareLink(item: link) {
-                    Text("Share payment link").pillLabel()
-                }
-                .accessibilityLabel("Share your payment link")
             } else {
-                MCard { Text("Loading your account…").foregroundStyle(Theme.Palette.tertiary) }
+                MCard { Text("Loading your account…").font(.text(15)).foregroundStyle(Theme.Palette.tertiary) }
             }
         }
         .task { account = try? await client.account() }
     }
 
-    private func primaryTarget(_ account: Account) -> String {
-        account.handle.hasPrefix("@") ? account.handle : account.address
+    private var header: some View {
+        VStack(spacing: Theme.Space.xs) {
+            Text("Receive MUSD")
+                .font(.display(24, weight: .medium))
+                .foregroundStyle(Theme.Palette.ink)
+            Text("Share your wallet address or QR code to receive MUSD on Mezo.")
+                .font(.text(15))
+                .foregroundStyle(Theme.Palette.muted)
+                .multilineTextAlignment(.center)
+                .fixedSize(horizontal: false, vertical: true)
+        }
+        .frame(maxWidth: .infinity)
     }
 
-    @ViewBuilder private func copyCard(label: String, value: String, copyValue: String, show: Bool) -> some View {
-        if show {
-            MCard {
-                HStack(spacing: Theme.Space.sm) {
-                    VStack(alignment: .leading, spacing: 4) {
-                        Text(label).labelStyle()
-                        Text(value)
-                            .font(.figure(15, weight: .medium))
-                            .foregroundStyle(Theme.Palette.ink)
-                            .lineLimit(1)
-                            .truncationMode(.middle)
-                    }
-                    Spacer(minLength: Theme.Space.sm)
-                    CopyButton(value: copyValue, describes: label.lowercased())
+    private func infoCard(_ account: Account) -> some View {
+        MCard(padding: Theme.Space.md) {
+            VStack(spacing: 0) {
+                StatRow(label: "Network") {
+                    Text("MUSD · Mezo").font(.text(15, weight: .medium)).foregroundStyle(Theme.Palette.ink)
+                }
+                StatRow(label: "Wallet address", showsDivider: false, fixedValue: false) {
+                    Text(MarenSession.shortAddress(account.address))
+                        .font(.figure(15, weight: .medium))
+                        .foregroundStyle(Theme.Palette.ink)
                 }
             }
         }
+    }
+
+    private func actions(link: String, address: String) -> some View {
+        HStack(spacing: Theme.Space.sm) {
+            CopyButton(value: address, describes: "your address", title: "Copy address", style: .filled)
+            ShareLink(item: link) {
+                Label("Share QR", systemImage: "square.and.arrow.up").pillLabel()
+            }
+            .accessibilityLabel("Share your payment link")
+        }
+    }
+
+    private func primaryTarget(_ account: Account) -> String {
+        account.handle.hasPrefix("@") ? account.handle : account.address
     }
 }
