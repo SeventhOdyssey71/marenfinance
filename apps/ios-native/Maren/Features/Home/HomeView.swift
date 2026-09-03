@@ -12,7 +12,13 @@ struct HomeView: View {
     @Environment(MarenSession.self) private var session
     @Environment(AppRouter.self) private var router
     @State private var model = HomeModel()
-    @State private var destination: PayDestination?
+    @State private var fullFlow: PayDestination?
+    @State private var overlayFlow: PayDestination?
+
+    /// Send and the pay flows open full screen; Receive opens as a bottom-sheet overlay.
+    private func present(_ d: PayDestination) {
+        if d.isFullScreen { fullFlow = d } else { overlayFlow = d }
+    }
 
     var body: some View {
         ScrollView {
@@ -32,7 +38,8 @@ struct HomeView: View {
         }
         .background(Theme.Palette.canvas)
         .task { await model.load(using: client) }
-        .sheet(item: $destination) { $0.view }
+        .fullScreenCover(item: $fullFlow) { $0.view }
+        .sheet(item: $overlayFlow) { $0.view }
     }
 
     // MARK: header — avatar, greeting, name, scan
@@ -50,7 +57,7 @@ struct HomeView: View {
                     .overlay(alignment: .bottom) { DottedDivider().offset(y: 3) }
             }
             Spacer()
-            Button { destination = .scan } label: {
+            Button { present(.scan) } label: {
                 HugeIcon(name: "scan", size: 22)
                     .foregroundStyle(Theme.Palette.ink)
                     .frame(width: 44, height: 44)
@@ -79,8 +86,8 @@ struct HomeView: View {
 
     private var actionPills: some View {
         HStack(spacing: Theme.Space.sm) {
-            PillButton(title: "Send", hugeIcon: "send", variant: .primary) { destination = .send }
-            PillButton(title: "Receive", hugeIcon: "receive", variant: .quiet) { destination = .receive }
+            PillButton(title: "Send", hugeIcon: "send", variant: .primary) { present(.send) }
+            PillButton(title: "Receive", hugeIcon: "receive", variant: .quiet) { present(.receive) }
         }
     }
 

@@ -41,6 +41,14 @@ private struct VaultSection: View {
             PriceNote(feed: model.priceFeed)
         }
         actionGrid
+            // Screenshot/testing hook: open a flow directly. Inert in normal use.
+            .onAppear {
+                switch ProcessInfo.processInfo.environment["MAREN_SCREEN"] {
+                case "borrow": flow = .borrow
+                case "deposit": flow = .deposit
+                default: break
+                }
+            }
     }
 
     private var positionCard: some View {
@@ -116,7 +124,7 @@ private struct VaultSection: View {
                 ActionTile(title: "Withdraw", icon: "withdraw") { flow = .withdraw }
             }
         }
-        .sheet(item: $flow) { flow in
+        .fullScreenCover(item: $flow) { flow in
             SingleAmountFlow(config: config(for: flow))
                 .onDisappear { Task { await model.load(using: clientForReload) } }
         }
@@ -292,7 +300,7 @@ private struct EarnSection: View {
             ActionTile(title: "Move in", icon: "leaf.fill", emphasized: true) { flow = .supply }
             ActionTile(title: "Move out", icon: "arrow.up.left") { flow = .withdraw }
         }
-        .sheet(item: $flow) { flow in
+        .fullScreenCover(item: $flow) { flow in
             SingleAmountFlow(config: config(for: flow))
         }
     }

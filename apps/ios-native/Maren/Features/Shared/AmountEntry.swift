@@ -11,8 +11,12 @@ import SwiftUI
 struct AmountReadout: View {
     /// The raw typed string, e.g. "3.0". Empty renders as a greyed "0".
     let raw: String
-    let unitLabel: String            // "MUSD"
-    let onToggle: () -> Void
+    let unitLabel: String            // "MUSD" or "BTC"
+    /// The big-figure prefix — "$" for MUSD, empty for BTC.
+    var prefix: String = "$"
+    /// Whether to show the fiat/crypto toggle affordance (MUSD only; it's 1:1 so cosmetic).
+    var showToggle: Bool = true
+    var onToggle: () -> Void = {}
 
     private var isZero: Bool { raw.isEmpty || Decimal(string: raw) == 0 }
     private var shown: String { raw.isEmpty ? "0" : raw }
@@ -20,7 +24,9 @@ struct AmountReadout: View {
     var body: some View {
         VStack(spacing: Theme.Space.sm) {
             HStack(alignment: .firstTextBaseline, spacing: 2) {
-                Text("$").font(.system(size: 34, weight: .bold, design: .rounded))
+                if !prefix.isEmpty {
+                    Text(prefix).font(.system(size: 34, weight: .bold, design: .rounded))
+                }
                 Text(shown).font(.system(size: 60, weight: .bold, design: .rounded))
                     .contentTransition(.numericText())
             }
@@ -32,11 +38,14 @@ struct AmountReadout: View {
             Button(action: onToggle) {
                 HStack(spacing: 6) {
                     Text("\(shown) \(unitLabel)").font(.text(15, weight: .medium))
-                    Image(systemName: "arrow.up.arrow.down").font(.system(size: 13, weight: .semibold))
+                    if showToggle {
+                        Image(systemName: "arrow.up.arrow.down").font(.system(size: 13, weight: .semibold))
+                    }
                 }
                 .foregroundStyle(Theme.Palette.tertiary)
             }
             .buttonStyle(.plain)
+            .disabled(!showToggle)
             .accessibilityLabel("Amount \(shown) \(unitLabel)")
         }
     }

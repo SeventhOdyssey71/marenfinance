@@ -31,7 +31,7 @@ struct RootView: View {
                         GlassTabBar(selection: $router.tab)
                     }
                     .background(Theme.Palette.canvas)
-                    .sheet(item: $launchDestination) { $0.view }
+                    .fullScreenCover(item: $launchDestination) { $0.view }
                 }
                 .onAppear(perform: applyLaunchScreen)
             } else {
@@ -55,7 +55,7 @@ struct RootView: View {
 
     private func applyLaunchScreen() {
         switch launchScreen {
-        case "finance": router.goToVault()
+        case "finance", "borrow", "deposit": router.goToVault()
         case "earn": router.goToEarn()
         case "activity": router.tab = .activity
         case "profile": router.tab = .profile

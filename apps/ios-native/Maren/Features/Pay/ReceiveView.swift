@@ -11,21 +11,27 @@ struct ReceiveView: View {
     @State private var account: Account?
 
     var body: some View {
-        FlowScreen(title: "Receive") {
-            if let account {
-                let link = PaymentLinks.buildPayment(to: primaryTarget(account))
-                VStack(spacing: Theme.Space.lg) {
+        ScrollView {
+            VStack(spacing: Theme.Space.lg) {
+                if let account {
+                    let link = PaymentLinks.buildPayment(to: primaryTarget(account))
                     header
                     QRCode(string: link, size: 230)
                         .frame(maxWidth: .infinity)
                         .padding(.vertical, Theme.Space.xs)
                     infoCard(account)
                     actions(link: link, address: account.address)
+                } else {
+                    MCard { Text("Loading your account…").font(.text(15)).foregroundStyle(Theme.Palette.tertiary) }
                 }
-            } else {
-                MCard { Text("Loading your account…").font(.text(15)).foregroundStyle(Theme.Palette.tertiary) }
             }
+            .padding(.horizontal, Theme.Space.md)
+            .padding(.top, Theme.Space.xl)
+            .padding(.bottom, Theme.Space.lg)
         }
+        .background(Theme.Palette.canvas)
+        .presentationDetents([.large])
+        .presentationDragIndicator(.visible)
         .task { account = try? await client.account() }
     }
 

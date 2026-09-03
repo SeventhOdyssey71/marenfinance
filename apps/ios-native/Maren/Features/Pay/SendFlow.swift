@@ -12,8 +12,8 @@ struct SendFlow: View {
     @Environment(\.marenClient) private var client
     @Environment(\.dismiss) private var dismiss
 
-    private enum Stage { case recipient, amount, submitting, done }
-    @State private var stage: Stage = .recipient
+    private enum Stage { case amount, recipient, submitting, done }
+    @State private var stage: Stage = .amount
     @State private var recipient = ""
     @State private var raw = ""            // the amount as typed
     @State private var balance: Decimal?
@@ -53,7 +53,6 @@ struct SendFlow: View {
             if let prefill {
                 recipient = prefill.to
                 if let a = prefill.amount { raw = a }
-                if recipientValid { stage = .amount }
             }
         }
     }
@@ -104,11 +103,13 @@ struct SendFlow: View {
             )
             .padding(.horizontal, Theme.Space.md)
             Spacer()
-            PillButton(title: "Continue", variant: .primary) { stage = .amount }
-                .disabled(!recipientValid)
-                .opacity(recipientValid ? 1 : 0.5)
-                .padding(.horizontal, Theme.Space.md)
-                .padding(.bottom, Theme.Space.md)
+            PillButton(title: "Send \(MoneyFormat.musd(amount ?? 0, unit: false)) MUSD", variant: .primary) {
+                Task { await submit() }
+            }
+            .disabled(!recipientValid)
+            .opacity(recipientValid ? 1 : 0.5)
+            .padding(.horizontal, Theme.Space.md)
+            .padding(.bottom, Theme.Space.md)
         }
     }
 
@@ -116,7 +117,7 @@ struct SendFlow: View {
 
     private var amountStage: some View {
         VStack(spacing: Theme.Space.md) {
-            header(title: "Send to", pill: shortRecipient) { stage = .recipient }
+            header(title: "Send")
             Spacer(minLength: 0)
             AmountReadout(raw: raw, unitLabel: "MUSD", onToggle: {})
             if overBalance {
@@ -126,9 +127,7 @@ struct SendFlow: View {
             assetCard
             AmountKeypad(onDigit: digit, onDot: dot, onDelete: del)
                 .padding(.horizontal, Theme.Space.sm)
-            GasNote(mode: .sponsored)
-                .padding(.horizontal, Theme.Space.md)
-            PillButton(title: "Continue", variant: .primary) { Task { await submit() } }
+            PillButton(title: "Continue", variant: .primary) { stage = .recipient }
                 .disabled(!amountValid || overBalance)
                 .opacity(amountValid && !overBalance ? 1 : 0.5)
                 .padding(.horizontal, Theme.Space.md)

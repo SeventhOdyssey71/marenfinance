@@ -3,9 +3,9 @@ import SwiftUI
 // MARK: - SingleAmountFlow
 //
 // The workhorse for any flow that is "enter one amount, review it, submit it": deposit,
-// borrow, repay, withdraw, Earn supply/withdraw. Three stages — entry, review, outcome —
-// with the honest submit discipline handled once here, so no screen re-implements it and
-// none can drift on what "done" means.
+// borrow, repay, withdraw, Earn supply/withdraw. Full screen, the same shape as Send: a
+// custom keypad and a big animated figure, then an honest review, then the glossy loader,
+// then the one honest outcome — so every money flow reads and behaves identically.
 
 struct AmountFlowConfig {
     let navTitle: String
@@ -25,134 +25,170 @@ struct AmountFlowConfig {
     let reviewRows: (Decimal) -> [ReviewRow]
 }
 
-private func unitLabel(_ unit: Intent.Unit) -> String { unit == .musd ? "MUSD" : "BTC" }
-
 struct SingleAmountFlow: View {
     let config: AmountFlowConfig
     @Environment(\.marenActions) private var actions
     @Environment(\.dismiss) private var dismiss
 
-    private enum Stage: Equatable { case entry, review, submitting, done }
-
-    @State private var stage: Stage = .entry
-    @State private var amountText = ""
+    private enum Stage { case amount, review, submitting, done }
+    @State private var stage: Stage = .amount
+    @State private var raw = ""
     @State private var outcome: SubmitOutcome?
 
-    private var amount: Decimal? { Amount.parse(amountText) }
-    private var overMax: Bool {
-        guard let amount, let available = config.available else { return false }
-        return amount > available
-    }
-    private var canProceed: Bool { amount != nil && !overMax }
+    private var isMusd: Bool { config.unit == .musd }
+    private var unitLabel: String { isMusd ? "MUSD" : "BTC" }
+    private var amount: Decimal? { Decimal(string: raw.isEmpty ? "0" : raw) }
+    private var overMax: Bool { if let a = amount, let m = config.available { return a > m }; return false }
+    private var amountValid: Bool { (amount ?? 0) > 0 && !overMax }
 
     var body: some View {
-        FlowScreen(title: config.navTitle) {
+        VStack(spacing: 0) {
             switch stage {
-            case .entry: entry
-            case .review, .submitting: review
-            case .done: outcomeView
+            case .amount:     amountStage
+            case .review:     reviewStage
+            case .submitting: submittingStage
+            case .done:       doneStage
             }
         }
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
+        .background(Theme.Palette.canvas)
     }
 
-    // MARK: entry
-
-    @ViewBuilder private var entry: some View {
-        if let explainer = config.explainer {
-            Text(explainer)
-                .font(.system(size: 15))
-                .foregroundStyle(Theme.Palette.muted)
-                .fixedSize(horizontal: false, vertical: true)
-        }
-        AmountField(unit: unitLabel(config.unit), text: $amountText, caption: overMax ? overMaxCaption : nil)
-        if !config.presets.isEmpty {
-            presetRow
-        }
-        if let available = config.available, let label = config.availableLabel {
-            MCard(padding: Theme.Space.md) {
-                StatRow(label: label, showsDivider: false) {
-                    MoneyText(text: figure(available), size: 17, weight: .semibold)
-                }
+    private func header(_ title: String) -> some View {
+        HStack {
+            Text(title).font(.display(24, weight: .medium)).foregroundStyle(Theme.Palette.ink)
+            Spacer()
+            Button { dismiss() } label: {
+                Image(systemName: "xmark").font(.system(size: 16, weight: .semibold))
+                    .foregroundStyle(Theme.Palette.muted).frame(width: 44, height: 44)
             }
+            .accessibilityLabel("Close")
         }
-        GasNote(mode: config.gas, detail: config.gasDetail)
-        SubmitBar(title: "Review", enabled: canProceed) { stage = .review }
+        .padding(.horizontal, Theme.Space.md).padding(.top, Theme.Space.sm)
     }
 
-    private var overMaxCaption: String {
-        config.unit == .musd ? "More than your available MUSD." : "More than you can use."
+    // MARK: amount
+
+    private var amountStage: some View {
+        VStack(spacing: Theme.Space.md) {
+            header(config.navTitle)
+            if let explainer = config.explainer {
+                Text(explainer).font(.text(13)).foregroundStyle(Theme.Palette.muted)
+                    .fixedSize(horizontal: false, vertical: true)
+                    .padding(.horizontal, Theme.Space.md)
+            }
+            Spacer(minLength: 0)
+            AmountReadout(raw: raw, unitLabel: unitLabel,
+                          prefix: isMusd ? "$" : "", showToggle: isMusd)
+            if overMax {
+                Text(isMusd ? "More than your available MUSD" : "More than you can use")
+                    .font(.text(13, weight: .medium)).foregroundStyle(Theme.Palette.warning)
+            }
+            Spacer(minLength: 0)
+            if let available = config.available, let label = config.availableLabel {
+                availableCard(available, label)
+            }
+            AmountKeypad(onDigit: digit, onDot: dot, onDelete: del)
+                .padding(.horizontal, Theme.Space.sm)
+            GasNote(mode: config.gas, detail: config.gasDetail).padding(.horizontal, Theme.Space.md)
+            PillButton(title: "Review", variant: .primary) { stage = .review }
+                .disabled(!amountValid)
+                .opacity(amountValid ? 1 : 0.5)
+                .padding(.horizontal, Theme.Space.md).padding(.bottom, Theme.Space.md)
+        }
     }
 
-    private var presetRow: some View {
+    private func availableCard(_ available: Decimal, _ label: String) -> some View {
         HStack(spacing: Theme.Space.sm) {
-            ForEach(config.presets, id: \.self) { preset in
-                Button {
-                    amountText = MoneyFormat.musd(preset, unit: false).replacingOccurrences(of: ",", with: "")
-                    if config.unit == .btc { amountText = MoneyFormat.btc(preset, unit: false) }
-                } label: {
-                    Text(config.unit == .musd ? MoneyFormat.musd(preset, unit: false) : MoneyFormat.btc(preset, unit: false))
-                        .font(.system(size: 14, weight: .semibold))
-                        .foregroundStyle(Theme.Palette.ink)
-                        .frame(maxWidth: .infinity, minHeight: 44)
-                        .background(Theme.Palette.inset, in: Capsule())
-                }
-                .buttonStyle(PressableStyle())
-                .accessibilityLabel("Use \(figure(preset)) \(unitLabel(config.unit))")
+            VStack(alignment: .leading, spacing: 1) {
+                Text(label).font(.text(13)).foregroundStyle(Theme.Palette.tertiary)
+                Text(figure(available) + " " + unitLabel)
+                    .font(.figure(15, weight: .medium)).foregroundStyle(Theme.Palette.ink)
             }
-            if let available = config.available {
-                Button {
-                    amountText = config.unit == .musd ? MoneyFormat.musd(available, unit: false).replacingOccurrences(of: ",", with: "") : MoneyFormat.btc(available, unit: false)
-                } label: {
-                    Text("Max")
-                        .font(.system(size: 14, weight: .semibold))
-                        .foregroundStyle(Theme.Palette.ink)
-                        .frame(maxWidth: .infinity, minHeight: 44)
-                        .background(Theme.Palette.inset, in: Capsule())
-                }
-                .buttonStyle(PressableStyle())
-                .accessibilityLabel("Use the maximum")
+            Spacer()
+            Button { raw = figure(available) } label: {
+                Text("Use Max").font(.text(14, weight: .medium)).foregroundStyle(Theme.Palette.ink)
+                    .padding(.horizontal, 16).padding(.vertical, 9)
+                    .background(Theme.Palette.card, in: Capsule())
             }
+            .buttonStyle(PressableStyle())
         }
+        .padding(Theme.Space.sm)
+        .background(Theme.Palette.inset, in: RoundedRectangle(cornerRadius: Theme.Radius.pill, style: .continuous))
+        .padding(.horizontal, Theme.Space.md)
     }
 
     // MARK: review
 
-    @ViewBuilder private var review: some View {
-        if let amount {
-            MCard {
-                VStack(alignment: .leading, spacing: 4) {
-                    Text("You’re submitting")
-                        .labelStyle()
-                    MoneyText(text: "\(figure(amount)) \(unitLabel(config.unit))", size: 34, weight: .bold)
+    private var reviewStage: some View {
+        VStack(spacing: Theme.Space.md) {
+            header(config.navTitle)
+            if let amount {
+                ScrollView {
+                    VStack(alignment: .leading, spacing: Theme.Space.lg) {
+                        MCard {
+                            VStack(alignment: .leading, spacing: 4) {
+                                Text("You’re submitting").labelStyle()
+                                MoneyText(text: "\(figure(amount)) \(unitLabel)", size: 34, weight: .bold)
+                            }
+                        }
+                        ReviewList(rows: config.reviewRows(amount))
+                        GasNote(mode: config.gas, detail: config.gasDetail)
+                    }
+                    .padding(.horizontal, Theme.Space.md)
                 }
-            }
-            ReviewList(rows: config.reviewRows(amount))
-            GasNote(mode: config.gas, detail: config.gasDetail)
-            SubmitBar(title: config.submitTitle, submitting: stage == .submitting) {
-                Task { await submit(amount) }
-            }
-            if stage != .submitting {
-                PillButton(title: "Back", variant: .quiet) { stage = .entry }
+                VStack(spacing: Theme.Space.sm) {
+                    PillButton(title: config.submitTitle, variant: .primary) { Task { await submit(amount) } }
+                    PillButton(title: "Back", variant: .quiet) { stage = .amount }
+                }
+                .padding(.horizontal, Theme.Space.md).padding(.bottom, Theme.Space.md)
             }
         }
+    }
+
+    // MARK: submitting + done
+
+    private var submittingStage: some View {
+        VStack(spacing: Theme.Space.lg) {
+            header(config.navTitle)
+            Spacer()
+            LogoLoader()
+            Text("Working…").font(.text(16, weight: .medium)).foregroundStyle(Theme.Palette.muted)
+            Spacer()
+        }
+    }
+
+    private var doneStage: some View {
+        VStack(alignment: .leading, spacing: Theme.Space.lg) {
+            header(config.navTitle)
+            if let outcome {
+                OutcomeView(outcome: outcome, network: .testnet) { dismiss() }
+                    .padding(.horizontal, Theme.Space.md)
+            }
+            Spacer()
+        }
+    }
+
+    // MARK: keypad + submit
+
+    private func digit(_ d: String) {
+        if raw == "0" { raw = d; return }
+        let maxDp = isMusd ? 2 : 8
+        if let dot = raw.firstIndex(of: "."), raw.distance(from: dot, to: raw.endIndex) > maxDp { return }
+        if raw.count >= 14 { return }
+        raw += d
+    }
+    private func dot() { if !raw.contains(".") { raw = raw.isEmpty ? "0." : raw + "." } }
+    private func del() { if !raw.isEmpty { raw.removeLast() } }
+
+    private func figure(_ value: Decimal) -> String {
+        (isMusd ? MoneyFormat.musd(value, unit: false) : MoneyFormat.btc(value, unit: false))
+            .replacingOccurrences(of: ",", with: "")
     }
 
     private func submit(_ amount: Decimal) async {
         stage = .submitting
-        let result = await actions.submit(config.makeIntent(amount))
-        outcome = result
+        outcome = await actions.submit(config.makeIntent(amount))
         stage = .done
-    }
-
-    // MARK: outcome
-
-    @ViewBuilder private var outcomeView: some View {
-        if let outcome {
-            OutcomeView(outcome: outcome, network: .testnet) { dismiss() }
-        }
-    }
-
-    private func figure(_ value: Decimal) -> String {
-        config.unit == .musd ? MoneyFormat.musd(value, unit: false) : MoneyFormat.btc(value, unit: false)
     }
 }

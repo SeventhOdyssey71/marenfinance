@@ -33,6 +33,9 @@ enum PayDestination: String, Identifiable, CaseIterable {
         }
     }
 
+    /// Send and the pay flows are full-screen pages; Receive is a bottom-sheet overlay.
+    var isFullScreen: Bool { self != .receive }
+
     @ViewBuilder var view: some View {
         switch self {
         case .send: SendFlow()
