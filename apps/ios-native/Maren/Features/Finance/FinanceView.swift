@@ -338,8 +338,8 @@ private struct EarnSection: View {
 
     private var actionRow: some View {
         HStack(spacing: Theme.Space.sm) {
-            ActionTile(title: "Move in", icon: "leaf.fill", emphasized: true) { flow = .supply }
-            ActionTile(title: "Move out", icon: "arrow.up.left") { flow = .withdraw }
+            ActionTile(title: "Move in", icon: "deposit", emphasized: true) { flow = .supply }
+            ActionTile(title: "Move out", icon: "withdraw") { flow = .withdraw }
         }
         .fullScreenCover(item: $flow) { flow in
             SingleAmountFlow(config: config(for: flow))

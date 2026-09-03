@@ -42,15 +42,51 @@ struct ActivityView: View {
         }
     }
 
+    // Grouped by day, most recent first — a clean, scannable structure with a quiet date
+    // header over each card, rather than one long undifferentiated list.
+    private struct DayGroup: Identifiable {
+        let id: Date
+        let label: String
+        let items: [ActivityItem]
+    }
+
+    private static let dayFormatter: DateFormatter = {
+        let formatter = DateFormatter()
+        formatter.dateFormat = "MMMM d"
+        return formatter
+    }()
+
+    private var groups: [DayGroup] {
+        let calendar = Calendar.current
+        let byDay = Dictionary(grouping: items) { calendar.startOfDay(for: $0.date) }
+        return byDay.keys.sorted(by: >).map { day in
+            let label: String
+            if calendar.isDateInToday(day) { label = "Today" }
+            else if calendar.isDateInYesterday(day) { label = "Yesterday" }
+            else { label = Self.dayFormatter.string(from: day) }
+            return DayGroup(id: day, label: label, items: byDay[day]!.sorted { $0.date > $1.date })
+        }
+    }
+
     private var list: some View {
-        MCard(padding: Theme.Space.md) {
-            VStack(spacing: 0) {
-                ForEach(Array(items.enumerated()), id: \.element.id) { index, item in
-                    Button { selected = item } label: {
-                        ActivityRow(item: item, showsDivider: index < items.count - 1)
+        VStack(spacing: Theme.Space.lg) {
+            ForEach(groups) { group in
+                VStack(alignment: .leading, spacing: Theme.Space.sm) {
+                    Text(group.label)
+                        .font(.text(13, weight: .medium))
+                        .foregroundStyle(Theme.Palette.tertiary)
+                        .padding(.horizontal, Theme.Space.xs)
+                    MCard(padding: Theme.Space.md) {
+                        VStack(spacing: 0) {
+                            ForEach(Array(group.items.enumerated()), id: \.element.id) { index, item in
+                                Button { selected = item } label: {
+                                    ActivityRow(item: item, showsDivider: index < group.items.count - 1)
+                                }
+                                .buttonStyle(PressableStyle())
+                                .accessibilityHint("Opens the receipt")
+                            }
+                        }
                     }
-                    .buttonStyle(PressableStyle())
-                    .accessibilityHint("Opens the receipt")
                 }
             }
         }
@@ -113,12 +149,17 @@ private struct ActivityRow: View {
                     }
                 }
                 Spacer(minLength: Theme.Space.sm)
-                Text(item.amount)
-                    .font(.text(15, weight: .medium))
-                    .foregroundStyle(item.status == .failed ? Theme.Palette.tertiary : item.amountColor)
-                    .strikethrough(item.status == .failed)
-                    .lineLimit(1)
-                    .fixedSize(horizontal: true, vertical: false)
+                VStack(alignment: .trailing, spacing: 2) {
+                    Text(item.amount)
+                        .font(.text(15, weight: .medium))
+                        .foregroundStyle(item.status == .failed ? Theme.Palette.tertiary : item.amountColor)
+                        .strikethrough(item.status == .failed)
+                        .lineLimit(1)
+                        .fixedSize(horizontal: true, vertical: false)
+                    Text(item.date, style: .time)
+                        .font(.text(11))
+                        .foregroundStyle(Theme.Palette.tertiary)
+                }
             }
             .padding(.vertical, 12)
             if showsDivider {
