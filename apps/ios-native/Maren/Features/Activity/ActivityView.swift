@@ -114,7 +114,8 @@ private struct ActivityRow: View {
                 }
                 Spacer(minLength: Theme.Space.sm)
                 Text(item.amount)
-                    .font(.figure(15, weight: .semibold))
+                    .font(.text(15, weight: .medium))
+                    .tracking(-2)
                     .foregroundStyle(item.status == .failed ? Theme.Palette.tertiary : item.amountColor)
                     .strikethrough(item.status == .failed)
                     .lineLimit(1)
