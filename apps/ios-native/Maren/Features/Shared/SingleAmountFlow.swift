@@ -72,11 +72,6 @@ struct SingleAmountFlow: View {
     private var amountStage: some View {
         VStack(spacing: Theme.Space.md) {
             header(config.navTitle)
-            if let explainer = config.explainer {
-                Text(explainer).font(.text(13)).foregroundStyle(Theme.Palette.muted)
-                    .fixedSize(horizontal: false, vertical: true)
-                    .padding(.horizontal, Theme.Space.md)
-            }
             Spacer(minLength: 0)
             AmountReadout(raw: raw, unitLabel: unitLabel,
                           prefix: isMusd ? "$" : "", showToggle: isMusd)
@@ -90,7 +85,6 @@ struct SingleAmountFlow: View {
             }
             AmountKeypad(onDigit: digit, onDot: dot, onDelete: del)
                 .padding(.horizontal, Theme.Space.sm)
-            GasNote(mode: config.gas, detail: config.gasDetail).padding(.horizontal, Theme.Space.md)
             PillButton(title: "Review", variant: .primary) { stage = .review }
                 .disabled(!amountValid)
                 .opacity(amountValid ? 1 : 0.5)

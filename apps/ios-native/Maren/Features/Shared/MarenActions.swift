@@ -35,8 +35,8 @@ enum GasMode: Sendable {
 
     var title: String {
         switch self {
-        case .sponsored: return "Gasless: you pay no BTC"
-        case .youPayBtc: return "This costs BTC gas"
+        case .sponsored: return "Gasless"
+        case .youPayBtc: return "Costs BTC gas"
         }
     }
 
@@ -45,9 +45,9 @@ enum GasMode: Sendable {
     var body: String {
         switch self {
         case .sponsored:
-            return "You sign an EIP-712 message; Maren’s relayer submits it and pays the BTC gas. Your Bitcoin stays collateral."
+            return "You sign, Maren’s relayer pays the BTC gas."
         case .youPayBtc:
-            return "Deposits send Bitcoin, and a relayer cannot carry your BTC for you. This one transaction you sign and pay for yourself. Every action after it, including borrowing and every payment, is gasless."
+            return "You pay this one; every action after is gasless."
         }
     }
 }

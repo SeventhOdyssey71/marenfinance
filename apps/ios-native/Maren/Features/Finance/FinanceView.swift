@@ -306,7 +306,7 @@ private struct EarnSection: View {
     }
 
     private var earnGasDetail: String {
-        "You pay the BTC gas here. Earn settles from your own wallet rather than through Maren’s relayer, so a deposit or withdrawal costs a little Bitcoin gas."
+        "Earn settles from your wallet, so you pay a little BTC gas."
     }
 
     private func config(for flow: Flow) -> AmountFlowConfig {
