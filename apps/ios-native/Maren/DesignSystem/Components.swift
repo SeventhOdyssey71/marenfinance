@@ -39,6 +39,42 @@ struct SectionHeader: View {
     }
 }
 
+// MARK: - AvatarPlaceholder
+//
+// A clean, designed placeholder for a profile image — the brand swoosh on the violet
+// gradient. Never a face and never a bare initial; used until a real avatar exists.
+
+struct AvatarPlaceholder: View {
+    var size: CGFloat = 38
+
+    var body: some View {
+        ZStack {
+            Circle()
+                .fill(LinearGradient(colors: [Theme.Palette.accent, Theme.Palette.accentText],
+                                     startPoint: .topLeading, endPoint: .bottomTrailing))
+            MarenGlyph()
+                .fill(Color.white)
+                .frame(width: size * 0.52, height: size * 0.52)
+        }
+        .frame(width: size, height: size)
+        .accessibilityHidden(true)
+    }
+}
+
+/// The Maren mark as a Shape: a rising swoosh/wing. Filled, so it scales crisply at any size.
+struct MarenGlyph: Shape {
+    func path(in rect: CGRect) -> Path {
+        let w = rect.width, h = rect.height
+        var p = Path()
+        p.move(to: CGPoint(x: w * 0.10, y: h * 0.76))
+        p.addQuadCurve(to: CGPoint(x: w * 0.50, y: h * 0.40),
+                       control: CGPoint(x: w * 0.24, y: h * 0.46))
+        p.addQuadCurve(to: CGPoint(x: w * 0.90, y: h * 0.26),
+                       control: CGPoint(x: w * 0.70, y: h * 0.66))
+        return p.strokedPath(StrokeStyle(lineWidth: w * 0.14, lineCap: .round, lineJoin: .round))
+    }
+}
+
 // MARK: - DottedDivider
 //
 // The very slight dotted hairline from the reference — an airy separator under the header
@@ -72,6 +108,10 @@ struct StatRow<Value: View>: View {
     let label: String
     var hint: String? = nil
     var showsDivider: Bool = true
+    /// Money figures are short and pin to their intrinsic width; a long plain value (a 0x
+    /// address, a memo) must instead be allowed to truncate, or it blows the row — and the
+    /// whole sheet — wider than the screen. Pass false for those.
+    var fixedValue: Bool = true
     @ViewBuilder var value: Value
 
     var body: some View {
@@ -94,7 +134,7 @@ struct StatRow<Value: View>: View {
                 Spacer(minLength: Theme.Space.sm)
                 value
                     .lineLimit(1)
-                    .fixedSize(horizontal: true, vertical: false)
+                    .fixedSize(horizontal: fixedValue, vertical: false)
             }
             .padding(.vertical, 12)
 

@@ -39,7 +39,7 @@ struct HomeView: View {
 
     private var header: some View {
         HStack(alignment: .center, spacing: Theme.Space.sm) {
-            avatar
+            AvatarPlaceholder(size: 38)
             VStack(alignment: .leading, spacing: 1) {
                 Text("Good morning")
                     .font(.text(12))
@@ -59,23 +59,6 @@ struct HomeView: View {
             .accessibilityLabel("Scan a payment or claim code")
         }
         .padding(.top, Theme.Space.xs)
-    }
-
-    private var avatar: some View {
-        Circle()
-            .fill(LinearGradient(colors: [Theme.Palette.accent, Theme.Palette.accentText],
-                                 startPoint: .topLeading, endPoint: .bottomTrailing))
-            .frame(width: 38, height: 38)
-            .overlay(
-                Text(initial)
-                    .font(.display(17, weight: .semibold))
-                    .foregroundStyle(.white)
-            )
-            .accessibilityHidden(true)
-    }
-
-    private var initial: String {
-        String(session.greetingName.first.map(String.init) ?? "M").uppercased()
     }
 
     // MARK: balance hero — one big number, in dollars, centered

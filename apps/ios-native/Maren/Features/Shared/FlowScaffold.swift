@@ -161,7 +161,8 @@ struct ReviewList: View {
         MCard(padding: Theme.Space.md) {
             VStack(spacing: 0) {
                 ForEach(Array(rows.enumerated()), id: \.element.id) { index, row in
-                    StatRow(label: row.label, hint: row.hint, showsDivider: index < rows.count - 1) {
+                    StatRow(label: row.label, hint: row.hint, showsDivider: index < rows.count - 1,
+                            fixedValue: !row.plain) {
                         if row.unavailable {
                             Unavailable()
                         } else if row.plain {
