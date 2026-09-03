@@ -39,39 +39,61 @@ struct SectionHeader: View {
     }
 }
 
-// MARK: - AvatarPlaceholder
+// MARK: - HugeIcon
 //
-// A clean, designed placeholder for a profile image — the brand swoosh on the violet
-// gradient. Never a face and never a bare initial; used until a real avatar exists.
+// A HugeIcons glyph, bundled as a template SVG in Assets.xcassets (hgi-<name>). Template
+// rendering means `.foregroundStyle` tints it like an SF Symbol. One clean icon set across
+// the app, replacing the SF Symbols on the primary surfaces.
 
-struct AvatarPlaceholder: View {
-    var size: CGFloat = 38
+struct HugeIcon: View {
+    let name: String
+    var size: CGFloat = 20
 
     var body: some View {
-        ZStack {
-            Circle()
-                .fill(LinearGradient(colors: [Theme.Palette.accent, Theme.Palette.accentText],
-                                     startPoint: .topLeading, endPoint: .bottomTrailing))
-            MarenGlyph()
-                .fill(Color.white)
-                .frame(width: size * 0.52, height: size * 0.52)
-        }
-        .frame(width: size, height: size)
-        .accessibilityHidden(true)
+        Image("hgi-\(name)")
+            .renderingMode(.template)
+            .resizable()
+            .scaledToFit()
+            .frame(width: size, height: size)
     }
 }
 
-/// The Maren mark as a Shape: a rising swoosh/wing. Filled, so it scales crisply at any size.
-struct MarenGlyph: Shape {
-    func path(in rect: CGRect) -> Path {
-        let w = rect.width, h = rect.height
-        var p = Path()
-        p.move(to: CGPoint(x: w * 0.10, y: h * 0.76))
-        p.addQuadCurve(to: CGPoint(x: w * 0.50, y: h * 0.40),
-                       control: CGPoint(x: w * 0.24, y: h * 0.46))
-        p.addQuadCurve(to: CGPoint(x: w * 0.90, y: h * 0.26),
-                       control: CGPoint(x: w * 0.70, y: h * 0.66))
-        return p.strokedPath(StrokeStyle(lineWidth: w * 0.14, lineCap: .round, lineJoin: .round))
+// MARK: - GeneratedAvatar
+//
+// A colourful profile image generated deterministically from a seed (the wallet address),
+// so every account gets its own distinct mix of colours — the wallet-identicon pattern. No
+// faces, no bundled images: two hues derived from a hash, blended over an angular gradient
+// with a soft light bloom for depth. Same seed always yields the same avatar.
+
+struct GeneratedAvatar: View {
+    let seed: String
+    var size: CGFloat = 38
+
+    var body: some View {
+        let palette = Self.palette(for: seed)
+        ZStack {
+            AngularGradient(colors: palette.ring, center: .center, angle: .degrees(palette.angle))
+            RadialGradient(colors: [.white.opacity(0.45), .clear],
+                           center: .topLeading, startRadius: 0, endRadius: size)
+            RadialGradient(colors: [palette.deep.opacity(0.55), .clear],
+                           center: .bottomTrailing, startRadius: 0, endRadius: size * 0.9)
+        }
+        .frame(width: size, height: size)
+        .clipShape(Circle())
+        .accessibilityHidden(true)
+    }
+
+    /// Deterministic two-hue palette from a djb2 hash of the seed — full hue range, so
+    /// accounts read as visibly different (violet, teal, coral, lime…), never washed out.
+    private static func palette(for seed: String) -> (ring: [Color], deep: Color, angle: Double) {
+        var hash: UInt64 = 5381
+        for byte in seed.lowercased().utf8 { hash = (hash &* 33) ^ UInt64(byte) }
+        let h1 = Double(hash % 360) / 360
+        let h2 = Double((hash / 7) % 360) / 360
+        let angle = Double((hash / 13) % 360)
+        let a = Color(hue: h1, saturation: 0.72, brightness: 0.92)
+        let b = Color(hue: h2, saturation: 0.78, brightness: 0.80)
+        return (ring: [a, b, a], deep: b, angle: angle)
     }
 }
 

@@ -39,7 +39,7 @@ struct HomeView: View {
 
     private var header: some View {
         HStack(alignment: .center, spacing: Theme.Space.sm) {
-            AvatarPlaceholder(size: 38)
+            GeneratedAvatar(seed: session.address ?? session.greetingName, size: 38)
             VStack(alignment: .leading, spacing: 1) {
                 Text("Good morning")
                     .font(.text(12))
@@ -51,8 +51,7 @@ struct HomeView: View {
             }
             Spacer()
             Button { destination = .scan } label: {
-                Image(systemName: "qrcode.viewfinder")
-                    .font(.system(size: 20, weight: .regular))
+                HugeIcon(name: "scan", size: 22)
                     .foregroundStyle(Theme.Palette.ink)
                     .frame(width: 44, height: 44)
             }
@@ -80,8 +79,8 @@ struct HomeView: View {
 
     private var actionPills: some View {
         HStack(spacing: Theme.Space.sm) {
-            PillButton(title: "Send", icon: "arrow.up.right", variant: .primary) { destination = .send }
-            PillButton(title: "Receive", icon: "arrow.down.left", variant: .quiet) { destination = .receive }
+            PillButton(title: "Send", hugeIcon: "send", variant: .primary) { destination = .send }
+            PillButton(title: "Receive", hugeIcon: "receive", variant: .quiet) { destination = .receive }
         }
     }
 

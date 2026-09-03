@@ -12,6 +12,8 @@ struct PillButton: View {
 
     let title: String
     var icon: String? = nil
+    /// A bundled HugeIcons name (hgi-<name>), taking precedence over the SF `icon`.
+    var hugeIcon: String? = nil
     var variant: Variant = .quiet
     var fullWidth: Bool = true
     let action: () -> Void
@@ -19,7 +21,9 @@ struct PillButton: View {
     var body: some View {
         Button(action: action) {
             HStack(spacing: 8) {
-                if let icon {
+                if let hugeIcon {
+                    HugeIcon(name: hugeIcon, size: 18)
+                } else if let icon {
                     Image(systemName: icon)
                         .font(.system(size: 15, weight: .semibold))
                 }
@@ -111,8 +115,7 @@ struct ActionTile: View {
     var body: some View {
         Button(action: action) {
             VStack(spacing: 8) {
-                Image(systemName: icon)
-                    .font(.system(size: 20, weight: .regular))
+                HugeIcon(name: icon, size: 24)
                     .foregroundStyle(emphasized ? Theme.Palette.accent : Theme.Palette.ink)
                     .frame(height: 26)
                 Text(title)

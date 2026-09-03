@@ -108,12 +108,12 @@ private struct VaultSection: View {
     private var actionGrid: some View {
         VStack(spacing: Theme.Space.sm) {
             HStack(spacing: Theme.Space.sm) {
-                ActionTile(title: "Deposit", icon: "bitcoinsign") { flow = .deposit }
-                ActionTile(title: "Borrow", icon: "banknote", emphasized: true) { flow = .borrow }
+                ActionTile(title: "Deposit", icon: "deposit") { flow = .deposit }
+                ActionTile(title: "Borrow", icon: "borrow", emphasized: true) { flow = .borrow }
             }
             HStack(spacing: Theme.Space.sm) {
-                ActionTile(title: "Repay", icon: "arrow.counterclockwise") { flow = .repay }
-                ActionTile(title: "Withdraw", icon: "arrow.up.bitcoinsign") { flow = .withdraw }
+                ActionTile(title: "Repay", icon: "repay") { flow = .repay }
+                ActionTile(title: "Withdraw", icon: "withdraw") { flow = .withdraw }
             }
         }
         .sheet(item: $flow) { flow in

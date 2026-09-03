@@ -15,10 +15,10 @@ struct GlassTabBar: View {
     @Namespace private var indicator
 
     private let items: [(tab: AppTab, label: String, icon: String)] = [
-        (.home, "Home", "house.fill"),
-        (.finance, "Finance", "chart.pie.fill"),
-        (.activity, "Activity", "clock.arrow.circlepath"),
-        (.profile, "Profile", "person.fill"),
+        (.home, "Home", "home"),
+        (.finance, "Finance", "finance"),
+        (.activity, "Activity", "activity"),
+        (.profile, "Profile", "profile"),
     ]
 
     var body: some View {
@@ -30,10 +30,9 @@ struct GlassTabBar: View {
                     else { withAnimation(.spring(response: 0.32, dampingFraction: 0.82)) { selection = item.tab } }
                 } label: {
                     VStack(spacing: 3) {
-                        Image(systemName: item.icon)
-                            .font(.system(size: 19, weight: .semibold))
+                        HugeIcon(name: item.icon, size: 22)
                         Text(item.label)
-                            .font(.system(size: 11, weight: .medium))
+                            .font(.text(11, weight: .medium))
                     }
                     .foregroundStyle(selected ? Theme.Palette.accentText : Theme.Palette.muted)
                     .frame(maxWidth: .infinity, minHeight: 50)
