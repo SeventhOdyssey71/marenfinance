@@ -15,19 +15,19 @@ import SwiftUI
 enum Theme {
     enum Palette {
         // Base surfaces
-        static let canvas = Color(hex: 0xF2F2F2)      // paper-cream page
-        static let card = Color(hex: 0xFFFFFF)        // soft-white card
-        static let inset = Color(hex: 0xECECEF)        // quiet grey well — tone, not a border
+        static let canvas = Color(hex: 0xFFFFFF)      // pure white page
+        static let card = Color(hex: 0xFFFFFF)        // white card — separated by shadow, not tone
+        static let inset = Color(hex: 0xF1F0F6)        // quiet well — a whisper of violet-grey, chosen not default
 
         // Ink / text
         static let ink = Color(hex: 0x101013)         // primary text
-        static let muted = Color(hex: 0x6E6E6E)        // secondary (AA on paper + card)
+        static let muted = Color(hex: 0x6E6E6E)        // secondary (AA on white)
         static let tertiary = Color(hex: 0x9A9AA2)     // tertiary / greyed decimals
 
-        // Brand — Riot Pink
-        static let accent = Color(hex: 0xFA00FF)       // vivid pink: fills, dots, the CTA glow
-        static let accentText = Color(hex: 0xC400C9)   // text-safe deep magenta for small pink text
-        static let accentWash = Color(hex: 0xFFE3FF)   // faint pink wash for chips/haloes
+        // Brand — Maren violet, taken from the logo mark (a violet gradient swoosh).
+        static let accent = Color(hex: 0x5B3DF5)       // primary violet: fills, dots, the CTA
+        static let accentText = Color(hex: 0x4A2BE0)   // text-safe deep violet for small brand text on white
+        static let accentWash = Color(hex: 0xEDEAFF)   // faint violet wash for chips/haloes
 
         // Accent family (used sparingly, for meaning or category)
         static let lime = Color(hex: 0xADFF02)
@@ -65,19 +65,13 @@ enum Theme {
 // MARK: - Soft shadow (a whisper of drop, never an outline)
 
 extension View {
-    /// The soft-white card shadow: a tight contact shadow plus a soft ambient drop.
+    /// The card shadow: a tight contact shadow plus a soft ambient drop. On a pure-white
+    /// page the shadow is the ONLY thing separating a white card from the canvas, so it
+    /// carries a touch more weight than it would over tone.
     func softCardShadow() -> some View {
         self
-            .shadow(color: Color(hex: 0x101013).opacity(0.04), radius: 1, x: 0, y: 1)
-            .shadow(color: Color(hex: 0x101013).opacity(0.10), radius: 20, x: 0, y: 14)
-    }
-
-    /// The Riot-Pink glow that lives entirely behind the primary pill, so the pill
-    /// face stays high-contrast and the bloom never intercepts touches.
-    func pinkGlow() -> some View {
-        self
-            .shadow(color: Theme.Palette.accent.opacity(0.42), radius: 16, x: 0, y: 0)
-            .shadow(color: Theme.Palette.accent.opacity(0.40), radius: 20, x: 0, y: 6)
+            .shadow(color: Color(hex: 0x101013).opacity(0.05), radius: 2, x: 0, y: 1)
+            .shadow(color: Color(hex: 0x101013).opacity(0.09), radius: 24, x: 0, y: 12)
     }
 }
 

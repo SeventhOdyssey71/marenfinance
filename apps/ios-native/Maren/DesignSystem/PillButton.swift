@@ -50,33 +50,17 @@ private struct PillButtonStyle: ButtonStyle {
         configuration.label
             .background(background)
             .clipShape(Capsule())
-            .modifier(GlowModifier(variant: variant))
             .scaleEffect((configuration.isPressed && !reduceMotion) ? 0.97 : 1)
             .animation(reduceMotion ? nil : .easeOut(duration: 0.2), value: configuration.isPressed)
     }
 
+    // The primary CTA is a clean, solid violet pill — no glow, no ring. High contrast on
+    // white, and it never blooms behind a disabled state.
     @ViewBuilder private var background: some View {
         switch variant {
         case .quiet: Theme.Palette.inset
         case .dark: Theme.Palette.ink
-        case .primary: Theme.Palette.ink
-        }
-    }
-}
-
-/// The pink bloom + crisp ring, applied only to the primary variant.
-private struct GlowModifier: ViewModifier {
-    let variant: PillButton.Variant
-
-    func body(content: Content) -> some View {
-        if variant == .primary {
-            content
-                .overlay(
-                    Capsule().strokeBorder(Theme.Palette.accent.opacity(0.85), lineWidth: 1.5)
-                )
-                .pinkGlow()
-        } else {
-            content
+        case .primary: Theme.Palette.accent
         }
     }
 }

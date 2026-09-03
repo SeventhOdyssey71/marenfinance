@@ -13,37 +13,32 @@ struct RootView: View {
     @State private var launchDestination: PayDestination?
     private let launchScreen = ProcessInfo.processInfo.environment["MAREN_SCREEN"]
 
-    init() {
-        // The tab bar renders on a soft, near-canvas surface with no hard top line.
-        let appearance = UITabBarAppearance()
-        appearance.configureWithOpaqueBackground()
-        appearance.backgroundColor = UIColor(Theme.Palette.card)
-        appearance.shadowColor = UIColor(Theme.Palette.ink.opacity(0.06))
-        UITabBar.appearance().standardAppearance = appearance
-        UITabBar.appearance().scrollEdgeAppearance = appearance
-    }
-
     var body: some View {
         @Bindable var router = router
         return UnlockGate {
-            TabView(selection: $router.tab) {
-                HomeView()
-                    .tabItem { Label("Home", systemImage: "house.fill") }
-                    .tag(AppTab.home)
-                FinanceView()
-                    .tabItem { Label("Finance", systemImage: "chart.pie.fill") }
-                    .tag(AppTab.finance)
-                ActivityView()
-                    .tabItem { Label("Activity", systemImage: "clock.arrow.circlepath") }
-                    .tag(AppTab.activity)
-                ProfileView()
-                    .tabItem { Label("Profile", systemImage: "person.fill") }
-                    .tag(AppTab.profile)
+            ZStack(alignment: .bottom) {
+                // All four tabs stay in the hierarchy so switching preserves scroll and
+                // model state; only the selected one is visible and receives touches.
+                ZStack {
+                    tab(.home) { HomeView() }
+                    tab(.finance) { FinanceView() }
+                    tab(.activity) { ActivityView() }
+                    tab(.profile) { ProfileView() }
+                }
+                GlassTabBar(selection: $router.tab)
             }
+            .background(Theme.Palette.canvas)
             .sheet(item: $launchDestination) { $0.view }
         }
         .environment(router)
         .onAppear(perform: applyLaunchScreen)
+    }
+
+    /// One tab layer: visible and interactive only when selected.
+    @ViewBuilder private func tab<V: View>(_ which: AppTab, @ViewBuilder _ content: () -> V) -> some View {
+        content()
+            .opacity(router.tab == which ? 1 : 0)
+            .allowsHitTesting(router.tab == which)
     }
 
     private func applyLaunchScreen() {

@@ -1,6 +1,10 @@
 import SwiftUI
 
 // MARK: - Home
+//
+// A glanceable summary, kept deliberately simple: what you can spend (your MUSD balance,
+// shown in dollars), the health of your Bitcoin vault in one plain sentence, and the pay
+// shortcuts. The dense position table lives in the Finance tab — Home never repeats it.
 
 struct HomeView: View {
     @Environment(\.marenClient) private var client
@@ -13,89 +17,82 @@ struct HomeView: View {
         ScrollView {
             VStack(alignment: .leading, spacing: Theme.Space.lg) {
                 header
-                positionCard
-                priceNote
-                actionRow
+                balanceCard
+                vaultCard
                 payRow
                 Spacer(minLength: Theme.Space.md)
             }
             .padding(.horizontal, Theme.Space.md)
             .padding(.top, Theme.Space.sm)
-            .padding(.bottom, Theme.Space.xl)
+            .padding(.bottom, 120)   // clear the floating glass tab bar
         }
         .background(Theme.Palette.canvas)
         .task { await model.load(using: client) }
         .sheet(item: $destination) { $0.view }
     }
 
-    // MARK: wordmark + account line
+    // MARK: header — the logo mark, scan, demo badge
 
     private var header: some View {
-        VStack(alignment: .leading, spacing: 2) {
-            HStack(alignment: .center) {
-                Text("MAREN")
-                    .font(.display(46))
-                    .tracking(-0.5)
+        HStack(alignment: .center) {
+            Image("MarenMark")
+                .resizable()
+                .scaledToFit()
+                .frame(height: 30)
+                .accessibilityLabel("Maren")
+            Spacer()
+            Button { destination = .scan } label: {
+                Image(systemName: "qrcode.viewfinder")
+                    .font(.system(size: 20, weight: .semibold))
                     .foregroundStyle(Theme.Palette.ink)
-                Spacer()
-                Button { destination = .scan } label: {
-                    Image(systemName: "qrcode.viewfinder")
-                        .font(.system(size: 20, weight: .semibold))
-                        .foregroundStyle(Theme.Palette.ink)
-                        .frame(width: 44, height: 44)
-                }
-                .accessibilityLabel("Scan a payment or claim code")
-                if !actions.canSettle { DemoBadge() }
+                    .frame(width: 44, height: 44)
             }
-            Text(accountLine)
-                .font(.figure(15, weight: .medium))
-                .foregroundStyle(Theme.Palette.muted)
+            .accessibilityLabel("Scan a payment or claim code")
+            if !actions.canSettle { DemoBadge() }
         }
         .padding(.top, Theme.Space.xs)
     }
 
-    private var accountLine: String {
-        guard let account = model.account else { return "Loading account…" }
-        return "\(account.handle) · \(account.address)"
-    }
+    // MARK: balance hero — the one big number, in dollars
 
-    // MARK: position summary
-
-    private var positionCard: some View {
+    private var balanceCard: some View {
         MCard {
             VStack(alignment: .leading, spacing: Theme.Space.md) {
-                HStack(alignment: .top) {
-                    VStack(alignment: .leading, spacing: 4) {
-                        Text("Your position")
-                            .labelStyle()
-                        safetyText
-                    }
-                    Spacer(minLength: Theme.Space.md)
-                    if let position = model.position {
-                        HealthChip(status: position.health)
-                    }
+                Text("Balance").labelStyle()
+                if let musd = model.balances?.musd {
+                    MoneyText(text: MoneyFormat.usd(musd), size: 46, weight: .bold)
+                } else {
+                    Unavailable(label: "Balance unavailable")
                 }
-
-                collateralValueLine
-
-                Divider().overlay(Theme.Palette.ink.opacity(0.07))
-
-                VStack(spacing: 0) {
-                    StatRow(label: "Bitcoin locked") {
-                        rowValue(model.position.map { MoneyFormat.btc($0.bitcoinLocked) })
-                    }
-                    StatRow(label: "Borrowed", hint: "1.00% APR") {
-                        rowValue(model.position.map { MoneyFormat.musd($0.borrowed) })
-                    }
-                    StatRow(label: "Left to borrow", showsDivider: false) {
-                        rowValue(model.position.map { MoneyFormat.musd($0.leftToBorrow) })
-                    }
+                Text("In MUSD · Mezo")
+                    .font(.system(size: 13))
+                    .foregroundStyle(Theme.Palette.tertiary)
+                HStack(spacing: Theme.Space.sm) {
+                    PillButton(title: "Send", icon: "arrow.up.right", variant: .primary) { destination = .send }
+                    PillButton(title: "Receive", icon: "arrow.down.left", variant: .quiet) { destination = .receive }
                 }
+                .padding(.top, 2)
             }
         }
     }
 
-    @ViewBuilder private var safetyText: some View {
+    // MARK: vault summary — one honest sentence, details live in Finance
+
+    private var vaultCard: some View {
+        MCard {
+            VStack(alignment: .leading, spacing: Theme.Space.md) {
+                HStack {
+                    Text("Your Bitcoin vault").labelStyle()
+                    Spacer(minLength: Theme.Space.md)
+                    if let position = model.position { HealthChip(status: position.health) }
+                }
+                vaultLine
+                PillButton(title: "Manage vault", variant: .quiet) { router.goToVault() }
+            }
+        }
+    }
+
+    @ViewBuilder private var vaultLine: some View {
         if let line = model.safetyLine {
             Text(line)
                 .font(.system(size: 20, weight: .semibold))
@@ -113,54 +110,7 @@ struct HomeView: View {
         }
     }
 
-    /// When the oracle isn't live, the same visible banner Finance uses — so the *why*
-    /// behind the unavailable collateral value is reachable on touch, not lost to a
-    /// desktop-only tooltip.
-    @ViewBuilder private var priceNote: some View {
-        if case .unavailable = model.priceFeed {
-            PriceNote(feed: model.priceFeed)
-        }
-    }
-
-    /// The USD value of locked BTC. When the price feed is unavailable this is an
-    /// explicit unavailable state — the honest gap, never a fabricated dollar figure.
-    @ViewBuilder private var collateralValueLine: some View {
-        HStack(alignment: .firstTextBaseline) {
-            Text("Collateral value")
-                .font(.system(size: 15))
-                .foregroundStyle(Theme.Palette.muted)
-            Spacer()
-            if let usd = model.collateralUsd {
-                MoneyText(text: MoneyFormat.usd(usd), size: 17, weight: .semibold)
-            } else if case .unavailable = model.priceFeed {
-                Unavailable(label: "Price unavailable")
-            } else {
-                Unavailable()
-            }
-        }
-    }
-
-    @ViewBuilder private func rowValue(_ text: String?) -> some View {
-        if let text {
-            MoneyText(text: text, size: 17, weight: .semibold)
-        } else {
-            Unavailable()
-        }
-    }
-
-    // MARK: action row
-
-    private var actionRow: some View {
-        VStack(alignment: .leading, spacing: Theme.Space.sm) {
-            SectionHeader(title: "Actions")
-            HStack(spacing: Theme.Space.sm) {
-                ActionTile(title: "Send", icon: "arrow.up.right") { destination = .send }
-                ActionTile(title: "Receive", icon: "arrow.down.left") { destination = .receive }
-                ActionTile(title: "Borrow", icon: "banknote", emphasized: true) { router.goToVault() }
-                ActionTile(title: "Earn", icon: "leaf.fill") { router.goToEarn() }
-            }
-        }
-    }
+    // MARK: pay shortcuts
 
     private var payRow: some View {
         VStack(alignment: .leading, spacing: Theme.Space.sm) {
@@ -175,14 +125,8 @@ struct HomeView: View {
     }
 }
 
-#Preview("Home — price unavailable") {
+#Preview("Home") {
     HomeView()
         .environment(\.marenClient, StubMarenClient())
-        .environment(AppRouter())
-}
-
-#Preview("Home — price wired") {
-    HomeView()
-        .environment(\.marenClient, StubMarenClient(priceWired: true))
         .environment(AppRouter())
 }

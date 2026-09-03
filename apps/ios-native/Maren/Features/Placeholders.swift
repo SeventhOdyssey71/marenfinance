@@ -27,7 +27,7 @@ struct Screen<Content: View>: View {
             }
             .padding(.horizontal, Theme.Space.md)
             .padding(.top, Theme.Space.sm)
-            .padding(.bottom, Theme.Space.xl)
+            .padding(.bottom, 120)   // clear the floating glass tab bar
         }
         .background(Theme.Palette.canvas)
     }
