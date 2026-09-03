@@ -102,6 +102,16 @@ struct MezoRPC: Sendable {
         return Self.word(out, 0)
     }
 
+    /// MUSD `allowance(owner, spender)`, in wei — how much MUSD `spender` may pull via
+    /// transferFrom. Read before a send so a first payment approves MarenPay once.
+    func musdAllowance(owner: String, spender: String) async throws -> BigUInt {
+        let enc = ABIFunctionEncoder("allowance")
+        try enc.encode(EthereumAddress(owner))
+        try enc.encode(EthereumAddress(spender))
+        let out = try await call(to: MusdAddresses.of(chain.network).musd, data: try enc.encoded())
+        return Self.word(out, 0)
+    }
+
     /// The BTC/USD price and its age, from the Mezo oracle PRECOMPILE. `latestRoundData()`
     /// carries `updatedAt`, which is what a staleness read needs — `PriceFeed.fetchPrice()`
     /// only returns a number or reverts and can never say HOW OLD a price is. The answer is

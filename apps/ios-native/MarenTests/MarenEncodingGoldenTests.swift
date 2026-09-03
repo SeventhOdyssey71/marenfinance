@@ -196,4 +196,13 @@ final class MarenEncodingGoldenTests: XCTestCase {
             "0000000000000000000000000000000000000000000000000000000000000000"
         XCTAssertEqual(data.web3.hexString, expected, "deposit calldata must match cast")
     }
+
+    // cast calldata "approve(address,uint256)" 0x54196397D6f01b48739dB3957257cB33cD341885 1000000000000000000
+    func testApproveCalldataMatchesCast() throws {
+        let data = try MarenEncoding.approveCalldata(spender: recipient, amount: BigUInt(10).power(18))
+        let expected = "0x095ea7b3" +
+            "00000000000000000000000054196397d6f01b48739db3957257cb33cd341885" +
+            "0000000000000000000000000000000000000000000000000de0b6b3a7640000"
+        XCTAssertEqual(data.web3.hexString, expected, "approve calldata must match cast")
+    }
 }

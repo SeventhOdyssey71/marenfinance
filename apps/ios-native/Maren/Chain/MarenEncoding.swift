@@ -58,6 +58,16 @@ enum MarenEncoding {
         return try enc.encoded()
     }
 
+    /// Calldata for `IERC20.approve(spender, amount)`. `MarenPay.pay` moves MUSD with
+    /// transferFrom, so a first send needs MarenPay approved; a one-time max approval means
+    /// every send after it is fully gasless.
+    static func approveCalldata(spender: String, amount: BigUInt) throws -> Data {
+        let enc = ABIFunctionEncoder("approve")
+        try enc.encode(EthereumAddress(spender))
+        try enc.encode(amount)
+        return try enc.encoded()
+    }
+
     // ---------------------------------------------------------------------------
     // MarenPay.claimLink digest
     // ---------------------------------------------------------------------------
