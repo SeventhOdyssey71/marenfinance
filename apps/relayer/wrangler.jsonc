@@ -1,0 +1,35 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "maren-relayer",
+  "main": "worker/index.ts",
+  "compatibility_date": "2025-06-01",
+  // node:crypto (logger/keystore) + viem run under Node compat on Workers.
+  "compatibility_flags": ["nodejs_compat"],
+
+  // The relayer runs as ONE Durable Object — a single authoritative instance for
+  // the nonce sequence and the daily budget. SQLite storage backs both the DO's
+  // state and the DurableStore counters, and its alarm drives the settlement sweep.
+  "durable_objects": {
+    "bindings": [{ "name": "RELAYER", "class_name": "RelayerDO" }]
+  },
+  "migrations": [{ "tag": "v1", "new_sqlite_classes": ["RelayerDO"] }],
+
+  // Backstop for the settlement/refund sweep, in case an idle instance has no
+  // alarm armed. Every 2 minutes; the DO's own alarm is the primary timer.
+  "triggers": { "crons": ["*/2 * * * *"] },
+
+  "observability": { "enabled": true },
+
+  // Non-secret config. RELAYER_PRIVATE_KEY is NOT here — set it once with
+  //   wrangler secret put RELAYER_PRIVATE_KEY
+  // Values mirror the verified testnet config in .env.relayer.
+  "vars": {
+    "RELAYER_NETWORK": "testnet",
+    "RELAYER_RPC_URLS": "https://rpc.test.mezo.org,https://mezo-testnet.drpc.org",
+    "RELAYER_FORWARDER_ADDRESS": "0x22cC1Adfb0C91D9359746dE3F7E8cB7F2B8eA98C",
+    "RELAYER_ALLOWED_TARGETS": "marenPay:0xe475Ff919D54E055809f516E3bed8a5c7a101836,marenRegistry:0x9e123Cdd0CD524812CF9F552d3FAB13d8143b77E,marenVault:0x46252B00AB59384518d9dB6D1f210ffF1221645b",
+    "RELAYER_MAX_DAILY_SPONSORED_BTC": "0.01",
+    "RELAYER_FREE_ACTIONS_PER_ADDRESS": "25",
+    "RELAYER_IP_SALT": "maren-testnet-relayer-ipsalt-v1"
+  }
+}

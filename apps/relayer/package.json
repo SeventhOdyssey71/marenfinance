@@ -12,6 +12,9 @@
   "scripts": {
     "dev": "tsx watch src/server.ts",
     "start": "node --import tsx src/server.ts",
+    "cf:dev": "wrangler dev",
+    "cf:deploy": "wrangler deploy",
+    "cf:typecheck": "tsc --noEmit -p worker/tsconfig.json",
     "build": "tsc --noEmit",
     "typecheck": "tsc --noEmit",
     "lint": "echo 'no linter configured yet' && exit 0",
@@ -29,8 +32,11 @@
     "zod": "^3.24.1"
   },
   "devDependencies": {
+    "@cloudflare/containers": "^0.3.7",
+    "@cloudflare/workers-types": "^5.20260903.1",
     "@types/node": "^22.10.2",
     "typescript": "^5.7.2",
-    "vitest": "^2.1.8"
+    "vitest": "^2.1.8",
+    "wrangler": "^4.129.0"
   }
 }

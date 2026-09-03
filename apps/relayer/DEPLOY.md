@@ -79,6 +79,56 @@ over-reserved. Do not set `auto_stop_machines`, do not `fly scale count 2`, and
 do not switch the deploy strategy to `bluegreen` or `canary` (both run two
 machines at once).
 
+### Option C: Cloudflare Workers (Durable Object)
+
+This is the one serverless-shaped target that is **not** refused, and the reason
+is the whole of why Vercel was. The two mechanisms the standalone server owns —
+the stuck-transaction sweep (settlement reconciliation + deferred-refund drain)
+and a single authoritative nonce sequence — are given real homes here instead of
+being dropped:
+
+- The relayer runs inside **one Durable Object**, addressed by a fixed name, so
+  every request and the sweep hit the same instance. That is the single-instance
+  guarantee `fly.toml`'s "one machine" gives, enforced by the platform rather
+  than by remembering not to scale. `VERCEL` is never set, so the multi-instance
+  refusal in `create.ts` correctly stays off.
+- The sweep runs on the DO's **self-rescheduling alarm**, backed by a **Cron
+  Trigger** every two minutes. The alarm is the process that outlives a request;
+  the cron revives it if an idle instance ever has none armed. This is exactly
+  the "durable trigger" `create.ts` said was missing on serverless.
+- Counters (the daily BTC cap, the free-action allowance) live in **Durable
+  Object storage** (`worker/durable-store.ts`), so a cold start cannot reset an
+  attacker's quota the way the in-memory store would. `/healthz` reports
+  `store: "durable"`.
+
+Files: `wrangler.jsonc`, `worker/index.ts` (front door → single DO),
+`worker/relayer-do.ts` (boots `createRelayer` with `startWatcher: false`), and
+`worker/durable-store.ts`. The relayer's own code is unchanged.
+
+```bash
+cd apps/relayer
+wrangler login                              # interactive; a browser opens
+# Containers/DO need the Workers Paid plan ($5/mo). Enable it in the dashboard.
+wrangler secret put RELAYER_PRIVATE_KEY     # paste the testnet hot key
+pnpm cf:deploy                              # wrangler deploy
+```
+
+Local dev needs no account: `pnpm cf:dev` runs the whole worker in miniflare,
+reading the key from a gitignored `.dev.vars` (`RELAYER_PRIVATE_KEY=0x…`).
+
+| Claim                                                                                | Verified?                                                                                             |
+| ------------------------------------------------------------------------------------ | ----------------------------------------------------------------------------------------------------- |
+| The worker bundles and boots (`createRelayer`, pino, viem, the DO, `DurableStore`)   | Yes, `pnpm cf:dev` in miniflare                                                                        |
+| It answers `/health` + `/healthz` with `accepting: true`, `store: "durable"`         | Yes, locally                                                                                           |
+| It reads the signer's real balance and nonce from Mezo testnet through the worker    | Yes — `/health` returned the on-chain balance and nonce (viem `http()` transport works on Workers)    |
+| The 296 unit tests, `worker/tsconfig` typecheck, and `src` build all pass            | Yes                                                                                                   |
+| The alarm/cron sweep fires on Cloudflare's schedule                                  | **No.** Verified wired; not observed on a real deployment (crons don't auto-fire in local dev)         |
+| An actual `wrangler deploy` to Cloudflare                                            | **No.** Needs `wrangler login` (interactive) and the Workers Paid plan — both owner-only              |
+
+For real funds, prefer a keystore over `RELAYER_PRIVATE_KEY` here too — but on
+Workers the key is a `wrangler secret`, not a file, so Step 2's keystore-file
+mode does not apply; the secret is the whole of the key handling.
+
 ---
 
 ## Step 2: the signing key

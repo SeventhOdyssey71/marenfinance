@@ -1,0 +1,11 @@
+{
+  "extends": "../tsconfig.json",
+  "compilerOptions": {
+    // The worker imports from ../src (which uses node:crypto / node:fs types) AND
+    // the Workers runtime (DurableObject, DurableObjectStorage, the
+    // `cloudflare:workers` module), so both type sets are needed. skipLibCheck in
+    // the base config keeps the two global libs from clashing.
+    "types": ["node", "@cloudflare/workers-types"]
+  },
+  "include": ["**/*.ts"]
+}

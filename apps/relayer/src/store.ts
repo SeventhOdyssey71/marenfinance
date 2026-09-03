@@ -16,7 +16,7 @@ import { unavailable } from './errors.js';
  * would reset an attacker's quota on every cold start.
  */
 export interface RelayStore {
-  readonly kind: 'memory' | 'redis';
+  readonly kind: 'memory' | 'redis' | 'durable';
   /** Atomically add `amount` and return the new value. Sets a TTL on creation. */
   incrBy(key: string, amount: bigint, ttlSeconds: number): Promise<bigint>;
   get(key: string): Promise<bigint>;

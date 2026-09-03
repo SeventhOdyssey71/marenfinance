@@ -98,3 +98,8 @@ _grant/
 .harness/
 scratch/
 Screenshot*.png
+
+# Cloudflare Wrangler local secrets (never commit)
+.dev.vars
+**/.dev.vars
+.wrangler/
