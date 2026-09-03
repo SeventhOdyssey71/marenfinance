@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<!--
+  Keychain access group for the signing key. Reading a biometric-protected Keychain item
+  (SecAccessControl) requires this entitlement; without it the Security framework rejects
+  the read with errSecMissingEntitlement (-34018). $(AppIdentifierPrefix) resolves to the
+  team prefix on a signed device build and is empty on the ad-hoc simulator build — both
+  yield a valid group the default Keychain queries in Keystore.swift can use.
+-->
+<plist version="1.0">
+<dict>
+    <key>keychain-access-groups</key>
+    <array>
+        <string>$(AppIdentifierPrefix)finance.maren.swift</string>
+    </array>
+</dict>
+</plist>

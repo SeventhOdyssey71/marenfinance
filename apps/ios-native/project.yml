@@ -46,6 +46,7 @@ targets:
       - path: Maren
         excludes:
           - Info.plist
+          - Maren.entitlements
     dependencies:
       - package: web3.swift
         product: web3.swift
@@ -58,6 +59,13 @@ targets:
         # merges the INFOPLIST_KEY_* Apple keys below into it at build time.
         INFOPLIST_FILE: Maren/Info.plist
         GENERATE_INFOPLIST_FILE: "YES"
+        # The biometric Keychain item (Keystore.swift) can only be read with a keychain-access
+        # entitlement; without it the read fails with errSecMissingEntitlement (-34018). Ad-hoc
+        # signing ("-") applies the entitlement on the simulator with no team, and a real device
+        # build supplies its own team prefix.
+        CODE_SIGN_ENTITLEMENTS: Maren/Maren.entitlements
+        CODE_SIGNING_ALLOWED: "YES"
+        CODE_SIGN_IDENTITY: "-"
         INFOPLIST_KEY_UILaunchScreen_Generation: "YES"
         INFOPLIST_KEY_CFBundleDisplayName: Maren
         INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents: "YES"
