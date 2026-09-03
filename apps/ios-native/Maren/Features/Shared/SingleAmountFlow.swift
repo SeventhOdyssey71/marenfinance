@@ -94,6 +94,7 @@ struct SingleAmountFlow: View {
 
     private func availableCard(_ available: Decimal, _ label: String) -> some View {
         HStack(spacing: Theme.Space.sm) {
+            TokenCoin(isBtc: !isMusd, size: 34)
             VStack(alignment: .leading, spacing: 1) {
                 Text(label).font(.text(13)).foregroundStyle(Theme.Palette.tertiary)
                 Text(figure(available) + " " + unitLabel)

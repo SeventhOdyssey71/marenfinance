@@ -14,6 +14,8 @@ struct HomeView: View {
     @State private var model = HomeModel()
     @State private var fullFlow: PayDestination?
     @State private var overlayFlow: PayDestination?
+    @State private var refreshing = false
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     /// Send and the pay flows open full screen; Receive opens as a bottom-sheet overlay.
     private func present(_ d: PayDestination) {
@@ -133,6 +135,25 @@ struct HomeView: View {
                 Text("Transaction history")
                     .font(.sectionDisplay())
                     .foregroundStyle(Theme.Palette.ink)
+                Button {
+                    guard !refreshing else { return }
+                    refreshing = true
+                    Task {
+                        await model.load(using: client, address: session.address)
+                        refreshing = false
+                    }
+                } label: {
+                    Image(systemName: "arrow.clockwise")
+                        .font(.system(size: 11, weight: .semibold))
+                        .foregroundStyle(Theme.Palette.tertiary)
+                        .rotationEffect(.degrees(refreshing ? 360 : 0))
+                        .animation(refreshing && !reduceMotion
+                                   ? .linear(duration: 0.8).repeatForever(autoreverses: false) : .snappy,
+                                   value: refreshing)
+                        .frame(width: 28, height: 28)
+                }
+                .buttonStyle(.plain)
+                .accessibilityLabel("Refresh")
                 Spacer()
                 Button { router.tab = .activity } label: {
                     Text("View all")
