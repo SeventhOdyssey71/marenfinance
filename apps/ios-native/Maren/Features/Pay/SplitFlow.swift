@@ -123,7 +123,7 @@ struct SplitFlow: View {
 
     private func submit() async {
         stage = .submitting
-        let intent = Intent(kind: .split(recipients: validLegs.map(\.recipient)), amount: total, unit: .musd)
+        let intent = Intent(kind: .split(recipients: validLegs.map(\.recipient), amounts: validLegs.map(\.amount)), amount: total, unit: .musd)
         outcome = await actions.submit(intent)
         stage = .done
     }

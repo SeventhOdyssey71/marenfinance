@@ -106,6 +106,16 @@ enum MarenEncoding {
         return try enc.encoded()
     }
 
+    /// Calldata for `MarenPay.split(address[] recipients, uint256[] amounts, string memo)` —
+    /// one payment to each recipient in a single relayed call. Needs a MUSD approval to MarenPay.
+    static func splitCalldata(recipients: [String], amounts: [BigUInt], memo: String) throws -> Data {
+        let enc = ABIFunctionEncoder("split")
+        try enc.encode(recipients.map { EthereumAddress($0) })
+        try enc.encode(amounts)
+        try enc.encode(memo)
+        return try enc.encoded()
+    }
+
     // ---------------------------------------------------------------------------
     // MarenPay.claimLink digest
     // ---------------------------------------------------------------------------

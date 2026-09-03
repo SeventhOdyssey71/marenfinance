@@ -186,6 +186,25 @@ struct MezoActions {
         }
     }
 
+    /// A relayed split payment — one MUSD transfer to each recipient. Like send, it needs a
+    /// one-time MarenPay approval (transferFrom), then every split is gasless.
+    func split(loadedAddress: String, recipients: [String], amountsWei: [BigUInt], totalWei: BigUInt, memo: String) async -> ActionResult {
+        let key: Data
+        switch await accessKey(loadedAddress) {
+        case .ok(let k): key = k
+        case .fail(let reason): return .declined(reason: reason)
+        }
+        let maren = MarenAddresses.of(chain.network)
+        if let approveDecline = await ensureMusdAllowance(privateKey: key, loadedAddress: loadedAddress,
+                                                          spender: maren.marenPay, needed: totalWei) {
+            return .declined(reason: approveDecline)
+        }
+        do {
+            let data = try MarenEncoding.splitCalldata(recipients: recipients, amounts: amountsWei, memo: memo)
+            return await relayCall(privateKey: key, loadedAddress: loadedAddress, to: maren.marenPay, data: data)
+        } catch { return .declined(reason: prepFailed) }
+    }
+
     private func confirmSelfPaid(_ hash: String) async -> ActionResult {
         let client = EthereumHttpClient(url: chain.rpcURLs[0], network: .custom(String(chain.chainId)))
         let outcome = await Receipt.confirm(client: client, hash: hash, sponsored: false)

@@ -63,7 +63,7 @@ struct Intent: Sendable {
         case withdraw
         case earnSupply
         case earnWithdraw
-        case split(recipients: [String])
+        case split(recipients: [String], amounts: [Decimal])
         case request(to: String)
         case createLink
         case claim(PaymentLinks.ClaimLink)
@@ -160,6 +160,25 @@ struct LiveMarenActions: MarenActions {
         // Relayed claim of a payment link (the link's own secret authorises the payout).
         case let .claim(link):
             return Self.outcome(await mezo.claimLink(loadedAddress: loadedAddress, linkId: link.linkId, secretHex: link.secret))
+
+        // Relayed split — one MUSD transfer per recipient.
+        case let .split(recipients, amounts):
+            guard recipients.count == amounts.count, !recipients.isEmpty else {
+                return .declined(reason: "That split could not be read, so nothing was submitted.")
+            }
+            for r in recipients where !PaymentLinks.isAddress(r) {
+                return .declined(reason: "Live split needs 0x addresses in this build. Handle resolution is not wired yet, so nothing was submitted.")
+            }
+            var amountsWei: [BigUInt] = []
+            for a in amounts {
+                guard let wei = Amount.toWei(a) else {
+                    return .declined(reason: "That amount could not be read, so nothing was submitted.")
+                }
+                amountsWei.append(wei)
+            }
+            let total = amountsWei.reduce(BigUInt(0), +)
+            return Self.outcome(await mezo.split(loadedAddress: loadedAddress, recipients: recipients,
+                                                 amountsWei: amountsWei, totalWei: total, memo: ""))
 
         default:
             return .declined(reason: MarenClientError.liveWritesUnavailable.errorDescription

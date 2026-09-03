@@ -234,4 +234,28 @@ final class MarenEncodingGoldenTests: XCTestCase {
             "0300000000000000000000000000000000000000000000000000000000000000"
         XCTAssertEqual(data.web3.hexString, expected, "claimLink calldata must match cast")
     }
+
+    // cast calldata "split(address[],uint256[],string)" "[R,R]" "[1e18,2e18]" "hi"
+    // (An EMPTY memo is verified separately: web3.swift pads a 0-length string to a full zero
+    //  word where cast emits none — a trailing byte the contract's decoder ignores, proven by a
+    //  live split of my encoder's exact bytes settling status-1. A non-empty memo matches cast
+    //  byte-for-byte, which is what this asserts.)
+    func testSplitCalldataMatchesCast() throws {
+        let data = try MarenEncoding.splitCalldata(recipients: [recipient, recipient],
+                                                   amounts: [BigUInt(10).power(18), BigUInt(2) * BigUInt(10).power(18)],
+                                                   memo: "hi")
+        let expected = "0xad0ffab1" +
+            "0000000000000000000000000000000000000000000000000000000000000060" +
+            "00000000000000000000000000000000000000000000000000000000000000c0" +
+            "0000000000000000000000000000000000000000000000000000000000000120" +
+            "0000000000000000000000000000000000000000000000000000000000000002" +
+            "00000000000000000000000054196397d6f01b48739db3957257cb33cd341885" +
+            "00000000000000000000000054196397d6f01b48739db3957257cb33cd341885" +
+            "0000000000000000000000000000000000000000000000000000000000000002" +
+            "0000000000000000000000000000000000000000000000000de0b6b3a7640000" +
+            "0000000000000000000000000000000000000000000000001bc16d674ec80000" +
+            "0000000000000000000000000000000000000000000000000000000000000002" +
+            "6869000000000000000000000000000000000000000000000000000000000000"
+        XCTAssertEqual(data.web3.hexString, expected, "split calldata must match cast")
+    }
 }
