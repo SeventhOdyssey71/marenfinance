@@ -60,15 +60,7 @@ struct ReceiveView: View {
                             .truncationMode(.middle)
                     }
                     Spacer(minLength: Theme.Space.sm)
-                    Button {
-                        UIPasteboard.general.string = copyValue
-                    } label: {
-                        Image(systemName: "doc.on.doc")
-                            .font(.system(size: 16, weight: .semibold))
-                            .foregroundStyle(Theme.Palette.accentText)
-                            .frame(width: 44, height: 44)
-                    }
-                    .accessibilityLabel("Copy \(label)")
+                    CopyButton(value: copyValue, describes: label.lowercased())
                 }
             }
         }

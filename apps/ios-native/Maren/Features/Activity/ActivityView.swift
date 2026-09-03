@@ -137,7 +137,6 @@ struct ReceiptDetail: View {
     let item: ActivityItem
     @Environment(\.marenClient) private var client
     @Environment(\.dismiss) private var dismiss
-    @State private var copied = false
 
     var body: some View {
         FlowScreen(title: "Receipt") {
@@ -197,16 +196,8 @@ struct ReceiptDetail: View {
                 .frame(maxWidth: .infinity, minHeight: 48).background(Theme.Palette.ink, in: Capsule())
             }
             .accessibilityLabel("View this transaction on the Mezo explorer")
-            Button {
-                UIPasteboard.general.string = hash
-                copied = true
-                DispatchQueue.main.asyncAfter(deadline: .now() + 1.4) { copied = false }
-            } label: {
-                Text(copied ? "Copied" : "Copy transaction hash")
-                    .font(.system(size: 15, weight: .semibold)).foregroundStyle(Theme.Palette.ink)
-                    .frame(maxWidth: .infinity, minHeight: 44)
-            }
-            .accessibilityLabel("Copy the transaction hash")
+            CopyButton(value: hash, describes: "the transaction hash",
+                       title: "Copy transaction hash", style: .inline)
         }
     }
 

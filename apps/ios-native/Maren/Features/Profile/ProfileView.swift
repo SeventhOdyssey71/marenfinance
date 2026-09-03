@@ -11,7 +11,6 @@ struct ProfileView: View {
     @Environment(\.marenActions) private var actions
     @State private var account: Account?
     @State private var showSetup = false
-    @State private var copied = false
     @State private var protection: KeyProtection?
     private let capability = Keystore.shared.capability()
 
@@ -57,17 +56,9 @@ struct ProfileView: View {
                         .foregroundStyle(Theme.Palette.muted)
                         .lineLimit(1).truncationMode(.middle)
                     Spacer(minLength: Theme.Space.sm)
-                    Button {
-                        if let addr = account?.address { UIPasteboard.general.string = addr }
-                        copied = true
-                        DispatchQueue.main.asyncAfter(deadline: .now() + 1.4) { copied = false }
-                    } label: {
-                        Image(systemName: copied ? "checkmark" : "doc.on.doc")
-                            .font(.system(size: 15, weight: .semibold))
-                            .foregroundStyle(Theme.Palette.accentText)
-                            .frame(width: 44, height: 44)
+                    if let addr = account?.address {
+                        CopyButton(value: addr, describes: "your address")
                     }
-                    .accessibilityLabel("Copy your address")
                 }
                 Divider().overlay(Theme.Palette.ink.opacity(0.07))
                 StatRow(label: "Network", showsDivider: false) {

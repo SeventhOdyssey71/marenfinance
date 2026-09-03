@@ -109,12 +109,7 @@ struct ClaimableLinkFlow: View {
                 }
             }
             HStack(spacing: Theme.Space.sm) {
-                Button { UIPasteboard.general.string = link } label: {
-                    Label("Copy", systemImage: "doc.on.doc")
-                        .font(.system(size: 15, weight: .semibold)).foregroundStyle(Theme.Palette.ink)
-                        .frame(maxWidth: .infinity, minHeight: 48).background(Theme.Palette.inset, in: Capsule())
-                }
-                .accessibilityLabel("Copy the claim link")
+                CopyButton(value: link, describes: "the claim link", style: .filled)
                 ShareLink(item: link) {
                     Label("Share", systemImage: "square.and.arrow.up")
                         .font(.system(size: 15, weight: .semibold)).foregroundStyle(.white)
