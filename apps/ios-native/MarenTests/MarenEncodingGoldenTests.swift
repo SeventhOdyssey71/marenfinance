@@ -162,4 +162,38 @@ final class MarenEncodingGoldenTests: XCTestCase {
         let recovered = try KeyUtil.recoverPublicKey(message: digest, signature: sig)
         XCTAssertEqual(recovered.lowercased(), expectedAddress.lowercased())
     }
+
+    // MARK: MarenVault write calldata (borrow / repay / withdraw / deposit)
+    //
+    // amount = 1e18, both hints = the zero address.
+    // cast calldata "borrow(uint256,address,address)"   1000000000000000000 0x0…0 0x0…0
+    // cast calldata "repay(uint256,address,address)"    1000000000000000000 0x0…0 0x0…0
+    // cast calldata "withdraw(uint256,address,address)" 1000000000000000000 0x0…0 0x0…0
+    // cast calldata "deposit(address,address)"          0x0…0 0x0…0
+
+    func testVaultWriteCalldataMatchesCast() throws {
+        let amount = BigUInt(10).power(18)
+        let expected: [String: String] = [
+            "borrow": "0xd5164184",
+            "repay": "0xc883b2e5",
+            "withdraw": "0xb460af94",
+        ]
+        // Full 100-byte body: selector + amount(32) + zero(32) + zero(32).
+        let tail =
+            "0000000000000000000000000000000000000000000000000de0b6b3a7640000" +
+            "0000000000000000000000000000000000000000000000000000000000000000" +
+            "0000000000000000000000000000000000000000000000000000000000000000"
+        for (fn, selector) in expected {
+            let data = try MarenEncoding.vaultWriteCalldata(function: fn, amount: amount)
+            XCTAssertEqual(data.web3.hexString, selector + tail, "\(fn) calldata must match cast")
+        }
+    }
+
+    func testDepositCalldataMatchesCast() throws {
+        let data = try MarenEncoding.depositCalldata()
+        let expected = "0xf9609f08" +
+            "0000000000000000000000000000000000000000000000000000000000000000" +
+            "0000000000000000000000000000000000000000000000000000000000000000"
+        XCTAssertEqual(data.web3.hexString, expected, "deposit calldata must match cast")
+    }
 }

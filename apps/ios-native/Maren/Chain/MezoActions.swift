@@ -69,7 +69,33 @@ struct MezoActions {
     /// Submit a sponsored `pay` to `to`. Face ID → build calldata → sign ForwardRequest →
     /// POST to the relayer → confirm the receipt. Declines honestly when no relayer is set or
     /// the Keychain key does not derive `loadedAddress`.
+    /// A relayed (gasless) MarenPay payment.
     func send(loadedAddress: String, to: String, amountWei: BigUInt, memo: String) async -> ActionResult {
+        let data: Data
+        do { data = try MarenEncoding.payCalldata(to: to, amount: amountWei, memo: memo) }
+        catch { return .declined(reason: prepFailed) }
+        return await relayCall(loadedAddress: loadedAddress, to: MarenAddresses.of(chain.network).marenPay, data: data)
+    }
+
+    /// A relayed (gasless) MarenVault write — `function` is "borrow" | "repay" | "withdraw".
+    func vaultWrite(_ function: String, loadedAddress: String, amountWei: BigUInt) async -> ActionResult {
+        let data: Data
+        do { data = try MarenEncoding.vaultWriteCalldata(function: function, amount: amountWei) }
+        catch { return .declined(reason: prepFailed) }
+        return await relayCall(loadedAddress: loadedAddress, to: MarenAddresses.of(chain.network).marenVault, data: data)
+    }
+
+    private var prepFailed: String {
+        "The transaction could not be prepared, so nothing was submitted and no gas was spent."
+    }
+
+    // MARK: - The shared relayed-write flow
+    //
+    // Face ID → key-derives-account check → signed ForwardRequest → relay → receipt. Every
+    // gasless write goes through this; only `to` and `data` differ. A hash is never a success
+    // on its own — `Receipt.confirm` is what turns it into `.delivered`.
+
+    private func relayCall(loadedAddress: String, to: String, data: Data) async -> ActionResult {
         guard let relayerURL = RelayerConfig.url else {
             return .declined(reason: MarenClientError.liveWritesUnavailable.errorDescription ?? "Live writes unavailable.")
         }
@@ -92,14 +118,12 @@ struct MezoActions {
 
         let maren = MarenAddresses.of(chain.network)
         do {
-            let data = try MarenEncoding.payCalldata(to: to, amount: amountWei, memo: memo)
-
             // 2 — build the signed ForwardRequest. Nonce is read on-chain, never guessed.
-            let estimate = (try? await rpc.estimateGas(from: loadedAddress, to: maren.marenPay, data: data)) ?? BigUInt(300_000)
+            let estimate = (try? await rpc.estimateGas(from: loadedAddress, to: to, data: data)) ?? BigUInt(400_000)
             let nonce = try await rpc.forwarderNonce(hub: maren.marenForwarder, owner: loadedAddress)
             let deadline = UInt64(Date().timeIntervalSince1970) + RELAY_DEADLINE_SECONDS
             let request = MarenEncoding.ForwardRequest(
-                from: loadedAddress, to: maren.marenPay, value: 0,
+                from: loadedAddress, to: to, value: 0,
                 gas: Self.relayGasLimit(directEstimate: estimate), nonce: nonce,
                 deadline: deadline, data: data
             )
@@ -124,7 +148,51 @@ struct MezoActions {
         } catch let refused as RelayRefused {
             return .declined(reason: refused.reason.detail)
         } catch {
-            return .declined(reason: "The transaction could not be prepared, so nothing was submitted and no gas was spent.")
+            return .declined(reason: prepFailed)
+        }
+    }
+
+    // MARK: - Self-paid deposit
+    //
+    // Deposit sends BTC as msg.value, so a relayer cannot carry it — the user signs a direct
+    // transaction and pays the BTC gas themselves. Face ID → build + sign → send raw tx →
+    // confirm the receipt. `sponsored: false`, so the row honestly reads "you paid BTC".
+
+    func deposit(loadedAddress: String, valueWei: BigUInt) async -> ActionResult {
+        let access = await Keystore.shared.access()
+        let privateKey: Data
+        switch access {
+        case .ok(let key): privateKey = key
+        case .denied(let reason): return .declined(reason: reason)
+        case .missing: return .declined(reason: "No signing key is available on this device.")
+        }
+        guard let derived = try? Keystore.address(of: privateKey),
+              derived.lowercased() == loadedAddress.lowercased() else {
+            return .declined(reason: MarenClientError.keyMismatch.errorDescription ?? "Key mismatch.")
+        }
+
+        let maren = MarenAddresses.of(chain.network)
+        do {
+            let data = try MarenEncoding.depositCalldata()
+            let account = try EthereumAccount(keyStorage: InMemoryKeyStorage(privateKey))
+            let client = EthereumHttpClient(url: chain.rpcURLs[0], network: .custom(String(chain.chainId)))
+            let gasPrice = (try? await client.eth_gasPrice()) ?? BigUInt(2_000_000)
+            let tx = EthereumTransaction(
+                from: EthereumAddress(loadedAddress),
+                to: EthereumAddress(maren.marenVault),
+                value: valueWei,
+                data: data,
+                nonce: nil,                    // filled with the pending nonce on send
+                gasPrice: gasPrice,
+                gasLimit: BigUInt(500_000),    // generous; a payable deposit is a simple call
+                chainId: chain.chainId
+            )
+            let hash = try await client.eth_sendRawTransaction(tx, withAccount: account)
+            let outcome = await Receipt.confirm(client: client, hash: hash, sponsored: false)
+            if case .delivered(let d) = outcome { return .ok(d) }
+            return .failed(outcome)
+        } catch {
+            return .declined(reason: prepFailed)
         }
     }
 }

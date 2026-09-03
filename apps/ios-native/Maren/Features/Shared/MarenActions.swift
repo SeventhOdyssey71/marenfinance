@@ -120,6 +120,7 @@ struct LiveMarenActions: MarenActions {
     var canSettle: Bool { RelayerConfig.isConfigured }
 
     func submit(_ intent: Intent) async -> SubmitOutcome {
+        let mezo = MezoActions(.of(network))
         switch intent.kind {
         case let .send(to, memo):
             guard let wei = Amount.toWei(intent.amount) else {
@@ -130,17 +131,38 @@ struct LiveMarenActions: MarenActions {
             guard PaymentLinks.isAddress(to) else {
                 return .declined(reason: "Live send needs a 0x address in this build. Handle resolution is not wired yet, so nothing was submitted.")
             }
-            let result = await MezoActions(.of(network)).send(
-                loadedAddress: loadedAddress, to: to, amountWei: wei, memo: memo
-            )
-            switch result {
-            case let .ok(delivered): return .delivered(delivered)
-            case let .declined(reason): return .declined(reason: reason)
-            case let .failed(outcome): return .failed(outcome)
+            return Self.outcome(await mezo.send(loadedAddress: loadedAddress, to: to, amountWei: wei, memo: memo))
+
+        // Relayed (gasless) vault writes.
+        case .borrow:   return await vaultWrite("borrow", intent, mezo)
+        case .repay:    return await vaultWrite("repay", intent, mezo)
+        case .withdraw: return await vaultWrite("withdraw", intent, mezo)
+
+        // Self-paid deposit (sends BTC as msg.value, so it is not relayed).
+        case .deposit:
+            guard let wei = Amount.toWei(intent.amount) else {
+                return .declined(reason: "That amount could not be read, so nothing was submitted.")
             }
+            return Self.outcome(await mezo.deposit(loadedAddress: loadedAddress, valueWei: wei))
+
         default:
             return .declined(reason: MarenClientError.liveWritesUnavailable.errorDescription
                              ?? "This build has no relayer configured, so nothing was submitted.")
+        }
+    }
+
+    private func vaultWrite(_ function: String, _ intent: Intent, _ mezo: MezoActions) async -> SubmitOutcome {
+        guard let wei = Amount.toWei(intent.amount) else {
+            return .declined(reason: "That amount could not be read, so nothing was submitted.")
+        }
+        return Self.outcome(await mezo.vaultWrite(function, loadedAddress: loadedAddress, amountWei: wei))
+    }
+
+    private static func outcome(_ result: ActionResult) -> SubmitOutcome {
+        switch result {
+        case let .ok(delivered): return .delivered(delivered)
+        case let .declined(reason): return .declined(reason: reason)
+        case let .failed(outcome): return .failed(outcome)
         }
     }
 }

@@ -31,6 +31,34 @@ enum MarenEncoding {
     }
 
     // ---------------------------------------------------------------------------
+    // MarenVault writes — borrow / repay / withdraw (uint256 amount, address, address)
+    // ---------------------------------------------------------------------------
+
+    private static let zeroAddress = "0x0000000000000000000000000000000000000000"
+
+    /// Calldata for `MarenVault.borrow/repay/withdraw(amount, upperHint, lowerHint)`. The two
+    /// hints are the pooled trove's insertion position in SortedTroves; passing the zero
+    /// address makes the contract search from the list head — more gas, but correct, and the
+    /// relayer pays that gas. `function` is "borrow" | "repay" | "withdraw", which fixes the
+    /// selector via the (uint256,address,address) argument types.
+    static func vaultWriteCalldata(function: String, amount: BigUInt) throws -> Data {
+        let enc = ABIFunctionEncoder(function)
+        try enc.encode(amount)
+        try enc.encode(EthereumAddress(zeroAddress))
+        try enc.encode(EthereumAddress(zeroAddress))
+        return try enc.encoded()
+    }
+
+    /// Calldata for `MarenVault.deposit(upperHint, lowerHint)` — the BTC is sent as msg.value,
+    /// so there is no amount argument. Self-paid (a relayer would fund the deposit itself).
+    static func depositCalldata() throws -> Data {
+        let enc = ABIFunctionEncoder("deposit")
+        try enc.encode(EthereumAddress(zeroAddress))
+        try enc.encode(EthereumAddress(zeroAddress))
+        return try enc.encoded()
+    }
+
+    // ---------------------------------------------------------------------------
     // MarenPay.claimLink digest
     // ---------------------------------------------------------------------------
 
