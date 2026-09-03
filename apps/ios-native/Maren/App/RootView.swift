@@ -7,6 +7,7 @@ import SwiftUI
 // screen send you to another (Home's Borrow/Earn jump to Finance).
 
 struct RootView: View {
+    @State private var session = MarenSession()
     @State private var router = AppRouter()
     /// A screenshot/testing hook: `MAREN_SCREEN` preselects a tab and, for pay flows, presents
     /// the sheet at launch. Absent in normal use, so it changes nothing for a real user.
@@ -15,23 +16,34 @@ struct RootView: View {
 
     var body: some View {
         @Bindable var router = router
-        return UnlockGate {
-            ZStack(alignment: .bottom) {
-                // All four tabs stay in the hierarchy so switching preserves scroll and
-                // model state; only the selected one is visible and receives touches.
-                ZStack {
-                    tab(.home) { HomeView() }
-                    tab(.finance) { FinanceView() }
-                    tab(.activity) { ActivityView() }
-                    tab(.profile) { ProfileView() }
+        return Group {
+            if session.hasWallet {
+                UnlockGate {
+                    ZStack(alignment: .bottom) {
+                        // All four tabs stay in the hierarchy so switching preserves scroll and
+                        // model state; only the selected one is visible and receives touches.
+                        ZStack {
+                            tab(.home) { HomeView() }
+                            tab(.finance) { FinanceView() }
+                            tab(.activity) { ActivityView() }
+                            tab(.profile) { ProfileView() }
+                        }
+                        GlassTabBar(selection: $router.tab)
+                    }
+                    .background(Theme.Palette.canvas)
+                    .sheet(item: $launchDestination) { $0.view }
                 }
-                GlassTabBar(selection: $router.tab)
+                .onAppear(perform: applyLaunchScreen)
+            } else {
+                OnboardingView()
             }
-            .background(Theme.Palette.canvas)
-            .sheet(item: $launchDestination) { $0.view }
         }
+        .environment(session)
         .environment(router)
-        .onAppear(perform: applyLaunchScreen)
+        .environment(\.marenClient, session.client)
+        .environment(\.marenActions, session.actions)
+        .environment(\.isDemoData, session.isDemo)
+        .tint(Theme.Palette.accent)
     }
 
     /// One tab layer: visible and interactive only when selected.

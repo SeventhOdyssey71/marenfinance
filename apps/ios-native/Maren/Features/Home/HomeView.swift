@@ -2,14 +2,14 @@ import SwiftUI
 
 // MARK: - Home
 //
-// Clean and light: a greeting header with your handle, one big balance in dollars, and the
-// pay shortcuts. Type is SF Pro Rounded at moderate weights (never heavy); numbers grey
-// their decimals; separators are the slight dotted hairline. The dense vault table lives on
-// the Finance tab — Home never repeats it.
+// Clean and light: a greeting header with your name, one big balance in dollars, the vault
+// health in a sentence, and recent transactions. Type is SF Pro Rounded at moderate weights;
+// numbers grey their decimals; separators are the slight dotted hairline. The dense vault
+// table lives on the Finance tab.
 
 struct HomeView: View {
     @Environment(\.marenClient) private var client
-    @Environment(\.marenActions) private var actions
+    @Environment(MarenSession.self) private var session
     @Environment(AppRouter.self) private var router
     @State private var model = HomeModel()
     @State private var destination: PayDestination?
@@ -23,7 +23,7 @@ struct HomeView: View {
                 actionPills
                 DottedDivider()
                 vaultCard
-                payRow
+                historySection
                 Spacer(minLength: Theme.Space.md)
             }
             .padding(.horizontal, Theme.Space.md)
@@ -35,39 +35,47 @@ struct HomeView: View {
         .sheet(item: $destination) { $0.view }
     }
 
-    // MARK: header — logo, greeting, handle, scan
+    // MARK: header — avatar, greeting, name, scan
 
     private var header: some View {
-        VStack(alignment: .leading, spacing: Theme.Space.sm) {
-            HStack(alignment: .center) {
-                Image("MarenMark")
-                    .resizable()
-                    .scaledToFit()
-                    .frame(height: 26)
-                    .accessibilityLabel("Maren")
-                Spacer()
-                Button { destination = .scan } label: {
-                    Image(systemName: "qrcode.viewfinder")
-                        .font(.system(size: 20, weight: .regular))
-                        .foregroundStyle(Theme.Palette.ink)
-                        .frame(width: 44, height: 44)
-                }
-                .accessibilityLabel("Scan a payment or claim code")
+        HStack(alignment: .center, spacing: Theme.Space.sm) {
+            avatar
+            VStack(alignment: .leading, spacing: 1) {
+                Text("Good morning")
+                    .font(.body(12))
+                    .foregroundStyle(Theme.Palette.tertiary)
+                Text(session.greetingName)
+                    .font(.display(18, weight: .medium))
+                    .foregroundStyle(Theme.Palette.ink)
+                    .overlay(alignment: .bottom) { DottedDivider().offset(y: 3) }
             }
-            VStack(alignment: .leading, spacing: 3) {
-                Text("Good morning").labelStyle()
-                HStack(spacing: Theme.Space.sm) {
-                    Text(model.account?.handle ?? "…")
-                        .font(.display(20, weight: .medium))
-                        .foregroundStyle(Theme.Palette.ink)
-                        .overlay(alignment: .bottom) {
-                            DottedDivider().offset(y: 4)
-                        }
-                    if !actions.canSettle { DemoBadge() }
-                }
+            Spacer()
+            Button { destination = .scan } label: {
+                Image(systemName: "qrcode.viewfinder")
+                    .font(.system(size: 20, weight: .regular))
+                    .foregroundStyle(Theme.Palette.ink)
+                    .frame(width: 44, height: 44)
             }
+            .accessibilityLabel("Scan a payment or claim code")
         }
         .padding(.top, Theme.Space.xs)
+    }
+
+    private var avatar: some View {
+        Circle()
+            .fill(LinearGradient(colors: [Theme.Palette.accent, Theme.Palette.accentText],
+                                 startPoint: .topLeading, endPoint: .bottomTrailing))
+            .frame(width: 38, height: 38)
+            .overlay(
+                Text(initial)
+                    .font(.display(17, weight: .semibold))
+                    .foregroundStyle(.white)
+            )
+            .accessibilityHidden(true)
+    }
+
+    private var initial: String {
+        String(session.greetingName.first.map(String.init) ?? "M").uppercased()
     }
 
     // MARK: balance hero — one big number, in dollars, centered
@@ -76,7 +84,7 @@ struct HomeView: View {
         VStack(spacing: Theme.Space.sm) {
             Text("Balance").labelStyle()
             if let musd = model.balances?.musd {
-                MoneyText(text: MoneyFormat.usd(musd), size: 46, weight: .bold)
+                MoneyText(text: MoneyFormat.usd(musd), size: 44, weight: .bold)
             } else {
                 Unavailable(label: "Balance unavailable")
             }
@@ -129,16 +137,68 @@ struct HomeView: View {
         }
     }
 
-    // MARK: pay shortcuts
+    // MARK: transaction history — a few recent, tap through for all
 
-    private var payRow: some View {
-        VStack(alignment: .leading, spacing: Theme.Space.sm) {
-            SectionHeader(title: "Pay")
+    private var historySection: some View {
+        VStack(alignment: .leading, spacing: Theme.Space.md) {
+            HStack {
+                Text("Transaction history")
+                    .font(.sectionDisplay())
+                    .foregroundStyle(Theme.Palette.ink)
+                Spacer()
+                Button { router.tab = .activity } label: {
+                    Text("View all")
+                        .font(.body(13, weight: .medium))
+                        .foregroundStyle(Theme.Palette.muted)
+                        .overlay(alignment: .bottom) { DottedDivider().offset(y: 2) }
+                }
+                .buttonStyle(.plain)
+                .accessibilityLabel("View all transactions")
+            }
+            MCard(padding: Theme.Space.md) {
+                if model.activity.isEmpty {
+                    Text("No transactions yet.")
+                        .font(.body(15))
+                        .foregroundStyle(Theme.Palette.tertiary)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                } else {
+                    VStack(spacing: 0) {
+                        let rows = Array(model.activity.prefix(3))
+                        ForEach(Array(rows.enumerated()), id: \.element.id) { index, item in
+                            txRow(item, showsDivider: index < rows.count - 1)
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    private func txRow(_ item: ActivityItem, showsDivider: Bool) -> some View {
+        VStack(spacing: 0) {
             HStack(spacing: Theme.Space.sm) {
-                ActionTile(title: "Request", icon: "arrow.down.circle") { destination = .request }
-                ActionTile(title: "Split", icon: "person.2") { destination = .split }
-                ActionTile(title: "Link", icon: "link") { destination = .link }
-                ActionTile(title: "Claim", icon: "gift") { destination = .claim }
+                Image(systemName: item.icon)
+                    .font(.system(size: 17, weight: .regular))
+                    .foregroundStyle(Theme.Palette.ink)
+                    .frame(width: 26)
+                    .accessibilityHidden(true)
+                VStack(alignment: .leading, spacing: 1) {
+                    Text(item.title)
+                        .font(.body(15, weight: .medium))
+                        .foregroundStyle(Theme.Palette.ink)
+                    Text(item.subtitle)
+                        .font(.body(13))
+                        .foregroundStyle(Theme.Palette.tertiary)
+                }
+                Spacer(minLength: Theme.Space.sm)
+                Text(item.amount)
+                    .font(.figure(15, weight: .semibold))
+                    .foregroundStyle(Theme.Palette.ink)
+                    .lineLimit(1)
+                    .fixedSize(horizontal: true, vertical: false)
+            }
+            .padding(.vertical, 11)
+            if showsDivider {
+                Rectangle().fill(Theme.Palette.ink.opacity(0.07)).frame(height: 1)
             }
         }
     }
@@ -147,5 +207,6 @@ struct HomeView: View {
 #Preview("Home") {
     HomeView()
         .environment(\.marenClient, StubMarenClient())
+        .environment(MarenSession())
         .environment(AppRouter())
 }

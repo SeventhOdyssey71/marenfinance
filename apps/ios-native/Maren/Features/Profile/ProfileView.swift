@@ -9,25 +9,33 @@ import SwiftUI
 struct ProfileView: View {
     @Environment(\.marenClient) private var client
     @Environment(\.marenActions) private var actions
+    @Environment(\.isDemoData) private var isDemoData
+    @Environment(MarenSession.self) private var session
     @State private var account: Account?
     @State private var showSetup = false
     @State private var protection: KeyProtection?
     private let capability = Keystore.shared.capability()
 
     var body: some View {
-        Screen(title: "Profile", badge: !actions.canSettle) {
+        Screen(title: "Profile", badge: isDemoData) {
             accountCard
             securityCard
             howItWorksCard
             if !actions.canSettle {
-                Text("This build runs on demo data. Creating a wallet stores a real key on this device, but there is no relayer configured, so no transaction can be settled from here yet.")
-                    .font(.system(size: 13)).foregroundStyle(Theme.Palette.tertiary)
+                Text("Reads run live against Mezo testnet. Writing (sending, borrowing) waits on a relayer, which isn’t configured in this build — so those actions decline honestly rather than pretend to settle.")
+                    .font(.body(13)).foregroundStyle(Theme.Palette.tertiary)
                     .fixedSize(horizontal: false, vertical: true)
+            }
+            if session.address != nil {
+                PillButton(title: "Sign out", variant: .quiet) { session.signOut() }
             }
         }
         .task { account = try? await client.account() }
         .sheet(isPresented: $showSetup) {
-            WalletSetupView { protection = $0 }
+            WalletSetupView { newProtection in
+                protection = newProtection
+                if newProtection == nil { session.signOut() }
+            }
         }
         .onAppear(perform: refreshProtection)
     }

@@ -10,6 +10,7 @@ import SwiftUI
 struct ActivityView: View {
     @Environment(\.marenClient) private var client
     @Environment(\.marenActions) private var actions
+    @Environment(\.isDemoData) private var isDemoData
 
     private enum Phase: Equatable { case loading, loaded, failed(String) }
     @State private var phase: Phase = .loading
@@ -17,7 +18,7 @@ struct ActivityView: View {
     @State private var selected: ActivityItem?
 
     var body: some View {
-        Screen(title: "Activity", badge: !actions.canSettle) {
+        Screen(title: "Activity", badge: isDemoData) {
             switch phase {
             case .loading:
                 MCard { HStack { ProgressView().tint(Theme.Palette.tertiary); Text("Reading recent activity…").foregroundStyle(Theme.Palette.tertiary).font(.system(size: 15)) } }

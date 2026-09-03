@@ -16,6 +16,7 @@ final class HomeModel {
     private(set) var position: Position?
     private(set) var balances: Balances?
     private(set) var priceFeed: PriceFeed = .unavailable(reason: "Not loaded")
+    private(set) var activity: [ActivityItem] = []
 
     func load(using client: any MarenClient) async {
         phase = .loading
@@ -24,11 +25,15 @@ final class HomeModel {
             async let position = client.position()
             async let balances = client.balances()
             async let price = client.priceFeed()
+            // Activity is best-effort on Home — a failed read leaves the section empty here
+            // (the Activity tab is where a failed read is surfaced explicitly), never faked.
+            async let activity = client.recentActivity()
 
             self.account = try await account
             self.position = try await position
             self.balances = try await balances
             self.priceFeed = try await price
+            self.activity = (try? await activity) ?? []
             phase = .loaded
         } catch {
             phase = .failed(error.localizedDescription)

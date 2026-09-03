@@ -9,12 +9,13 @@ import SwiftUI
 struct FinanceView: View {
     @Environment(\.marenClient) private var client
     @Environment(\.marenActions) private var actions
+    @Environment(\.isDemoData) private var isDemoData
     @Environment(AppRouter.self) private var router
     @State private var model = FinanceModel()
 
     var body: some View {
         @Bindable var router = router
-        return Screen(title: "Finance", badge: !actions.canSettle) {
+        return Screen(title: "Finance", badge: isDemoData) {
             Segmented(options: [(FinanceTab.vault, "Vault"), (FinanceTab.earn, "Earn")],
                       selection: $router.financeTab)
             switch router.financeTab {
