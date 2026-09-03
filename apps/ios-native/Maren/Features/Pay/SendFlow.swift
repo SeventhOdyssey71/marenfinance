@@ -19,9 +19,19 @@ struct SendFlow: View {
     @State private var balance: Decimal?
     @State private var outcome: SubmitOutcome?
     @State private var loaded = false
+    @State private var resolvedAddress: String?   // a handle's resolved 0x address, as you type
+    @State private var resolving = false
 
     private var trimmedRecipient: String { recipient.trimmingCharacters(in: .whitespaces) }
     private var recipientValid: Bool { PaymentLinks.isRecipient(trimmedRecipient) }
+    private var isHandle: Bool { PaymentLinks.isHandle(trimmedRecipient) }
+
+    /// Ready to send: a literal address always is; a handle only once it has resolved.
+    private var canSend: Bool {
+        if PaymentLinks.isAddress(trimmedRecipient) { return true }
+        if isHandle { return resolvedAddress != nil }
+        return false
+    }
     private var amount: Decimal? { Decimal(string: raw.isEmpty ? "0" : raw) }
     private var amountValid: Bool { (amount ?? 0) > 0 }
     private var overBalance: Bool { if let a = amount, let b = balance { return a > b }; return false }
@@ -102,15 +112,50 @@ struct SendFlow: View {
                 footnote: recipient.isEmpty || recipientValid ? nil : "Not a valid @handle or 0x address."
             )
             .padding(.horizontal, Theme.Space.md)
+            if isHandle { handlePreview.padding(.horizontal, Theme.Space.md) }
             Spacer()
             PillButton(title: "Send \(MoneyFormat.musd(amount ?? 0, unit: false)) MUSD", variant: .primary) {
                 Task { await submit() }
             }
-            .disabled(!recipientValid)
-            .opacity(recipientValid ? 1 : 0.5)
+            .disabled(!canSend)
+            .opacity(canSend ? 1 : 0.5)
             .padding(.horizontal, Theme.Space.md)
             .padding(.bottom, Theme.Space.md)
         }
+        // As-you-type handle resolution, debounced. `.task(id:)` cancels the prior lookup on
+        // every keystroke, so only the settled handle hits the registry.
+        .task(id: trimmedRecipient) {
+            resolvedAddress = nil
+            guard isHandle else { resolving = false; return }
+            try? await Task.sleep(nanoseconds: 350_000_000)
+            if Task.isCancelled { return }
+            resolving = true
+            let address = await actions.resolve(trimmedRecipient)
+            if Task.isCancelled { return }
+            resolvedAddress = address
+            resolving = false
+        }
+    }
+
+    // The line under a @handle: resolving → resolved address → or not registered.
+    @ViewBuilder private var handlePreview: some View {
+        HStack(spacing: 6) {
+            if resolving {
+                ProgressView().controlSize(.small)
+                Text("Resolving \(trimmedRecipient)…")
+                    .font(.text(13)).foregroundStyle(Theme.Palette.tertiary)
+            } else if let resolvedAddress {
+                Image(systemName: "checkmark.circle.fill")
+                    .font(.system(size: 13)).foregroundStyle(Theme.Palette.success)
+                Text(MarenSession.shortAddress(resolvedAddress))
+                    .font(.figure(13, weight: .medium)).foregroundStyle(Theme.Palette.muted)
+            } else {
+                Text("\(trimmedRecipient) isn’t registered yet.")
+                    .font(.text(13)).foregroundStyle(Theme.Palette.tertiary)
+            }
+            Spacer(minLength: 0)
+        }
+        .accessibilityElement(children: .combine)
     }
 
     // MARK: amount

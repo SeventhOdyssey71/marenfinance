@@ -89,6 +89,10 @@ protocol MarenActions: Sendable {
     /// live build with no relayer configured — the review step says so up front.
     var canSettle: Bool { get }
     func submit(_ intent: Intent) async -> SubmitOutcome
+    /// Resolve a typed recipient — a `0x` address or an `@handle` — to its `0x` address for a
+    /// live as-you-type preview, or `nil` if a handle isn't registered (or can't be reached).
+    /// A read only; it moves no funds. The submit path resolves again authoritatively.
+    func resolve(_ recipient: String) async -> String?
 }
 
 // MARK: - DemoMarenActions
@@ -103,6 +107,12 @@ struct DemoMarenActions: MarenActions {
         // A brief, honest pause so the flow reads like a submit without pretending to broadcast.
         try? await Task.sleep(nanoseconds: 700_000_000)
         return .demo
+    }
+
+    // No chain to ask, so only a literal address "resolves"; handles cannot in demo mode.
+    func resolve(_ recipient: String) async -> String? {
+        let trimmed = recipient.trimmingCharacters(in: .whitespaces)
+        return PaymentLinks.isAddress(trimmed) ? trimmed : nil
     }
 }
 
@@ -190,6 +200,11 @@ struct LiveMarenActions: MarenActions {
             return .declined(reason: MarenClientError.liveWritesUnavailable.errorDescription
                              ?? "This build has no relayer configured, so nothing was submitted.")
         }
+    }
+
+    func resolve(_ recipient: String) async -> String? {
+        if case let .ok(address) = await MezoActions(.of(network)).resolveRecipient(recipient) { return address }
+        return nil
     }
 
     private func vaultWrite(_ function: String, _ intent: Intent, _ mezo: MezoActions) async -> SubmitOutcome {
