@@ -121,17 +121,17 @@ struct HomeView: View {
     @ViewBuilder private var vaultLine: some View {
         if let line = model.safetyLine {
             Text(line)
-                .font(.text(19, weight: .medium))
+                .font(.text(16, weight: .medium))
                 .foregroundStyle(Theme.Palette.ink)
                 .fixedSize(horizontal: false, vertical: true)
         } else if model.position != nil {
             Text("No debt yet. Borrow MUSD against your Bitcoin whenever you’re ready.")
-                .font(.text(19, weight: .medium))
+                .font(.text(16, weight: .medium))
                 .foregroundStyle(Theme.Palette.ink)
                 .fixedSize(horizontal: false, vertical: true)
         } else {
             Text("Loading your position…")
-                .font(.text(19, weight: .medium))
+                .font(.text(16, weight: .medium))
                 .foregroundStyle(Theme.Palette.tertiary)
         }
     }

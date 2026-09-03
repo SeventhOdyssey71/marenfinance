@@ -20,24 +20,20 @@ final class HomeModel {
 
     func load(using client: any MarenClient) async {
         phase = .loading
-        do {
-            async let account = client.account()
-            async let position = client.position()
-            async let balances = client.balances()
-            async let price = client.priceFeed()
-            // Activity is best-effort on Home — a failed read leaves the section empty here
-            // (the Activity tab is where a failed read is surfaced explicitly), never faked.
-            async let activity = client.recentActivity()
+        // Each read is independent: one that fails leaves ITS field unavailable (nil), it does
+        // not nuke the others. A failed position read must never blank out a good balance.
+        async let account = client.account()
+        async let position = client.position()
+        async let balances = client.balances()
+        async let price = client.priceFeed()
+        async let activity = client.recentActivity()
 
-            self.account = try await account
-            self.position = try await position
-            self.balances = try await balances
-            self.priceFeed = try await price
-            self.activity = (try? await activity) ?? []
-            phase = .loaded
-        } catch {
-            phase = .failed(error.localizedDescription)
-        }
+        self.account = try? await account
+        self.position = try? await position
+        self.balances = try? await balances
+        self.priceFeed = (try? await price) ?? .unavailable(reason: "The price feed could not be read.")
+        self.activity = (try? await activity) ?? []
+        phase = .loaded
     }
 
     /// The plain-language safety line. Only stated when there is debt and a real drop

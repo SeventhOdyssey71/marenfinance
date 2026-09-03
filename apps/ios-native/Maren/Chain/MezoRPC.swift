@@ -143,6 +143,39 @@ struct MezoRPC: Sendable {
         return TroveRead(collWei: coll, principalWei: principal, interestWei: interest)
     }
 
+    /// A pooled position in `MarenVault`, keyed by the user's EOA. Most Maren loans live here,
+    /// NOT in the raw TroveManager (whose trove is owned by the vault, not the user) — so a
+    /// position read that only hit `trove()` reported "no debt" for a real pooled borrower.
+    ///
+    /// `collateralOf` is the redemption-adjusted collateral a UI should show; `previewDebtOf`
+    /// is the debt including interest accrued since the last on-chain accrual. A pooled debt
+    /// carries NO 200 MUSD gas compensation (the pool's seed position paid it once), so unlike
+    /// the direct trove nothing is subtracted back out.
+    struct VaultRead: Sendable {
+        let collWei: BigUInt
+        let debtWei: BigUInt
+    }
+
+    func vaultPosition(_ account: String) async throws -> VaultRead {
+        let vault = MarenAddresses.of(chain.network).marenVault
+        // `collateralOf` (the redemption-adjusted view) reverts in the deployed testnet
+        // bytecode — its `_pendingRedemptionDebit` path reverts with no reason. The raw
+        // `collateral(address)` mapping getter returns the on-book collateral and works; the
+        // two differ only in the window between a redemption landing and the next reconcile,
+        // so this is the honest, available figure. `previewDebtOf` includes accrued interest.
+        let coll = try await callAddressUint(to: vault, function: "collateral", account: account)
+        let debt = try await callAddressUint(to: vault, function: "previewDebtOf", account: account)
+        return VaultRead(collWei: coll, debtWei: debt)
+    }
+
+    /// An `fn(address) -> uint256` view call, decoding the first word.
+    private func callAddressUint(to: String, function: String, account: String) async throws -> BigUInt {
+        let enc = ABIFunctionEncoder(function)
+        try enc.encode(EthereumAddress(account))
+        let out = try await call(to: to, data: try enc.encoded())
+        return Self.word(out, 0)
+    }
+
     // MARK: word decoding
     //
     // eth_call returns ABI-encoded 32-byte words. These pull one word by index; a request for

@@ -64,52 +64,84 @@ struct MezoMarenClient: MarenClient {
     }
 
     func position() async throws -> Position {
-        let trove = try await rpc.trove(accountAddress)
         let (priceWei, _) = try await rpc.priceObservation()
 
-        // Net principal drawn: TroveManager's principal includes the 200 MUSD gas compensation,
-        // so it is subtracted back out. Total debt is principal + interest.
-        let netPrincipal = trove.principalWei > MUSD_GAS_COMPENSATION ? trove.principalWei - MUSD_GAS_COMPENSATION : BigUInt(0)
-        let debtWei = trove.principalWei + trove.interestWei
-        let netDebtWei = netPrincipal + trove.interestWei
-
-        let bitcoinLocked = Wei.toDecimal(trove.collWei) ?? 0
-        let borrowed = Wei.toDecimal(netDebtWei) ?? 0
-
-        // Collateral value in MUSD, from the on-chain price. All wei maths, so no rounding lie.
-        let collateralValueWei = trove.collWei * priceWei / BigUInt(10).power(18)
-
-        guard debtWei > 0, trove.collWei > 0 else {
-            return Position(bitcoinLocked: bitcoinLocked, borrowed: 0, leftToBorrow: Wei.toDecimal(collateralValueWei).map { $0 / (MarenPolicy.marenHealthyFloorPercent / 100) } ?? 0,
-                            collateralRatioPercent: nil, dropToLiquidationPercent: nil, health: .none)
+        // POOLED FIRST, best-effort. Most Maren loans are pooled positions held in MarenVault
+        // and keyed by the user's EOA; the raw TroveManager trove is owned by the vault, not the
+        // user, so a read that only hit `trove()` reported "no debt" for a real pooled borrower.
+        // A pooled debt carries no per-user 200 MUSD gas compensation, so nothing is subtracted.
+        // A vault read failure must NOT hide a direct trove, so it is tolerated (try?).
+        let vault = try? await rpc.vaultPosition(accountAddress)
+        if let vault, vault.debtWei > 0 {
+            return Self.buildPosition(collWei: vault.collWei, ratioDebtWei: vault.debtWei,
+                                      shownDebtWei: vault.debtWei, priceWei: priceWei)
         }
 
-        let ratioPercent = collateralValueWei * 100 / debtWei
+        // Otherwise a direct trove (>= the 1,800 MUSD protocol minimum), owned by the EOA. Its
+        // principal includes the 200 MUSD gas compensation: the ratio is computed against the
+        // gross debt, but the "borrowed" figure shown subtracts the gas comp back out.
+        let trove = try? await rpc.trove(accountAddress)
+        if let trove {
+            let grossDebtWei = trove.principalWei + trove.interestWei
+            if grossDebtWei > 0, trove.collWei > 0 {
+                let netPrincipal = trove.principalWei > MUSD_GAS_COMPENSATION ? trove.principalWei - MUSD_GAS_COMPENSATION : BigUInt(0)
+                return Self.buildPosition(collWei: trove.collWei, ratioDebtWei: grossDebtWei,
+                                          shownDebtWei: netPrincipal + trove.interestWei, priceWei: priceWei)
+            }
+        }
+
+        // If BOTH position reads failed, that is a genuine failure — throw so the UI shows an
+        // honest "couldn't load", never a false "no debt".
+        if vault == nil && trove == nil {
+            throw MezoRPCError.allEndpointsFailed("position reads failed on every endpoint")
+        }
+
+        // No debt on either route. Collateral may still sit in the vault with nothing borrowed.
+        let collWei = vault?.collWei ?? trove?.collWei ?? BigUInt(0)
+        let collateralValueWei = collWei * priceWei / BigUInt(10).power(18)
+        return Position(
+            bitcoinLocked: Wei.toDecimal(collWei) ?? 0,
+            borrowed: 0,
+            leftToBorrow: Wei.toDecimal(collateralValueWei).map { $0 / (MarenPolicy.marenHealthyFloorPercent / 100) } ?? 0,
+            collateralRatioPercent: nil,
+            dropToLiquidationPercent: nil,
+            health: .none
+        )
+    }
+
+    /// Build a `Position` from a collateral + debt pair and the on-chain price — shared by the
+    /// pooled and direct routes so they can never disagree on the maths. All wei integer maths.
+    /// `ratioDebtWei` is the debt the collateral ratio and liquidation are measured against;
+    /// `shownDebtWei` is the figure shown as "borrowed" (they differ for a direct trove's gas
+    /// compensation).
+    private static func buildPosition(collWei: BigUInt, ratioDebtWei: BigUInt, shownDebtWei: BigUInt, priceWei: BigUInt) -> Position {
+        let collateralValueWei = collWei * priceWei / BigUInt(10).power(18)
+        let ratioPercent = ratioDebtWei > 0 ? collateralValueWei * 100 / ratioDebtWei : BigUInt(0)
         let ratio = Decimal(string: String(ratioPercent)) ?? 0
 
         // Headroom under Maren's 180% floor: max debt at that ratio, minus what is drawn.
         let maxDebtAtFloorWei = collateralValueWei * 100 / BigUInt(180)
-        let leftWei = maxDebtAtFloorWei > debtWei ? maxDebtAtFloorWei - debtWei : BigUInt(0)
-        let leftToBorrow = Wei.toDecimal(leftWei) ?? 0
+        let leftWei = maxDebtAtFloorWei > ratioDebtWei ? maxDebtAtFloorWei - ratioDebtWei : BigUInt(0)
 
         // How far BTC can fall before the 110% Mezo liquidation cliff.
-        // liqPrice = debt * 1.1 / coll ; drop% = (price - liqPrice) / price * 100.
-        let liqPriceWei = debtWei * MezoLiquidationNumerator / (trove.collWei * 10)
-        let drop: Decimal?
-        if priceWei > liqPriceWei {
-            let dropWei = (priceWei - liqPriceWei) * 100 / priceWei
-            drop = Decimal(string: String(dropWei))
-        } else {
-            drop = 0
+        // liqPrice = debt * 1.1 / coll, kept in the same 1e18 price scale (the * WAD is what
+        // makes the units match `priceWei`; without it the drop collapsed to ~99% for a
+        // small-collateral position). drop% = (price - liqPrice) / price * 100.
+        var drop: Decimal? = nil
+        if collWei > 0 {
+            let liqPriceWei = ratioDebtWei * MezoLiquidationNumerator * BigUInt(10).power(18) / (collWei * 10)
+            drop = priceWei > liqPriceWei
+                ? Decimal(string: String((priceWei - liqPriceWei) * 100 / priceWei))
+                : 0
         }
 
         return Position(
-            bitcoinLocked: bitcoinLocked,
-            borrowed: borrowed,
-            leftToBorrow: leftToBorrow,
+            bitcoinLocked: Wei.toDecimal(collWei) ?? 0,
+            borrowed: Wei.toDecimal(shownDebtWei) ?? 0,
+            leftToBorrow: Wei.toDecimal(leftWei) ?? 0,
             collateralRatioPercent: ratio,
             dropToLiquidationPercent: drop,
-            health: Self.health(ratioPercent: ratio)
+            health: health(ratioPercent: ratio)
         )
     }
 

@@ -51,7 +51,7 @@ private struct VaultSection: View {
                         Text("Your vault")
                             .labelStyle()
                         Text(headline)
-                            .font(.system(size: 20, weight: .semibold))
+                            .font(.text(17, weight: .medium))
                             .foregroundStyle(Theme.Palette.ink)
                             .fixedSize(horizontal: false, vertical: true)
                     }
