@@ -1,0 +1,170 @@
+import Foundation
+import BigInt
+import web3
+
+// MARK: - Mezo RPC reads
+//
+// Interactive reads against the Mezo testnet RPC, mirroring `apps/ios/src/data/live.ts`. Two
+// disciplines are carried over verbatim:
+//
+//   FAILOVER IS NOT OPTIONAL. Mezo's public RPCs are transiently flaky, and one has been
+//   observed answering `-32601 method not found` for methods it fully supports and then
+//   serving them correctly an hour later. `call` walks the endpoint list in the order
+//   `chains.ts` argues for and only gives up when every endpoint has failed.
+//
+//   HONEST DATA. A read that fails throws (or, for price, returns `.unavailable`). It never
+//   substitutes a fabricated zero or a plausible-looking value. "Your borrowing ceiling is 0"
+//   and "we could not read your borrowing ceiling" are different sentences and only one of
+//   them is true.
+
+enum MezoRPCError: Error, Sendable, Equatable {
+    case allEndpointsFailed(String)
+    case emptyResult
+    case decode(String)
+}
+
+struct MezoRPC: Sendable {
+    let chain: MezoChain
+
+    init(_ chain: MezoChain) { self.chain = chain }
+
+    private func makeClient(_ url: URL) -> EthereumHttpClient {
+        EthereumHttpClient(url: url, network: .custom(String(chain.chainId)))
+    }
+
+    // MARK: low-level
+
+    /// `eth_call` with failover across the chain's endpoint list. Returns the raw hex result.
+    func call(to: String, data: Data) async throws -> Data {
+        var lastError = "no endpoints configured"
+        for url in chain.rpcURLs {
+            do {
+                let client = makeClient(url)
+                let tx = EthereumTransaction(to: EthereumAddress(to), data: data)
+                let hex = try await client.eth_call(tx, block: .Latest)
+                guard let out = Data(hex: hex) else { throw MezoRPCError.decode("non-hex eth_call result") }
+                return out
+            } catch {
+                lastError = String(describing: error)
+                continue
+            }
+        }
+        throw MezoRPCError.allEndpointsFailed(lastError)
+    }
+
+    /// Native BTC balance via `eth_getBalance`, with failover.
+    func nativeBalance(_ address: String) async throws -> BigUInt {
+        var lastError = "no endpoints configured"
+        for url in chain.rpcURLs {
+            do {
+                return try await makeClient(url).eth_getBalance(address: EthereumAddress(address), block: .Latest)
+            } catch {
+                lastError = String(describing: error)
+                continue
+            }
+        }
+        throw MezoRPCError.allEndpointsFailed(lastError)
+    }
+
+    /// `MarenRelayHub.nonces(owner)`. The only forwarder read the write path performs; the
+    /// nonce is inside the signed struct, so it is read on-chain and never guessed.
+    func forwarderNonce(hub: String, owner: String) async throws -> BigUInt {
+        let enc = ABIFunctionEncoder("nonces")
+        try enc.encode(EthereumAddress(owner))
+        let out = try await call(to: hub, data: try enc.encoded())
+        return Self.word(out, 0)
+    }
+
+    /// A direct-call gas estimate, with failover. Used to size the relayed gas cap.
+    func estimateGas(from: String, to: String, data: Data) async throws -> BigUInt {
+        var lastError = "no endpoints configured"
+        for url in chain.rpcURLs {
+            do {
+                let tx = EthereumTransaction(from: EthereumAddress(from), to: EthereumAddress(to),
+                                             value: 0, data: data, nonce: nil, gasPrice: nil, gasLimit: nil,
+                                             chainId: chain.chainId)
+                return try await makeClient(url).eth_estimateGas(tx)
+            } catch {
+                lastError = String(describing: error)
+                continue
+            }
+        }
+        throw MezoRPCError.allEndpointsFailed(lastError)
+    }
+
+    // MARK: typed reads
+
+    /// MUSD `balanceOf(account)`, in wei.
+    func musdBalance(_ account: String) async throws -> BigUInt {
+        let enc = ABIFunctionEncoder("balanceOf")
+        try enc.encode(EthereumAddress(account))
+        let out = try await call(to: MusdAddresses.of(chain.network).musd, data: try enc.encoded())
+        return Self.word(out, 0)
+    }
+
+    /// The BTC/USD price and its age, from the Mezo oracle PRECOMPILE. `latestRoundData()`
+    /// carries `updatedAt`, which is what a staleness read needs — `PriceFeed.fetchPrice()`
+    /// only returns a number or reverts and can never say HOW OLD a price is. The answer is
+    /// scaled up to 1e18. A non-positive answer is treated as unavailable, never as zero.
+    func priceObservation() async throws -> (priceWei: BigUInt, updatedAt: BigUInt) {
+        let oracle = MEZO_PRICE_ORACLE_PRECOMPILE
+        let decEnc = ABIFunctionEncoder("decimals")
+        let decimalsOut = try await call(to: oracle, data: try decEnc.encoded())
+        let decimals = Int(Self.word(decimalsOut, 0))
+
+        let roundEnc = ABIFunctionEncoder("latestRoundData")
+        let round = try await call(to: oracle, data: try roundEnc.encoded())
+        // (roundId, answer int256, startedAt, updatedAt, answeredInRound)
+        let answer = Self.signedWord(round, 1)
+        let updatedAt = Self.word(round, 3)
+        guard answer.sign != .minus, answer.magnitude > 0 else {
+            throw MezoRPCError.decode("oracle returned a non-positive price")
+        }
+        let scale = BigUInt(10).power(max(0, 18 - decimals))
+        return (answer.magnitude * scale, updatedAt)
+    }
+
+    /// The pooled/direct position, read from MUSD's TroveManager, mirroring `readPosition` in
+    /// live.ts. `getEntireDebtAndColl(account)` returns
+    /// (coll, principal, interest, pendingColl, pendingPrincipal, pendingInterest).
+    struct TroveRead: Sendable {
+        let collWei: BigUInt
+        let principalWei: BigUInt   // includes the 200 MUSD gas compensation
+        let interestWei: BigUInt
+    }
+
+    func trove(_ account: String) async throws -> TroveRead {
+        let enc = ABIFunctionEncoder("getEntireDebtAndColl")
+        try enc.encode(EthereumAddress(account))
+        let out = try await call(to: MusdAddresses.of(chain.network).troveManager, data: try enc.encoded())
+        let coll = Self.word(out, 0) + Self.word(out, 3)
+        let principal = Self.word(out, 1) + Self.word(out, 4)
+        let interest = Self.word(out, 2) + Self.word(out, 5)
+        return TroveRead(collWei: coll, principalWei: principal, interestWei: interest)
+    }
+
+    // MARK: word decoding
+    //
+    // eth_call returns ABI-encoded 32-byte words. These pull one word by index; a request for
+    // a word past the end of a short/empty result throws rather than reading zero, so a
+    // truncated response can never be mistaken for a valid all-zero answer.
+
+    static func word(_ data: Data, _ index: Int) -> BigUInt {
+        let start = index * 32
+        guard start + 32 <= data.count else { return BigUInt(0) }
+        return BigUInt(data.subdata(in: start..<start + 32))
+    }
+
+    static func signedWord(_ data: Data, _ index: Int) -> BigInt {
+        let start = index * 32
+        guard start + 32 <= data.count else { return BigInt(0) }
+        let raw = data.subdata(in: start..<start + 32)
+        let magnitude = BigUInt(raw)
+        // Two's-complement: top bit set means negative.
+        if raw.first! & 0x80 != 0 {
+            let modulus = BigUInt(1) << 256
+            return BigInt(magnitude) - BigInt(modulus)
+        }
+        return BigInt(magnitude)
+    }
+}

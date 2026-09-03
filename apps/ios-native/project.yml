@@ -15,6 +15,28 @@ settings:
     MARKETING_VERSION: "0.1.0"
     CURRENT_PROJECT_VERSION: "1"
 
+# The real Mezo chain layer is built on argentlabs/web3.swift — a maintained Swift EVM
+# library that gives us keccak256, ABI encoding, secp256k1 signing, EIP-712 TypedData and a
+# JSON-RPC HTTP client. No crypto is hand-rolled. See Maren/Chain/.
+packages:
+  web3.swift:
+    url: https://github.com/argentlabs/web3.swift
+    # 2.0.0 declares swift-tools 6.1 (needs Xcode 16.3+); this repo builds on Xcode 16.2 /
+    # Swift 6.0, so the 1.6.x line is the newest that resolves here. Pinned to a minor range.
+    minorVersion: "1.6.1"
+  # BigInt is web3.swift's own transitive dependency; declared explicitly so the app and test
+  # modules may `import BigInt` and name `BigUInt` directly. Same 5.x line web3.swift resolves.
+  BigInt:
+    url: https://github.com/attaswift/BigInt
+    from: "5.3.0"
+  # web3.swift 1.6.1 requires the `secp256k1` PRODUCT from GigaBitcoin/secp256k1.swift, but
+  # that package renamed it to `libsecp256k1` at 0.20.0. Its own dependency range
+  # (upToNextMajor from 0.6.0) would otherwise resolve to 0.21.x and fail the graph, so it is
+  # pinned to the last version that still ships the `secp256k1` product.
+  secp256k1.swift:
+    url: https://github.com/GigaBitcoin/secp256k1.swift.git
+    exactVersion: "0.18.0"
+
 targets:
   Maren:
     type: application
@@ -22,6 +44,11 @@ targets:
     deploymentTarget: "17.0"
     sources:
       - path: Maren
+    dependencies:
+      - package: web3.swift
+        product: web3.swift
+      - package: BigInt
+        product: BigInt
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: finance.maren.swift
@@ -31,6 +58,7 @@ targets:
         INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents: "YES"
         INFOPLIST_KEY_UISupportedInterfaceOrientations: UIInterfaceOrientationPortrait
         INFOPLIST_KEY_UIUserInterfaceStyle: Light
+        INFOPLIST_KEY_NSFaceIDUsageDescription: Maren uses Face ID to unlock your signing key before every transaction, so only you can move your money.
         SWIFT_STRICT_CONCURRENCY: complete
         ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
         ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME: AccentColor
@@ -42,8 +70,24 @@ targets:
     sources:
       - path: MarenTests
     dependencies:
+      # Hosted in the Maren app process: the app already links web3.swift and its SwiftNIO
+      # transitive frameworks, so the test bundle resolves those symbols from the host via
+      # BUNDLE_LOADER rather than re-linking the package product itself (which fails to pull
+      # in NIO when built standalone). `embed: false, link: false` keeps the products on the
+      # compile-time module search path (so `import web3` / `import BigInt` resolve) without
+      # re-linking them into the test bundle.
       - target: Maren
+      - package: web3.swift
+        product: web3.swift
+        embed: false
+        link: false
+      - package: BigInt
+        product: BigInt
+        embed: false
+        link: false
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: finance.maren.swift.tests
         GENERATE_INFOPLIST_FILE: "YES"
+        TEST_HOST: "$(BUILT_PRODUCTS_DIR)/Maren.app/Maren"
+        BUNDLE_LOADER: "$(TEST_HOST)"

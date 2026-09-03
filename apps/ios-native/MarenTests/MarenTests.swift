@@ -12,6 +12,9 @@ final class MarenTests: XCTestCase {
         }
     }
 
+    // MoneyText is a SwiftUI view type (@MainActor), so its static `split` is main-actor
+    // isolated; the test hops onto the main actor to call it under Swift 6 strict concurrency.
+    @MainActor
     func testMoneyGreysDecimals() {
         let (head, tail) = MoneyText.split("1,240.50 MUSD")
         XCTAssertEqual(head, "1,240")
