@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<!--
+  Partial Info.plist for custom keys only. GENERATE_INFOPLIST_FILE=YES still injects the
+  standard Apple keys (INFOPLIST_KEY_* in project.yml) into this file at build time.
+
+  MAREN_RELAYER_URL is the hosted relayer the app talks to. RelayerConfig.url lets a
+  process-environment MAREN_RELAYER_URL override it for local dev, so this is the default,
+  not a hard pin.
+-->
+<plist version="1.0">
+<dict>
+    <key>MAREN_RELAYER_URL</key>
+    <string>https://maren-relayer.rolandojude18.workers.dev</string>
+</dict>
+</plist>

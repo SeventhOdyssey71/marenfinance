@@ -44,6 +44,8 @@ targets:
     deploymentTarget: "17.0"
     sources:
       - path: Maren
+        excludes:
+          - Info.plist
     dependencies:
       - package: web3.swift
         product: web3.swift
@@ -52,6 +54,9 @@ targets:
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: finance.maren.swift
+        # Partial Info.plist for custom keys (MAREN_RELAYER_URL); GENERATE_INFOPLIST_FILE still
+        # merges the INFOPLIST_KEY_* Apple keys below into it at build time.
+        INFOPLIST_FILE: Maren/Info.plist
         GENERATE_INFOPLIST_FILE: "YES"
         INFOPLIST_KEY_UILaunchScreen_Generation: "YES"
         INFOPLIST_KEY_CFBundleDisplayName: Maren

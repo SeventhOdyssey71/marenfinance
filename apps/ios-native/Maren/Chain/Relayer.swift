@@ -19,14 +19,14 @@ enum RelayerConfig {
     /// ForwardRequest exposes the user's address, target and amount, so a plain-`http://`
     /// remote host is refused; only https, or http to localhost, is accepted.
     static var url: URL? {
-        // Info.plist (a real build's MAREN_RELAYER_URL) first; then a process-environment
-        // override, so a dev/sim run can point at a local relayer without a rebuild. Both go
-        // through the same https-or-localhost guard.
-        if let raw = Bundle.main.object(forInfoDictionaryKey: "MAREN_RELAYER_URL") as? String,
-           let u = normalise(raw) {
+        // A process-environment MAREN_RELAYER_URL wins, so a dev/sim run can point at a local
+        // relayer without a rebuild; the Info.plist value (a real build's hosted relayer) is the
+        // default under it. Both go through the same https-or-localhost guard.
+        if let env = ProcessInfo.processInfo.environment["MAREN_RELAYER_URL"], let u = normalise(env) {
             return u
         }
-        if let env = ProcessInfo.processInfo.environment["MAREN_RELAYER_URL"], let u = normalise(env) {
+        if let raw = Bundle.main.object(forInfoDictionaryKey: "MAREN_RELAYER_URL") as? String,
+           let u = normalise(raw) {
             return u
         }
         return nil
