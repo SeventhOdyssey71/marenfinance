@@ -16,7 +16,7 @@ const nextConfig: NextConfig = {
   // production instead of 500-ing (the pages are force-static, but the function
   // still imports the loader on cold start).
   outputFileTracingIncludes: {
-    '/docs/[[...slug]]': ['../../docs-site/**/*.mdx', '../../docs-site/docs.json'],
+    '/docs/[[...slug]]': ['./docs-content/**/*'],
   },
   // @maren/sdk ships TypeScript source rather than a build step, so Next has to compile
   // it the same way it compiles the app. It is the one place the chain constants live,

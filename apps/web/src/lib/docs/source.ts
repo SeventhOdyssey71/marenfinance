@@ -13,17 +13,32 @@
 import { existsSync, readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 
-/** Walk up from the build cwd until we find the monorepo's docs-site tree. */
+/**
+ * Locate the docs tree. Production ships an in-project `docs-content/` mirror
+ * (scripts/sync-docs.mjs copies docs-site there at build so the serverless bundle
+ * includes it); dev falls back to the monorepo's `docs-site/`. We check both the
+ * cwd and an `apps/web/` sub-path directly (the function cwd can be either the app
+ * root or the monorepo root), then walk up as a last resort.
+ */
 function findDocsRoot(): string {
+  const names = ['docs-content', 'docs-site'];
+  const direct = [process.cwd(), join(process.cwd(), 'apps', 'web')];
+  for (const base of direct) {
+    for (const name of names) {
+      if (existsSync(join(base, name, 'docs.json'))) return join(base, name);
+    }
+  }
   let dir = process.cwd();
   for (let i = 0; i < 8; i += 1) {
-    const candidate = join(dir, 'docs-site');
-    if (existsSync(join(candidate, 'docs.json'))) return candidate;
+    for (const name of names) {
+      const candidate = join(dir, name);
+      if (existsSync(join(candidate, 'docs.json'))) return candidate;
+    }
     const parent = dirname(dir);
     if (parent === dir) break;
     dir = parent;
   }
-  throw new Error(`Could not locate docs-site/docs.json starting from ${process.cwd()}`);
+  throw new Error(`Could not locate docs-content/ or docs-site/ from ${process.cwd()}`);
 }
 
 /**
