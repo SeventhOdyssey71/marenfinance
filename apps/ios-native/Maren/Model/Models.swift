@@ -71,6 +71,18 @@ struct Balances: Sendable, Equatable, Codable {
     let btc: Decimal                  // native BTC in the wallet (gas token), for deposits
 }
 
+/// What backs MarenEarn right now, in protocol-native units. The pool is not pure MUSD: as it
+/// absorbs liquidations it takes on Bitcoin, so `btcSeized` is the BTC the pool is holding from
+/// those liquidations and `btcValuedMusd` is that BTC valued in MUSD at the oracle price.
+/// `stalePrice` is true when that valuation rests on a price the oracle would reject as too old,
+/// so `btcValuedMusd` may understate the real figure and must never be shown as authoritative.
+struct EarnExposure: Sendable, Equatable, Codable {
+    let musdBacking: Decimal          // MUSD idle + in the Stability Pool
+    let btcSeized: Decimal            // BTC held + pending from liquidations (18-dec BTC)
+    let btcValuedMusd: Decimal        // that BTC valued in MUSD at the oracle price
+    let stalePrice: Bool              // the BTC valuation rests on a price the oracle would reject
+}
+
 /// R15 status wording. `pending` never reads as delivered, and `failed` says plainly that no
 /// funds moved rather than hiding behind "unsuccessful".
 enum ActivityStatus: Sendable, Equatable, Codable {

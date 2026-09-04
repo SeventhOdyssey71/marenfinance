@@ -12,6 +12,9 @@ protocol MarenClient: Sendable {
     func position() async throws -> Position
     func balances() async throws -> Balances
     func earnBalance() async throws -> Decimal
+    /// What backs the Earn pool right now — its MUSD plus any Bitcoin it seized absorbing
+    /// liquidations. Read live; a failure throws so the UI can show unavailable, never a zero.
+    func earnExposure() async throws -> EarnExposure
     func recentActivity() async throws -> [ActivityItem]
 }
 
@@ -60,6 +63,12 @@ struct StubMarenClient: MarenClient {
     }
 
     func earnBalance() async throws -> Decimal { 512.40 }
+
+    func earnExposure() async throws -> EarnExposure {
+        // Demo composition: a mostly-MUSD pool that has taken on a little Bitcoin from
+        // liquidations. The USD valuation is shown as fresh here (priceWired mirrors the feed).
+        EarnExposure(musdBacking: 41_200, btcSeized: 0.0125, btcValuedMusd: 800, stalePrice: !priceWired)
+    }
 
     func recentActivity() async throws -> [ActivityItem] {
         let now = Date()

@@ -22,7 +22,7 @@ struct ProfileView: View {
             securityCard
             howItWorksCard
             if !actions.canSettle {
-                Text("Reads run live against Mezo testnet. Writing (sending, borrowing) waits on a relayer, which isn’t configured in this build, so those actions decline honestly rather than pretend to settle.")
+                Text("Reads run live against Mezo testnet. Deposit and Earn are self-paid: you sign, pay a little BTC gas, and they settle on-chain now. Sending, borrowing, repaying, splitting, and claiming go through a relayer, which isn’t configured in this build, so those decline honestly rather than pretend to settle.")
                     .font(.text(13)).foregroundStyle(Theme.Palette.tertiary)
                     .fixedSize(horizontal: false, vertical: true)
             }

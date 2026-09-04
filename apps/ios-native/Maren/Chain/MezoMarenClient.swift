@@ -164,6 +164,24 @@ struct MezoMarenClient: MarenClient {
         Wei.toDecimal(try await rpc.earnBalance(accountAddress)) ?? 0
     }
 
+    /// The Earn pool's live composition: MUSD backing plus any Bitcoin it seized absorbing
+    /// liquidations, valued in MUSD at the oracle price. The stale-price flag is read alongside
+    /// so the UI can refuse to present the BTC valuation as authoritative when the oracle price
+    /// is one the protocol would reject. A read failure throws — never a fabricated breakdown.
+    func earnExposure() async throws -> EarnExposure {
+        async let breakdown = rpc.earnAssetBreakdown()
+        async let stale = rpc.earnIsUsingStalePrice()
+        let b = try await breakdown
+        let musdBacking = (Wei.toDecimal(b.musdIdleWei) ?? 0) + (Wei.toDecimal(b.musdInPoolWei) ?? 0)
+        let btcSeized = (Wei.toDecimal(b.btcHeldWei) ?? 0) + (Wei.toDecimal(b.btcPendingWei) ?? 0)
+        return EarnExposure(
+            musdBacking: musdBacking,
+            btcSeized: btcSeized,
+            btcValuedMusd: Wei.toDecimal(b.btcValuedWei) ?? 0,
+            stalePrice: try await stale
+        )
+    }
+
     /// Activity from `eth_getLogs`, across all three Maren contracts and every event they
     /// emit — the same scan the web app runs (apps/web/src/lib/chain/logs.ts), so the two
     /// apps agree on a user's history. Vault (deposit/borrow/repay/withdraw), Pay

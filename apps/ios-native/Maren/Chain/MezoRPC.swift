@@ -116,6 +116,46 @@ struct MezoRPC: Sendable {
         return Self.word(try await call(to: earn, data: try convEnc.encoded()), 0)
     }
 
+    /// MarenEarn's asset composition, read from `assetBreakdown()` (selector 0x6a938424). All
+    /// five words are 18-decimal: `musdIdle` + `musdInPool` is the MUSD backing; `btcHeld` +
+    /// `btcPending` is Bitcoin the pool SEIZED absorbing liquidations (18-dec BTC, not 8), and
+    /// `btcValued` is that Bitcoin valued in MUSD at the oracle price. A short/failed read is a
+    /// throw upstream in `call`, never a fabricated zero breakdown.
+    struct EarnBreakdownRead: Sendable {
+        let musdIdleWei: BigUInt
+        let musdInPoolWei: BigUInt
+        let btcHeldWei: BigUInt
+        let btcPendingWei: BigUInt
+        let btcValuedWei: BigUInt
+    }
+
+    func earnAssetBreakdown() async throws -> EarnBreakdownRead {
+        let earn = MarenAddresses.of(chain.network).marenEarn
+        let enc = ABIFunctionEncoder("assetBreakdown")
+        let out = try await call(to: earn, data: try enc.encoded())
+        // Five 32-byte words = 160 bytes. A shorter reply means the node answered with a
+        // truncated result, which is a decode failure, not five zeroes.
+        guard out.count >= 160 else { throw MezoRPCError.decode("assetBreakdown returned a short result") }
+        return EarnBreakdownRead(
+            musdIdleWei: Self.word(out, 0),
+            musdInPoolWei: Self.word(out, 1),
+            btcHeldWei: Self.word(out, 2),
+            btcPendingWei: Self.word(out, 3),
+            btcValuedWei: Self.word(out, 4)
+        )
+    }
+
+    /// MarenEarn `isUsingStalePrice()` (selector 0xc1095f9f). True when the vault is valuing its
+    /// seized Bitcoin off a price the oracle would otherwise reject as too old — so `btcValued`
+    /// may understate the real figure and must not be presented as authoritative.
+    func earnIsUsingStalePrice() async throws -> Bool {
+        let earn = MarenAddresses.of(chain.network).marenEarn
+        let enc = ABIFunctionEncoder("isUsingStalePrice")
+        let out = try await call(to: earn, data: try enc.encoded())
+        guard out.count >= 32 else { throw MezoRPCError.decode("isUsingStalePrice returned a short result") }
+        return Self.word(out, 0) != 0
+    }
+
     /// MUSD `allowance(owner, spender)`, in wei — how much MUSD `spender` may pull via
     /// transferFrom. Read before a send so a first payment approves MarenPay once.
     func musdAllowance(owner: String, spender: String) async throws -> BigUInt {

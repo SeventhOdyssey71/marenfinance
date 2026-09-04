@@ -275,6 +275,7 @@ private struct EarnSection: View {
     var body: some View {
         balanceCard
         yieldCard
+        exposureCard
         riskCard
         actionRow
     }
@@ -317,6 +318,68 @@ private struct EarnSection: View {
                     .foregroundStyle(Theme.Palette.muted)
                     .fixedSize(horizontal: false, vertical: true)
             }
+        }
+    }
+
+    // What actually backs the pool right now: its MUSD, plus any Bitcoin it seized absorbing
+    // liquidations. One focal figure (the MUSD backing); the seized-BTC exposure and any stale
+    // price are stated honestly beneath it. Degrades to an explicit unavailable, never a zero.
+    private var exposureCard: some View {
+        MCard {
+            VStack(alignment: .leading, spacing: Theme.Space.sm) {
+                Text("Pool backing").labelStyle()
+                if let exposure = model.earnExposure {
+                    MoneyText(text: MoneyFormat.musd(exposure.musdBacking), size: 28, weight: .bold)
+                    Text("MUSD backing the Stability Pool")
+                        .font(.text(13)).foregroundStyle(Theme.Palette.tertiary)
+                    if exposure.btcSeized > 0 {
+                        Divider().overlay(Theme.Palette.ink.opacity(0.07))
+                        seizedLine(exposure)
+                    }
+                    if exposure.stalePrice {
+                        stalePriceNote
+                    }
+                } else {
+                    Unavailable(label: "Couldn’t read the pool backing")
+                }
+            }
+        }
+    }
+
+    // "Includes {btc} BTC seized at liquidation (≈ {musd} MUSD)". When the oracle price is stale
+    // the ≈ MUSD figure is withheld — the stale note below carries the reason — so a value the
+    // protocol would refuse is never presented as authoritative.
+    @ViewBuilder private func seizedLine(_ exposure: EarnExposure) -> some View {
+        HStack(alignment: .top, spacing: Theme.Space.sm) {
+            Image(systemName: "bitcoinsign.circle")
+                .font(.system(size: 14, weight: .semibold))
+                .foregroundStyle(Theme.Palette.muted)
+                .accessibilityHidden(true)
+            Text(seizedText(exposure))
+                .font(.text(13))
+                .foregroundStyle(Theme.Palette.muted)
+                .fixedSize(horizontal: false, vertical: true)
+        }
+    }
+
+    private func seizedText(_ exposure: EarnExposure) -> String {
+        let btc = MoneyFormat.btc(exposure.btcSeized)
+        if exposure.stalePrice {
+            return "Includes \(btc) seized at liquidation."
+        }
+        return "Includes \(btc) seized at liquidation (≈ \(MoneyFormat.musd(exposure.btcValuedMusd)))."
+    }
+
+    private var stalePriceNote: some View {
+        HStack(alignment: .top, spacing: Theme.Space.sm) {
+            Image(systemName: "clock.badge.exclamationmark")
+                .font(.system(size: 14, weight: .semibold))
+                .foregroundStyle(Theme.Palette.warning)
+                .accessibilityHidden(true)
+            Text("The oracle price is stale, so the BTC value may be understated.")
+                .font(.text(13))
+                .foregroundStyle(Theme.Palette.muted)
+                .fixedSize(horizontal: false, vertical: true)
         }
     }
 

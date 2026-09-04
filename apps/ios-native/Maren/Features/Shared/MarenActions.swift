@@ -118,10 +118,12 @@ struct DemoMarenActions: MarenActions {
 
 // MARK: - LiveMarenActions
 //
-// Pairs with `MezoMarenClient`. Drives the real chain layer. Send is wired end-to-end through
-// `MezoActions.send`; the remaining writes have no encoder in this build's chain layer and no
-// relayer is configured, so they decline honestly with the same sentence the RN app uses —
-// never a fabricated hash or receipt.
+// Pairs with `MezoMarenClient`. Drives the real chain layer. Every write has an encoder and is
+// wired end-to-end. The two self-paid actions — deposit and Earn (supply/withdraw) — send or
+// hold value a relayer cannot carry, so the user signs a direct tx, pays the BTC gas, and they
+// SETTLE on-chain now. The relayed actions — send, borrow, repay, withdraw, split, claim — need
+// a configured relayer; none is set in this build, so those decline honestly with the same
+// sentence the RN app uses, never a fabricated hash or receipt.
 
 struct LiveMarenActions: MarenActions {
     let network: MezoNetwork
