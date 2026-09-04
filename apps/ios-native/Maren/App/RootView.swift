@@ -9,15 +9,30 @@ import SwiftUI
 struct RootView: View {
     @State private var session = MarenSession()
     @State private var router = AppRouter()
+    /// First-run intro. Shown once, then persisted so it never returns. This is a UI flag only —
+    /// no key, no wallet state — so UserDefaults is the right home for it.
+    @AppStorage("hasOnboarded") private var hasOnboarded = false
     /// A screenshot/testing hook: `MAREN_SCREEN` preselects a tab and, for pay flows, presents
     /// the sheet at launch. Absent in normal use, so it changes nothing for a real user.
     @State private var launchDestination: PayDestination?
     private let launchScreen = ProcessInfo.processInfo.environment["MAREN_SCREEN"]
 
+    /// The intro gates the very first launch, ahead of the wallet gate. It is bypassed for the
+    /// screenshot/demo hooks (which expect the shell or a specific screen), and can be forced on
+    /// with `MAREN_SCREEN=intro` to capture it.
+    private var showIntro: Bool {
+        if launchScreen == "intro" { return true }
+        let screenshotMode = launchScreen != nil
+            || ProcessInfo.processInfo.environment["MAREN_DEMO"] != nil
+        return !hasOnboarded && !screenshotMode
+    }
+
     var body: some View {
         @Bindable var router = router
         return Group {
-            if session.hasWallet {
+            if showIntro {
+                IntroOnboardingView { hasOnboarded = true }
+            } else if session.hasWallet {
                 UnlockGate {
                     ZStack(alignment: .bottom) {
                         // All four tabs stay in the hierarchy so switching preserves scroll and
