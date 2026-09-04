@@ -1,6 +1,5 @@
 import Link from 'next/link';
 import { XLogo, GitHubLogo } from './ui/icons';
-import { StickerButton } from './ugly-ui';
 import { Reveal } from './ui/reveal';
 
 /**
@@ -45,20 +44,20 @@ const socials = [
 export function Footer() {
   return (
     <footer className="u-wrap pb-10 pt-24 sm:pt-28">
-      {/* Closing CTA — lime sticker panel */}
+      {/* Closing CTA — clean dark panel */}
       <Reveal>
-        <div className="u-glow-wrap rounded-[42px] bg-[color:var(--lime)] p-8 text-center sm:p-14">
-          <h2 className="u-display mx-auto max-w-[14ch] text-[clamp(40px,8vw,110px)]">
+        <div className="rounded-[36px] bg-[color:var(--ink)] p-10 text-center sm:p-16">
+          <h2 className="u-display mx-auto max-w-[16ch] text-[clamp(30px,5vw,58px)]" style={{ color: '#fff' }}>
             Spend Bitcoin. Never sell it.
           </h2>
-          <p className="mx-auto mt-5 max-w-[48ch] text-[16px] font-semibold leading-[1.5] text-[color:var(--ink)] sm:text-[18px]">
+          <p className="mx-auto mt-4 max-w-[46ch] text-[15px] font-normal leading-[1.5] text-white/65 sm:text-[17px]">
             Deposit from 0.001 BTC, draw MUSD, and spend it without keeping a gas balance. Maren is
             pre-audit, so start small.
           </p>
           <div className="mt-8 flex justify-center">
-            <StickerButton href="/app" variant="dark">
-              Launch app
-            </StickerButton>
+            <a href="/app" className="footer-cta">
+              Open the app
+            </a>
           </div>
         </div>
       </Reveal>

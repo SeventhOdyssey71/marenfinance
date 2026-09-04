@@ -59,9 +59,6 @@ export function Nav() {
           </div>
 
           <div className="flex items-center gap-3">
-            <a href="/app" className="nav-signin hidden sm:inline-flex">
-              Sign in
-            </a>
             <a href="/app" className="nav-cta">
               Open app
             </a>

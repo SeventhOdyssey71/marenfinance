@@ -33,10 +33,10 @@ export function HowItWorks() {
     <section id="how" className="u-wrap scroll-mt-28 pt-24 sm:pt-28">
       <Reveal className="flex flex-col items-center text-center">
         <Tag>How it works</Tag>
-        <h2 className="u-display mt-6 max-w-[16ch] text-[clamp(38px,6.5vw,84px)]">
+        <h2 className="u-display mt-5 max-w-[16ch] text-[clamp(30px,4.6vw,54px)]">
           Deposit. Draw. Spend.
         </h2>
-        <p className="mt-5 max-w-[52ch] text-[16px] font-medium leading-[1.5] text-[color:var(--muted)] sm:text-[18px]">
+        <p className="mt-4 max-w-[52ch] text-[15px] font-normal leading-[1.5] text-[color:var(--muted)] sm:text-[17px]">
           Three steps, one signature each. Borrow against Bitcoin without selling it, then move the
           dollars you draw the way you already move money.
         </p>
@@ -49,12 +49,12 @@ export function HowItWorks() {
             className="u-card flex flex-col p-6"
           >
             <span
-              className="u-display grid size-16 place-items-center rounded-[12px] text-[30px] leading-none text-[color:var(--ink)]"
-              style={{ background: s.fill }}
+              className="u-display grid size-14 place-items-center rounded-[14px] text-[26px] leading-none"
+              style={{ background: 'var(--accent-wash)', color: 'var(--accent-text)' }}
             >
               {s.n}
             </span>
-            <h3 className="mt-6 text-[22px] font-extrabold tracking-[-0.02em] text-[color:var(--ink)]">
+            <h3 className="mt-5 text-[20px] font-semibold tracking-[-0.02em] text-[color:var(--ink)]">
               {s.title}
             </h3>
             <p className="mt-3 text-[15px] font-medium leading-[1.5] text-[color:var(--muted)]">

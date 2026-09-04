@@ -164,8 +164,10 @@ function AccordionItem({
           <span
             aria-hidden
             className={`grid size-9 shrink-0 place-items-center rounded-[10px] transition-colors duration-[200ms] ease-out ${
-              open ? 'bg-[color:var(--lime)]' : 'bg-[color:var(--soft-fill)]'
-            } text-[color:var(--ink)]`}
+              open
+                ? 'bg-[color:var(--accent-wash)] text-[color:var(--accent-text)]'
+                : 'bg-[color:var(--soft-fill)] text-[color:var(--ink)]'
+            }`}
           >
             {open ? <Minus className="size-4" /> : <Plus className="size-4" />}
           </span>
@@ -196,10 +198,10 @@ export function Faq() {
       <div className="grid grid-cols-1 gap-8 lg:grid-cols-[0.8fr_1.2fr] lg:gap-14">
         <div className="lg:sticky lg:top-28 lg:self-start">
           <Tag>The awkward questions</Tag>
-          <h2 className="u-display mt-6 max-w-[12ch] text-[clamp(38px,6vw,76px)]">
+          <h2 className="u-display mt-5 max-w-[12ch] text-[clamp(30px,4.4vw,52px)]">
             Risk, stated plainly.
           </h2>
-          <p className="mt-5 max-w-[38ch] text-[16px] font-medium leading-[1.5] text-[color:var(--muted)]">
+          <p className="mt-4 max-w-[38ch] text-[15px] font-normal leading-[1.5] text-[color:var(--muted)]">
             We are handling people’s Bitcoin. Risk gets stated plainly, or it is not stated at all.
           </p>
         </div>

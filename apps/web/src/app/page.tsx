@@ -3,6 +3,7 @@ import './landing.css';
 import { Nav } from '@/components/nav';
 import { Hero } from '@/components/hero';
 import { Surfaces } from '@/components/surfaces';
+import { Showcase } from '@/components/showcase';
 import { HowItWorks } from '@/components/how-it-works';
 import { Faq } from '@/components/faq';
 import { Footer } from '@/components/footer';
@@ -35,6 +36,7 @@ export default function HomePage() {
       <main id="main">
         <Hero />
         <Surfaces />
+        <Showcase />
         <HowItWorks />
         <Faq />
       </main>

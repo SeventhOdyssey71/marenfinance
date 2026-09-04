@@ -158,8 +158,8 @@
   inset: -8% -6%;
   z-index: -1;
   border-radius: 50%;
-  background: radial-gradient(closest-side, rgba(250, 0, 255, 0.5), rgba(140, 90, 255, 0.28), transparent 72%);
-  filter: blur(48px);
+  background: radial-gradient(closest-side, rgba(91, 61, 245, 0.12), transparent 70%);
+  filter: blur(52px);
   pointer-events: none;
 }
 
@@ -259,7 +259,7 @@
 .landing .u-tag-dot {
   width: 8px;
   height: 8px;
-  background: var(--pink);
+  background: var(--accent);
   border-radius: 999px;
 }
 
@@ -516,4 +516,31 @@
   .landing .nav-links a:hover,
   .landing .nav-signin:hover { color: var(--ink); }
   .landing .nav-cta:hover { background: var(--accent-text); }
+}
+
+/* ── Footer closing CTA button (white pill on the dark panel) ─────────────── */
+.landing .footer-cta {
+  display: inline-flex; align-items: center; justify-content: center;
+  font-family: var(--body); font-weight: 500; font-size: 16px;
+  background: #fff; color: var(--ink);
+  padding: 14px 28px; border-radius: 999px;
+  transition: transform 200ms ease-out, background 200ms ease-out;
+}
+.landing .footer-cta:active { transform: scale(0.97); }
+@media (hover: hover) { .landing .footer-cta:hover { background: #ececef; } }
+
+/* ── Screenshot showcase — real app screens in mini phone frames ──────────── */
+.landing .showcase-row {
+  display: flex; gap: 28px; justify-content: center; flex-wrap: wrap; margin-top: 44px;
+}
+.landing .shot-fig { display: flex; flex-direction: column; align-items: center; }
+.landing .shot {
+  width: min(232px, 72vw); aspect-ratio: 1206 / 2622;
+  border-radius: 46px; background: #050506; padding: 7px;
+  box-shadow: 0 2px 3px rgba(16, 16, 19, 0.08), 0 42px 84px -32px rgba(16, 16, 19, 0.34);
+}
+.landing .shot img { width: 100%; height: 100%; object-fit: cover; border-radius: 39px; display: block; }
+.landing .shot-cap {
+  margin-top: 16px; font-family: var(--body); font-size: 14px;
+  color: var(--muted); text-align: center; max-width: 22ch;
 }
