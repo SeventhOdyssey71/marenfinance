@@ -22,7 +22,7 @@ struct ProfileView: View {
             securityCard
             howItWorksCard
             if !actions.canSettle {
-                Text("Reads run live against Mezo testnet. Writing (sending, borrowing) waits on a relayer, which isn’t configured in this build — so those actions decline honestly rather than pretend to settle.")
+                Text("Reads run live against Mezo testnet. Writing (sending, borrowing) waits on a relayer, which isn’t configured in this build, so those actions decline honestly rather than pretend to settle.")
                     .font(.text(13)).foregroundStyle(Theme.Palette.tertiary)
                     .fixedSize(horizontal: false, vertical: true)
             }
@@ -56,7 +56,7 @@ struct ProfileView: View {
             VStack(alignment: .leading, spacing: Theme.Space.sm) {
                 Text("Account").labelStyle()
                 Text(account?.handle ?? "—")
-                    .font(.system(size: 26, weight: .bold))
+                    .font(.display(26, weight: .bold))
                     .foregroundStyle(Theme.Palette.ink)
                 HStack(spacing: Theme.Space.sm) {
                     Text(account?.address ?? "—")
@@ -87,8 +87,8 @@ struct ProfileView: View {
                         .frame(width: 32)
                         .accessibilityHidden(true)
                     VStack(alignment: .leading, spacing: 2) {
-                        Text(keyTitle).font(.system(size: 16, weight: .semibold)).foregroundStyle(Theme.Palette.ink)
-                        Text(keySubtitle).font(.system(size: 14)).foregroundStyle(Theme.Palette.muted)
+                        Text(keyTitle).font(.text(16, weight: .medium)).foregroundStyle(Theme.Palette.ink)
+                        Text(keySubtitle).font(.text(14)).foregroundStyle(Theme.Palette.muted)
                             .fixedSize(horizontal: false, vertical: true)
                     }
                     Spacer(minLength: 0)
@@ -104,8 +104,8 @@ struct ProfileView: View {
         MCard {
             VStack(alignment: .leading, spacing: Theme.Space.sm) {
                 Text("How Maren works").labelStyle()
-                Text("Deposit BTC, borrow MUSD, pay by @handle — on Mezo. Your first deposit pays BTC gas; borrowing and every payment after are relayed and gasless. Minimum deposit \(MoneyFormat.btc(MarenPolicy.minCollateralBtc)).")
-                    .font(.system(size: 15)).foregroundStyle(Theme.Palette.muted)
+                Text("Deposit BTC, borrow MUSD, and pay by @handle, all on Mezo. Your first deposit pays BTC gas; borrowing and every payment after are relayed and gasless. Minimum deposit \(MoneyFormat.btc(MarenPolicy.minCollateralBtc)).")
+                    .font(.text(15)).foregroundStyle(Theme.Palette.muted)
                     .fixedSize(horizontal: false, vertical: true)
             }
         }
@@ -137,7 +137,7 @@ struct ProfileView: View {
         case .keychainBiometric:
             return "Your signing key is in the Keychain and needs a biometric check before every transaction."
         case let .sessionOnly(reason):
-            return "\(reason) The key lives in memory for this session and is not described as biometrically protected."
+            return "\(reason) The key stays in memory for this session only, not protected by biometrics."
         case .none:
             return capability.available && capability.enrolled
                 ? "Create or import a key to sign transactions. It will be protected by \(capability.displayName)."

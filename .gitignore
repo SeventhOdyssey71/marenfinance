@@ -106,3 +106,6 @@ Screenshot*.png
 
 # Local design source assets (fonts + raw screenshots); the app ships derived woff2 + public/shots
 design/
+
+# Atomic-write / editor temp artifacts
+.!*!*

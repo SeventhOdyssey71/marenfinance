@@ -41,7 +41,7 @@ struct SplitFlow: View {
     }
 
     @ViewBuilder private var entry: some View {
-        Text("Pay several people at once. Each leg is its own transfer — nothing is pooled.")
+        Text("Pay several people at once. Each leg is its own transfer. Nothing is pooled.")
             .font(.system(size: 15))
             .foregroundStyle(Theme.Palette.muted)
             .fixedSize(horizontal: false, vertical: true)

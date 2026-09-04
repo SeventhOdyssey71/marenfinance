@@ -115,7 +115,7 @@ struct ActivityView: View {
                         .accessibilityHidden(true)
                     Text("Could not read your activity").font(.system(size: 17, weight: .semibold)).foregroundStyle(Theme.Palette.ink)
                 }
-                Text("This is a read that failed, not an empty history — so nothing is shown rather than a misleading “no activity”.")
+                Text("This is a read that failed, not an empty history, so nothing is shown rather than a misleading “no activity”.")
                     .font(.system(size: 15)).foregroundStyle(Theme.Palette.muted)
                     .fixedSize(horizontal: false, vertical: true)
                 PillButton(title: "Try again", variant: .quiet) { Task { await load() } }

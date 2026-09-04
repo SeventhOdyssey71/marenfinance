@@ -32,7 +32,7 @@ struct ClaimableLinkFlow: View {
     }
 
     @ViewBuilder private var entry: some View {
-        Text("Escrow MUSD to a one-time link. Whoever opens it can claim the funds into their own wallet — so treat the link like cash.")
+        Text("Escrow MUSD to a one-time link. Whoever opens it can claim the funds into their own wallet, so treat the link like cash.")
             .font(.system(size: 15))
             .foregroundStyle(Theme.Palette.muted)
             .fixedSize(horizontal: false, vertical: true)
@@ -95,7 +95,7 @@ struct ClaimableLinkFlow: View {
                         Image(systemName: "eye.trianglebadge.exclamationmark")
                             .font(.system(size: 13, weight: .bold)).foregroundStyle(Theme.Palette.warning)
                             .accessibilityHidden(true)
-                        Text("Shown once — save it now").labelStyle().foregroundStyle(Theme.Palette.warning)
+                        Text("Shown once, save it now").labelStyle().foregroundStyle(Theme.Palette.warning)
                     }
                     Text(link)
                         .font(.figure(13, weight: .regular))
