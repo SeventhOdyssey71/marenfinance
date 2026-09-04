@@ -666,7 +666,7 @@ function ReviewStep({
       {needsApproval ? (
         <div className="mt-6">
           <Note>
-            MarenPay needs an allowance for {formatMusd(amountWei)} first — currently{' '}
+            MarenPay needs an allowance for {formatMusd(amountWei)} first; currently{' '}
             {formatMusd(allowanceWei ?? 0n)}. That is a separate transaction, shown here rather
             than slipped in behind the payment.
           </Note>

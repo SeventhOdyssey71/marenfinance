@@ -485,7 +485,7 @@ function Receipt({ item, counterparty }: { item: ActivityItem; counterparty?: st
           {item.status === 'pending' ? (
             <span className="text-text-subtle">not settled yet</span>
           ) : item.sponsored ? (
-            <span className="text-text">Sponsored — no gas paid by you</span>
+            <span className="text-text">Sponsored. No gas paid by you</span>
           ) : (
             // `Btc` not a bare `formatBtc`: Mezo's gas is a few hundred wei and a real fee
             // of 0.000000029 BTC rounds to "0 BTC" at display precision, so the exact

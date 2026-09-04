@@ -826,7 +826,7 @@ function SplitPanel({ runner }: { runner: TxRunner }) {
         {funds.ok && needsApproval && total > 0n ? (
           <div className="mt-6">
             <Note>
-              MarenPay needs an allowance for {formatMusd(total)} before it can pull the split —
+              MarenPay needs an allowance for {formatMusd(total)} before it can pull the split;
               currently {formatMusd(allowanceWei ?? 0n)}. That is a separate transaction, shown here
               rather than slipped in behind the payment.
             </Note>

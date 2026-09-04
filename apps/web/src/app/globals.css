@@ -69,7 +69,7 @@
     --color-bg: #f2f2f2; /* paper-cream canvas */
     --color-surface: #ffffff; /* soft-white card */
     --color-surface-raised: #ffffff;
-    --color-surface-inset: #ececef; /* quiet grey well — tone, not a border */
+    --color-surface-inset: #ececef; /* quiet grey well: tone, not a border */
     --color-text: #101013; /* ink */
     --color-text-muted: #6e6e6e; /* secondary (AA on paper + card) */
     --color-text-subtle: #9a9aa2; /* tertiary / greyed decimals */

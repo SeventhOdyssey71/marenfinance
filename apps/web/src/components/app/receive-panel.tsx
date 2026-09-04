@@ -49,7 +49,7 @@ export function ReceivePanel() {
             <p className="text-text-subtle text-sm">Checking for a registered handle…</p>
           ) : (
             <p className="text-text-muted text-sm">
-              No handle registered yet — you can still be paid at the address below.
+              No handle registered yet, but you can still be paid at the address below.
             </p>
           )}
           <p className="num text-text-subtle mt-2 break-all text-xs">{account}</p>

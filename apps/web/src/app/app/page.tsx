@@ -394,7 +394,7 @@ function PositionCard({
                 ) : (
                   <>
                     Mezo fixes this trove’s borrowing ceiling at the price it opened at. Adding
-                    collateral does not raise it — only a refinance does, at today’s price for a
+                    collateral does not raise it; only a refinance does, at today’s price for a
                     fee.{' '}
                   </>
                 )}
