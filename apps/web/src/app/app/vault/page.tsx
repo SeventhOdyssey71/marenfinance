@@ -32,6 +32,7 @@ import { PriceBanner } from '@/components/app/price-banner';
 import {
   ActionButton,
   AppCard,
+  AppLoading,
   EmptyState,
   Label,
   Metric,
@@ -39,6 +40,7 @@ import {
   Note,
   Panel,
   PanelBody,
+  Refreshing,
   StatRow,
 } from '@/components/app/primitives';
 import { TxSheet, useTxRunner, type TxIntent, type TxRunner } from '@/components/app/tx';
@@ -141,10 +143,14 @@ export default function VaultPage() {
   const [chosen, setChosen] = useState<Mode | null>(null);
   const source = useDataSource();
   const price = usePrice();
-  const { data: position } = usePosition();
-  const { data: balances } = useBalances();
-  const { data: stats } = useProtocolStats();
+  const positionQ = usePosition();
+  const balancesQ = useBalances();
+  const statsQ = useProtocolStats();
   const runner = useTxRunner();
+
+  const position = positionQ.data;
+  const balances = balancesQ.data;
+  const stats = statsQ.data;
 
   const livePrice = price.state === 'live' ? price.priceWei : null;
 
@@ -188,6 +194,25 @@ export default function VaultPage() {
     );
   }
 
+  // The account's own figures have not arrived yet: skeletons hold the layout rather than
+  // a slider bound to a position that is not loaded.
+  const firstLoad = source.ready && (positionQ.isLoading || balancesQ.isLoading);
+  // Figures are up and being re-read — after a confirmed deposit, borrow, repay or
+  // withdraw the shared invalidation refetches these, and this is where the user sees it.
+  const refreshing =
+    source.ready &&
+    !firstLoad &&
+    (positionQ.isFetching || balancesQ.isFetching || statsQ.isFetching);
+
+  if (firstLoad) {
+    return (
+      <div className="flex flex-col gap-4">
+        <Header />
+        <AppLoading panels={[3, 3]} />
+      </div>
+    );
+  }
+
   const empty = position !== undefined && position.collateralWei === 0n && position.debtWei === 0n;
 
   /**
@@ -199,7 +224,7 @@ export default function VaultPage() {
 
   return (
     <div className="flex flex-col gap-4">
-      <Header />
+      <Header refreshing={refreshing} />
 
       {price.state !== 'live' ? <PriceBanner feed={price} /> : null}
 
@@ -225,11 +250,14 @@ export default function VaultPage() {
   );
 }
 
-function Header() {
+function Header({ refreshing = false }: { refreshing?: boolean }) {
   return (
-    <div>
-      <Label>Vault</Label>
-      <h1 className="t-h3 mt-1.5">Bitcoin credit</h1>
+    <div className="flex items-start justify-between gap-4">
+      <div>
+        <Label>Vault</Label>
+        <h1 className="t-h3 mt-1.5">Bitcoin credit</h1>
+      </div>
+      {refreshing ? <Refreshing /> : null}
     </div>
   );
 }

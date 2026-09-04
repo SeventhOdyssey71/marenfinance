@@ -10,7 +10,7 @@ import { ConnectPrompt } from '@/components/app/connect-prompt';
 import { AmountField, Segmented } from '@/components/app/controls';
 import { HandleRegistration } from '@/components/app/handle-registration';
 import { Musd } from '@/components/app/money';
-import { ActionButton, Info, Label, Note, Panel } from '@/components/app/primitives';
+import { ActionButton, Info, Label, Note, Panel, Refreshing } from '@/components/app/primitives';
 import { ReceivePanel } from '@/components/app/receive-panel';
 import { SendFlow } from '@/components/app/send-flow';
 import { TxSheet, useTxRunner, type TxIntent, type TxRunner } from '@/components/app/tx';
@@ -71,6 +71,13 @@ export default function PayPage() {
   const [tab, setTab] = useState<Tab>('send');
   const runner = useTxRunner();
 
+  // Pay is a form surface, so there is nothing to skeleton — the inputs are usable at
+  // once and the action buttons are already gated on `writes.ready` and the preflight.
+  // The one figure behind them is the MUSD balance, so its read (on first load and on the
+  // refetch a confirmed send/split/link triggers) is what the quiet header mark reflects.
+  const balancesQ = useBalances();
+  const refreshing = source.ready && balancesQ.isFetching;
+
   // Home's action pills deep-link a tab through the URL hash (e.g. `/app/pay#receive`).
   // Read it once on mount so "Receive" lands on Receive; unknown hashes are ignored and
   // the default Send stands. No new state, and the segmented control still owns `tab`.
@@ -94,7 +101,7 @@ export default function PayPage() {
 
   return (
     <div className="flex flex-col gap-4">
-      <Header />
+      <Header refreshing={refreshing} />
 
       <Segmented options={TABS} value={tab} onChange={setTab} label="Payment type" />
 
@@ -110,11 +117,14 @@ export default function PayPage() {
   );
 }
 
-function Header() {
+function Header({ refreshing = false }: { refreshing?: boolean }) {
   return (
-    <div>
-      <Label>Pay</Label>
-      <h1 className="t-h3 mt-1.5">Move dollars</h1>
+    <div className="flex items-start justify-between gap-4">
+      <div>
+        <Label>Pay</Label>
+        <h1 className="t-h3 mt-1.5">Move dollars</h1>
+      </div>
+      {refreshing ? <Refreshing /> : null}
     </div>
   );
 }

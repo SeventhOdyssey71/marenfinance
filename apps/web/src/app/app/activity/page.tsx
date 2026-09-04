@@ -7,7 +7,15 @@ import type { Address } from 'viem';
 import { ConnectPrompt } from '@/components/app/connect-prompt';
 import { Segmented } from '@/components/app/controls';
 import { Btc, Num } from '@/components/app/money';
-import { EmptyState, Info, Label, Loading, Note, Panel } from '@/components/app/primitives';
+import {
+  AppLoading,
+  EmptyState,
+  Info,
+  Label,
+  Note,
+  Panel,
+  Refreshing,
+} from '@/components/app/primitives';
 import {
   ArrowDown,
   ArrowUpRight,
@@ -68,8 +76,13 @@ const explorer = getChain(NETWORK).blockExplorers.default;
  */
 export default function ActivityPage() {
   const source = useDataSource();
-  const { data: window, isPending, error } = useActivity();
+  const { data: window, isPending, isFetching, error } = useActivity();
   const [filter, setFilter] = useState<Filter>('all');
+
+  // The list is up and the log scan is running again — a background refetch, or the one a
+  // confirmed write triggers through the shared invalidation. Keep the rows on screen and
+  // mark the re-read quietly rather than dropping back to the skeleton.
+  const refreshing = source.connected && window !== undefined && isFetching;
 
   const items = useMemo(() => window?.items ?? [], [window]);
   const rows = items.filter((item) => filter === 'all' || GROUPS[filter].includes(item.kind));
@@ -91,9 +104,12 @@ export default function ActivityPage() {
 
   return (
     <div className="flex flex-col gap-4">
-      <div>
-        <Label>Activity</Label>
-        <h1 className="t-h3 mt-1.5">History</h1>
+      <div className="flex items-start justify-between gap-4">
+        <div>
+          <Label>Activity</Label>
+          <h1 className="t-h3 mt-1.5">History</h1>
+        </div>
+        {refreshing ? <Refreshing /> : null}
       </div>
 
       <Body
@@ -144,7 +160,7 @@ function Body({
   }
 
   if (!window && !error && isPending) {
-    return <Loading>Reading your history from Maren&rsquo;s contract logs&hellip;</Loading>;
+    return <AppLoading panels={[6]} />;
   }
 
   /**

@@ -380,3 +380,103 @@ export function Loading({ children }: { children: ReactNode }) {
     </div>
   );
 }
+
+/**
+ * ONE loading vocabulary for the whole app, in two words.
+ *
+ * A `Skeleton` block is what a screen shows while it has NOTHING yet — it stands in the
+ * exact footprint the real figure will take, so the number arriving does not shove the
+ * layout. `Refreshing` is what a screen shows while it already has figures on display and
+ * is re-reading them (a react-query background refetch, and every refetch a confirmed
+ * write triggers): the existing numbers stay put and update calmly in place, with a quiet
+ * violet mark saying they are being checked rather than the screen blanking. Honest-data
+ * cuts both ways here — a skeleton is an admission we do not know the number yet, never a
+ * placeholder figure; and a background refetch never hides the last known-true value
+ * behind a spinner, because that value is still the truest thing we can show until a new
+ * one lands.
+ */
+
+/**
+ * A neutral skeleton block: the quiet violet-grey `surface-inset` well, pulsing gently.
+ * Decorative, so `aria-hidden` — the announcement lives once on the `AppLoading` wrapper
+ * rather than on every block. Under `prefers-reduced-motion` the pulse is dropped for a
+ * static block, the same call the spinners make: a paused animation reads as broken.
+ */
+export function Skeleton({ className = '' }: { className?: string }) {
+  return (
+    <span
+      aria-hidden
+      className={`bg-surface-inset block animate-pulse rounded-[var(--radius-input)] motion-reduce:animate-none ${className}`}
+    />
+  );
+}
+
+/**
+ * A card-shaped skeleton that traces `Panel`: the same hairline, the same header bar over
+ * a rule, the same edge-to-edge rows at `StatRow`'s rhythm. Matching the final shape is
+ * the point — the panel does not resize or jump when the real numbers replace it.
+ */
+export function SkeletonPanel({ rows = 3, header = true }: { rows?: number; header?: boolean }) {
+  return (
+    <div className="card" aria-hidden>
+      {header ? (
+        <div className="flex items-center justify-between border-b border-[var(--border-hairline)] px-5 py-3">
+          <Skeleton className="h-3 w-24" />
+        </div>
+      ) : null}
+      <div className="px-5 py-1.5">
+        {Array.from({ length: rows }).map((_, i) => (
+          <div
+            key={i}
+            className={`flex items-center justify-between gap-4 py-3 ${
+              i === rows - 1 ? '' : 'border-b border-[var(--border-hairline)]'
+            }`}
+          >
+            <Skeleton className="h-3.5 w-28" />
+            <Skeleton className="h-4 w-20" />
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+/**
+ * The first-load body: a stack of `SkeletonPanel`s, one per panel the real screen will
+ * show, so the page keeps its height and rhythm before any figure has arrived. Carries
+ * the single `role="status"` for the whole skeleton, announced once rather than once per
+ * block. `panels` is the row count for each card, so a caller matches its own layout.
+ */
+export function AppLoading({ panels = [3, 3] }: { panels?: number[] }) {
+  return (
+    <div role="status" className="flex flex-col gap-4">
+      <span className="sr-only">Reading your data from Mezo</span>
+      {panels.map((rows, i) => (
+        <SkeletonPanel key={i} rows={rows} />
+      ))}
+    </div>
+  );
+}
+
+/**
+ * The background-refetch mark: a quiet brand-violet spinner and one word, shown beside a
+ * screen's title while its figures are being re-read. It never covers the numbers — the
+ * whole point is that they stay on screen and update in place. `role="status"` so a
+ * screen reader hears the update without it being an interruption; reduced-motion swaps
+ * the ring for a static dot, matching every other spinner in the app.
+ */
+export function Refreshing({ label = 'Refreshing' }: { label?: string }) {
+  return (
+    <span className="text-text-subtle inline-flex items-center gap-2 text-xs" role="status">
+      <span
+        aria-hidden
+        className="size-3 shrink-0 animate-spin rounded-[var(--radius-pill)] border-2 border-violet-500 border-t-transparent motion-reduce:hidden"
+      />
+      <span
+        aria-hidden
+        className="hidden size-1.5 shrink-0 rounded-[var(--radius-pill)] bg-violet-500 motion-reduce:block"
+      />
+      {label}
+    </span>
+  );
+}

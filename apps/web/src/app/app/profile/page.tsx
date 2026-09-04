@@ -4,7 +4,14 @@ import { getChain, shortAddress } from '@maren/sdk';
 
 import { ConnectPrompt } from '@/components/app/connect-prompt';
 import { HandleRegistrationCard } from '@/components/app/handle-registration';
-import { Label, Panel, PanelBody, StatRow } from '@/components/app/primitives';
+import {
+  Label,
+  Panel,
+  PanelBody,
+  Refreshing,
+  Skeleton,
+  StatRow,
+} from '@/components/app/primitives';
 import { ConnectButton } from '@/components/app/wallet';
 import { ProfileIcon } from '@/components/ui/icons';
 import { NETWORK, useDataSource, usePrimaryHandle } from '@/lib/data/source';
@@ -19,7 +26,8 @@ import { NETWORK, useDataSource, usePrimaryHandle } from '@/lib/data/source';
  */
 export default function ProfilePage() {
   const source = useDataSource();
-  const { data: handle } = usePrimaryHandle();
+  const handleQ = usePrimaryHandle();
+  const handle = handleQ.data;
   const chain = getChain(NETWORK);
 
   if (!source.connected) {
@@ -39,9 +47,15 @@ export default function ProfilePage() {
 
   const account = source.account ?? '';
 
+  // The address and network are known the moment a wallet is connected; only the handle is
+  // a chain read. So the panel renders at once and just the handle row wears a skeleton
+  // until the registry answers — nothing shifts, and no value is invented in the meantime.
+  const handleLoading = source.ready && handleQ.isLoading;
+  const refreshing = source.ready && !handleLoading && handleQ.isFetching;
+
   return (
     <div className="flex flex-col gap-4">
-      <Header />
+      <Header refreshing={refreshing} />
 
       <HandleRegistrationCard />
 
@@ -49,7 +63,13 @@ export default function ProfilePage() {
         <PanelBody>
           <StatRow
             label="Handle"
-            value={handle ?? <span className="text-text-subtle text-sm">none yet</span>}
+            value={
+              handleLoading ? (
+                <Skeleton className="h-4 w-24" />
+              ) : (
+                (handle ?? <span className="text-text-subtle text-sm">none yet</span>)
+              )
+            }
           />
           <StatRow
             label="Address"
@@ -83,11 +103,14 @@ export default function ProfilePage() {
   );
 }
 
-function Header() {
+function Header({ refreshing = false }: { refreshing?: boolean }) {
   return (
-    <div>
-      <Label>Profile</Label>
-      <h1 className="t-h3 mt-1.5">You on Maren</h1>
+    <div className="flex items-start justify-between gap-4">
+      <div>
+        <Label>Profile</Label>
+        <h1 className="t-h3 mt-1.5">You on Maren</h1>
+      </div>
+      {refreshing ? <Refreshing /> : null}
     </div>
   );
 }

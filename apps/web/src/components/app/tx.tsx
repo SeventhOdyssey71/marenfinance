@@ -216,7 +216,34 @@ export function useTxRunner(): TxRunner {
       }
 
       const outcome = await confirmTransaction(client, hash, { sponsored: intent.gas.sponsored });
-      await queryClient.invalidateQueries({ queryKey: ['maren'] });
+
+      /**
+       * REFETCH ONLY ON A CONFIRMED RECEIPT, NEVER ON A HASH.
+       *
+       * This is the one place the whole app learns that on-chain state has actually
+       * moved, so it is the one place the read caches are invalidated — every screen's
+       * balances, position, vault health, Earn position and exposure, and activity then
+       * refetch from RPC on their own, and the user sees the new numbers without touching
+       * anything. It is gated on `delivered` on purpose: a revert moved nothing, and a
+       * timeout or an unreachable node tells us NOTHING about whether it landed, so
+       * refetching on those could only ever repaint the same figures or, worse, dress a
+       * stale read as a fresh result. Honest-data: a new number appears only once the
+       * chain has one.
+       *
+       *   - `['maren']` covers every react-query read in `lib/data/source.ts`, which all
+       *     key under that namespace (balances, position, earn, activity, protocol, price,
+       *     handles).
+       *   - `['readContract']` is wagmi's own key prefix, and the MUSD allowance
+       *     (`useMusdAllowance`) is a wagmi `useReadContract` living outside the `maren`
+       *     namespace. Refetching it is what makes the one-time approve step disappear the
+       *     moment the approval confirms, rather than lingering until a manual reload.
+       */
+      if (outcome.kind === 'delivered') {
+        await Promise.all([
+          queryClient.invalidateQueries({ queryKey: ['maren'] }),
+          queryClient.invalidateQueries({ queryKey: ['readContract'] }),
+        ]);
+      }
 
       /**
        * A transaction that passed simulation and then reverted anyway means state moved

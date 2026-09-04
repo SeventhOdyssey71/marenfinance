@@ -8,6 +8,7 @@ import { Btc, Dash, Musd, Num } from '@/components/app/money';
 import {
   ActionButton,
   AppCard,
+  AppLoading,
   EmptyState,
   Info,
   Label,
@@ -15,6 +16,7 @@ import {
   MetricStrip,
   Note,
   Panel,
+  Refreshing,
   StatRow,
 } from '@/components/app/primitives';
 import { TxSheet, useTxRunner, type TxIntent } from '@/components/app/tx';
@@ -51,8 +53,10 @@ import type { EarnPosition } from '@/lib/data/types';
  */
 export default function EarnPage() {
   const source = useDataSource();
-  const { data: earn } = useEarn();
-  const { data: balances } = useBalances();
+  const earnQ = useEarn();
+  const balancesQ = useBalances();
+  const earn = earnQ.data;
+  const balances = balancesQ.data;
   const runner = useTxRunner();
   const writes = useMarenWrites({ onSimulated: runner.onSimulated });
   const relayer = useRelayerStatus();
@@ -192,11 +196,31 @@ export default function EarnPage() {
     );
   }
 
+  // Earn's own figures have not landed yet: hold the layout with skeletons rather than a
+  // 0.00 MUSD balance that reads as a real, empty position.
+  const firstLoad = source.ready && (earnQ.isLoading || balancesQ.isLoading);
+  const refreshing = source.ready && !firstLoad && (earnQ.isFetching || balancesQ.isFetching);
+
+  if (firstLoad) {
+    return (
+      <div className="flex flex-col gap-4">
+        <div>
+          <Label>Earn</Label>
+          <h1 className="t-h3 mt-1.5">Idle MUSD</h1>
+        </div>
+        <AppLoading panels={[2, 3]} />
+      </div>
+    );
+  }
+
   return (
     <div className="flex flex-col gap-4">
-      <div>
-        <Label>Earn</Label>
-        <h1 className="t-h3 mt-1.5">Idle MUSD</h1>
+      <div className="flex items-start justify-between gap-4">
+        <div>
+          <Label>Earn</Label>
+          <h1 className="t-h3 mt-1.5">Idle MUSD</h1>
+        </div>
+        {refreshing ? <Refreshing /> : null}
       </div>
 
       <Panel title="Your balance in Earn">

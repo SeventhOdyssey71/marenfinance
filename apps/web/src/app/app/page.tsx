@@ -26,12 +26,14 @@ import { PriceBanner } from '@/components/app/price-banner';
 import {
   ActionLink,
   AppCard,
+  AppLoading,
   EmptyState,
   Info,
   Label,
   Note,
   Panel,
   PanelBody,
+  Refreshing,
   StatRow,
 } from '@/components/app/primitives';
 import { ConnectPrompt } from '@/components/app/connect-prompt';
@@ -83,14 +85,38 @@ import type { ActivityItem } from '@/lib/data/types';
 export default function PortfolioPage() {
   const source = useDataSource();
   const price = usePrice();
-  const { data: position } = usePosition();
-  const { data: balances } = useBalances();
-  const { data: earn } = useEarn();
+  const positionQ = usePosition();
+  const balancesQ = useBalances();
+  const earnQ = useEarn();
   const { data: handle } = usePrimaryHandle();
+
+  const position = positionQ.data;
+  const balances = balancesQ.data;
+  const earn = earnQ.data;
 
   const livePrice = price.state === 'live' ? price.priceWei : null;
 
   if (!source.connected) return <NotConnected />;
+
+  // Nothing on chain has arrived yet: stand in with skeletons that hold the layout, never
+  // with zeroes that would read as a real, empty position.
+  const firstLoad = source.ready && (positionQ.isLoading || balancesQ.isLoading || earnQ.isLoading);
+  // Figures are on screen and being re-read (a background refetch, or the refetch a
+  // confirmed write triggers). Say so quietly; do not blank the numbers.
+  const refreshing =
+    source.ready &&
+    !firstLoad &&
+    (positionQ.isFetching || balancesQ.isFetching || earnQ.isFetching);
+
+  if (firstLoad) {
+    return (
+      <div className="flex flex-col gap-4">
+        <AccountHeader handle={handle ?? null} account={source.account ?? ''} price={price} />
+        <ActionPills />
+        <AppLoading panels={[3, 2]} />
+      </div>
+    );
+  }
 
   const empty = position !== undefined && position.collateralWei === 0n && position.debtWei === 0n;
   const debtFree = position !== undefined && !empty && position.debtWei === 0n;
@@ -108,7 +134,12 @@ export default function PortfolioPage() {
 
   return (
     <div className="flex flex-col gap-4">
-      <AccountHeader handle={handle ?? null} account={source.account ?? ''} price={price} />
+      <AccountHeader
+        handle={handle ?? null}
+        account={source.account ?? ''}
+        price={price}
+        refreshing={refreshing}
+      />
 
       <ActionPills />
 
@@ -528,10 +559,12 @@ function AccountHeader({
   handle,
   account,
   price,
+  refreshing = false,
 }: {
   handle: string | null;
   account: string;
   price: ReturnType<typeof usePrice>;
+  refreshing?: boolean;
 }) {
   return (
     <div className="flex flex-wrap items-end justify-between gap-x-6 gap-y-2">
@@ -540,7 +573,10 @@ function AccountHeader({
         <h1 className="t-h3 mt-1.5 truncate">{handle ?? 'Your position'}</h1>
         <p className="num text-text-subtle mt-1 text-xs">{shortAddress(account, 10, 8)}</p>
       </div>
-      {price.state === 'live' ? <PriceBanner feed={price} /> : null}
+      <div className="flex items-center gap-4">
+        {refreshing ? <Refreshing /> : null}
+        {price.state === 'live' ? <PriceBanner feed={price} /> : null}
+      </div>
     </div>
   );
 }
