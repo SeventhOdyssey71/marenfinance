@@ -46,7 +46,7 @@ export function Hero() {
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img
                 src="/app-home.png"
-                alt="The Maren app home screen: a Bitcoin-backed MUSD balance, Send and Receive, a healthy Bitcoin vault, and recent transactions."
+                alt="The Maren app home screen: a Bitcoin-backed MUSD balance, Send and Receive, a Bitcoin vault with its liquidation buffer, and recent transactions."
               />
             </div>
           </div>
