@@ -3,54 +3,57 @@ title: "Maren Finance"
 description: "Spend Bitcoin. Never sell it. A money app for Bitcoin, built on Mezo."
 ---
 
-Maren is a consumer borrowing and payments app for [Mezo](https://mezo.org). You deposit
-Bitcoin, borrow MUSD against it from as little as 0.001 BTC, and spend it: pay a `@name`,
-share a payment link, request money, and put idle MUSD to work. Your Bitcoin stays yours the
-whole time, and when you repay you get all of it back. It is built for Mezo and deployed
-nowhere else.
+Maren is a money app for Bitcoin, built on [Mezo](https://mezo.org). Deposit Bitcoin, borrow
+MUSD against it from as little as 0.001 BTC, and spend it: pay a `@name`, send a money link,
+request money, and put idle MUSD to work. Your Bitcoin stays yours the whole time, and when you
+repay you get all of it back.
+
+It is built mobile-first. The iOS app is the headline product; a web app runs the same screens
+against the same contracts. Both are built for Mezo and deployed nowhere else.
 
 <Warning>
   **Maren is pre-audit and lives on Mezo testnet only.** Every contract runs on Mezo matsnet
-  (chain `31611`). Maren's mainnet addresses are all zeroes because Maren is not on mainnet:
-  a third-party audit is the deliberate gate. Do not use Maren with funds you cannot afford
-  to lose. The relayer that makes actions gasless is built and tested but not yet hosted, so
-  today your first deposit costs BTC gas.
+  (chain `31611`), and its mainnet addresses are all zeroes because Maren is not on mainnet: a
+  third-party audit is the deliberate gate. Do not use Maren with funds you cannot afford to
+  lose. The relayer that makes actions gasless is built and tested but not yet hosted, so today
+  your first deposit costs BTC gas.
 </Warning>
 
-## The honest one paragraph
+## Why Maren
 
-Mezo already runs the hard part: a live, audited borrowing engine where BTC mints a dollar.
-What it does not have is a consumer door. The protocol imposes a 2,000 MUSD minimum loan,
-about $3,000 of BTC to open responsibly, so a small holder cannot borrow at all; every action
-costs BTC gas; and once you hold MUSD there is almost nowhere to spend it. On-chain, MUSD is a
-DeFi-internal asset: only about 4.6% of its supply was created by user borrowing, and fewer
-than thirty troves are open. Maren is a bet that a consumer layer can create demand where none
-exists yet. Its real edge is not cheaper collateral: it is **no minimum loan size** at all. You
-can borrow $25 against $77 of Bitcoin, which the protocol itself cannot do. Whether meaningful
-demand exists is unproven, and we treat it as a bet rather than a certainty.
+Mezo already runs the hard part: a live, audited engine where BTC mints a dollar. What it does
+not have is a consumer door. The protocol requires a 2,000 MUSD minimum loan (about $3,000 of BTC
+to open responsibly), every action costs BTC gas, and once you hold MUSD there is almost nowhere
+to spend it. On-chain, MUSD is a DeFi-internal asset: only about 4.6% of its supply was created
+by user borrowing, across fewer than thirty troves.
 
-## Where to go next
+Maren's edge is not cheaper collateral. It is **no minimum loan size at all**. You can borrow $25
+against $77 of Bitcoin, which the protocol itself cannot do. Whether that demand exists is
+unproven, and we treat it as a bet, not a certainty.
 
-<CardGroup cols={2}>
-  <Card title="Quickstart" icon="rocket" href="/get-started/quickstart">
-    Connect on matsnet, deposit BTC, borrow MUSD, and spend it, in a few minutes.
-  </Card>
-  <Card title="The Social Vault" icon="vault" href="/product/social-vault">
-    The pooled model that removes the minimum loan, its wedge, and the risk it carries.
-  </Card>
-  <Card title="How it works" icon="gears" href="/how-it-works/pooled-vault">
-    Shares, the gasless relayer, preflight, and the redemption splitter, in depth.
-  </Card>
-  <Card title="Contracts and networks" icon="file-contract" href="/reference/contracts">
-    The five live matsnet addresses, the MUSD protocol addresses, and the precompiles.
-  </Card>
-  <Card title="Security and risk" icon="shield-halved" href="/security/risk">
-    What can lose user funds, stated plainly, and the three adversarial audits run so far.
-  </Card>
-  <Card title="Build and verify" icon="terminal" href="/developers/verify-on-chain">
-    Run Maren locally, and check every address and the live pooled trove yourself.
-  </Card>
-</CardGroup>
+## Where we're building toward
+
+Mobile-first Bitcoin spending, shipped in the order that keeps user funds safe:
+
+<Steps>
+  <Step title="Now: live on testnet">
+    Five contracts on matsnet, web app live, iOS app built and running the same screens. A real
+    user has borrowed through the app.
+  </Step>
+  <Step title="Next: TestFlight beta">
+    The iOS app goes to a small beta cohort on matsnet, and the gasless relayer gets hosted so
+    users stop paying gas after their first deposit.
+  </Step>
+  <Step title="Then: audit">
+    An independent audit of the two contracts that carry risk, with findings and remediations
+    published. This is the gate to mainnet.
+  </Step>
+  <Step title="Then: capped mainnet">
+    Mainnet launch with a hard-capped pooled vault. The cap rises only as the position proves out.
+  </Step>
+</Steps>
+
+The full trajectory, with the honest state of each phase, is on the [Roadmap](/get-started/roadmap).
 
 ## What is real today
 
@@ -64,8 +67,8 @@ demand exists is unproven, and we treat it as a bet rather than a certainty.
     `TroveManager`. Every claim carries a transaction hash.
   </Card>
   <Card title="Not yet mainnet" icon="circle-half-stroke">
-    No mainnet deployment, no paid audit, and the relayer is not hosted. Each of these is
-    stated on the pages that depend on it rather than buried.
+    No mainnet deployment, no paid audit, and the relayer is not hosted. Each is stated on the
+    page that depends on it, not buried.
   </Card>
 </CardGroup>
 
@@ -73,20 +76,41 @@ demand exists is unproven, and we treat it as a bet rather than a certainty.
 
 <AccordionGroup>
   <Accordion title="Not a claim of pent-up demand" icon="chart-line">
-    We do not argue that thousands of idle MUSD holders are waiting to borrow. Borrowing on
-    Mezo is barely used and whale-dominated. Maren is a demand-creation bet on a small, early
-    chain, and the honest evidence for it is Mezo's off-chain community, not any on-chain
-    count.
+    We do not argue that thousands of idle MUSD holders are waiting to borrow. Borrowing on Mezo
+    is barely used and whale-dominated. Maren is a demand-creation bet on a small, early chain,
+    and the honest evidence for it is Mezo's off-chain community, not any on-chain count.
   </Accordion>
   <Accordion title="Not zero gas, yet" icon="gas-pump">
-    The gasless path uses an ERC-2771 relayer that is built and fully tested but not hosted.
-    Until it is live, you submit your own transactions and pay BTC gas. Even once it is live,
-    the very first deposit into the vault always costs gas by design. See
-    [Gasless](/how-it-works/gasless).
+    The gasless path uses an ERC-2771 relayer that is built and fully tested but not hosted. Until
+    it is live, you pay BTC gas. Even once it is live, the first deposit always costs gas by
+    design. See [Gasless](/how-it-works/gasless).
   </Accordion>
   <Accordion title="Not a savings account" icon="piggy-bank">
     Earn is an ERC-4626 wrapper over the MUSD Stability Pool. Its returns come from real
-    liquidation gains, which are lumpy. Maren shows trailing realised yield and never
-    advertises a forward APY, because there is no rate to guarantee.
+    liquidation gains, which are lumpy. Maren shows trailing realised yield and never advertises a
+    forward APY, because there is no rate to guarantee.
   </Accordion>
 </AccordionGroup>
+
+## Where to go next
+
+<CardGroup cols={2}>
+  <Card title="Quickstart" icon="rocket" href="/get-started/quickstart">
+    Connect on matsnet, deposit BTC, borrow MUSD, and spend it, in a few minutes.
+  </Card>
+  <Card title="Roadmap" icon="road" href="/get-started/roadmap">
+    Where Maren is heading, phase by phase, with the honest state of each.
+  </Card>
+  <Card title="The Social Vault" icon="vault" href="/product/social-vault">
+    The pooled model that removes the minimum loan, its wedge, and the risk it carries.
+  </Card>
+  <Card title="How it works" icon="gears" href="/how-it-works/pooled-vault">
+    Shares, the gasless relayer, preflight, and the redemption splitter, in depth.
+  </Card>
+  <Card title="Security and risk" icon="shield-halved" href="/security/risk">
+    What can lose user funds, stated plainly, and the adversarial audits run so far.
+  </Card>
+  <Card title="Build and verify" icon="terminal" href="/developers/verify-on-chain">
+    Run Maren locally, and check every address and the live pooled trove yourself.
+  </Card>
+</CardGroup>

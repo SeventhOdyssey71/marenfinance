@@ -1,0 +1,91 @@
+---
+title: "Roadmap"
+description: "Where Maren is heading: mobile-first Bitcoin spending, shipped audit-first."
+---
+
+Maren's direction is simple: **let anyone spend Bitcoin from their phone without selling it.**
+The path there is ordered by safety, not by marketing. Nothing that touches other people's
+Bitcoin reaches mainnet before an independent audit, and the pooled vault launches capped either
+way.
+
+<Info>
+  This page states plans as plans. What already exists is on [What is
+  real today](/get-started/introduction) and proven, transaction by transaction, in the repo.
+  Everything below the current phase is planned, not shipped.
+</Info>
+
+## The phases
+
+<Steps>
+  <Step title="Phase 1: the engine (now, live on matsnet)">
+    Five contracts live on Mezo testnet `31611`: pooled vault, payments, name registry, ERC-4626
+    Earn, and the relay hub. The full loop runs end to end: deposit BTC, borrow from 0.001 BTC,
+    pay a name, send a link, request money, and Earn. The web app is live against matsnet; the
+    iOS app runs the same screens on a mock layer with identical signatures, so going live
+    replaces one file. A real user has already borrowed 25.7 MUSD through the app.
+  </Step>
+  <Step title="Phase 2: beta and gasless (next)">
+    The iOS app ships to a small **TestFlight beta** on matsnet, and the **gasless relayer gets
+    hosted** so users stop paying gas after their first deposit. The relayer is built and fully
+    tested today; hosting it is one command plus funding a hot wallet.
+  </Step>
+  <Step title="Phase 3: audit (the gate to mainnet)">
+    An independent third-party audit of `MarenVault` and `MarenRelayHub`, the two contracts that
+    carry risk, with findings and remediations published. No Maren contract reaches mainnet before
+    this.
+  </Step>
+  <Step title="Phase 4: capped mainnet">
+    Mainnet launch on chain `31612` with a hard-capped pooled vault. The cap is raised only as the
+    position proves out, never on a schedule.
+  </Step>
+  <Step title="Phase 5: the real world">
+    Money links polished for people who have never held crypto, bank cashout through licensed
+    off-ramp partners in the first corridors, and a small merchant pilot settling in MUSD over
+    Mezo's x402 rail. Design work, not code, today.
+  </Step>
+</Steps>
+
+## The vault cap rises on evidence
+
+The pooled vault is the one component that can lose user funds through a Maren design failure, so
+its cap is gated on proof, not time. See [Risk](/security/risk) for the full picture.
+
+| Phase | Cap | Gate |
+| --- | --- | --- |
+| Mainnet launch | 5 BTC | 14 days, no keeper failure |
+| Post-audit | 25 BTC | Critical and High findings resolved |
+| Post-traction | 100 BTC | 60 days of clean liquidation history |
+
+<Note>
+  **If the team cannot satisfy itself the pooled vault is safe, Maren ships without it.** Direct
+  troves, gasless payments, and Earn are valuable on their own. This commitment is binding.
+</Note>
+
+## How we will know it is working
+
+Every measure of success is readable from the chain by anyone. The one that matters most is the
+**spend ratio**: of the addresses that borrowed, the fraction that then spent what they borrowed.
+
+| Metric | What it shows |
+| --- | --- |
+| Funded positions below the protocol minimum | Borrowers who could not exist without Maren |
+| MUSD borrowed through the pooled vault | New MUSD in circulation, attributable on-chain |
+| Payments settled against names and links | The money-app claim, measured |
+| Link claims by brand-new addresses | The growth loop working |
+| Spend ratio | Whether people spend Bitcoin, not just borrow against it |
+
+<Info>
+  Read live on matsnet on 2026-08-25, the pilot showed 2 funded positions, 65.72 MUSD borrowed,
+  and a spend ratio of 0.0% (0 of 2 borrowers have spent). That is the honest starting point:
+  people have borrowed, and spending has not started yet. The tool will show it move, or show
+  that it does not. See [Verify on-chain](/developers/verify-on-chain).
+</Info>
+
+<CardGroup cols={2}>
+  <Card title="Try the loop now" icon="rocket" href="/get-started/quickstart">
+    Deposit, borrow, and spend on matsnet in a few minutes.
+  </Card>
+  <Card title="The risk we take to get there" icon="shield-halved" href="/security/risk">
+    The pooled vault, the cap, and everything that can go wrong, ordered by expected harm.
+  </Card>
+</CardGroup>

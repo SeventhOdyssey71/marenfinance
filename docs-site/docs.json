@@ -19,7 +19,7 @@
         "groups": [
           {
             "group": "Get started",
-            "pages": ["get-started/introduction", "get-started/quickstart"]
+            "pages": ["get-started/introduction", "get-started/quickstart", "get-started/roadmap"]
           },
           {
             "group": "The product",

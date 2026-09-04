@@ -41,7 +41,7 @@ docs-site/
   docs.json              # navigation, theme, brand colors, logo, favicon
   favicon.png            # copied from apps/web/src/app/icon.png
   logo/                  # brand mark, light and dark variants
-  get-started/           # introduction, quickstart
+  get-started/           # introduction, quickstart, roadmap
   product/               # social-vault, borrow, pay, earn, activity
   how-it-works/          # pooled-vault, gasless, preflight, redemptions
   reference/             # contracts, networks, sdk

@@ -15,8 +15,8 @@ colophon: |
 
 ## The goal
 
-Build the app that lets someone use their Bitcoin in the real world without selling
-it. On web and iOS.
+Let anyone spend their Bitcoin from their phone without selling it. Mobile-first, with
+a web app running the same screens.
 
 The mechanics underneath are a collateralised loan on Mezo: deposit BTC, borrow MUSD
 against it. But the product is not a lending dashboard. It is a money app. You put
@@ -66,8 +66,9 @@ which is currently zero by construction.
 ## The app
 
 One product, two clients sharing one SDK, so a rule enforced on one is the rule on the
-other. The web app runs live against matsnet today; the iOS app runs the same screens
-on a mock layer with identical signatures, and goes live by replacing one file.
+other. The iOS app is the headline client and runs the same screens on a mock layer
+with identical signatures, going live by replacing one file; the web app runs live
+against matsnet today.
 
 ### Home
 
@@ -144,10 +145,11 @@ The companion Progress & Evidence document carries the transaction-level proof.
 
 | Phase         | Scope                                                                                                | State                                     |
 | ------------- | ---------------------------------------------------------------------------------------------------- | ----------------------------------------- |
-| 1. The engine | Pooled vault from 0.001 BTC, borrow and repay, names, payments, requests, Earn, web and iOS          | Built. Live on matsnet, borrowing enabled |
-| 2. Mainnet    | Third-party audit, then mainnet with a capped vault; gasless relayer hosted so users stop paying gas | Next. Audit is the gate, deliberately     |
-| 3. Real world | Money links polished for non-crypto recipients, bank cashout in first corridors, x402 merchant pilot | Planned                                   |
-| 4. Scale      | Cap raises as the pooled position proves out, more corridors, more shops                             | Planned                                   |
+| 1. The engine | Pooled vault from 0.001 BTC, borrow and repay, names, payments, requests, Earn, iOS and web          | Built. Live on matsnet, borrowing enabled |
+| 2. Beta       | iOS TestFlight beta on matsnet; gasless relayer hosted so users stop paying gas after first deposit  | Next                                      |
+| 3. Mainnet    | Third-party audit, then mainnet with a capped vault                                                  | Audit is the gate, deliberately           |
+| 4. Real world | Money links polished for non-crypto recipients, bank cashout in first corridors, x402 merchant pilot | Planned                                   |
+| 5. Scale      | Cap raises as the pooled position proves out, more corridors, more shops                             | Planned                                   |
 
 The order is a safety decision, not a marketing one: nothing that touches other
 people's Bitcoin reaches mainnet before an independent audit, and the vault launches

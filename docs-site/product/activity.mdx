@@ -11,8 +11,8 @@ linked to `explorer.test.mezo.org`. There is no sample data anywhere in the prod
 
 Activity walks the four deployed Maren contracts from the deployment-block floor to the chain
 head, in the 10,000-block windows Mezo's RPC allows, decoding logs into rows. The floor is a
-real, bisected block number, so a reader that starts there and finds nothing has read **all** of
-the history, not merely a recent slice.
+real, bisected block number, so finding nothing there means **all** the history was read, not
+just a recent slice.
 
 ```typescript
 import { getDeploymentBlock, MEZO_MAX_LOG_RANGE } from '@maren/sdk';

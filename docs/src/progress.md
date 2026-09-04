@@ -16,10 +16,11 @@ colophon: |
 
 ## What Maren is, in one paragraph
 
-Maren is a consumer borrowing and payments app for Mezo, on web and iOS. Users deposit
-Bitcoin, borrow MUSD against it from as little as 0.001 BTC, and spend it: pay a
-`@name`, share a payment link, request money. It is built for Mezo and deployed
-nowhere else. Everything below is what exists today, with the evidence.
+Maren is a consumer borrowing and payments app for Mezo, mobile-first on iOS with a web
+app running the same screens. Users deposit Bitcoin, borrow MUSD against it from as
+little as 0.001 BTC, and spend it: pay a `@name`, share a payment link, request money.
+It is built for Mezo and deployed nowhere else. Everything below is what exists today,
+with the evidence.
 
 ## What was built
 
@@ -281,10 +282,10 @@ started yet. The tool will show it move, or show that it does not.
 ## Not done, stated plainly
 
 No mainnet deployment yet: it is gated on an independent audit, deliberately. No
-audit yet. The relayer is built and fully tested but not yet hosted, so today users
-submit their own transactions and the app says so on every screen. Bank cashout and
-merchant payments are design work, not code. Nothing in this document overstates
-that.
+audit yet. The iOS TestFlight beta is next, not shipped. The relayer is built and
+fully tested but not yet hosted, so today users submit their own transactions and the
+app says so on every screen. Bank cashout and merchant payments are design work, not
+code. Nothing in this document overstates that.
 
 ## Reproduce every number
 
