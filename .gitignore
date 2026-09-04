@@ -103,3 +103,6 @@ Screenshot*.png
 .dev.vars
 **/.dev.vars
 .wrangler/
+
+# Local design source assets (fonts + raw screenshots); the app ships derived woff2 + public/shots
+design/

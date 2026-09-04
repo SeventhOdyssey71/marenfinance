@@ -14,7 +14,6 @@ type NavLink = { href: string; label: string };
 
 const links: readonly NavLink[] = [
   { href: '#product', label: 'Product' },
-  { href: '#how', label: 'How it works' },
   { href: '/docs', label: 'Docs' },
   { href: '#faq', label: 'FAQ' },
 ];

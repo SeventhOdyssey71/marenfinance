@@ -13,7 +13,7 @@ const SHOTS: readonly { src: string; label: string }[] = [
 
 export function Showcase() {
   return (
-    <section className="u-wrap scroll-mt-28 pt-24 sm:pt-28">
+    <section id="product" className="u-wrap scroll-mt-28 pt-24 sm:pt-28">
       <Reveal className="flex flex-col items-center text-center">
         <Tag>A closer look</Tag>
         <h2 className="u-display mt-5 max-w-[16ch] text-[clamp(30px,4.6vw,54px)]">
@@ -29,8 +29,15 @@ export function Showcase() {
         {SHOTS.map((s) => (
           <figure key={s.src} className="shot-fig">
             <div className="shot">
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img src={s.src} alt={s.label} />
+              <span className="pbtn pbtn-action" aria-hidden />
+              <span className="pbtn pbtn-vol" aria-hidden />
+              <span className="pbtn pbtn-power" aria-hidden />
+              <div className="bezel">
+                <div className="screen">
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img src={s.src} alt={s.label} />
+                </div>
+              </div>
             </div>
             <figcaption className="shot-cap">{s.label}</figcaption>
           </figure>

@@ -158,7 +158,10 @@ function AccordionItem({
           >
             {String(index + 1).padStart(2, '0')}
           </span>
-          <span className="flex-1 text-balance text-[17px] font-bold tracking-[-0.01em] text-[color:var(--ink)]">
+          <span
+            className="flex-1 text-balance text-[18px] font-semibold tracking-[-0.01em] text-[color:var(--ink)]"
+            style={{ fontFamily: 'var(--display)' }}
+          >
             {item.q}
           </span>
           <span

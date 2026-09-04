@@ -54,7 +54,10 @@ export function HowItWorks() {
             >
               {s.n}
             </span>
-            <h3 className="mt-5 text-[20px] font-semibold tracking-[-0.02em] text-[color:var(--ink)]">
+            <h3
+              className="mt-5 text-[21px] font-semibold tracking-[-0.02em] text-[color:var(--ink)]"
+              style={{ fontFamily: 'var(--display)' }}
+            >
               {s.title}
             </h3>
             <p className="mt-3 text-[15px] font-medium leading-[1.5] text-[color:var(--muted)]">

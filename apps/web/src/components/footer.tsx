@@ -65,7 +65,10 @@ export function Footer() {
       {/* Link table */}
       <div className="mt-14 grid grid-cols-1 gap-6 border-t border-[color:var(--border-hairline)] pt-10 md:grid-cols-[1.6fr_1fr_1fr_1fr]">
         <div>
-          <span className="text-[20px] font-extrabold uppercase tracking-[-0.03em] text-[color:var(--ink)]">
+          <span
+            className="text-[22px] font-semibold tracking-[-0.02em] text-[color:var(--ink)]"
+            style={{ fontFamily: 'var(--display)' }}
+          >
             Maren
           </span>
           <p className="mt-3 max-w-[34ch] text-[14px] font-medium leading-[1.55] text-[color:var(--muted)]">

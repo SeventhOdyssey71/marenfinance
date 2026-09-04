@@ -535,11 +535,19 @@
 }
 .landing .shot-fig { display: flex; flex-direction: column; align-items: center; }
 .landing .shot {
-  width: min(232px, 72vw); aspect-ratio: 1206 / 2622;
-  border-radius: 46px; background: #050506; padding: 7px;
-  box-shadow: 0 2px 3px rgba(16, 16, 19, 0.08), 0 42px 84px -32px rgba(16, 16, 19, 0.34);
+  position: relative;
+  width: min(300px, 82vw); aspect-ratio: 1206 / 2622;
+  border-radius: 56px; padding: 3px;
+  background: linear-gradient(145deg, #e0dfe4 0%, #a6a5ab 22%, #78777e 50%, #b4b3b9 78%, #e4e3e8 100%);
+  box-shadow: 0 2px 3px rgba(16, 16, 19, 0.08), 0 48px 96px -34px rgba(16, 16, 19, 0.36);
 }
-.landing .shot img { width: 100%; height: 100%; object-fit: cover; border-radius: 39px; display: block; }
+.landing .shot .bezel { width: 100%; height: 100%; border-radius: 53px; background: #050506; padding: 8px; }
+.landing .shot .screen { width: 100%; height: 100%; border-radius: 46px; overflow: hidden; background: #fff; }
+.landing .shot .screen img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.landing .shot .pbtn { position: absolute; background: linear-gradient(180deg, #cdccd0, #8f8e94); border-radius: 3px; }
+.landing .shot .pbtn-action { left: -2.5px; top: 19%; width: 3px; height: 26px; }
+.landing .shot .pbtn-vol { left: -2.5px; top: 27%; width: 3px; height: 82px; }
+.landing .shot .pbtn-power { right: -2.5px; top: 25%; width: 3px; height: 98px; }
 .landing .shot-cap {
   margin-top: 16px; font-family: var(--body); font-size: 14px;
   color: var(--muted); text-align: center; max-width: 22ch;
