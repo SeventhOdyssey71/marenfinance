@@ -227,7 +227,15 @@ export async function readEarn(ctx: LiveContext): Promise<EarnPosition> {
    * overrides `maxWithdraw` to express a liquidity limit, this becomes a different number
    * and must go back to the two reads.
    */
-  const [shares, assets] = await Promise.all([
+  /**
+   * `assetBreakdown()` and `isUsingStalePrice()` ride in the SAME batch as the two reads
+   * that were already here, for the same reason those two are one `Promise.all`: they are
+   * views of one block and the client coalesces them into a single aggregate3, so the Earn
+   * screen stays one network round trip while gaining the vault's real composition. They
+   * are vault-wide facts, not the caller's — what backs every share, not this account's
+   * slice — and the screen labels them so.
+   */
+  const [shares, assets, breakdown, stalePrice] = await Promise.all([
     ctx.client.readContract({
       address: maren.marenEarn,
       abi: marenEarnAbi,
@@ -240,13 +248,33 @@ export async function readEarn(ctx: LiveContext): Promise<EarnPosition> {
       functionName: 'maxWithdraw',
       args: [ctx.account],
     }),
+    ctx.client.readContract({
+      address: maren.marenEarn,
+      abi: marenEarnAbi,
+      functionName: 'assetBreakdown',
+    }),
+    ctx.client.readContract({
+      address: maren.marenEarn,
+      abi: marenEarnAbi,
+      functionName: 'isUsingStalePrice',
+    }),
   ]);
+
+  const [musdIdle, musdInPool, btcHeld, btcPending, btcValued] = breakdown;
 
   return {
     sharesWei: shares,
     assetsWei: assets,
     depositedWei: 0n,
     trailing: { windowDays: 0, realisedWei: 0n, liquidationEvents: 0, lastGainAt: null },
+    breakdown: {
+      musdIdleWei: musdIdle,
+      musdInPoolWei: musdInPool,
+      btcHeldWei: btcHeld,
+      btcPendingWei: btcPending,
+      btcValuedWei: btcValued,
+    },
+    stalePrice,
   };
 }
 

@@ -4,7 +4,7 @@ import { useState } from 'react';
 import { formatMusd } from '@maren/sdk';
 
 import { AmountField, Segmented } from '@/components/app/controls';
-import { Dash, Musd, Num } from '@/components/app/money';
+import { Btc, Dash, Musd, Num } from '@/components/app/money';
 import {
   ActionButton,
   AppCard,
@@ -34,6 +34,7 @@ import {
   useRelayerStatus,
 } from '@/lib/chain/write';
 import { useBalances, useDataSource, useEarn } from '@/lib/data/source';
+import type { EarnPosition } from '@/lib/data/types';
 
 /**
  * Earn — idle MUSD into the MUSD Stability Pool via MarenEarn, an ERC-4626 vault.
@@ -223,6 +224,14 @@ export default function EarnPage() {
           ) : null}
         </div>
       </Panel>
+
+      {/* ----------------------------------------------------- What backs Earn */}
+      {/* The vault's live composition from assetBreakdown(). It exists because a
+          Stability-Pool share is not always MUSD: liquidations pay in Bitcoin, and the
+          vault holds that Bitcoin until a reviewed swap route exists. Showing the split
+          is the honest version of "your deposit is safe": most of it is MUSD in the
+          pool, some of it may be seized Bitcoin whose dollar value moves. */}
+      {earn ? <EarnBacking earn={earn} /> : null}
 
       {/* --------------------------------------------- Trailing realised yield */}
       {/* A window of zero days is not a window. Reporting "0.00 MUSD realised over 0
@@ -436,5 +445,80 @@ export default function EarnPage() {
 
       <TxSheet runner={runner} />
     </div>
+  );
+}
+
+/**
+ * What backs Earn — the vault's real composition, read live from `assetBreakdown()`.
+ *
+ * Vault-wide, and it says so: this is what stands behind every share, not the caller's
+ * personal slice. The Stability-Pool MUSD is the calm majority; the seized Bitcoin is the
+ * honest asterisk, because it is the one asset here whose dollar value moves and whose
+ * dollar value the vault cannot always price. When `isUsingStalePrice()` is true the
+ * exact Bitcoin amount is still shown, since that number does not depend on the oracle,
+ * but no MUSD figure is presented as authoritative for it.
+ */
+function EarnBacking({ earn }: { earn: EarnPosition }) {
+  const b = earn.breakdown;
+  const btcTotal = b.btcHeldWei + b.btcPendingWei;
+  const seized = btcTotal > 0n || b.btcValuedWei > 0n;
+
+  return (
+    <Panel title="What backs Earn">
+      <div className="px-5 py-5">
+        <p className="text-text-muted max-w-[68ch] text-sm leading-relaxed">
+          Your MUSD sits in the MUSD Stability Pool, which closes other people’s positions and is
+          paid in the Bitcoin seized doing it. This is the vault’s live composition, not your slice
+          of it.
+        </p>
+
+        <div className="mt-4">
+          <StatRow
+            label="Backing the pool"
+            hint="MUSD absorbing liquidated debt"
+            value={<Musd wei={b.musdInPoolWei} />}
+            last={!seized && b.musdIdleWei === 0n}
+          />
+          {b.musdIdleWei > 0n ? (
+            <StatRow
+              label="Idle MUSD"
+              hint="held by the vault, not yet in the pool"
+              value={<Musd wei={b.musdIdleWei} />}
+              last={!seized}
+            />
+          ) : null}
+          {seized ? (
+            <StatRow
+              label="Bitcoin seized at liquidation"
+              value={<Btc wei={btcTotal} tone="btc" />}
+              sub={
+                earn.stalePrice ? (
+                  <span className="text-text-subtle">
+                    dollar value withheld while the oracle price is stale
+                  </span>
+                ) : (
+                  <span className="text-text-subtle inline-flex items-baseline gap-1">
+                    worth about <Musd wei={b.btcValuedWei} size="sm" />
+                  </span>
+                )
+              }
+              last
+            />
+          ) : null}
+        </div>
+
+        {/* Only when the value could mislead. A precise dollar figure off a stale price is
+            exactly the kind of authoritative-looking number this product refuses. */}
+        {earn.stalePrice ? (
+          <div className="mt-5">
+            <Note tone="warning" role="status">
+              The oracle price is stale, so any dollar value for that Bitcoin would be understated.
+              Maren shows the Bitcoin amount, which is exact, and holds back a dollar figure until a
+              fresh price is available.
+            </Note>
+          </div>
+        ) : null}
+      </div>
+    </Panel>
   );
 }

@@ -1,17 +1,21 @@
+import { GASLESS_CAVEAT } from '@/lib/copy/value-props';
 import { Reveal } from './ui/reveal';
 import { Tag } from './ugly-ui';
 
 /**
  * How it works — three big numbered sticker cards: deposit, draw, spend. Honest
  * throughout: the first-deposit-costs-gas caveat is stated on step 01 and the
- * 140/110 buffer on step 02. (The gasless caveat lives in the FAQ.)
+ * 140/110 buffer on step 02. (The full "why" of the gasless caveat lives in the FAQ.)
+ *
+ * The gasless caveat sentence itself is single-sourced from `value-props.ts`, so the
+ * intro, this page and the value props cannot phrase it differently.
  */
 
 const STEPS: readonly { n: string; title: string; body: string; fill: string }[] = [
   {
     n: '01',
     title: 'Deposit BTC',
-    body: 'Connect any EVM wallet and deposit from 0.001 BTC. Your first deposit sends Bitcoin, so it costs gas, and always will.',
+    body: `Connect any EVM wallet and deposit from 0.001 BTC. ${GASLESS_CAVEAT}`,
     fill: 'var(--lime)',
   },
   {

@@ -433,7 +433,14 @@ describe('MUSD-denominated actions elsewhere in the product', () => {
 
   it('closes an Earn withdrawal when there are no shares', () => {
     const result = preflightEarnWithdraw(
-      { sharesWei: 0n, assetsWei: 0n, depositedWei: 0n, trailing: emptyTrailing },
+      {
+        sharesWei: 0n,
+        assetsWei: 0n,
+        depositedWei: 0n,
+        trailing: emptyTrailing,
+        breakdown: emptyBreakdown,
+        stalePrice: false,
+      },
       musd('1'),
     );
     expect(result.rangeDead).toBe(true);
@@ -445,6 +452,8 @@ describe('MUSD-denominated actions elsewhere in the product', () => {
       assetsWei: musd('42'),
       depositedWei: musd('40'),
       trailing: emptyTrailing,
+      breakdown: emptyBreakdown,
+      stalePrice: false,
     };
     expect(preflightEarnWithdraw(held, musd('42')).ok).toBe(true);
     expect(preflightEarnWithdraw(held, musd('42.01')).ok).toBe(false);
@@ -463,6 +472,14 @@ const emptyTrailing = {
   realisedWei: 0n,
   liquidationEvents: 0,
   lastGainAt: null,
+};
+
+const emptyBreakdown = {
+  musdIdleWei: 0n,
+  musdInPoolWei: 0n,
+  btcHeldWei: 0n,
+  btcPendingWei: 0n,
+  btcValuedWei: 0n,
 };
 
 describe('the arithmetic these fixtures depend on', () => {

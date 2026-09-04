@@ -68,6 +68,36 @@ export interface EarnPosition {
    * liquidation gains only, so it is lumpy and is never an APY we may advertise.
    */
   trailing: TrailingYield;
+  /**
+   * `MarenEarn.assetBreakdown()` — where the vault's assets actually sit right now. This is
+   * vault-wide, not the caller's slice: it is what backs every share, and it is the only
+   * honest way to show that a Stability-Pool deposit can be holding seized Bitcoin rather
+   * than MUSD.
+   */
+  breakdown: EarnBreakdown;
+  /**
+   * `MarenEarn.isUsingStalePrice()` — true when the vault is valuing its seized Bitcoin off
+   * an oracle price past its tolerance. When true, `breakdown.btcValuedWei` is a floor at
+   * best and must never be shown as an authoritative figure.
+   */
+  stalePrice: boolean;
+}
+
+/**
+ * MarenEarn.assetBreakdown(). All 1e18. `btc*` are 18-decimal BTC amounts; `btcValuedWei`
+ * is their MUSD value at the oracle price, which is only as current as `stalePrice` says.
+ */
+export interface EarnBreakdown {
+  /** MUSD held by the vault but not yet pushed into the Stability Pool. */
+  musdIdleWei: bigint;
+  /** MUSD deposited in the Stability Pool, absorbing liquidated debt. */
+  musdInPoolWei: bigint;
+  /** BTC seized at liquidation and held by the vault, 18-decimal. */
+  btcHeldWei: bigint;
+  /** BTC credited to the vault but not yet pulled in, 18-decimal. */
+  btcPendingWei: bigint;
+  /** MUSD value of the vault's Bitcoin at the oracle price. See `stalePrice`. */
+  btcValuedWei: bigint;
 }
 
 export interface TrailingYield {

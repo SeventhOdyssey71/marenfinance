@@ -1,6 +1,7 @@
 'use client';
 
 import { useState } from 'react';
+import { useSearchParams } from 'next/navigation';
 
 import { Segmented } from '@/components/app/controls';
 import { Label } from '@/components/app/primitives';
@@ -25,7 +26,17 @@ const SECTIONS = [
 ];
 
 export default function FinancePage() {
-  const [section, setSection] = useState<Section>('vault');
+  /**
+   * `/app/finance?section=earn` opens the Earn tab directly, so Home's "Earn" and "Open
+   * Earn" links land on the right sub-section instead of always on Vault. Read once into
+   * the initial state: after mount the segmented control owns the choice, so following the
+   * deep-link and then tapping Vault is not fought by the query string that is still in the
+   * URL. Anything other than `earn` falls back to Vault, the default destination.
+   */
+  const params = useSearchParams();
+  const [section, setSection] = useState<Section>(
+    params.get('section') === 'earn' ? 'earn' : 'vault',
+  );
 
   return (
     <div className="flex flex-col gap-6">
