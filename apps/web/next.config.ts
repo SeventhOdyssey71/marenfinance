@@ -10,6 +10,14 @@ const nextConfig: NextConfig = {
   reactStrictMode: true,
   poweredByHeader: false,
   outputFileTracingRoot: monorepoRoot,
+  // The /docs route reads MDX + docs.json from the monorepo's `docs-site/` tree,
+  // which lives outside apps/web and Next does not trace automatically. Bundle it
+  // into the route's serverless function so any server-side read resolves in
+  // production instead of 500-ing (the pages are force-static, but the function
+  // still imports the loader on cold start).
+  outputFileTracingIncludes: {
+    '/docs/[[...slug]]': ['../../docs-site/**/*.mdx', '../../docs-site/docs.json'],
+  },
   // @maren/sdk ships TypeScript source rather than a build step, so Next has to compile
   // it the same way it compiles the app. It is the one place the chain constants live,
   // and a duplicate compiled copy is exactly how those drift.

@@ -26,7 +26,18 @@ function findDocsRoot(): string {
   throw new Error(`Could not locate docs-site/docs.json starting from ${process.cwd()}`);
 }
 
-export const DOCS_ROOT = findDocsRoot();
+/**
+ * Located lazily and memoised. Importing this module must NOT run the walk: the
+ * /docs route's serverless function imports it on cold start, where `docs-site/`
+ * is not on disk, and a module-load throw there is what 500s the page even though
+ * every page is `force-static`. The walk only runs when a reader is actually
+ * called — which, for these static routes, is during build-time prerender.
+ */
+let _docsRoot: string | null = null;
+function docsRoot(): string {
+  if (_docsRoot === null) _docsRoot = findDocsRoot();
+  return _docsRoot;
+}
 
 /** The introduction is the docs landing page and lives at /docs rather than a sub-path. */
 export const ROOT_SLUG = 'get-started/introduction';
@@ -50,13 +61,13 @@ export function getGithubHref(): string {
 }
 
 function readDocsJson(): DocsJson {
-  return JSON.parse(readFileSync(join(DOCS_ROOT, 'docs.json'), 'utf8')) as DocsJson;
+  return JSON.parse(readFileSync(join(docsRoot(), 'docs.json'), 'utf8')) as DocsJson;
 }
 
 export type PageFrontmatter = { title: string; description: string };
 
 function mdxPath(slug: string): string {
-  return join(DOCS_ROOT, `${slug}.mdx`);
+  return join(docsRoot(), `${slug}.mdx`);
 }
 
 /** Minimal frontmatter reader: the docs only use quoted `title` and `description`. */
