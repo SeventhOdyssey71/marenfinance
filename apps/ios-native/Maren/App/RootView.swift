@@ -56,7 +56,9 @@ struct RootView: View {
         .environment(session)
         .environment(router)
         .environment(\.marenClient, session.client)
-        .environment(\.marenActions, session.actions)
+        // Wrap the injected actions so a confirmed settlement posts `.marenDidSettle` once,
+        // centrally, at the action→confirm boundary — the screens reload off that note.
+        .environment(\.marenActions, SettleBroadcaster(base: session.actions))
         .environment(\.isDemoData, session.isDemo)
         .tint(Theme.Palette.accent)
     }

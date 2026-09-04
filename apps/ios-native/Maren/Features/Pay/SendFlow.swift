@@ -19,6 +19,7 @@ struct SendFlow: View {
     @State private var balance: Decimal?
     @State private var outcome: SubmitOutcome?
     @State private var loaded = false
+    @State private var balanceLoaded = false
     @State private var resolvedAddress: String?   // a handle's resolved 0x address, as you type
     @State private var resolving = false
 
@@ -51,6 +52,7 @@ struct SendFlow: View {
             guard !loaded else { return }
             loaded = true
             balance = try? await client.balances().musd
+            balanceLoaded = true
             // Screenshot/testing hook: jump straight to a stage. Inert in normal use.
             switch ProcessInfo.processInfo.environment["MAREN_SCREEN"] {
             case "sendamount", "sendloading":
@@ -190,8 +192,10 @@ struct SendFlow: View {
             MusdCoin(size: 38)
             VStack(alignment: .leading, spacing: 1) {
                 Text("MUSD").font(.text(15, weight: .medium)).foregroundStyle(Theme.Palette.ink)
-                Text(balance.map { "\(MoneyFormat.musd($0, unit: false)) available" } ?? "Balance unavailable")
+                Text(balance.map { "\(MoneyFormat.musd($0, unit: false)) available" }
+                     ?? (balanceLoaded ? "Balance unavailable" : "0,000.00 available"))
                     .font(.text(13)).foregroundStyle(Theme.Palette.tertiary)
+                    .skeleton(!balanceLoaded && balance == nil)
             }
             Spacer()
             Button { useMax() } label: {

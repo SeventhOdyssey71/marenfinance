@@ -14,11 +14,23 @@ struct ProfileView: View {
     @State private var account: Account?
     @State private var showSetup = false
     @State private var protection: KeyProtection?
+    @State private var loadingAccount = true
     private let capability = Keystore.shared.capability()
+
+    /// While the account read is in flight and nothing has arrived, a neutral placeholder that
+    /// the skeleton redacts to bars — never a fabricated handle or address shown to the user.
+    private var displayAccount: Account? {
+        if loadingAccount && account == nil {
+            return Account(handle: "@handle", address: "0x0000000000000000000000000000000000000000")
+        }
+        return account
+    }
+    private var accountLoading: Bool { loadingAccount && account == nil }
 
     var body: some View {
         Screen(title: "Profile", badge: isDemoData) {
             accountCard
+                .skeleton(accountLoading)
             securityCard
             howItWorksCard
             if !actions.canSettle {
@@ -30,7 +42,11 @@ struct ProfileView: View {
                 PillButton(title: "Sign out", variant: .quiet) { session.signOut() }
             }
         }
-        .task { account = try? await client.account() }
+        .task {
+            loadingAccount = true
+            account = try? await client.account()
+            loadingAccount = false
+        }
         .sheet(isPresented: $showSetup) {
             WalletSetupView { newProtection in
                 protection = newProtection
@@ -55,16 +71,16 @@ struct ProfileView: View {
         MCard {
             VStack(alignment: .leading, spacing: Theme.Space.sm) {
                 Text("Account").labelStyle()
-                Text(account?.handle ?? "—")
+                Text(displayAccount?.handle ?? "—")
                     .font(.display(26, weight: .bold))
                     .foregroundStyle(Theme.Palette.ink)
                 HStack(spacing: Theme.Space.sm) {
-                    Text(account?.address ?? "—")
+                    Text(displayAccount?.address ?? "—")
                         .font(.figure(14, weight: .regular))
                         .foregroundStyle(Theme.Palette.muted)
                         .lineLimit(1).truncationMode(.middle)
                     Spacer(minLength: Theme.Space.sm)
-                    if let addr = account?.address {
+                    if let addr = displayAccount?.address {
                         CopyButton(value: addr, describes: "your address")
                     }
                 }

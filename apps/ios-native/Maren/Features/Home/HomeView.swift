@@ -14,7 +14,6 @@ struct HomeView: View {
     @State private var model = HomeModel()
     @State private var fullFlow: PayDestination?
     @State private var overlayFlow: PayDestination?
-    @State private var refreshing = false
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     /// Send and the pay flows open full screen; Receive opens as a bottom-sheet overlay.
@@ -40,6 +39,7 @@ struct HomeView: View {
         }
         .background(Theme.Palette.canvas)
         .task { await model.load(using: client, address: session.address) }
+        .refreshOnSettle { await model.load(using: client, address: session.address) }
         .fullScreenCover(item: $fullFlow) { $0.view }
         .sheet(item: $overlayFlow) { $0.view }
     }
@@ -59,6 +59,9 @@ struct HomeView: View {
                     .overlay(alignment: .bottom) { DottedDivider().offset(y: 3) }
             }
             Spacer()
+            if model.refreshing {
+                RefreshingChip().transition(.opacity)
+            }
             Button { present(.scan) } label: {
                 HugeIcon(name: "scan", size: 22)
                     .foregroundStyle(Theme.Palette.ink)
@@ -67,6 +70,7 @@ struct HomeView: View {
             .accessibilityLabel("Scan a payment or claim code")
         }
         .padding(.top, Theme.Space.xs)
+        .animation(.easeInOut(duration: 0.2), value: model.refreshing)
     }
 
     // MARK: balance hero — one big number, in dollars, centered
@@ -74,7 +78,7 @@ struct HomeView: View {
     private var balanceHero: some View {
         VStack(spacing: Theme.Space.xs) {
             Text("Balance").labelStyle()
-            if let musd = model.balances?.musd {
+            if let musd = model.displayBalances?.musd {
                 MoneyText(text: MoneyFormat.usd(musd), size: 38, weight: .bold, tracking: -2)
             } else {
                 Unavailable(label: "Balance unavailable")
@@ -84,6 +88,7 @@ struct HomeView: View {
                 .foregroundStyle(Theme.Palette.tertiary)
         }
         .frame(maxWidth: .infinity)
+        .skeleton(model.isFirstLoad)
     }
 
     private var actionPills: some View {
@@ -101,16 +106,23 @@ struct HomeView: View {
                 HStack {
                     Text("Your Bitcoin vault").labelStyle()
                     Spacer(minLength: Theme.Space.md)
-                    if let position = model.position { HealthChip(status: position.health) }
+                    if let position = model.displayPosition { HealthChip(status: position.health) }
                 }
                 vaultLine
                 PillButton(title: "Manage vault", variant: .quiet) { router.goToVault() }
             }
         }
+        .skeleton(model.isFirstLoad)
     }
 
     @ViewBuilder private var vaultLine: some View {
-        if let line = model.safetyLine {
+        if model.isFirstLoad {
+            // A sentence-shaped skeleton so the card is the right height before the real line.
+            Text("Your Bitcoin can fall 00% before it could be liquidated.")
+                .font(.text(16, weight: .medium))
+                .foregroundStyle(Theme.Palette.ink)
+                .fixedSize(horizontal: false, vertical: true)
+        } else if let line = model.safetyLine {
             Text(line)
                 .font(.text(16, weight: .medium))
                 .foregroundStyle(Theme.Palette.ink)
@@ -136,20 +148,16 @@ struct HomeView: View {
                     .font(.sectionDisplay())
                     .foregroundStyle(Theme.Palette.ink)
                 Button {
-                    guard !refreshing else { return }
-                    refreshing = true
-                    Task {
-                        await model.load(using: client, address: session.address)
-                        refreshing = false
-                    }
+                    guard !model.refreshing else { return }
+                    Task { await model.load(using: client, address: session.address) }
                 } label: {
                     Image(systemName: "arrow.clockwise")
                         .font(.system(size: 11, weight: .semibold))
                         .foregroundStyle(Theme.Palette.tertiary)
-                        .rotationEffect(.degrees(refreshing ? 360 : 0))
-                        .animation(refreshing && !reduceMotion
+                        .rotationEffect(.degrees(model.refreshing ? 360 : 0))
+                        .animation(model.refreshing && !reduceMotion
                                    ? .linear(duration: 0.8).repeatForever(autoreverses: false) : .snappy,
-                                   value: refreshing)
+                                   value: model.refreshing)
                         .frame(width: 28, height: 28)
                 }
                 .buttonStyle(.plain)
@@ -165,20 +173,21 @@ struct HomeView: View {
                 .accessibilityLabel("View all transactions")
             }
             MCard(padding: Theme.Space.md) {
-                if model.activity.isEmpty {
+                if model.displayActivity.isEmpty {
                     Text("No transactions yet.")
                         .font(.text(15))
                         .foregroundStyle(Theme.Palette.tertiary)
                         .frame(maxWidth: .infinity, alignment: .leading)
                 } else {
                     VStack(spacing: 0) {
-                        let rows = Array(model.activity.prefix(3))
+                        let rows = Array(model.displayActivity.prefix(3))
                         ForEach(Array(rows.enumerated()), id: \.element.id) { index, item in
                             txRow(item, showsDivider: index < rows.count - 1)
                         }
                     }
                 }
             }
+            .skeleton(model.isFirstLoad)
         }
     }
 

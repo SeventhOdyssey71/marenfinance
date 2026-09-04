@@ -16,12 +16,13 @@ struct ActivityView: View {
     @State private var phase: Phase = .loading
     @State private var items: [ActivityItem] = []
     @State private var selected: ActivityItem?
+    @State private var refreshing = false
 
     var body: some View {
-        Screen(title: "Activity", badge: isDemoData) {
+        Screen(title: "Activity", badge: isDemoData, refreshing: refreshing) {
             switch phase {
             case .loading:
-                MCard { HStack { ProgressView().tint(Theme.Palette.tertiary); Text("Reading recent activity…").foregroundStyle(Theme.Palette.tertiary).font(.system(size: 15)) } }
+                skeletonList
             case .failed(let reason):
                 failedState(reason)
             case .loaded:
@@ -29,17 +30,36 @@ struct ActivityView: View {
             }
         }
         .task { await load() }
+        .refreshOnSettle { await load() }
         .sheet(item: $selected) { ReceiptDetail(item: $0) }
     }
 
     private func load() async {
-        phase = .loading
+        // Only blank to the skeleton when there is nothing yet; otherwise keep the list on
+        // screen and refresh in place.
+        if items.isEmpty { phase = .loading } else { refreshing = true }
+        defer { refreshing = false }
         do {
             items = try await client.recentActivity()
             phase = .loaded
         } catch {
-            phase = .failed(error.localizedDescription)
+            // A failed read never dresses up as "no activity". With a list already on screen we
+            // keep those confirmed past rows (stale but true); only a first, empty read surfaces
+            // the explicit failed-read state.
+            if items.isEmpty { phase = .failed(error.localizedDescription) }
         }
+    }
+
+    // The first-load skeleton: real row shapes, redacted, so the list does not pop in.
+    private var skeletonList: some View {
+        MCard(padding: Theme.Space.md) {
+            VStack(spacing: 0) {
+                ForEach(Array(ActivityItem.placeholders.enumerated()), id: \.element.id) { index, item in
+                    ActivityRow(item: item, showsDivider: index < ActivityItem.placeholders.count - 1)
+                }
+            }
+        }
+        .skeleton(true)
     }
 
     // Grouped by day, most recent first — a clean, scannable structure with a quiet date

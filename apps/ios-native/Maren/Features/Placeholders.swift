@@ -8,6 +8,9 @@ import SwiftUI
 struct Screen<Content: View>: View {
     let title: String
     var badge: Bool = false
+    /// Shows the shared "Refreshing" chip in the title row during a background reload, so the
+    /// values already on screen stay put while fresher ones are fetched.
+    var refreshing: Bool = false
     @ViewBuilder var content: Content
 
     var body: some View {
@@ -17,9 +20,15 @@ struct Screen<Content: View>: View {
                     Text(title)
                         .font(.display(30, weight: .semibold))
                         .foregroundStyle(Theme.Palette.ink)
+                    if refreshing {
+                        RefreshingChip()
+                            .padding(.leading, Theme.Space.sm)
+                            .transition(.opacity)
+                    }
                     Spacer()
                     if badge { DemoBadge() }
                 }
+                .animation(.easeInOut(duration: 0.2), value: refreshing)
                 .padding(.top, Theme.Space.xs)
                 content
                 Spacer(minLength: Theme.Space.md)

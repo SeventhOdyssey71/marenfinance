@@ -17,23 +17,36 @@ final class HomeModel {
     private(set) var balances: Balances?
     private(set) var priceFeed: PriceFeed = .unavailable(reason: "Not loaded")
     private(set) var activity: [ActivityItem] = []
+    /// A background reload is in flight while values already on screen stay put.
+    private(set) var refreshing = false
 
-    private var hasData: Bool {
+    var hasData: Bool {
         balances != nil || position != nil || account != nil || !activity.isEmpty
     }
+
+    /// First paint with genuinely nothing to show — the screen renders a redacted skeleton.
+    var isFirstLoad: Bool { phase == .loading && !hasData }
+
+    // Skeleton feeds: neutral placeholder shapes while first-loading, the real values after.
+    // These drive DISPLAY only; action inputs always read the real `balances`/`position`.
+    var displayBalances: Balances? { isFirstLoad ? .placeholder : balances }
+    var displayPosition: Position? { isFirstLoad ? .placeholder : position }
+    var displayActivity: [ActivityItem] { isFirstLoad ? ActivityItem.placeholders : activity }
 
     func load(using client: any MarenClient, address: String? = nil) async {
         // Fast first paint: with nothing in memory, hydrate from the on-disk snapshot for this
         // address so the balance and history show instantly. Only show the loading state when
-        // there is genuinely nothing to paint.
-        if !hasData {
-            if let address, let snapshot = HomeCache.load(address: address) {
-                apply(snapshot)
-                phase = .loaded
-            } else {
-                phase = .loading
-            }
+        // there is genuinely nothing to paint; otherwise refresh in place.
+        if hasData {
+            refreshing = true
+        } else if let address, let snapshot = HomeCache.load(address: address) {
+            apply(snapshot)
+            phase = .loaded
+            refreshing = true
+        } else {
+            phase = .loading
         }
+        defer { refreshing = false }
 
         // Refresh in the background. Each read is independent, and a read that FAILS keeps the
         // last good value (cached or previous) rather than blanking the field — honest data

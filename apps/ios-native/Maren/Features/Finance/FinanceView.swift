@@ -15,7 +15,7 @@ struct FinanceView: View {
 
     var body: some View {
         @Bindable var router = router
-        return Screen(title: "Finance", badge: isDemoData) {
+        return Screen(title: "Finance", badge: isDemoData, refreshing: model.refreshing) {
             Segmented(options: [(FinanceTab.vault, "Vault"), (FinanceTab.earn, "Earn")],
                       selection: $router.financeTab)
             switch router.financeTab {
@@ -24,6 +24,7 @@ struct FinanceView: View {
             }
         }
         .task { await model.load(using: client) }
+        .refreshOnSettle { await model.load(using: client) }
     }
 }
 
@@ -37,10 +38,12 @@ private struct VaultSection: View {
 
     var body: some View {
         positionCard
-        if !model.priceLive {
+            .skeleton(model.isFirstLoad)
+        if !model.isFirstLoad && !model.priceLive {
             PriceNote(feed: model.priceFeed)
         }
         actionGrid
+            .skeleton(model.isFirstLoad)
             // Screenshot/testing hook: open a flow directly. Inert in normal use.
             .onAppear {
                 switch ProcessInfo.processInfo.environment["MAREN_SCREEN"] {
@@ -64,16 +67,16 @@ private struct VaultSection: View {
                             .fixedSize(horizontal: false, vertical: true)
                     }
                     Spacer(minLength: Theme.Space.md)
-                    if let position = model.position {
+                    if let position = model.displayPosition {
                         HealthChip(status: position.health)
                     }
                 }
                 Divider().overlay(Theme.Palette.ink.opacity(0.07))
                 VStack(spacing: 0) {
-                    StatRow(label: "Bitcoin locked") { rowValue(model.position.map { MoneyFormat.btc($0.bitcoinLocked) }) }
-                    StatRow(label: "Borrowed", hint: "1.00% APR") { rowValue(model.position.map { MoneyFormat.musd($0.borrowed) }) }
+                    StatRow(label: "Bitcoin locked") { rowValue(model.displayPosition.map { MoneyFormat.btc($0.bitcoinLocked) }) }
+                    StatRow(label: "Borrowed", hint: "1.00% APR") { rowValue(model.displayPosition.map { MoneyFormat.musd($0.borrowed) }) }
                     StatRow(label: "Collateral ratio") { ratioValue }
-                    StatRow(label: "Left to borrow") { rowValue(model.position.map { MoneyFormat.musd($0.leftToBorrow) }) }
+                    StatRow(label: "Left to borrow") { rowValue(model.displayPosition.map { MoneyFormat.musd($0.leftToBorrow) }) }
                     StatRow(label: "Drop to liquidation", hint: "at 110%", showsDivider: false) { dropValue }
                 }
             }
@@ -81,6 +84,8 @@ private struct VaultSection: View {
     }
 
     private var headline: String {
+        // While first-loading, a sentence-shaped line the redaction turns into a neutral bar.
+        if model.isFirstLoad { return "Your Bitcoin can fall 00% before it could be liquidated." }
         guard let position = model.position else { return "Loading your vault…" }
         if position.borrowed <= 0 { return "No debt yet. Borrow MUSD against your Bitcoin whenever you’re ready." }
         if let drop = position.dropToLiquidationPercent {
@@ -90,9 +95,9 @@ private struct VaultSection: View {
     }
 
     @ViewBuilder private var ratioValue: some View {
-        if let ratio = model.position?.collateralRatioPercent {
+        if let ratio = model.displayPosition?.collateralRatioPercent {
             MoneyText(text: MoneyFormat.ratio(ratio), size: 17, weight: .semibold)
-        } else if model.position?.borrowed == 0 {
+        } else if model.displayPosition?.borrowed == 0 {
             Text("No debt").font(.figure(15, weight: .medium)).foregroundStyle(Theme.Palette.tertiary)
         } else {
             Unavailable()
@@ -100,9 +105,9 @@ private struct VaultSection: View {
     }
 
     @ViewBuilder private var dropValue: some View {
-        if let drop = model.position?.dropToLiquidationPercent, (model.position?.borrowed ?? 0) > 0 {
+        if let drop = model.displayPosition?.dropToLiquidationPercent, (model.displayPosition?.borrowed ?? 0) > 0 {
             MoneyText(text: MoneyFormat.percent(drop), size: 17, weight: .semibold)
-        } else if model.position?.borrowed == 0 {
+        } else if model.displayPosition?.borrowed == 0 {
             Text("—").font(.figure(15, weight: .medium)).foregroundStyle(Theme.Palette.tertiary)
         } else {
             Unavailable()
@@ -274,10 +279,13 @@ private struct EarnSection: View {
 
     var body: some View {
         balanceCard
+            .skeleton(model.isFirstLoad)
         yieldCard
         exposureCard
+            .skeleton(model.isFirstLoad)
         riskCard
         actionRow
+            .skeleton(model.isFirstLoad)
     }
 
     private var balanceCard: some View {
@@ -288,7 +296,7 @@ private struct EarnSection: View {
                     Text("In Earn").labelStyle()
                     Spacer()
                 }
-                if let balance = model.earnBalance {
+                if let balance = model.displayEarnBalance {
                     MoneyText(text: MoneyFormat.musd(balance), size: 34, weight: .bold)
                     Text("Supplied to the Stability Pool")
                         .font(.text(13)).foregroundStyle(Theme.Palette.tertiary)
@@ -328,7 +336,7 @@ private struct EarnSection: View {
         MCard {
             VStack(alignment: .leading, spacing: Theme.Space.sm) {
                 Text("Pool backing").labelStyle()
-                if let exposure = model.earnExposure {
+                if let exposure = model.displayEarnExposure {
                     MoneyText(text: MoneyFormat.musd(exposure.musdBacking), size: 28, weight: .bold)
                     Text("MUSD backing the Stability Pool")
                         .font(.text(13)).foregroundStyle(Theme.Palette.tertiary)
