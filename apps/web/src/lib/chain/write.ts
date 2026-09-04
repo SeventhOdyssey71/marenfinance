@@ -9,7 +9,17 @@ import {
   useSignTypedData,
   useWriteContract,
 } from 'wagmi';
-import { encodeFunctionData, erc20Abi, type Abi, type Address, type Hash, type Hex } from 'viem';
+import {
+  encodeAbiParameters,
+  encodeFunctionData,
+  erc20Abi,
+  keccak256,
+  type Abi,
+  type Address,
+  type Hash,
+  type Hex,
+} from 'viem';
+import { privateKeyToAccount } from 'viem/accounts';
 import { getChain, getMarenAddresses, getMusdAddresses } from '@maren/sdk';
 
 import { marenEarnAbi, marenPayAbi, marenRegistryAbi, marenVaultAbi } from './abis';
@@ -189,6 +199,65 @@ export class NotConnectedError extends Error {
   }
 }
 
+/**
+ * The inner hash a payment link's one-time key signs, BEFORE the EIP-191 prefix.
+ *
+ * Reproduced byte-for-byte from `MarenPay.linkClaimDigest`:
+ *
+ *   keccak256(abi.encode("MarenPay.claimLink", block.chainid, address(this), linkId, recipient))
+ *
+ * with abi types `[string, uint256, address, uint256, address]`. This is the web twin of
+ * iOS `MarenEncoding.claimLinkInner`, which is golden-tested against Foundry's `cast
+ * abi-encode`; the string literal, the argument order and the types are identical here, so
+ * the two apps produce the same 32 bytes for the same link and recipient.
+ */
+export function claimLinkInnerHash(input: {
+  chainId: number;
+  marenPay: Address;
+  linkId: bigint;
+  recipient: Address;
+}): Hex {
+  return keccak256(
+    encodeAbiParameters(
+      [
+        { type: 'string' },
+        { type: 'uint256' },
+        { type: 'address' },
+        { type: 'uint256' },
+        { type: 'address' },
+      ],
+      ['MarenPay.claimLink', BigInt(input.chainId), input.marenPay, input.linkId, input.recipient],
+    ),
+  );
+}
+
+/**
+ * Sign a link claim with the link's one-time bearer key.
+ *
+ * THE SIGNATURE BINDS THE PAYOUT TO ONE RECIPIENT. The digest above names `recipient`, so a
+ * signature produced here is only ever valid for the address it already carries — a copied
+ * signature cannot be replayed to redirect the funds, which is what lets a link travel over
+ * an untrusted channel. The secret itself never touches the chain; only its signature over
+ * the recipient does.
+ *
+ * The wrapping `signMessage({ message: { raw } })` applies the EIP-191
+ * `\x19Ethereum Signed Message:\n32` prefix to the 32-byte inner hash, which is exactly
+ * what the contract's `MessageHashUtils.toEthSignedMessageHash` does before
+ * `ECDSA.recover`. The returned 65-byte signature has `v` as 27/28, the shape the contract
+ * recovers against. This mirrors iOS `MezoActions.signClaimLink` / `EthereumAccount.signMessage`.
+ */
+export async function signClaimLink(input: {
+  secret: Hex;
+  chainId: number;
+  marenPay: Address;
+  linkId: bigint;
+  recipient: Address;
+}): Promise<Hex> {
+  const inner = claimLinkInnerHash(input);
+  const linkAccount = privateKeyToAccount(input.secret);
+  return linkAccount.signMessage({ message: { raw: inner } });
+}
+
 /** Every write the app can perform. Each returns a hash, or throws. */
 export interface MarenWrites {
   /** True when a real signer is connected to the right chain. */
@@ -210,6 +279,26 @@ export interface MarenWrites {
   payHandle: (handle: string, amountWei: bigint, memo: string) => Promise<Hash>;
   /** `payer` is the zero address when anyone may fulfil the request. */
   createRequest: (payer: Address, amountWei: bigint, memo: string) => Promise<Hash>;
+  /**
+   * Pay a request somebody else created, releasing the requested MUSD to the requester.
+   *
+   * The amount and recipient live in the request the contract stored at `requestId`, so
+   * nothing about the payment is passed here — the contract reads its own record. It pulls
+   * MUSD with `transferFrom`, so it needs a prior MarenPay approval exactly as a direct pay
+   * does. The contract reverts `RequestNotOpen` if it was already fulfilled or cancelled,
+   * and the simulation surfaces that before anything is signed.
+   */
+  fulfillRequest: (requestId: bigint) => Promise<Hash>;
+  /**
+   * Claim a payment link into the connected wallet.
+   *
+   * `secret` is the one-time private key from the link's URL fragment. It signs a digest
+   * that names the claimer as recipient (see `signClaimLink`); the claimer's own wallet
+   * then submits — or, when a relayer is live, signs the forwarded request. The recipient
+   * is always the connected account, so a link cannot be claimed to an address the presser
+   * does not control.
+   */
+  claimLink: (linkId: bigint, secret: Hex) => Promise<Hash>;
   /**
    * Pay N recipients in one call. `recipients[i]` receives `amountsWei[i]`; the arrays
    * are index-aligned and the contract reverts `ArrayLengthMismatch` if they are not.
@@ -632,6 +721,54 @@ export function useMarenWrites(options: MarenWriteOptions = {}): MarenWrites {
           publicClient,
           params,
           'createRequest',
+          () => publicClient.simulateContract({ ...params, account }),
+          () => writeContractAsync({ ...params, chainId: targetChain.id }),
+        );
+      },
+
+      async fulfillRequest(requestId) {
+        const { account, publicClient } = requireSigner();
+        const params = {
+          address: maren.marenPay,
+          abi: marenPayAbi,
+          functionName: 'fulfillRequest',
+          args: [requestId],
+        } as const;
+        return submitCall(
+          account,
+          publicClient,
+          params,
+          'fulfillRequest',
+          () => publicClient.simulateContract({ ...params, account }),
+          () => writeContractAsync({ ...params, chainId: targetChain.id }),
+        );
+      },
+
+      async claimLink(linkId, secret) {
+        const { account, publicClient } = requireSigner();
+        // The link key (from the URL fragment) signs a digest binding the payout to THIS
+        // claimer, reproduced from `MarenPay.linkClaimDigest`. Built here, before the call,
+        // so the exact bytes the contract recovers against are what the simulation runs and
+        // what gets submitted. A wrong secret recovers to the wrong signer and the contract
+        // reverts `InvalidLinkSignature`, which the simulate-first path surfaces at no cost.
+        const signature = await signClaimLink({
+          secret,
+          chainId: targetChain.id,
+          marenPay: maren.marenPay,
+          linkId,
+          recipient: account,
+        });
+        const params = {
+          address: maren.marenPay,
+          abi: marenPayAbi,
+          functionName: 'claimLink',
+          args: [linkId, account, signature],
+        } as const;
+        return submitCall(
+          account,
+          publicClient,
+          params,
+          'claimLink',
           () => publicClient.simulateContract({ ...params, account }),
           () => writeContractAsync({ ...params, chainId: targetChain.id }),
         );

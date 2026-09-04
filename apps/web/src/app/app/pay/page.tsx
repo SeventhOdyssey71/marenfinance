@@ -1,8 +1,9 @@
 'use client';
 
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
+import { useReadContract } from 'wagmi';
 import { generatePrivateKey, privateKeyToAccount } from 'viem/accounts';
-import { formatMusd } from '@maren/sdk';
+import { formatMusd, getChain, shortAddress } from '@maren/sdk';
 import type { Address } from 'viem';
 
 import { BlockedNote } from '@/components/app/blocked';
@@ -10,12 +11,21 @@ import { ConnectPrompt } from '@/components/app/connect-prompt';
 import { AmountField, Segmented } from '@/components/app/controls';
 import { HandleRegistration } from '@/components/app/handle-registration';
 import { Musd } from '@/components/app/money';
-import { ActionButton, Info, Label, Note, Panel, Refreshing } from '@/components/app/primitives';
+import {
+  ActionButton,
+  Info,
+  Label,
+  Loading,
+  Note,
+  Panel,
+  Refreshing,
+} from '@/components/app/primitives';
 import { ReceivePanel } from '@/components/app/receive-panel';
 import { SendFlow } from '@/components/app/send-flow';
 import { TxSheet, useTxRunner, type TxIntent, type TxRunner } from '@/components/app/tx';
 import { ArrowUpRight, LinkIcon, Minus, PayIcon, Plus } from '@/components/ui/icons';
 import { parseUnitsSafe, utf8Length } from '@/lib/copy';
+import { marenPayAbi } from '@/lib/chain/abis';
 import { preflightMusdSpend } from '@/lib/chain/preflight';
 import { actionIsRelayable } from '@/lib/chain/relay';
 import {
@@ -26,7 +36,9 @@ import {
   useMusdAllowance,
   useRelayerStatus,
 } from '@/lib/chain/write';
-import { useBalances, useDataSource, useResolvedHandle } from '@/lib/data/source';
+import { NETWORK, useBalances, useDataSource, useResolvedHandle } from '@/lib/data/source';
+
+const TARGET_CHAIN_ID = getChain(NETWORK).id;
 
 type Tab = 'send' | 'split' | 'request' | 'link' | 'receive' | 'handle';
 
@@ -107,7 +119,12 @@ export default function PayPage() {
 
       {tab === 'send' ? <SendFlow runner={runner} /> : null}
       {tab === 'split' ? <SplitPanel runner={runner} /> : null}
-      {tab === 'request' ? <RequestPanel runner={runner} /> : null}
+      {tab === 'request' ? (
+        <>
+          <RequestPanel runner={runner} />
+          <FulfilPanel runner={runner} />
+        </>
+      ) : null}
       {tab === 'link' ? <LinkPanel runner={runner} /> : null}
       {tab === 'receive' ? <ReceivePanel /> : null}
       {tab === 'handle' ? <HandleRegistration runner={runner} /> : null}
@@ -273,6 +290,321 @@ function RequestPanel({ runner }: { runner: TxRunner }) {
         </p>
       </div>
     </Panel>
+  );
+}
+
+/**
+ * Fulfil a request somebody sent you.
+ *
+ * The settling half of the Request tab: a payer pastes the request id they were given,
+ * sees exactly who gets paid and how much read from the contract's own record, and pays it
+ * in one action. Nothing about the payment is entered here — the amount and the requester
+ * live in the request, so the payer agrees to a figure the contract will enforce rather
+ * than one this screen re-types.
+ *
+ * The honesty rules are the send flow's rules, because it moves the same MUSD: it pulls
+ * with `transferFrom`, so a first fulfilment needs a MarenPay approval shown as its own
+ * step; it preflights the wallet balance; and every state the request can be in — open,
+ * already fulfilled, cancelled, addressed to a different payer, or your own — is read and
+ * stated plainly rather than discovered inside a revert.
+ */
+const REQUEST_STATUS = ['None', 'Open', 'Fulfilled', 'Cancelled'] as const;
+
+function FulfilPanel({ runner }: { runner: TxRunner }) {
+  const { data: balances } = useBalances();
+  const { account } = useDataSource();
+  const writes = useMarenWrites({ onSimulated: runner.onSimulated });
+  const relayer = useRelayerStatus();
+  const [idText, setIdText] = useState('');
+
+  const trimmed = idText.trim();
+  const idValid = /^\d+$/.test(trimmed) && BigInt(trimmed || '0') > 0n;
+  const requestId = idValid ? BigInt(trimmed) : null;
+
+  const { data: record, isFetching } = useReadContract({
+    address: SPENDERS.pay,
+    abi: marenPayAbi,
+    functionName: 'requests',
+    args: requestId !== null ? [requestId] : undefined,
+    chainId: TARGET_CHAIN_ID,
+    query: { enabled: requestId !== null && writes.ready },
+  });
+
+  // requests(id) → (requester, payer, amount, createdAt, status).
+  const requester = record?.[0] as Address | undefined;
+  const designatedPayer = record?.[1] as Address | undefined;
+  const amountWei = (record?.[2] as bigint | undefined) ?? 0n;
+  const status = (record?.[4] as number | undefined) ?? 0;
+
+  const funds = preflightMusdSpend(balances, amountWei, { verb: 'pay', noun: 'Payment' });
+  const {
+    allowanceWei,
+    needed: needsApproval,
+    refetch: refetchAllowance,
+  } = useMusdAllowance(SPENDERS.pay, amountWei);
+
+  // After a delivered fulfilment, clear the id so the panel is ready for the next one; the
+  // sheet owns delivery and the balances refetch on their own from the confirmed receipt.
+  const sawDelivered = useRef(false);
+  useEffect(() => {
+    const phase = runner.phase;
+    if (phase.name === 'settled' && phase.outcome.kind === 'delivered') {
+      sawDelivered.current = true;
+    } else if (phase.name === 'idle' && sawDelivered.current) {
+      sawDelivered.current = false;
+      setIdText('');
+      refetchAllowance();
+    }
+  }, [runner.phase, refetchAllowance]);
+
+  const zero = '0x0000000000000000000000000000000000000000';
+  const isOpen = status === 1;
+  const addressedElsewhere =
+    designatedPayer !== undefined &&
+    designatedPayer !== zero &&
+    account !== null &&
+    designatedPayer.toLowerCase() !== account.toLowerCase();
+  const isMine =
+    requester !== undefined &&
+    account !== null &&
+    requester.toLowerCase() === account.toLowerCase();
+  // A request the contract can be paid by this account, right now.
+  const payable = isOpen && amountWei > 0n && !addressedElsewhere && !isMine;
+
+  const approvalIntent = (): TxIntent => ({
+    title: `Approve ${formatMusd(amountWei)} for MarenPay`,
+    successTitle: `Approved ${formatMusd(amountWei)}`,
+    changes: [
+      {
+        label: 'MarenPay allowance',
+        before: <Musd wei={allowanceWei ?? 0n} />,
+        after: <Musd wei={amountWei} />,
+      },
+    ],
+    details: [
+      { label: 'Token', value: <span className="text-text-muted">MUSD</span> },
+      { label: 'Amount', value: <Musd wei={amountWei} /> },
+      {
+        label: 'Spender',
+        value: <span className="num text-text-subtle break-all text-xs">{SPENDERS.pay}</span>,
+      },
+    ],
+    gas: {
+      sponsored: false,
+      note: 'The request cannot be paid without this. You pay the Bitcoin gas.',
+    },
+    confirmLabel: 'Approve',
+    submit: writes.ready
+      ? async () => {
+          const hash = await writes.approveMusd(SPENDERS.pay, amountWei);
+          refetchAllowance();
+          return hash;
+        }
+      : undefined,
+  });
+
+  const fulfilIntent = (): TxIntent => ({
+    title: `Pay ${formatMusd(amountWei)}`,
+    successTitle: `Paid ${formatMusd(amountWei)}`,
+    changes: [
+      {
+        label: 'MUSD in your wallet',
+        before: <Musd wei={balances?.musdWei ?? 0n} />,
+        after: (
+          <Musd
+            wei={(balances?.musdWei ?? 0n) > amountWei ? (balances?.musdWei ?? 0n) - amountWei : 0n}
+          />
+        ),
+      },
+    ],
+    details: [
+      { label: 'Amount', value: <Musd wei={amountWei} /> },
+      { label: 'Request', value: <span className="num text-text-muted">#{trimmed}</span> },
+      {
+        label: 'To',
+        value: <span className="num text-text-subtle break-all text-xs">{requester}</span>,
+      },
+    ],
+    gas: gasNote(
+      actionIsRelayable('fulfillRequest'),
+      'The amount and recipient are fixed by the request; paying it releases exactly that MUSD to the requester.',
+      relayer,
+    ),
+    confirmLabel: `Pay ${formatMusd(amountWei)}`,
+    submit: writes.ready && requestId !== null ? () => writes.fulfillRequest(requestId) : undefined,
+  });
+
+  return (
+    <Panel
+      title="Pay a request"
+      meta={<span className="text-text-muted text-xs">Settle a request someone sent you.</span>}
+    >
+      <div className="px-5 py-5">
+        <div className="max-w-xl">
+          <label htmlFor="fulfil-id" className="t-label text-text-subtle block">
+            Request number
+          </label>
+          <input
+            id="fulfil-id"
+            value={idText}
+            onChange={(event) => setIdText(event.target.value.replace(/[^\d]/g, ''))}
+            inputMode="numeric"
+            placeholder="e.g. 42"
+            autoComplete="off"
+            spellCheck={false}
+            className="num text-text placeholder:text-text-subtle/60 mt-3 w-full border-b border-[var(--border-hairline)] bg-transparent pb-3 text-lg outline-none focus:border-[var(--border-strong)]"
+          />
+          <p className="text-text-subtle mt-3 text-xs">
+            The number the requester shared, or the id shown on their request in Activity.
+          </p>
+        </div>
+
+        {!writes.ready ? (
+          <div className="mt-6">
+            <Note>Connect a wallet on {getChain(NETWORK).name} to read and pay a request.</Note>
+          </div>
+        ) : requestId === null ? null : isFetching && record === undefined ? (
+          <div className="mt-2">
+            <Loading>Reading request #{trimmed} from Mezo</Loading>
+          </div>
+        ) : status === 0 ? (
+          <div className="mt-6">
+            <Note tone="warning" role="alert">
+              There is no request #{trimmed} on {getChain(NETWORK).name}. Check the number and try
+              again.
+            </Note>
+          </div>
+        ) : (
+          <>
+            <dl className="card mt-6 overflow-hidden">
+              <FulfilRow label="Amount" value={<Musd wei={amountWei} />} />
+              <FulfilRow
+                label="Requester"
+                value={<span className="text-text text-sm">{shortAddress(requester ?? zero)}</span>}
+                sub={requester}
+              />
+              <FulfilRow
+                label="Status"
+                value={
+                  <span className={`text-sm ${isOpen ? 'text-text' : 'text-text-muted'}`}>
+                    {REQUEST_STATUS[status] ?? 'Unknown'}
+                  </span>
+                }
+                last={!(designatedPayer && designatedPayer !== zero)}
+              />
+              {designatedPayer && designatedPayer !== zero ? (
+                <FulfilRow
+                  label="Payer"
+                  value={<span className="text-text text-sm">{shortAddress(designatedPayer)}</span>}
+                  sub={designatedPayer}
+                  last
+                />
+              ) : null}
+            </dl>
+
+            {status === 2 ? (
+              <div className="mt-6">
+                <Note>This request has already been fulfilled. Nothing is owed on it.</Note>
+              </div>
+            ) : status === 3 ? (
+              <div className="mt-6">
+                <Note>The requester cancelled this request, so it can no longer be paid.</Note>
+              </div>
+            ) : isMine ? (
+              <div className="mt-6">
+                <Note>
+                  You created this request, so you cannot pay it yourself. Share the number with
+                  whoever owes you.
+                </Note>
+              </div>
+            ) : addressedElsewhere ? (
+              <div className="mt-6">
+                <Note tone="warning" role="alert">
+                  This request names a specific payer, and it is not the connected wallet. Only that
+                  address can pay it.
+                </Note>
+              </div>
+            ) : (
+              <>
+                {funds.rangeDead && funds.blocker ? (
+                  <div className="mt-6">
+                    <BlockedNote blocker={funds.blocker} id="fulfil-blocked" />
+                  </div>
+                ) : null}
+
+                {funds.ok && needsApproval && amountWei > 0n ? (
+                  <div className="mt-6">
+                    <Note>
+                      MarenPay needs an allowance for {formatMusd(amountWei)} before it can pull the
+                      payment. That is a separate transaction, shown here rather than slipped in
+                      behind it.
+                    </Note>
+                  </div>
+                ) : null}
+
+                <div className="mt-6">
+                  <p className="text-text-subtle text-xs leading-relaxed">
+                    {gasLine(actionIsRelayable('fulfillRequest'), relayer)}
+                  </p>
+                </div>
+
+                <div className="mt-4 flex flex-wrap gap-3">
+                  {needsApproval && amountWei > 0n ? (
+                    <ActionButton
+                      onClick={() => runner.request(approvalIntent())}
+                      disabled={!writes.ready || !funds.ok}
+                      aria-describedby="fulfil-blocked"
+                      icon={<ArrowUpRight className="size-4" />}
+                    >
+                      Approve {formatMusd(amountWei)}
+                    </ActionButton>
+                  ) : null}
+                  <ActionButton
+                    variant={needsApproval && amountWei > 0n ? 'secondary' : 'primary'}
+                    onClick={() => runner.request(fulfilIntent())}
+                    disabled={
+                      !payable || !funds.ok || !writes.ready || (needsApproval && amountWei > 0n)
+                    }
+                    aria-describedby="fulfil-blocked"
+                    icon={<PayIcon className="size-4" />}
+                  >
+                    Pay {formatMusd(amountWei)}
+                  </ActionButton>
+                </div>
+              </>
+            )}
+          </>
+        )}
+      </div>
+    </Panel>
+  );
+}
+
+function FulfilRow({
+  label,
+  value,
+  sub,
+  last = false,
+}: {
+  label: string;
+  value: ReactNode;
+  sub?: string;
+  last?: boolean;
+}) {
+  return (
+    <div
+      className={`flex items-start justify-between gap-6 px-5 py-3.5 ${
+        last ? '' : 'border-b border-[var(--border-hairline)]'
+      }`}
+    >
+      <dt className="t-label text-text-subtle pt-0.5">{label}</dt>
+      <dd className="min-w-0 text-right">
+        <span className="block">{value}</span>
+        {sub ? (
+          <span className="num text-text-subtle mt-0.5 block break-all text-xs">{sub}</span>
+        ) : null}
+      </dd>
+    </div>
   );
 }
 

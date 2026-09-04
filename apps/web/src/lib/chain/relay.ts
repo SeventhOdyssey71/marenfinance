@@ -311,6 +311,15 @@ export const WRITE_ACTIONS = {
   payAddress: { target: 'marenPay', functionName: 'pay', carriesValue: false },
   payHandle: { target: 'marenPay', functionName: 'payToHandle', carriesValue: false },
   createRequest: { target: 'marenPay', functionName: 'createRequest', carriesValue: false },
+  // The settling half of a request. On the hub's allowlist (Deploy.s.sol), so a payer
+  // fulfilling a request is sponsorable when a relayer is live, on the same free-tier path
+  // pay/payToHandle take. It pulls MUSD with transferFrom, so it needs a prior MarenPay
+  // approval exactly as a direct pay does.
+  fulfillRequest: { target: 'marenPay', functionName: 'fulfillRequest', carriesValue: false },
+  // The receiving half of a payment link. On the hub's allowlist for `claimLink` (the
+  // paired `createLink` is not — see `createLink` below), so a claim is sponsorable when a
+  // relayer is live. Moves no MUSD from the claimer; it releases escrow the contract holds.
+  claimLink: { target: 'marenPay', functionName: 'claimLink', carriesValue: false },
   // On the hub's allowlist (Deploy.s.sol payCalls[8]), so a split is sponsorable when a
   // relayer is live — the same free-tier path pay/payToHandle/createRequest take.
   splitPayment: { target: 'marenPay', functionName: 'split', carriesValue: false },
