@@ -123,6 +123,13 @@ let MUSD_GAS_COMPENSATION: BigUInt = BigUInt(200) * BigUInt(10).power(18)
 /// Ongoing interest: 1.00% APR, simple, fixed for the life of a loan.
 let INTEREST_RATE_BPS = 100
 
+/// Mezo's `PriceFeed.fetchPrice()` is a `view` that REVERTS once the oracle observation is
+/// older than this, so every on-chain borrow/liquidate/read path rejects a staler price. The
+/// app reads the precompile's `latestRoundData().updatedAt` directly (so it can say HOW old a
+/// price is instead of only seeing a revert), then applies the SAME 60s threshold here — a
+/// price the protocol would refuse is surfaced as unavailable, never rendered as if current.
+let ORACLE_MAX_PRICE_DELAY_SECONDS = 60
+
 /// The widest `[fromBlock, toBlock]` span Mezo's public RPC answers in one `eth_getLogs`.
 /// Measured: a wider range returns `maximum [from, to] blocks distance: 10000`.
 let MEZO_MAX_LOG_RANGE = 10_000

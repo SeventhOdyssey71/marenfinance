@@ -56,6 +56,14 @@ struct MezoMarenClient: MarenClient {
                 return .unavailable(reason: "The oracle price did not fit a decimal figure.")
             }
             let asOf = Date(timeIntervalSince1970: TimeInterval(updatedAt))
+            // Mezo's PriceFeed.fetchPrice() reverts above 60s staleness, so a price this old is
+            // one every on-chain borrow/liquidate/read path would reject. Surface it as
+            // unavailable rather than presenting a number the protocol itself would refuse. A
+            // clock-skewed future timestamp (negative age) is treated as fresh, not stale.
+            let age = Date().timeIntervalSince(asOf)
+            if age > TimeInterval(ORACLE_MAX_PRICE_DELAY_SECONDS) {
+                return .unavailable(reason: "Mezo's price oracle is \(Int(age))s old — past the 60s the protocol accepts, so it reads as unavailable.")
+            }
             return .available(usdPerBtc: usd, asOf: asOf)
         } catch {
             // A failed or stale read is unavailable, NEVER a fabricated number.
