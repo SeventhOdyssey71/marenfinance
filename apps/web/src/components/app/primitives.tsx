@@ -248,23 +248,23 @@ export function EmptyState({
   icon?: ReactNode;
 }) {
   return (
-    // A band, not a column. Stacked, this was a 450px-tall card with content in its
-    // top-left quadrant and nothing anywhere else — the least dense thing on a screen
-    // whose whole point is density. Icon, copy and action now sit on one line from `sm`
-    // up, and the card is a strip.
-    <div className="flex flex-col items-start gap-4 sm:flex-row sm:items-center sm:gap-6">
+    // The app renders inside a fixed ~480px phone frame at every viewport, so this
+    // stacks unconditionally — a mobile card, never a viewport-responsive strip. A
+    // `sm:flex-row` here activated on desktop viewports *inside* the narrow frame and
+    // collapsed the title to one word per line.
+    <div className="flex flex-col items-start gap-4">
       {icon ? (
         <span className="bg-surface-inset grid size-11 shrink-0 place-items-center rounded-[var(--radius-pill)] text-violet-500">
           {icon}
         </span>
       ) : null}
-      <div className="min-w-0 flex-1">
+      <div className="w-full min-w-0">
         <h3 className="t-h3">{title}</h3>
         {children ? (
           <p className="text-text-muted mt-1.5 max-w-[62ch] text-sm leading-relaxed">{children}</p>
         ) : null}
       </div>
-      {action ? <div className="shrink-0">{action}</div> : null}
+      {action ? <div className="w-full">{action}</div> : null}
     </div>
   );
 }
