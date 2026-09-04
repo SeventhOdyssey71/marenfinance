@@ -472,11 +472,11 @@
   /* One-shot entrance — BRAND.md §6: fires once, never on scroll-back */
   .reveal {
     opacity: 0;
-    transform: translateY(14px);
+    transform: translateY(22px);
   }
 
   .reveal-in {
-    animation: maren-reveal 480ms var(--ease-entrance) forwards;
+    animation: maren-reveal 640ms var(--ease-entrance) forwards;
   }
 
   @keyframes maren-reveal {

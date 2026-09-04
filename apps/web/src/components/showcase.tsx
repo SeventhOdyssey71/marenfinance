@@ -13,7 +13,7 @@ const SHOTS: readonly { src: string; label: string }[] = [
 
 export function Showcase() {
   return (
-    <section id="product" className="u-wrap scroll-mt-28 pt-24 sm:pt-28">
+    <section id="product" className="u-wrap scroll-mt-28 pt-32 sm:pt-48">
       <Reveal className="flex flex-col items-center text-center">
         <Tag>A closer look</Tag>
         <h2 className="u-display mt-5 max-w-[16ch] text-[clamp(30px,4.6vw,54px)]">

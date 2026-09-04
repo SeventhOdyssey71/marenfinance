@@ -30,7 +30,7 @@ const STEPS: readonly { n: string; title: string; body: string; fill: string }[]
 
 export function HowItWorks() {
   return (
-    <section id="how" className="u-wrap scroll-mt-28 pt-24 sm:pt-28">
+    <section id="how" className="u-wrap scroll-mt-28 pt-32 sm:pt-48">
       <Reveal className="flex flex-col items-center text-center">
         <Tag>How it works</Tag>
         <h2 className="u-display mt-5 max-w-[16ch] text-[clamp(30px,4.6vw,54px)]">

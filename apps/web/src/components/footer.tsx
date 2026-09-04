@@ -43,7 +43,7 @@ const socials = [
 
 export function Footer() {
   return (
-    <footer className="u-wrap pb-10 pt-24 sm:pt-28">
+    <footer className="u-wrap pb-12 pt-32 sm:pt-48">
       {/* Closing CTA — clean dark panel */}
       <Reveal>
         <div className="rounded-[36px] bg-[color:var(--ink)] p-10 text-center sm:p-16">
@@ -129,7 +129,10 @@ export function Footer() {
           © {new Date().getFullYear()} Maren Finance. Pre-audit software. Deposit only what you can
           afford to lose.
         </span>
-        <span className="inline-flex items-center gap-2.5 text-[12.5px] font-bold uppercase tracking-[0.06em] text-[color:var(--ink)]">
+        <span
+          className="inline-flex items-center gap-2.5 text-[12.5px] font-semibold uppercase tracking-[0.06em] text-[color:var(--ink)]"
+          style={{ fontFamily: 'var(--display)' }}
+        >
           <span aria-hidden className="size-2 rounded-[3px] bg-[color:var(--lime)]" />
           Built on Mezo
           <span className="num font-medium text-[color:var(--muted)]">31612 · 31611</span>

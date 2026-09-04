@@ -197,7 +197,7 @@ export function Faq() {
   const [open, setOpen] = useState<number | null>(0);
 
   return (
-    <section id="faq" className="u-wrap scroll-mt-28 pt-24 sm:pt-28">
+    <section id="faq" className="u-wrap scroll-mt-28 pt-32 sm:pt-48">
       <div className="grid grid-cols-1 gap-8 lg:grid-cols-[0.8fr_1.2fr] lg:gap-14">
         <div className="lg:sticky lg:top-28 lg:self-start">
           <Tag>The awkward questions</Tag>
