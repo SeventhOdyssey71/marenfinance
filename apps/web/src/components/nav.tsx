@@ -68,7 +68,7 @@ export function Nav() {
               aria-expanded={open}
               aria-controls="mobile-nav"
               aria-label={open ? 'Close menu' : 'Open menu'}
-              className="u-chip size-11 shrink-0 lg:hidden"
+              className="nav-menu-btn u-chip size-11 shrink-0 lg:hidden"
             >
               <svg
                 viewBox="0 0 20 20"

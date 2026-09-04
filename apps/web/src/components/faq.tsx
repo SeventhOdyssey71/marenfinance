@@ -142,7 +142,7 @@ function AccordionItem({
   const panelId = `faq-panel-${id}`;
 
   return (
-    <div className="u-card overflow-hidden">
+    <div className="border-b border-[color:var(--border-hairline)] last:border-b-0">
       <h3>
         <button
           type="button"
@@ -150,26 +150,26 @@ function AccordionItem({
           aria-expanded={open}
           aria-controls={panelId}
           onClick={onToggle}
-          className="flex w-full items-center gap-4 p-5 text-left"
+          className="group flex w-full items-center gap-4 px-6 py-5 text-left"
         >
           <span
             aria-hidden
-            className="num shrink-0 text-[13px] font-bold text-[color:var(--muted)]"
+            className="num w-6 shrink-0 text-[13px] font-semibold text-[color:var(--placeholder)]"
           >
             {String(index + 1).padStart(2, '0')}
           </span>
           <span
-            className="flex-1 text-balance text-[18px] font-semibold tracking-[-0.01em] text-[color:var(--ink)]"
+            className="flex-1 text-balance text-[17px] font-semibold tracking-[-0.01em] text-[color:var(--ink)]"
             style={{ fontFamily: 'var(--display)' }}
           >
             {item.q}
           </span>
           <span
             aria-hidden
-            className={`grid size-9 shrink-0 place-items-center rounded-[10px] transition-colors duration-[200ms] ease-out ${
+            className={`grid size-8 shrink-0 place-items-center rounded-full transition-colors duration-[200ms] ease-out ${
               open
-                ? 'bg-[color:var(--accent-wash)] text-[color:var(--accent-text)]'
-                : 'bg-[color:var(--soft-fill)] text-[color:var(--ink)]'
+                ? 'bg-[color:var(--accent)] text-white'
+                : 'bg-[color:var(--soft-fill)] text-[color:var(--ink)] group-hover:bg-[color:var(--accent-wash)] group-hover:text-[color:var(--accent-text)]'
             }`}
           >
             {open ? <Minus className="size-4" /> : <Plus className="size-4" />}
@@ -183,7 +183,7 @@ function AccordionItem({
             id={panelId}
             role="region"
             aria-labelledby={buttonId}
-            className="space-y-4 px-5 pb-6 pl-[3.6rem] text-[15px] font-medium leading-[1.6] text-[color:var(--muted)]"
+            className="space-y-4 px-6 pb-6 pl-[3.75rem] text-[15px] font-normal leading-[1.6] text-[color:var(--muted)]"
           >
             {item.a}
           </div>
@@ -209,7 +209,7 @@ export function Faq() {
           </p>
         </div>
 
-        <div className="flex flex-col gap-3">
+        <div className="u-card overflow-hidden">
           {items.map((item, i) => (
             <AccordionItem
               key={item.q}
