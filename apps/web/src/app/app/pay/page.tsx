@@ -804,7 +804,7 @@ function SplitPanel({ runner }: { runner: TxRunner }) {
             type="button"
             onClick={addRow}
             disabled={rows.length >= MAX_SPLIT_RECIPIENTS}
-            className="text-text-muted hover:text-text mt-6 inline-flex h-9 items-center gap-2 rounded-[var(--radius-pill)] border border-[var(--border-hairline)] px-3.5 text-sm transition-[color,border-color] duration-[120ms] ease-out hover:border-[var(--border-strong)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-violet-500 disabled:opacity-40 disabled:hover:border-[var(--border-hairline)]"
+            className="text-text-muted hover:text-text mt-6 inline-flex h-11 items-center gap-2 rounded-[var(--radius-pill)] border border-[var(--border-hairline)] px-4 text-sm transition-[color,border-color,transform] duration-[120ms] ease-out hover:border-[var(--border-strong)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-violet-500 active:scale-[0.97] disabled:opacity-40 disabled:hover:border-[var(--border-hairline)]"
           >
             <Plus aria-hidden className="size-4" />
             Add recipient
@@ -1001,7 +1001,7 @@ function SplitRecipientRow({
           onClick={() => onRemove(id)}
           disabled={!canRemove}
           aria-label={`Remove recipient ${index + 1}`}
-          className="text-text-muted hover:text-text grid size-10 shrink-0 place-items-center rounded-[var(--radius-pill)] border border-[var(--border-hairline)] transition-[color,border-color] duration-[120ms] ease-out hover:border-[var(--border-strong)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-violet-500 disabled:opacity-30 disabled:hover:border-[var(--border-hairline)]"
+          className="text-text-muted hover:text-text grid size-11 shrink-0 place-items-center rounded-[var(--radius-pill)] border border-[var(--border-hairline)] transition-[color,border-color,transform] duration-[120ms] ease-out hover:border-[var(--border-strong)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-violet-500 active:scale-[0.97] disabled:opacity-30 disabled:hover:border-[var(--border-hairline)]"
         >
           <Minus aria-hidden className="size-4" />
         </button>

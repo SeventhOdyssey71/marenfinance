@@ -250,12 +250,12 @@ function FlowHeader({ step, onBack }: { step: Step; onBack: () => void }) {
             type="button"
             onClick={onBack}
             aria-label="Go back a step"
-            className="text-text-muted hover:text-text grid size-9 shrink-0 place-items-center rounded-[var(--radius-pill)] border border-[var(--border-hairline)] transition-[color,border-color] duration-[120ms] ease-out hover:border-[var(--border-strong)]"
+            className="text-text-muted hover:text-text grid size-11 shrink-0 place-items-center rounded-[var(--radius-pill)] border border-[var(--border-hairline)] transition-[color,border-color,transform] duration-[120ms] ease-out hover:border-[var(--border-strong)] active:scale-[0.97]"
           >
             <ArrowRight aria-hidden className="size-4 rotate-180" />
           </button>
         ) : (
-          <span className="size-9 shrink-0" />
+          <span className="size-11 shrink-0" />
         )}
         <span className="t-h3">Send MUSD</span>
       </div>
@@ -388,7 +388,7 @@ function AmountStep({
 
       {/* Wallet pill + Max, honest available balance. */}
       <div className="mb-2 flex items-center justify-center gap-2">
-        <span className="bg-surface-inset inline-flex items-center gap-2 rounded-[var(--radius-pill)] border border-[var(--border-hairline)] px-3.5 py-1.5">
+        <span className="bg-surface-inset inline-flex h-11 items-center gap-2 rounded-[var(--radius-pill)] border border-[var(--border-hairline)] px-3.5">
           <span aria-hidden className="bg-success size-1.5 rounded-[var(--radius-pill)]" />
           <span className="t-label text-text-muted">Your wallet</span>
           <span className="text-text-subtle text-xs">·</span>
@@ -402,7 +402,7 @@ function AmountStep({
           type="button"
           onClick={() => onAmount(formatMusd(balance, { unit: false }).replace(/,/g, ''))}
           disabled={balance <= 0n}
-          className="bg-surface-inset text-text-muted hover:text-text inline-flex h-9 items-center rounded-[var(--radius-pill)] border border-[var(--border-hairline)] px-3.5 text-xs font-medium transition-[color,border-color] duration-[120ms] ease-out hover:border-[var(--border-strong)] disabled:opacity-40"
+          className="bg-surface-inset text-text-muted hover:text-text inline-flex h-11 items-center rounded-[var(--radius-pill)] border border-[var(--border-hairline)] px-4 text-xs font-medium transition-[color,border-color,transform] duration-[120ms] ease-out hover:border-[var(--border-strong)] active:scale-[0.97] disabled:opacity-40"
         >
           Max
         </button>
@@ -592,7 +592,7 @@ function RecentRecipients({
               key={r.address}
               type="button"
               onClick={() => onPick(r.label.startsWith('@') ? r.label : r.address)}
-              className={`inline-flex h-9 items-center gap-2 rounded-[var(--radius-pill)] border px-3.5 text-sm transition-[color,border-color] duration-[120ms] ease-out ${
+              className={`inline-flex h-11 items-center gap-2 rounded-[var(--radius-pill)] border px-4 text-sm transition-[color,border-color,transform] duration-[120ms] ease-out active:scale-[0.97] ${
                 active
                   ? 'text-text border-violet-500'
                   : 'bg-surface-inset text-text-muted hover:text-text border-[var(--border-hairline)] hover:border-[var(--border-strong)]'

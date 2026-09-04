@@ -22,7 +22,7 @@ export function PriceBanner({ feed, className = '' }: { feed: PriceFeed; classNa
       >
         <span
           aria-hidden
-          className="bg-success size-1.5 rounded-[var(--radius-pill)] shadow-[0_0_8px_1px_rgba(52,211,153,0.5)]"
+          className="bg-success size-1.5 rounded-[var(--radius-pill)] shadow-[0_0_8px_1px_color-mix(in_srgb,var(--color-success)_50%,transparent)]"
         />
         <span>BTC</span>
         <Num tone="default">{formatUsd(feed.priceWei)}</Num>
