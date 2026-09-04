@@ -51,8 +51,13 @@ export function AppProviders({ children }: { children: ReactNode }) {
     );
   }
 
+  // `reconnectOnMount={false}`: without it wagmi eagerly touches the injected provider on
+  // page load, and an installed Phantom (which claims `window.ethereum`) throws up its
+  // connect popup before the user has asked for anything. Connection now happens only when
+  // the user clicks Connect. A returning user reconnects with one click rather than a
+  // popup ambushing every visit.
   return (
-    <WagmiProvider config={wagmiConfig}>
+    <WagmiProvider config={wagmiConfig} reconnectOnMount={false}>
       <QueryClientProvider client={queryClient}>{children}</QueryClientProvider>
     </WagmiProvider>
   );
