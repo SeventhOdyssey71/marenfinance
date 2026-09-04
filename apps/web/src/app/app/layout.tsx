@@ -15,6 +15,13 @@ export const metadata: Metadata = {
 };
 
 /**
+ * The /app subtree renders per-request (wallet/chain state), so it opts INTO dynamic
+ * here rather than at the root — that kept the whole site, including the static /docs
+ * MDX pages, from prerendering and 500'd /docs in production.
+ */
+export const dynamic = 'force-dynamic';
+
+/**
  * The app shell.
  *
  * Everything below the nav is a client tree because it reads chain state; the layout
