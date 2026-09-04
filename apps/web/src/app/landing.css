@@ -121,12 +121,17 @@
 .landing .u-wrap {
   margin-inline: auto;
   width: 100%;
-  max-width: 1200px;
+  max-width: 1440px;
   padding-inline: 20px;
 }
 @media (min-width: 640px) {
   .landing .u-wrap {
-    padding-inline: 24px;
+    padding-inline: 32px;
+  }
+}
+@media (min-width: 1280px) {
+  .landing .u-wrap {
+    padding-inline: 48px;
   }
 }
 
