@@ -169,7 +169,7 @@ jobs:
       - name: Install Foundry
         uses: foundry-rs/foundry-toolchain@v1
         with:
-          version: stable
+          version: 1.4.3
 
       # forge keys its artefacts on the source hash and the solc settings, so a restored
       # cache makes a test-only change skip the whole compile. Paths are relative to the
@@ -239,7 +239,7 @@ jobs:
       - name: Install Foundry
         uses: foundry-rs/foundry-toolchain@v1
         with:
-          version: stable
+          version: 1.4.3
 
       # turbo hashes each task's inputs, so restoring its cache lets an unchanged
       # workspace replay instead of rebuilding. Keyed per commit, restored from the most

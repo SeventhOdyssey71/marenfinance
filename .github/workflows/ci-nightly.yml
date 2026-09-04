@@ -71,7 +71,7 @@ jobs:
       - name: Install Foundry
         uses: foundry-rs/foundry-toolchain@v1
         with:
-          version: stable
+          version: 1.4.3
 
       # Same key as ci.yml, so a nightly can restore what a push to main already
       # compiled. Paths are relative to the workspace root, not to
@@ -121,7 +121,7 @@ jobs:
       - name: Install Foundry
         uses: foundry-rs/foundry-toolchain@v1
         with:
-          version: stable
+          version: 1.4.3
 
       - name: Cache Foundry artefacts
         uses: actions/cache@v4
