@@ -11,7 +11,7 @@
 <dict>
     <key>keychain-access-groups</key>
     <array>
-        <string>$(AppIdentifierPrefix)finance.maren.swift</string>
+        <string>$(AppIdentifierPrefix)finance.maren.app</string>
     </array>
 </dict>
 </plist>

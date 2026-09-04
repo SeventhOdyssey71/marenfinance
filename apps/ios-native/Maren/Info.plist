@@ -12,5 +12,14 @@
 <dict>
     <key>MAREN_RELAYER_URL</key>
     <string>https://maren-relayer.rolandojude18.workers.dev</string>
+    <!--
+      Export-compliance declaration. Maren only uses standard, exempt cryptography: HTTPS/TLS
+      for network calls, Apple's Keychain/Secure Enclave and secp256k1 signing for the wallet.
+      It implements no proprietary or non-standard encryption, so it qualifies for the App
+      Store export-compliance exemption. NO means "no non-exempt encryption", which lets
+      TestFlight builds skip the manual export-compliance questionnaire on every upload.
+    -->
+    <key>ITSAppUsesNonExemptEncryption</key>
+    <false/>
 </dict>
 </plist>

@@ -1,0 +1,47 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<!--
+  ExportOptions for `xcodebuild -exportArchive` targeting App Store / TestFlight.
+
+  Usage (after an archive has been produced with a real DEVELOPMENT_TEAM):
+
+    xcodegen generate
+    xcodebuild -project Maren.xcodeproj -scheme Maren \
+      -configuration Release -sdk iphoneos \
+      -destination 'generic/platform=iOS' \
+      -archivePath build/Maren.xcarchive \
+      DEVELOPMENT_TEAM=XXXXXXXXXX \
+      archive
+    xcodebuild -exportArchive \
+      -archivePath build/Maren.xcarchive \
+      -exportOptionsPlist ExportOptions.plist \
+      -exportPath build/export \
+      -allowProvisioningUpdates
+
+  >>> ACTION REQUIRED <<< Replace the teamID placeholder below with your real 10-character
+  Apple Developer Team ID. Everything else is correct for a TestFlight/App Store upload.
+-->
+<plist version="1.0">
+<dict>
+    <key>method</key>
+    <string>app-store</string>
+
+    <!-- Replace with your real Apple Developer Team ID (App Store Connect -> Membership). -->
+    <key>teamID</key>
+    <string>REPLACE_WITH_TEAM_ID</string>
+
+    <!-- Let Xcode create/refresh the App Store distribution profile automatically. -->
+    <key>signingStyle</key>
+    <string>automatic</string>
+
+    <!-- Standard TestFlight/App Store settings. -->
+    <key>destination</key>
+    <string>export</string>
+    <key>uploadSymbols</key>
+    <true/>
+    <key>manageAppVersionAndBuildNumber</key>
+    <false/>
+    <key>stripSwiftSymbols</key>
+    <true/>
+</dict>
+</plist>

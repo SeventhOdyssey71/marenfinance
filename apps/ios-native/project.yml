@@ -9,10 +9,17 @@ options:
 settings:
   base:
     SWIFT_VERSION: "6.0"
+    # DEVELOPMENT_TEAM is intentionally empty at the project level. The real 10-character
+    # Apple Developer Team ID must be supplied for a device/distribution (Release) build —
+    # set it in the Maren target's Release config below, or pass
+    # DEVELOPMENT_TEAM=XXXXXXXXXX on the xcodebuild archive command. Simulator Debug builds
+    # need no team.
     DEVELOPMENT_TEAM: ""
     CODE_SIGNING_ALLOWED: "NO"
     CODE_SIGNING_REQUIRED: "NO"
-    MARKETING_VERSION: "0.1.0"
+    # Marketing version (CFBundleShortVersionString) and build number (CFBundleVersion).
+    # Bump CURRENT_PROJECT_VERSION for every new TestFlight upload of the same 1.0.0.
+    MARKETING_VERSION: "1.0.0"
     CURRENT_PROJECT_VERSION: "1"
 
 # The real Mezo chain layer is built on argentlabs/web3.swift — a maintained Swift EVM
@@ -54,18 +61,22 @@ targets:
         product: BigInt
     settings:
       base:
-        PRODUCT_BUNDLE_IDENTIFIER: finance.maren.swift
-        # Partial Info.plist for custom keys (MAREN_RELAYER_URL); GENERATE_INFOPLIST_FILE still
-        # merges the INFOPLIST_KEY_* Apple keys below into it at build time.
+        # Production reverse-DNS bundle identifier. (Internal Keychain service labels in
+        # Keystore.swift / MarenSession.swift are independent string constants and keep their
+        # historical "finance.maren.swift" value — they are cosmetic labels, unrelated to the
+        # bundle id or the keychain access group, so no code change is required.)
+        PRODUCT_BUNDLE_IDENTIFIER: finance.maren.app
+        # Partial Info.plist for custom keys (MAREN_RELAYER_URL, ITSAppUsesNonExemptEncryption);
+        # GENERATE_INFOPLIST_FILE still merges the INFOPLIST_KEY_* Apple keys below into it at
+        # build time.
         INFOPLIST_FILE: Maren/Info.plist
         GENERATE_INFOPLIST_FILE: "YES"
         # The biometric Keychain item (Keystore.swift) can only be read with a keychain-access
         # entitlement; without it the read fails with errSecMissingEntitlement (-34018). Ad-hoc
-        # signing ("-") applies the entitlement on the simulator with no team, and a real device
-        # build supplies its own team prefix.
+        # signing ("-") applies the entitlement on the simulator with no team (Debug); a real
+        # device / distribution build uses automatic signing with the team (Release, below).
         CODE_SIGN_ENTITLEMENTS: Maren/Maren.entitlements
         CODE_SIGNING_ALLOWED: "YES"
-        CODE_SIGN_IDENTITY: "-"
         INFOPLIST_KEY_UILaunchScreen_Generation: "YES"
         INFOPLIST_KEY_CFBundleDisplayName: Maren
         INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents: "YES"
@@ -76,6 +87,22 @@ targets:
         SWIFT_STRICT_CONCURRENCY: complete
         ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
         ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME: AccentColor
+      configs:
+        # Debug: ad-hoc signing ("-") so the Simulator build + tests run with no Apple team.
+        Debug:
+          CODE_SIGN_STYLE: Manual
+          CODE_SIGN_IDENTITY: "-"
+          CODE_SIGNING_REQUIRED: "NO"
+        # Release: automatic signing for a real device / App Store (TestFlight) archive.
+        # >>> ACTION REQUIRED <<< set DEVELOPMENT_TEAM to your 10-character Apple Developer
+        # Team ID (App Store Connect → Membership) before archiving, or pass it on the
+        # xcodebuild command line. Automatic signing will then provision an
+        # "Apple Distribution" certificate + App Store profile for finance.maren.app.
+        Release:
+          CODE_SIGN_STYLE: Automatic
+          DEVELOPMENT_TEAM: ""   # <-- FILL IN: your Apple Developer Team ID
+          CODE_SIGN_IDENTITY: "Apple Distribution"
+          CODE_SIGNING_REQUIRED: "YES"
 
   MarenTests:
     type: bundle.unit-test
@@ -101,7 +128,7 @@ targets:
         link: false
     settings:
       base:
-        PRODUCT_BUNDLE_IDENTIFIER: finance.maren.swift.tests
+        PRODUCT_BUNDLE_IDENTIFIER: finance.maren.app.tests
         GENERATE_INFOPLIST_FILE: "YES"
         TEST_HOST: "$(BUILT_PRODUCTS_DIR)/Maren.app/Maren"
         BUNDLE_LOADER: "$(TEST_HOST)"
