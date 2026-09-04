@@ -6,24 +6,21 @@ import { usePathname } from 'next/navigation';
 
 import { ActivityIcon, FinanceIcon, HomeIcon, ProfileIcon } from '@/components/ui/icons';
 import { ChainStatus, VaultProvenance } from '@/components/app/chain-status';
-import { NavSidebar } from '@/components/app/nav-sidebar';
 import { ConnectButton, NetworkGuard } from '@/components/app/wallet';
 
 /**
- * The app shell — a left sidebar on desktop, a bottom nav on mobile.
+ * The app shell — the native app, running in a browser.
  *
- * This replaces the single top bar the dApp shipped with, and adopts the shape a
- * wallet is navigated from: four fixed destinations always in reach, and the money
- * flows (Send, Split, Request, Link, Receive) launched from Home rather than sitting
- * as a top-level peer. The four are Home, Finance, Activity, Profile.
+ * The dApp is a phone experience on every screen size: one centered narrow column, a
+ * quiet top bar (wordmark + connect control) and a floating glass bottom-nav pill with
+ * the four fixed destinations the native app carries — Home, Finance, Activity, Profile.
+ * The money flows (Send, Receive, Borrow, Deposit) are launched from Home, never a
+ * top-level peer, exactly as they are on iOS. There is no desktop sidebar and no wide
+ * dashboard: the same layout at 360px and at 1440px, so the product reads as the phone
+ * app it is a port of.
  *
- *   lg+   →  a 240px fixed left sidebar: wordmark, the four primary items, then an
- *            account footer with the connect control and the pre-audit disclosure.
- *   <lg   →  a transparent top bar (wordmark + connect control), the content, and a
- *            floating glass bottom-nav pill carrying the same four items.
- *
- * The shell owns chrome only. Every screen keeps its own connected / disconnected
- * states, its own data reads, and its own flows — this moves them under one frame.
+ * The shell owns chrome only. Every screen keeps its own connected / disconnected states,
+ * its own contract reads, and its own flows — this frames them.
  */
 
 type NavItem = {
@@ -47,6 +44,27 @@ const NAV: readonly NavItem[] = [
 function isActive(pathname: string, href: string): boolean {
   if (href === '/app') return pathname === '/app';
   return pathname === href || pathname.startsWith(href + '/');
+}
+
+/** The wordmark — SF Pro Rounded, the app's friendly display face, sentence case. */
+function Wordmark() {
+  return (
+    <Link
+      href="/"
+      aria-label="Maren Finance home"
+      className="-m-2 inline-flex w-fit rounded-[var(--radius-pill)] p-2"
+    >
+      <span
+        className="text-[22px] leading-none tracking-[-0.02em] text-[color:var(--color-text)]"
+        style={{
+          fontFamily: 'var(--font-sf-rounded), ui-rounded, system-ui, sans-serif',
+          fontWeight: 600,
+        }}
+      >
+        Maren
+      </span>
+    </Link>
+  );
 }
 
 /** The pre-audit disclosure and provenance — the two facts a user most needs. */
@@ -77,68 +95,31 @@ export function AppShell({ children }: { children: ReactNode }) {
 
   return (
     <div className="min-h-screen">
-      {/* ── Desktop sidebar (lg+) ── */}
-      <aside className="bg-bg fixed inset-y-0 left-0 z-40 hidden w-60 flex-col px-4 py-6 lg:flex">
-        <Link
-          href="/"
-          aria-label="Maren Finance home"
-          className="-m-2 mb-8 inline-flex w-fit rounded-[var(--radius-pill)] p-2"
-        >
-          <span
-            className="text-[22px] uppercase leading-none tracking-[-0.03em] text-[color:var(--color-text)]"
-            style={{ fontFamily: 'var(--font-anton), Arial Narrow, sans-serif' }}
-          >
-            Maren
-          </span>
-        </Link>
-
-        <NavSidebar items={NAV} />
-
-        {/* Account and disclosure sit at the foot of the rail. */}
-        <div className="mt-auto flex flex-col gap-5 pt-6">
+      {/* The phone column — one centered narrow frame at every width. */}
+      <div className="mx-auto flex min-h-screen w-full max-w-[30rem] flex-col px-5">
+        {/* Top bar — transparent, scrolls with the page. */}
+        <header className="flex items-center justify-between pb-2 pt-5">
+          <Wordmark />
           <ConnectButton />
-          <Disclosure />
-        </div>
-      </aside>
+        </header>
 
-      {/* ── Mobile top bar (<lg) ── transparent, scrolls with the page. */}
-      <header className="flex items-center justify-between px-5 pb-2 pt-5 lg:hidden">
-        <Link
-          href="/"
-          aria-label="Maren Finance home"
-          className="-m-2 inline-flex rounded-[var(--radius-pill)] p-2"
-        >
-          <span
-            className="text-[22px] uppercase leading-none tracking-[-0.03em] text-[color:var(--color-text)]"
-            style={{ fontFamily: 'var(--font-anton), Arial Narrow, sans-serif' }}
-          >
-            Maren
-          </span>
-        </Link>
-        <ConnectButton />
-      </header>
-
-      {/* ── Content column ── offset past the fixed sidebar on desktop. */}
-      <div className="lg:pl-60">
-        <main id="app-content" className="container-maren pb-28 pt-4 lg:pb-16 lg:pt-10">
-          <div className="flex flex-col gap-6">
+        <main id="app-content" className="flex-1 pb-28 pt-3">
+          <div className="flex flex-col gap-4">
             <NetworkGuard />
             <ChainStatus />
           </div>
-          <div className="mt-6 lg:mt-8">{children}</div>
+          <div className="mt-5">{children}</div>
 
-          {/* The disclosure follows the content on mobile; the sidebar carries it on
-              desktop, so it is hidden there to avoid saying the same thing twice. */}
-          <div className="hairline-t mt-12 pt-8 lg:hidden">
+          <div className="hairline-t mt-12 pt-8">
             <Disclosure />
           </div>
         </main>
       </div>
 
-      {/* ── Mobile bottom nav (<lg) ── a floating glass pill. */}
+      {/* Bottom nav — a floating glass pill, on every screen size. */}
       <nav
         aria-label="App sections"
-        className="fixed inset-x-0 bottom-0 z-40 flex justify-center px-4 pb-4 lg:hidden"
+        className="fixed inset-x-0 bottom-0 z-40 flex justify-center px-4 pb-[max(1rem,env(safe-area-inset-bottom))]"
       >
         <ul className="bg-surface-raised/90 flex items-center gap-1 rounded-[var(--radius-pill)] p-1.5 shadow-[0_1px_2px_rgba(16,16,19,0.05),0_12px_32px_-12px_rgba(16,16,19,0.28)] backdrop-blur-xl">
           {NAV.map(({ href, label, Icon }) => {

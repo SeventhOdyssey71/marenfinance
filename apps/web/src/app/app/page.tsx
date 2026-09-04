@@ -165,11 +165,10 @@ export default function PortfolioPage() {
         </Panel>
       )}
 
-      {/* The secondary area: two real reads side by side on desktop so the wide canvas
-          reads as a dashboard, not a lone card. Left is what your MUSD is doing (Earn +
-          spendable), right is what just happened. Both are contract reads — no invented
-          figure, no sparkline, and each carries its own honest empty state. */}
-      <div className="grid grid-cols-1 items-start gap-4 lg:grid-cols-2">
+      {/* The secondary area, stacked like the native app: what your MUSD is doing (Earn +
+          spendable) over what just happened. Both are contract reads — no invented figure,
+          no sparkline, and each carries its own honest empty state. */}
+      <div className="grid grid-cols-1 items-start gap-4">
         <EarnSnapshot earn={earn} balances={balances} />
         <RecentActivity />
       </div>
@@ -493,6 +492,10 @@ function RecentRow({ item, last }: { item: ActivityItem; last: boolean }) {
   const isMusd = item.musdWei !== undefined;
   const wei = isMusd ? item.musdWei : item.btcWei;
   const sign = direction === 'out' ? '−' : direction === 'in' ? '+' : '';
+  // Green for money in, red for money out, matching the native app; a directionless
+  // move keeps the asset tone. Always paired with the sign above, never colour alone.
+  const amountTone =
+    direction === 'in' ? 'moneyIn' : direction === 'out' ? 'moneyOut' : isMusd ? 'musd' : 'btc';
 
   return (
     <div
@@ -509,9 +512,9 @@ function RecentRow({ item, last }: { item: ActivityItem; last: boolean }) {
           <span className="flex items-baseline gap-0.5">
             {sign ? <span className="text-text-subtle text-sm">{sign}</span> : null}
             {isMusd ? (
-              <Musd wei={wei} size="sm" tone="musd" />
+              <Musd wei={wei} size="sm" tone={amountTone} />
             ) : (
-              <Btc wei={wei} size="sm" tone="btc" />
+              <Btc wei={wei} size="sm" tone={amountTone} />
             )}
           </span>
         ) : null}

@@ -33,7 +33,8 @@ const sizes: Record<Size, string> = {
   xl: 't-numeric-xl',
 };
 
-export type NumTone = 'default' | 'muted' | 'subtle' | 'btc' | 'musd' | 'inherit';
+export type NumTone =
+  'default' | 'muted' | 'subtle' | 'btc' | 'musd' | 'moneyIn' | 'moneyOut' | 'inherit';
 
 const tones: Record<NumTone, string> = {
   default: 'text-text',
@@ -41,6 +42,10 @@ const tones: Record<NumTone, string> = {
   subtle: 'text-text-subtle',
   btc: 'text-btc',
   musd: 'text-musd',
+  // Ledger direction, matching the iOS app. Only ever used alongside a + / - sign, so
+  // the direction never reads by colour alone.
+  moneyIn: 'text-[color:var(--color-money-in)]',
+  moneyOut: 'text-[color:var(--color-money-out)]',
   inherit: '',
 };
 

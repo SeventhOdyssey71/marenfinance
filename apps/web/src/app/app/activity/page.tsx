@@ -394,8 +394,9 @@ function badgeFor(kind: ActivityKind): {
 
 /**
  * The amount, signed, with the fractional part and unit greyed so the eye lands on the
- * figure that matters. Asset-coloured — BTC amber, MUSD green — with the exact,
- * unabbreviated value on hover per BRAND.md §8.
+ * figure that matters. Coloured by direction like the native app — green for money in,
+ * red for money out, always beside a + / - sign so direction never reads by colour alone;
+ * a directionless move keeps the asset tone. The exact, unabbreviated value is on hover.
  */
 function LedgerAmount({
   item,
@@ -412,9 +413,11 @@ function LedgerAmount({
   const formatted = isMusd ? formatMusd(wei, { unit: false }) : formatBtc(wei, { unit: false });
   const [whole, frac] = formatted.split('.');
   const sign = direction === 'out' ? '−' : direction === 'in' ? '+' : '';
+  const tone =
+    direction === 'in' ? 'moneyIn' : direction === 'out' ? 'moneyOut' : isMusd ? 'musd' : 'btc';
 
   return (
-    <Num size="md" tone={isMusd ? 'musd' : 'btc'} title={exactValue(wei, unit)}>
+    <Num size="md" tone={tone} title={exactValue(wei, unit)}>
       {sign}
       {whole}
       {frac ? <span className="text-text-subtle">.{frac}</span> : null}

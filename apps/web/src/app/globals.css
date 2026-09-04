@@ -59,27 +59,27 @@
      hold AA on #F7F6FB; violet-400 collapses onto violet-500 because the
      lighter tint only ever existed to survive a dark background.
   ------------------------------------------------------------------------- */
-  /* The app is the light "soft UGLYCASH" world: a paper-cream canvas, soft-white
-     cards separated by tone and a whisper of shadow (never an outline), ink type
-     with greyed tertiary/decimals, and a Riot-Pink brand accent. These are the
-     ugly.cash surface/ink values the landing already uses, re-pointed onto the
-     product's existing semantic tokens so the whole /app subtree reskins through
-     them. The dark :root and the .landing scope are untouched. */
+  /* The app is the light world, matched to the native iOS app and the landing: a
+     near-white canvas, soft-white cards separated by tone and a whisper of shadow
+     (never an outline), ink type with greyed tertiary/decimals, and the ONE Maren
+     violet accent. Re-pointed onto the product's existing semantic tokens so the
+     whole /app subtree reskins through them. The dark :root and the .landing scope
+     are untouched. */
   [data-app-theme='light'] {
     --color-bg: #f2f2f2; /* paper-cream canvas */
     --color-surface: #ffffff; /* soft-white card */
     --color-surface-raised: #ffffff;
-    --color-surface-inset: #ececef; /* quiet grey well: tone, not a border */
+    --color-surface-inset: #f1f0f6; /* quiet violet-grey well: tone, not a border */
     --color-text: #101013; /* ink */
     --color-text-muted: #6e6e6e; /* secondary (AA on paper + card) */
     --color-text-subtle: #9a9aa2; /* tertiary / greyed decimals */
-    /* Brand accent is now Riot Pink. violet-400 is the TEXT-safe accent (links,
-       focus, active labels) and stays a deep magenta that holds AA on white;
-       violet-500 is the vivid pink used for fills, dots, badges and the CTA glow,
-       where the bar is 3:1 UI-contrast rather than 4.5:1 text. */
-    --color-violet-400: #b5179e;
-    --color-violet-500: #fa00ff;
-    --color-violet-900: #ffe3ff;
+    /* Brand accent is Maren violet, from the logo mark. violet-400 is the TEXT-safe
+       deep violet (links, focus, active labels) that holds AA on white; violet-500 is
+       the primary violet used for fills, dots, badges and the CTA glow, where the bar
+       is 3:1 UI-contrast; violet-900 is the faint violet wash for chips and haloes. */
+    --color-violet-400: #4a2be0;
+    --color-violet-500: #5b3df5;
+    --color-violet-900: #edeaff;
     /* BTC orange as TEXT fails on the light page (2.14:1); this is the darkened
        text-safe value the iOS theme derived (5.41:1 on the worst surface). */
     --color-btc: #9a5300;
@@ -87,6 +87,11 @@
     --color-warning: #b45309;
     --color-danger: #dc2626;
     --color-musd: #0d9e70;
+    /* Money direction in ledgers, matching the iOS app: a fresh green for money in
+       and a soft red for money out. Their own roles, not reused success/danger, and
+       only ever paired with a + / - sign so direction never reads by colour alone. */
+    --color-money-in: #12a66f;
+    --color-money-out: #e5484d;
     --border-hairline: rgba(16, 16, 19, 0.07);
     --border-strong: rgba(16, 16, 19, 0.12);
     background-color: var(--color-bg);
@@ -119,17 +124,17 @@
     color: var(--color-text);
   }
 
-  /* The primary CTA pill in the app: a clean pill wrapped in a crisp Riot-Pink
-     ring and a tight bloom — the ugly.cash "Get the APP" halo. The pink lives
-     entirely in the shadow, so the pill face stays high-contrast and the glow
-     never intercepts clicks. Applied by the shared pill primitives; scoped to
-     the light app so the dark marketing pills are unaffected. */
+  /* The primary CTA pill in the app: a clean pill wrapped in a crisp Maren-violet
+     ring and a tight bloom. The violet lives entirely in the shadow, so the pill
+     face stays high-contrast and the glow never intercepts clicks. Applied by the
+     shared pill primitives; scoped to the light app so the dark marketing pills are
+     unaffected. */
   [data-app-theme='light'] .app-pill-glow {
     box-shadow:
-      0 0 0 1.5px rgba(250, 0, 255, 0.85),
-      0 0 0 4px rgba(250, 0, 255, 0.14),
-      0 0 16px 1px rgba(250, 0, 255, 0.42),
-      0 6px 20px -8px rgba(250, 0, 255, 0.4);
+      0 0 0 1.5px rgba(91, 61, 245, 0.85),
+      0 0 0 4px rgba(91, 61, 245, 0.14),
+      0 0 16px 1px rgba(91, 61, 245, 0.42),
+      0 6px 20px -8px rgba(91, 61, 245, 0.4);
   }
   [data-app-theme='light'] .app-pill-glow:disabled {
     box-shadow: none;
@@ -137,9 +142,9 @@
   @media (hover: hover) {
     [data-app-theme='light'] .app-pill-glow:not(:disabled):hover {
       box-shadow:
-        0 0 0 1.5px rgba(250, 0, 255, 0.95),
-        0 10px 34px -6px rgba(250, 0, 255, 0.52),
-        0 6px 18px -6px rgba(140, 90, 255, 0.5);
+        0 0 0 1.5px rgba(91, 61, 245, 0.95),
+        0 10px 34px -6px rgba(91, 61, 245, 0.52),
+        0 6px 18px -6px rgba(122, 90, 255, 0.5);
     }
   }
 
@@ -320,48 +325,49 @@
     letter-spacing: -0.02em;
   }
 
-  /* ── App voice: UGLYCASH loud, scoped to the product ─────────────────────
-     The /app was wearing Satoshi + Geist Mono, which reads calm and corporate.
-     UGLYCASH is Inter body/numbers with a condensed-black Anton SHOUT on the
-     headers and hero numbers. Scoped to `[data-app-theme='light']` so /docs and
+  /* ── App voice: native, scoped to the product ────────────────────────────
+     The /app mirrors the iOS app and the landing: body / UI / headings / labels in
+     Neue Montreal (calm, clean, sentence-case), and every figure in SF Pro Rounded
+     with monospaced digits — the friendly rounded numerals the native app uses for
+     balances, ratios and counts. Scoped to `[data-app-theme='light']` so /docs and
      the marketing landing keep their own type. Higher specificity than the base
      `.t-*` rules above, so it wins in-layer. */
   [data-app-theme='light'] {
     font-family:
-      var(--font-inter),
+      var(--font-neue),
       ui-sans-serif,
       system-ui,
       -apple-system,
       'Segoe UI',
       sans-serif;
-    letter-spacing: -0.02em;
+    letter-spacing: -0.01em;
   }
   [data-app-theme='light'] .t-display,
   [data-app-theme='light'] .t-h1,
   [data-app-theme='light'] .t-h2,
   [data-app-theme='light'] .t-h3 {
-    font-family: var(--font-anton), 'Arial Narrow', 'Roboto Condensed', sans-serif;
-    font-weight: 400; /* Anton ships one heavy cut */
-    text-transform: uppercase;
-    letter-spacing: -0.03em;
+    font-family: var(--font-neue), ui-sans-serif, system-ui, sans-serif;
+    font-weight: 500; /* Neue Montreal Medium, the native heading weight */
+    text-transform: none;
+    letter-spacing: -0.02em;
   }
   [data-app-theme='light'] .t-h3 {
-    font-size: 1.5rem;
-    line-height: 1.02;
+    font-size: 1.375rem;
+    line-height: 1.2;
     letter-spacing: -0.02em;
   }
   [data-app-theme='light'] .num {
-    font-family: var(--font-inter), ui-sans-serif, system-ui, sans-serif;
+    font-family: var(--font-sf-rounded), ui-rounded, system-ui, sans-serif;
     font-variant-numeric: tabular-nums;
     letter-spacing: -0.01em;
   }
   [data-app-theme='light'] .t-numeric-xl {
-    font-family: var(--font-anton), 'Arial Narrow', 'Roboto Condensed', sans-serif;
-    font-weight: 400;
+    font-family: var(--font-sf-rounded), ui-rounded, system-ui, sans-serif;
+    font-weight: 600;
     letter-spacing: -0.02em;
   }
   [data-app-theme='light'] .t-label {
-    font-family: var(--font-inter), ui-sans-serif, system-ui, sans-serif;
+    font-family: var(--font-neue), ui-sans-serif, system-ui, sans-serif;
   }
 
   .prose-measure {
