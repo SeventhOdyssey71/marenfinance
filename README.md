@@ -6,6 +6,8 @@
 
 Built on [Mezo Chain](https://mezo.org).
 
+<img src="docs/assets/hero.png" alt="Maren — Spend Bitcoin, never sell it" width="880" />
+
 </div>
 
 ---
@@ -24,16 +26,16 @@ afford to lose.
 
 ## Repository map
 
-| Path                 | What it is               | Contents                                                                   |
-| -------------------- | ------------------------ | -------------------------------------------------------------------------- |
-| `packages/contracts` | Foundry, Solidity 0.8.28 | `MarenVault`, `MarenPay`, `MarenRelayHub`, `MarenRegistry`, `MarenEarn`    |
-| `packages/sdk`       | `@maren/sdk`, TypeScript | Chain config, verified addresses, position and borrow math, number formats |
-| `apps/web`           | Next.js 15               | Landing page and the dApp. Reads live from matsnet                         |
-| `apps/ios`           | Expo, expo-router        | iOS app. Runs on mock data, behind the interfaces the live reads will use  |
-| `apps/relayer`       | Hono                     | ERC-2771 meta-transaction relayer that pays BTC gas                        |
-| `tools/pdf`          | Node, puppeteer-core     | Builds `docs/src/*.md` into the branded PDFs in `docs/build`               |
-| `tools/copy`         | Node                     | The em dash scanner that both app test suites and CI share                 |
-| `tools/demo`         | Node, playwright-core    | Screen-records a walkthrough of the web app                                |
+| Path                 | What it is               | Contents                                                                           |
+| -------------------- | ------------------------ | ---------------------------------------------------------------------------------- |
+| `packages/contracts` | Foundry, Solidity 0.8.28 | `MarenVault`, `MarenPay`, `MarenRelayHub`, `MarenRegistry`, `MarenEarn`            |
+| `packages/sdk`       | `@maren/sdk`, TypeScript | Chain config, verified addresses, position and borrow math, number formats         |
+| `apps/web`           | Next.js 15               | Landing page and the dApp. Reads live from matsnet                                 |
+| `apps/ios-native`    | Swift, SwiftUI           | Native iOS app. Reads live from matsnet; deposit self-paid, borrow and pay relayed |
+| `apps/relayer`       | Hono                     | ERC-2771 meta-transaction relayer that pays BTC gas                                |
+| `tools/pdf`          | Node, puppeteer-core     | Builds `docs/src/*.md` into the branded PDFs in `docs/build`                       |
+| `tools/copy`         | Node                     | The em dash scanner that both app test suites and CI share                         |
+| `tools/demo`         | Node, playwright-core    | Screen-records a walkthrough of the web app                                        |
 
 `packages/contracts` is a Foundry project rather than a pnpm workspace. It has no
 `package.json`, so drive it with `forge` directly or with the `contracts:*` root scripts.
@@ -76,7 +78,7 @@ deployment block is `null`, which callers must handle as unavailable rather than
 - No gasless meta-transaction has been sent through `MarenRelayHub` on chain, and no
   code in `apps/web` posts to the relayer yet; wiring the web transaction path to it is
   the follow-up to the deployment packaging.
-- `apps/ios` is on mock data throughout.
+- `apps/ios-native` is the native SwiftUI app and reads live from matsnet.
 
 ## Networks
 
@@ -106,16 +108,16 @@ cp .env.example .env                      # then fill in the values
 **Always prefix pnpm with `CI=true`.** Without it pnpm can stop on an interactive prompt
 that never renders in a non-TTY, and it looks exactly like a network hang.
 
-| Part       | Command                                                          |
-| ---------- | ---------------------------------------------------------------- |
-| Everything | `CI=true pnpm dev`                                               |
-| Web        | `CI=true pnpm --filter @maren/web dev` on `:3000`                |
-| iOS        | `CI=true pnpm --filter @maren/ios start`, then `i` for Simulator |
-| Relayer    | `CI=true pnpm --filter @maren/relayer dev`                       |
-| Contracts  | `forge build --sizes` inside `packages/contracts`                |
-| Documents  | `CI=true pnpm docs:pdf` builds eleven PDFs into `docs/build`     |
+| Part       | Command                                                                     |
+| ---------- | --------------------------------------------------------------------------- |
+| Everything | `CI=true pnpm dev`                                                          |
+| Web        | `CI=true pnpm --filter @maren/web dev` on `:3000`                           |
+| iOS        | Native SwiftUI: `xcodegen generate` in `apps/ios-native`, then run in Xcode |
+| Relayer    | `CI=true pnpm --filter @maren/relayer dev`                                  |
+| Contracts  | `forge build --sizes` inside `packages/contracts`                           |
+| Documents  | `CI=true pnpm docs:pdf` builds eleven PDFs into `docs/build`                |
 
-The iOS app runs `start`, not `dev`, so a root `pnpm dev` does not launch Expo.
+The iOS app is native SwiftUI — build and run it from Xcode after `xcodegen generate` in `apps/ios-native`, not through pnpm.
 
 ## Tests
 

@@ -107,8 +107,9 @@ export { EM_DASH };
 const REPO_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..', '..');
 export const COPY_ROOTS = [
   join(REPO_ROOT, 'apps', 'web', 'src'),
-  join(REPO_ROOT, 'apps', 'ios', 'app'),
-  join(REPO_ROOT, 'apps', 'ios', 'src'),
+  // The iOS app is now native Swift (apps/ios-native) — this scanner only reads
+  // .ts/.tsx/.js/.jsx/.css, so it cannot cover Swift copy; the old Expo roots
+  // (apps/ios/app, apps/ios/src) are gone. Web is the only JS/TS copy surface.
 ];
 
 /**
