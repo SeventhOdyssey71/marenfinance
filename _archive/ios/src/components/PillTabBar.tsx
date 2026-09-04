@@ -25,11 +25,9 @@ import { Txt } from './Text';
 type TabBarProps = {
   state: { index: number; routes: { key: string; name: string }[] };
   navigation: {
-    emit: (e: {
-      type: 'tabPress';
-      target: string;
-      canPreventDefault: true;
-    }) => { defaultPrevented: boolean };
+    emit: (e: { type: 'tabPress'; target: string; canPreventDefault: true }) => {
+      defaultPrevented: boolean;
+    };
     navigate: (name: string) => void;
   };
 };

@@ -111,7 +111,9 @@ export default function Profile() {
               </Txt>
             }
             onPress={toggleHidden}
-            accessibilityLabel={hidden ? 'Amounts are hidden. Tap to show.' : 'Amounts are shown. Tap to hide.'}
+            accessibilityLabel={
+              hidden ? 'Amounts are hidden. Tap to show.' : 'Amounts are shown. Tap to hide.'
+            }
             accessibilityHint="Toggles whether balances are visible."
             last
           />

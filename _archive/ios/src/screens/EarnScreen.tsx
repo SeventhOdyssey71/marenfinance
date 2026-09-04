@@ -259,8 +259,8 @@ export function EarnBody() {
         <View style={styles.gasRow}>
           <Icon name="alert" size={14} color={semanticText.warning} />
           <Txt variant="small" tone="muted" style={styles.gasText}>
-            You pay the BTC gas here. Earn settles from your own wallet rather than through
-            Maren’s relayer, so a deposit or withdrawal costs a little Bitcoin gas.
+            You pay the BTC gas here. Earn settles from your own wallet rather than through Maren’s
+            relayer, so a deposit or withdrawal costs a little Bitcoin gas.
           </Txt>
         </View>
 

@@ -116,14 +116,14 @@ pnpm cf:deploy                              # wrangler deploy
 Local dev needs no account: `pnpm cf:dev` runs the whole worker in miniflare,
 reading the key from a gitignored `.dev.vars` (`RELAYER_PRIVATE_KEY=0x…`).
 
-| Claim                                                                                | Verified?                                                                                             |
-| ------------------------------------------------------------------------------------ | ----------------------------------------------------------------------------------------------------- |
-| The worker bundles and boots (`createRelayer`, pino, viem, the DO, `DurableStore`)   | Yes, `pnpm cf:dev` in miniflare                                                                        |
-| It answers `/health` + `/healthz` with `accepting: true`, `store: "durable"`         | Yes, locally                                                                                           |
-| It reads the signer's real balance and nonce from Mezo testnet through the worker    | Yes — `/health` returned the on-chain balance and nonce (viem `http()` transport works on Workers)    |
-| The 296 unit tests, `worker/tsconfig` typecheck, and `src` build all pass            | Yes                                                                                                   |
-| The alarm/cron sweep fires on Cloudflare's schedule                                  | **No.** Verified wired; not observed on a real deployment (crons don't auto-fire in local dev)         |
-| An actual `wrangler deploy` to Cloudflare                                            | **No.** Needs `wrangler login` (interactive) and the Workers Paid plan — both owner-only              |
+| Claim                                                                              | Verified?                                                                                          |
+| ---------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------- |
+| The worker bundles and boots (`createRelayer`, pino, viem, the DO, `DurableStore`) | Yes, `pnpm cf:dev` in miniflare                                                                    |
+| It answers `/health` + `/healthz` with `accepting: true`, `store: "durable"`       | Yes, locally                                                                                       |
+| It reads the signer's real balance and nonce from Mezo testnet through the worker  | Yes — `/health` returned the on-chain balance and nonce (viem `http()` transport works on Workers) |
+| The 296 unit tests, `worker/tsconfig` typecheck, and `src` build all pass          | Yes                                                                                                |
+| The alarm/cron sweep fires on Cloudflare's schedule                                | **No.** Verified wired; not observed on a real deployment (crons don't auto-fire in local dev)     |
+| An actual `wrangler deploy` to Cloudflare                                          | **No.** Needs `wrangler login` (interactive) and the Workers Paid plan — both owner-only           |
 
 For real funds, prefer a keystore over `RELAYER_PRIVATE_KEY` here too — but on
 Workers the key is a `wrangler secret`, not a file, so Step 2's keystore-file

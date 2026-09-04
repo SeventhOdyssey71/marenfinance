@@ -75,9 +75,7 @@ export function SendFlow({ runner }: { runner: TxRunner }) {
 
   const amountWei = parseUnitsSafe(amount);
   const balance = balances?.musdWei ?? 0n;
-  const recipient: Address | null = isAddress
-    ? (trimmed as Address)
-    : (resolved?.address ?? null);
+  const recipient: Address | null = isAddress ? (trimmed as Address) : (resolved?.address ?? null);
   const memoBytes = utf8Length(memo);
 
   const {
@@ -252,7 +250,7 @@ function FlowHeader({ step, onBack }: { step: Step; onBack: () => void }) {
             type="button"
             onClick={onBack}
             aria-label="Go back a step"
-            className="text-text-muted hover:text-text hover:border-[var(--border-strong)] grid size-9 shrink-0 place-items-center rounded-[var(--radius-pill)] border border-[var(--border-hairline)] transition-[color,border-color] duration-[120ms] ease-out"
+            className="text-text-muted hover:text-text grid size-9 shrink-0 place-items-center rounded-[var(--radius-pill)] border border-[var(--border-hairline)] transition-[color,border-color] duration-[120ms] ease-out hover:border-[var(--border-strong)]"
           >
             <ArrowRight aria-hidden className="size-4 rotate-180" />
           </button>
@@ -281,7 +279,11 @@ function FlowHeader({ step, onBack }: { step: Step; onBack: () => void }) {
           <span
             key={s.key}
             className={`t-label ${
-              i === activeIndex ? 'text-text' : i < activeIndex ? 'text-violet-400' : 'text-text-subtle'
+              i === activeIndex
+                ? 'text-text'
+                : i < activeIndex
+                  ? 'text-violet-400'
+                  : 'text-text-subtle'
             }`}
           >
             {s.label}
@@ -361,7 +363,9 @@ function AmountStep({
               className={`${BIG_NUMBER} block ${over ? 'text-danger' : 'text-text'}`}
             >
               {whole}
-              {frac ? <span className={over ? 'text-danger/60' : 'text-text-subtle'}>{frac}</span> : null}
+              {frac ? (
+                <span className={over ? 'text-danger/60' : 'text-text-subtle'}>{frac}</span>
+              ) : null}
             </span>
             <input
               ref={inputRef}
@@ -388,13 +392,17 @@ function AmountStep({
           <span aria-hidden className="bg-success size-1.5 rounded-[var(--radius-pill)]" />
           <span className="t-label text-text-muted">Your wallet</span>
           <span className="text-text-subtle text-xs">·</span>
-          {balanceKnown ? <Musd wei={balance} size="sm" tone="muted" /> : <span className="text-text-subtle text-xs">—</span>}
+          {balanceKnown ? (
+            <Musd wei={balance} size="sm" tone="muted" />
+          ) : (
+            <span className="text-text-subtle text-xs">—</span>
+          )}
         </span>
         <button
           type="button"
           onClick={() => onAmount(formatMusd(balance, { unit: false }).replace(/,/g, ''))}
           disabled={balance <= 0n}
-          className="bg-surface-inset text-text-muted hover:text-text hover:border-[var(--border-strong)] inline-flex h-9 items-center rounded-[var(--radius-pill)] border border-[var(--border-hairline)] px-3.5 text-xs font-medium transition-[color,border-color] duration-[120ms] ease-out disabled:opacity-40"
+          className="bg-surface-inset text-text-muted hover:text-text inline-flex h-9 items-center rounded-[var(--radius-pill)] border border-[var(--border-hairline)] px-3.5 text-xs font-medium transition-[color,border-color] duration-[120ms] ease-out hover:border-[var(--border-strong)] disabled:opacity-40"
         >
           Max
         </button>
@@ -504,7 +512,10 @@ function RecipientStep({
         )}
       </div>
 
-      <RecentRecipients onPick={onTo} activeAddress={isAddress ? (trimmed as Address) : resolved?.address} />
+      <RecentRecipients
+        onPick={onTo}
+        activeAddress={isAddress ? (trimmed as Address) : resolved?.address}
+      />
 
       <div className="mt-8">
         <label htmlFor="send-memo" className="t-label text-text-subtle block">
@@ -583,7 +594,7 @@ function RecentRecipients({
               onClick={() => onPick(r.label.startsWith('@') ? r.label : r.address)}
               className={`inline-flex h-9 items-center gap-2 rounded-[var(--radius-pill)] border px-3.5 text-sm transition-[color,border-color] duration-[120ms] ease-out ${
                 active
-                  ? 'border-violet-500 text-text'
+                  ? 'text-text border-violet-500'
                   : 'bg-surface-inset text-text-muted hover:text-text border-[var(--border-hairline)] hover:border-[var(--border-strong)]'
               }`}
             >
@@ -648,27 +659,19 @@ function ReviewStep({
           sub={fromAddress ?? 'Signed by your connected wallet'}
           subMono={fromAddress !== null}
         />
-        <ReviewRow
-          label="To"
-          value={toHandle ?? shortAddress(toAddress)}
-          sub={toAddress}
-          subMono
-        />
-        {memo ? <ReviewRow label="Memo" value={memo} sub="Written on-chain, public forever" /> : null}
-        <ReviewRow
-          label="Network fee"
-          value="You pay gas"
-          sub={relayerLine}
-          last
-        />
+        <ReviewRow label="To" value={toHandle ?? shortAddress(toAddress)} sub={toAddress} subMono />
+        {memo ? (
+          <ReviewRow label="Memo" value={memo} sub="Written on-chain, public forever" />
+        ) : null}
+        <ReviewRow label="Network fee" value="You pay gas" sub={relayerLine} last />
       </dl>
 
       {needsApproval ? (
         <div className="mt-6">
           <Note>
             MarenPay needs an allowance for {formatMusd(amountWei)} first; currently{' '}
-            {formatMusd(allowanceWei ?? 0n)}. That is a separate transaction, shown here rather
-            than slipped in behind the payment.
+            {formatMusd(allowanceWei ?? 0n)}. That is a separate transaction, shown here rather than
+            slipped in behind the payment.
           </Note>
         </div>
       ) : null}

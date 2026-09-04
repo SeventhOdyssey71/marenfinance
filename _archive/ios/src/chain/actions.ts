@@ -305,7 +305,11 @@ async function buildLiveCall(
       });
       return {
         to: maren.marenVault,
-        data: encodeFunctionData({ abi: marenVaultAbi, functionName: 'deposit', args: [upper, lower] }),
+        data: encodeFunctionData({
+          abi: marenVaultAbi,
+          functionName: 'deposit',
+          args: [upper, lower],
+        }),
         value: action.btcWei,
         relayable: false,
         sponsored: false,

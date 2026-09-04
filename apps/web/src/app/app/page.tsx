@@ -113,7 +113,10 @@ export default function PortfolioPage() {
       <ActionPills />
 
       {debtFree && position ? (
-        <Panel title="Your position" meta={<span className="t-label text-text-subtle">No debt</span>}>
+        <Panel
+          title="Your position"
+          meta={<span className="t-label text-text-subtle">No debt</span>}
+        >
           <div className="px-5 py-5">
             <div className="flex flex-wrap items-baseline gap-3">
               <Btc wei={position.collateralWei} size="xl" />
@@ -389,7 +392,8 @@ function PositionCard({
                   <>
                     You share one trove with everyone else in the social vault. Your Bitcoin is
                     segregated in accounting, not custody, so a fall faster than the keeper can act
-                    could socialise losses. Adding collateral does not raise the shared ceiling.{' '}
+                    could socialise losses. Adding collateral does not raise the shared
+                    ceiling.{' '}
                   </>
                 ) : (
                   <>

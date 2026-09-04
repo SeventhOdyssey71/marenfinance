@@ -1,13 +1,7 @@
-"use client"
+'use client';
 
-import * as React from "react"
-import {
-  AnimatePresence,
-  motion,
-  useReducedMotion,
-  useScroll,
-  useSpring,
-} from "motion/react"
+import * as React from 'react';
+import { AnimatePresence, motion, useReducedMotion, useScroll, useSpring } from 'motion/react';
 
 /**
  * Floating scroll-progress indicator for the Maren landing (rare-ui, adapted).
@@ -20,26 +14,25 @@ import {
 
 /** Minimal local class-join (replaces rare-ui's `cn`/`@/lib/utils`). */
 const cn = (...classes: Array<string | false | null | undefined>) =>
-  classes.filter(Boolean).join(" ")
+  classes.filter(Boolean).join(' ');
 
-export type ScrollProgressSection = { id: string; label: string }
+export type ScrollProgressSection = { id: string; label: string };
 
-const EASE_IN_OUT = [0.65, 0, 0.35, 1] as const
-const EASE_OUT = [0.22, 1, 0.36, 1] as const
-const SIZE_SPRING = { type: "spring", bounce: 0.16, duration: 0.5 } as const
-const LABEL_CROSSFADE = { duration: 0.22, ease: EASE_OUT } as const
-const LAYER_FADE = { duration: 0.24, ease: EASE_IN_OUT } as const
+const EASE_IN_OUT = [0.65, 0, 0.35, 1] as const;
+const EASE_OUT = [0.22, 1, 0.36, 1] as const;
+const SIZE_SPRING = { type: 'spring', bounce: 0.16, duration: 0.5 } as const;
+const LABEL_CROSSFADE = { duration: 0.22, ease: EASE_OUT } as const;
+const LAYER_FADE = { duration: 0.24, ease: EASE_IN_OUT } as const;
 
-const useIsoLayoutEffect =
-  typeof window !== "undefined" ? React.useLayoutEffect : React.useEffect
+const useIsoLayoutEffect = typeof window !== 'undefined' ? React.useLayoutEffect : React.useEffect;
 
-type Size = { width: number; height: number }
+type Size = { width: number; height: number };
 
-export type ScrollProgressProps = React.ComponentProps<"div"> & {
-  sections?: ScrollProgressSection[]
-  containerRef?: React.RefObject<HTMLElement | null>
-  offset?: number
-}
+export type ScrollProgressProps = React.ComponentProps<'div'> & {
+  sections?: ScrollProgressSection[];
+  containerRef?: React.RefObject<HTMLElement | null>;
+  offset?: number;
+};
 
 const ScrollProgress = ({
   className,
@@ -48,158 +41,144 @@ const ScrollProgress = ({
   offset = 120,
   ...props
 }: ScrollProgressProps) => {
-  const layoutId = React.useId()
-  const reduceMotion = useReducedMotion()
+  const layoutId = React.useId();
+  const reduceMotion = useReducedMotion();
 
-  const { scrollYProgress } = useScroll(
-    containerRef ? { container: containerRef } : undefined
-  )
+  const { scrollYProgress } = useScroll(containerRef ? { container: containerRef } : undefined);
   const progress = useSpring(scrollYProgress, {
     stiffness: 120,
     damping: 30,
     mass: 0.3,
-  })
+  });
 
-  const [activeId, setActiveId] = React.useState(sections[0]?.id)
-  const [open, setOpen] = React.useState(false)
+  const [activeId, setActiveId] = React.useState(sections[0]?.id);
+  const [open, setOpen] = React.useState(false);
 
-  const scrollLock = React.useRef(false)
-  const scrollLockTimer = React.useRef<ReturnType<typeof setTimeout>>(undefined)
+  const scrollLock = React.useRef(false);
+  const scrollLockTimer = React.useRef<ReturnType<typeof setTimeout>>(undefined);
 
   React.useEffect(() => {
-    const scroller = containerRef?.current ?? window
+    const scroller = containerRef?.current ?? window;
 
     const update = () => {
-      if (scrollLock.current) return
-      const anchor =
-        (containerRef?.current?.getBoundingClientRect().top ?? 0) + offset
-      let active: ScrollProgressSection | undefined
+      if (scrollLock.current) return;
+      const anchor = (containerRef?.current?.getBoundingClientRect().top ?? 0) + offset;
+      let active: ScrollProgressSection | undefined;
       for (let i = sections.length - 1; i >= 0; i--) {
-        const s = sections[i]
-        const top = s
-          ? document.getElementById(s.id)?.getBoundingClientRect().top
-          : undefined
+        const s = sections[i];
+        const top = s ? document.getElementById(s.id)?.getBoundingClientRect().top : undefined;
         if (top !== undefined && top <= anchor) {
-          active = s
-          break
+          active = s;
+          break;
         }
       }
-      setActiveId(active?.id ?? sections[0]?.id)
-    }
+      setActiveId(active?.id ?? sections[0]?.id);
+    };
 
-    update()
-    scroller.addEventListener("scroll", update, { passive: true })
-    window.addEventListener("resize", update)
+    update();
+    scroller.addEventListener('scroll', update, { passive: true });
+    window.addEventListener('resize', update);
     return () => {
-      scroller.removeEventListener("scroll", update)
-      window.removeEventListener("resize", update)
-    }
-  }, [sections, containerRef, offset])
+      scroller.removeEventListener('scroll', update);
+      window.removeEventListener('resize', update);
+    };
+  }, [sections, containerRef, offset]);
 
-  const label = sections.find((s) => s.id === activeId)?.label
+  const label = sections.find((s) => s.id === activeId)?.label;
 
-  const labelVersion = React.useRef(0)
-  const prevLabel = React.useRef(label)
+  const labelVersion = React.useRef(0);
+  const prevLabel = React.useRef(label);
   if (label !== prevLabel.current) {
-    prevLabel.current = label
-    labelVersion.current += 1
+    prevLabel.current = label;
+    labelVersion.current += 1;
   }
 
-  const collapsedRef = React.useRef<HTMLDivElement>(null)
-  const openRef = React.useRef<HTMLDivElement>(null)
-  const labelRef = React.useRef<HTMLSpanElement>(null)
-  const rootRef = React.useRef<HTMLDivElement>(null)
+  const collapsedRef = React.useRef<HTMLDivElement>(null);
+  const openRef = React.useRef<HTMLDivElement>(null);
+  const labelRef = React.useRef<HTMLSpanElement>(null);
+  const rootRef = React.useRef<HTMLDivElement>(null);
 
-  const [collapsedSize, setCollapsedSize] = React.useState<Size>()
-  const [openSize, setOpenSize] = React.useState<Size>()
-  const [labelWidth, setLabelWidth] = React.useState<number>()
+  const [collapsedSize, setCollapsedSize] = React.useState<Size>();
+  const [openSize, setOpenSize] = React.useState<Size>();
+  const [labelWidth, setLabelWidth] = React.useState<number>();
 
   useIsoLayoutEffect(() => {
     const measure = () => {
-      if (labelRef.current) setLabelWidth(labelRef.current.offsetWidth)
+      if (labelRef.current) setLabelWidth(labelRef.current.offsetWidth);
       if (collapsedRef.current) {
         setCollapsedSize({
           width: collapsedRef.current.offsetWidth,
           height: collapsedRef.current.offsetHeight,
-        })
+        });
       }
       if (openRef.current) {
         setOpenSize({
           width: openRef.current.offsetWidth,
           height: openRef.current.offsetHeight,
-        })
+        });
       }
-    }
+    };
 
-    measure()
-    const ro = new ResizeObserver(measure)
-    if (labelRef.current) ro.observe(labelRef.current)
-    if (collapsedRef.current) ro.observe(collapsedRef.current)
-    if (openRef.current) ro.observe(openRef.current)
-    document.fonts?.ready.then(measure).catch(() => {})
-    return () => ro.disconnect()
-  }, [sections])
+    measure();
+    const ro = new ResizeObserver(measure);
+    if (labelRef.current) ro.observe(labelRef.current);
+    if (collapsedRef.current) ro.observe(collapsedRef.current);
+    if (openRef.current) ro.observe(openRef.current);
+    document.fonts?.ready.then(measure).catch(() => {});
+    return () => ro.disconnect();
+  }, [sections]);
 
   React.useEffect(() => {
-    if (!open) return
+    if (!open) return;
     const onPointer = (e: PointerEvent) => {
-      if (!rootRef.current?.contains(e.target as Node)) setOpen(false)
-    }
+      if (!rootRef.current?.contains(e.target as Node)) setOpen(false);
+    };
     const onKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape") setOpen(false)
-    }
-    document.addEventListener("pointerdown", onPointer)
-    document.addEventListener("keydown", onKey)
+      if (e.key === 'Escape') setOpen(false);
+    };
+    document.addEventListener('pointerdown', onPointer);
+    document.addEventListener('keydown', onKey);
     return () => {
-      document.removeEventListener("pointerdown", onPointer)
-      document.removeEventListener("keydown", onKey)
-    }
-  }, [open])
+      document.removeEventListener('pointerdown', onPointer);
+      document.removeEventListener('keydown', onKey);
+    };
+  }, [open]);
 
-  React.useEffect(() => () => clearTimeout(scrollLockTimer.current), [])
+  React.useEffect(() => () => clearTimeout(scrollLockTimer.current), []);
 
   const selectSection = (id: string) => {
-    scrollLock.current = true
-    clearTimeout(scrollLockTimer.current)
+    scrollLock.current = true;
+    clearTimeout(scrollLockTimer.current);
     scrollLockTimer.current = setTimeout(
       () => {
-        scrollLock.current = false
+        scrollLock.current = false;
       },
-      reduceMotion ? 0 : 700
-    )
+      reduceMotion ? 0 : 700,
+    );
 
-    setActiveId(id)
-    setOpen(false)
+    setActiveId(id);
+    setOpen(false);
     document.getElementById(id)?.scrollIntoView({
-      behavior: reduceMotion ? "auto" : "smooth",
-      block: "start",
-    })
-  }
+      behavior: reduceMotion ? 'auto' : 'smooth',
+      block: 'start',
+    });
+  };
 
-  const size = open ? openSize : collapsedSize
-  const radius = open ? 26 : (collapsedSize?.height ?? 32) / 2
-  const squircle = "[corner-shape:squircle]"
+  const size = open ? openSize : collapsedSize;
+  const radius = open ? 26 : (collapsedSize?.height ?? 32) / 2;
+  const squircle = '[corner-shape:squircle]';
 
   return (
     <div
       ref={rootRef}
       data-slot="scroll-progress"
-      className={cn(
-        "sp-root fixed bottom-6 left-1/2 z-40 -translate-x-1/2",
-        className
-      )}
+      className={cn('sp-root fixed bottom-6 left-1/2 z-40 -translate-x-1/2', className)}
       {...props}
     >
       <div className="pointer-events-none invisible absolute" aria-hidden>
-        <div
-          ref={collapsedRef}
-          className="inline-flex items-center gap-2.5 py-1.5 pl-2 pr-4"
-        >
+        <div ref={collapsedRef} className="inline-flex items-center gap-2.5 py-1.5 pl-2 pr-4">
           <span className="h-5 w-5" />
-          <span
-            ref={labelRef}
-            className="whitespace-nowrap text-sm font-medium leading-none"
-          >
+          <span ref={labelRef} className="whitespace-nowrap text-sm font-medium leading-none">
             {label}
           </span>
         </div>
@@ -220,8 +199,8 @@ const ScrollProgress = ({
         <motion.div
           data-slot="scroll-progress-surface"
           className={cn(
-            "sp-surface absolute bottom-0 left-1/2 -translate-x-1/2 overflow-hidden",
-            squircle
+            'sp-surface absolute bottom-0 left-1/2 -translate-x-1/2 overflow-hidden',
+            squircle,
           )}
           initial={false}
           animate={{
@@ -238,51 +217,44 @@ const ScrollProgress = ({
                 className="absolute inset-0 flex flex-col p-1.5"
                 initial={{
                   opacity: 0,
-                  filter: reduceMotion ? undefined : "blur(4px)",
+                  filter: reduceMotion ? undefined : 'blur(4px)',
                 }}
-                animate={{ opacity: 1, filter: "blur(0px)" }}
+                animate={{ opacity: 1, filter: 'blur(0px)' }}
                 exit={{
                   opacity: 0,
-                  filter: reduceMotion ? undefined : "blur(4px)",
+                  filter: reduceMotion ? undefined : 'blur(4px)',
                 }}
                 transition={LAYER_FADE}
               >
                 {sections.map((s, i) => {
-                  const isActive = s.id === activeId
+                  const isActive = s.id === activeId;
                   return (
                     <li key={s.id}>
                       <button
                         type="button"
                         onClick={() => selectSection(s.id)}
                         className={cn(
-                          "sp-item relative flex w-full items-center gap-3 rounded-[14px] px-3 py-2 text-left text-sm font-medium leading-none transition-colors",
+                          'sp-item relative flex w-full items-center gap-3 rounded-[14px] px-3 py-2 text-left text-sm font-medium leading-none transition-colors',
                           squircle,
-                          isActive && "sp-item-on"
+                          isActive && 'sp-item-on',
                         )}
                       >
                         {isActive && (
                           <motion.span
                             layoutId={`${layoutId}-active`}
-                            className={cn(
-                              "sp-active absolute inset-0 rounded-[14px]",
-                              squircle
-                            )}
-                            transition={
-                              reduceMotion ? { duration: 0 } : SIZE_SPRING
-                            }
+                            className={cn('sp-active absolute inset-0 rounded-[14px]', squircle)}
+                            transition={reduceMotion ? { duration: 0 } : SIZE_SPRING}
                           />
                         )}
                         <motion.span
                           className={cn(
-                            "relative h-1.5 w-1.5 shrink-0 rounded-full",
-                            isActive ? "sp-dot-on" : "sp-dot-off"
+                            'relative h-1.5 w-1.5 shrink-0 rounded-full',
+                            isActive ? 'sp-dot-on' : 'sp-dot-off',
                           )}
                           initial={
-                            reduceMotion
-                              ? undefined
-                              : { opacity: 0, y: 4, filter: "blur(3px)" }
+                            reduceMotion ? undefined : { opacity: 0, y: 4, filter: 'blur(3px)' }
                           }
-                          animate={{ opacity: 1, y: 0, filter: "blur(0px)" }}
+                          animate={{ opacity: 1, y: 0, filter: 'blur(0px)' }}
                           transition={{
                             duration: 0.3,
                             ease: EASE_IN_OUT,
@@ -292,11 +264,9 @@ const ScrollProgress = ({
                         <motion.span
                           className="relative whitespace-nowrap"
                           initial={
-                            reduceMotion
-                              ? undefined
-                              : { opacity: 0, y: 4, filter: "blur(3px)" }
+                            reduceMotion ? undefined : { opacity: 0, y: 4, filter: 'blur(3px)' }
                           }
-                          animate={{ opacity: 1, y: 0, filter: "blur(0px)" }}
+                          animate={{ opacity: 1, y: 0, filter: 'blur(0px)' }}
                           transition={{
                             duration: 0.3,
                             ease: EASE_IN_OUT,
@@ -307,7 +277,7 @@ const ScrollProgress = ({
                         </motion.span>
                       </button>
                     </li>
-                  )
+                  );
                 })}
               </motion.ul>
             ) : (
@@ -319,12 +289,12 @@ const ScrollProgress = ({
                 className="absolute inset-0 flex items-center gap-2.5 py-1.5 pl-2 pr-4"
                 initial={{
                   opacity: 0,
-                  filter: reduceMotion ? undefined : "blur(4px)",
+                  filter: reduceMotion ? undefined : 'blur(4px)',
                 }}
-                animate={{ opacity: 1, filter: "blur(0px)" }}
+                animate={{ opacity: 1, filter: 'blur(0px)' }}
                 exit={{
                   opacity: 0,
-                  filter: reduceMotion ? undefined : "blur(4px)",
+                  filter: reduceMotion ? undefined : 'blur(4px)',
                 }}
                 transition={LAYER_FADE}
               >
@@ -351,10 +321,7 @@ const ScrollProgress = ({
                   </svg>
                 </span>
 
-                <span
-                  className="relative h-5 shrink-0"
-                  style={{ width: labelWidth }}
-                >
+                <span className="relative h-5 shrink-0" style={{ width: labelWidth }}>
                   <AnimatePresence initial={false}>
                     {label && (
                       <motion.span
@@ -362,16 +329,10 @@ const ScrollProgress = ({
                         data-slot="scroll-progress-label"
                         className="absolute inset-y-0 left-0 flex items-center whitespace-nowrap text-sm font-medium leading-none"
                         initial={
-                          reduceMotion
-                            ? { opacity: 0 }
-                            : { opacity: 0, filter: "blur(1.5px)" }
+                          reduceMotion ? { opacity: 0 } : { opacity: 0, filter: 'blur(1.5px)' }
                         }
-                        animate={{ opacity: 1, filter: "blur(0px)" }}
-                        exit={
-                          reduceMotion
-                            ? { opacity: 0 }
-                            : { opacity: 0, filter: "blur(1.5px)" }
-                        }
+                        animate={{ opacity: 1, filter: 'blur(0px)' }}
+                        exit={reduceMotion ? { opacity: 0 } : { opacity: 0, filter: 'blur(1.5px)' }}
                         transition={LABEL_CROSSFADE}
                       >
                         {label}
@@ -385,8 +346,8 @@ const ScrollProgress = ({
         </motion.div>
       )}
     </div>
-  )
-}
+  );
+};
 
-export { ScrollProgress }
-export default ScrollProgress
+export { ScrollProgress };
+export default ScrollProgress;

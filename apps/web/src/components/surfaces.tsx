@@ -26,7 +26,9 @@ function VaultCard() {
         <span className="u-chip size-10">
           <VaultIcon className="size-5" />
         </span>
-        <h3 className="text-[20px] font-semibold tracking-[-0.02em] text-[color:var(--ink)]">Vault</h3>
+        <h3 className="text-[20px] font-semibold tracking-[-0.02em] text-[color:var(--ink)]">
+          Vault
+        </h3>
       </div>
 
       <div className="u-well mt-6 p-4">
@@ -74,7 +76,9 @@ function PayCard() {
         <span className="u-chip size-10">
           <PayIcon className="size-5" />
         </span>
-        <h3 className="text-[20px] font-semibold tracking-[-0.02em] text-[color:var(--ink)]">Pay</h3>
+        <h3 className="text-[20px] font-semibold tracking-[-0.02em] text-[color:var(--ink)]">
+          Pay
+        </h3>
       </div>
 
       <div className="u-well mt-6 p-4">
@@ -86,10 +90,7 @@ function PayCard() {
         </div>
         <ul className="flex flex-col gap-2">
           {rows.map(([to, meta, amt]) => (
-            <li
-              key={to}
-              className="u-well flex items-center justify-between gap-3 px-3 py-2"
-            >
+            <li key={to} className="u-well flex items-center justify-between gap-3 px-3 py-2">
               <div className="min-w-0">
                 <div className="text-[12.5px] font-bold text-[color:var(--ink)]">{to}</div>
                 <div className="num text-[10px] text-[color:var(--muted)]">{meta}</div>
@@ -115,7 +116,9 @@ function EarnCard() {
         <span className="u-chip size-10">
           <EarnIcon className="size-5" />
         </span>
-        <h3 className="text-[20px] font-semibold tracking-[-0.02em] text-[color:var(--ink)]">Earn</h3>
+        <h3 className="text-[20px] font-semibold tracking-[-0.02em] text-[color:var(--ink)]">
+          Earn
+        </h3>
       </div>
 
       <div className="u-well mt-6 p-4">

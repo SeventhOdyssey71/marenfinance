@@ -151,9 +151,7 @@ export function isOutflow(kind: ActivityKind): boolean {
  * accessibility label; this is what those owners put in that label, so the figure is
  * announced exactly once and reads the same on the row and in its receipt.
  */
-export function signedAmountText(
-  item: Pick<ActivityItem, 'kind' | 'musdWei' | 'btcWei'>,
-): string {
+export function signedAmountText(item: Pick<ActivityItem, 'kind' | 'musdWei' | 'btcWei'>): string {
   const sign = isOutflow(item.kind) ? '−' : '+';
   if (item.musdWei !== undefined) return `${sign}${formatMusd(item.musdWei)}`;
   if (item.btcWei !== undefined) return `${sign}${formatBtc(item.btcWei)}`;

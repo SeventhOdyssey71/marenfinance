@@ -826,7 +826,11 @@ function SplitPanel({ onScan }: { onScan: () => void }) {
     const sponsored = isSponsored({ type: 'split', recipients: [], amounts: [], memo });
     return (
       <View style={styles.reviewStack}>
-        <StepHeader title="Review split" onBack={() => setStep('edit')} backLabel="Back to editing" />
+        <StepHeader
+          title="Review split"
+          onBack={() => setStep('edit')}
+          backLabel="Back to editing"
+        />
 
         <Card style={styles.reviewCard}>
           <Label>{handle ? `From ${handle}` : 'From you'}</Label>
@@ -1078,7 +1082,11 @@ function LinkPanel() {
     const memoBytes = utf8Length(memo);
     return (
       <View style={styles.editStack}>
-        <StepHeader title="Link details" onBack={() => setStep('amount')} backLabel="Back to amount" />
+        <StepHeader
+          title="Link details"
+          onBack={() => setStep('amount')}
+          backLabel="Back to amount"
+        />
 
         <Card style={styles.panel}>
           <Label>Expires after</Label>
@@ -1134,11 +1142,20 @@ function LinkPanel() {
   }
 
   // review
-  const sponsored = isSponsored({ type: 'link-create', linkKey: '', musdWei: amountWei, expiry: 0n });
+  const sponsored = isSponsored({
+    type: 'link-create',
+    linkKey: '',
+    musdWei: amountWei,
+    expiry: 0n,
+  });
   const expiryDate = new Date((nowSeconds() + expiryDays * 86_400) * 1000);
   return (
     <View style={styles.reviewStack}>
-      <StepHeader title="Review link" onBack={() => setStep('details')} backLabel="Back to details" />
+      <StepHeader
+        title="Review link"
+        onBack={() => setStep('details')}
+        backLabel="Back to details"
+      />
 
       <Card style={styles.reviewCard}>
         <Label>You escrow</Label>
@@ -1254,8 +1271,8 @@ function LinkIssued({
       ) : (
         <Card style={styles.reviewCard}>
           <Txt variant="small" tone="muted">
-            The link was funded on Mezo, but its id could not be read from the receipt, so the
-            claim link cannot be shown here. Find it in Activity to reclaim after it expires.
+            The link was funded on Mezo, but its id could not be read from the receipt, so the claim
+            link cannot be shown here. Find it in Activity to reclaim after it expires.
           </Txt>
         </Card>
       )}
@@ -1267,7 +1284,10 @@ function LinkIssued({
             variant="secondary"
             tone="danger"
             onPress={() =>
-              reclaimRunner.run({ type: 'link-reclaim', linkId }, `Reclaim ${formatMusd(amountWei)}`)
+              reclaimRunner.run(
+                { type: 'link-reclaim', linkId },
+                `Reclaim ${formatMusd(amountWei)}`,
+              )
             }
             accessibilityHint="Takes an unclaimed link back. Requires Face ID. You pay the BTC gas."
           />

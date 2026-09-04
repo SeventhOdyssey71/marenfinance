@@ -207,8 +207,8 @@ function Body({
             ) : (
               <EmptyState title="Nothing in the blocks we could read">
                 Mezo’s RPC answers 10,000 blocks at a time, so this scan covered the most recent
-                stretch rather than all of history. Anything older than that is not shown and is
-                not claimed to be absent.
+                stretch rather than all of history. Anything older than that is not shown and is not
+                claimed to be absent.
               </EmptyState>
             )}
           </div>
@@ -318,7 +318,7 @@ function Row({
 
   return (
     <details className={`group ${last ? '' : 'border-b border-[var(--border-hairline)]'}`}>
-      <summary className="marker:content-none flex cursor-pointer list-none items-center gap-3 rounded-[var(--radius-input)] py-3">
+      <summary className="flex cursor-pointer list-none items-center gap-3 rounded-[var(--radius-input)] py-3 marker:content-none">
         <Badge kind={item.kind} />
 
         <div className="min-w-0 flex-1">

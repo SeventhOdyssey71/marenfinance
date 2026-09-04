@@ -406,18 +406,18 @@ export default function EarnPage() {
       >
         <div className="px-5 py-5">
           <p className="text-text-muted max-w-[68ch] text-sm leading-relaxed">
-            Name a goal, set a target, and watch your Earn balance grow toward it. This is
-            planned for a coming release; none of it is wired yet, so there is nothing on
-            this card to press.
+            Name a goal, set a target, and watch your Earn balance grow toward it. This is planned
+            for a coming release; none of it is wired yet, so there is nothing on this card to
+            press.
           </p>
           <Info summary="Why it is not here yet">
-            A goal needs a balance of its own to track against its target, and MarenEarn issues
-            a single fungible ERC-4626 share, and there is no on-chain way to fence off part of it
-            for a “house deposit” goal without an allocation the contract does not record.
-            Rather than track that split in your browser and show a goal as funded while the
-            money sits undivided in the pool, Maren is waiting on per-goal accounting it can
-            prove on chain. Until then your whole Earn balance is the real, undivided figure
-            shown at the top of this screen.
+            A goal needs a balance of its own to track against its target, and MarenEarn issues a
+            single fungible ERC-4626 share, and there is no on-chain way to fence off part of it for
+            a “house deposit” goal without an allocation the contract does not record. Rather than
+            track that split in your browser and show a goal as funded while the money sits
+            undivided in the pool, Maren is waiting on per-goal accounting it can prove on chain.
+            Until then your whole Earn balance is the real, undivided figure shown at the top of
+            this screen.
           </Info>
         </div>
       </Panel>

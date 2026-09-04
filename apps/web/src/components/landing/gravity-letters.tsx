@@ -1,6 +1,6 @@
-"use client";
+'use client';
 
-import React, { useCallback, useEffect, useRef, useState } from "react";
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 
 /**
  * Gravity letters (rare-ui) — a contained physics toy: glyphs pour in on
@@ -14,11 +14,11 @@ import React, { useCallback, useEffect, useRef, useState } from "react";
 
 /** Minimal local class-join (replaces rare-ui's `cn`/`@/lib/utils`). */
 const cn = (...classes: Array<string | false | null | undefined>) =>
-  classes.filter(Boolean).join(" ");
+  classes.filter(Boolean).join(' ');
 
-export type GlyphType = "letters" | "numbers" | "both";
+export type GlyphType = 'letters' | 'numbers' | 'both';
 
-export type GravityLettersProps = React.ComponentProps<"div"> & {
+export type GravityLettersProps = React.ComponentProps<'div'> & {
   type?: GlyphType;
   items?: React.ReactNode[];
   gravity?: number;
@@ -29,9 +29,9 @@ export type GravityLettersProps = React.ComponentProps<"div"> & {
 };
 
 const POOLS: Record<GlyphType, string> = {
-  letters: "ABCDEFGHIJKLMNOPQRSTUVWXYZ",
-  numbers: "0123456789",
-  both: "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789",
+  letters: 'ABCDEFGHIJKLMNOPQRSTUVWXYZ',
+  numbers: '0123456789',
+  both: 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789',
 };
 
 const COL = 8; // heightmap column width, px
@@ -48,8 +48,7 @@ const EAGER = 0.45; // slide-threshold factor while tilted
 
 const rand = (min: number, max: number) => min + Math.random() * (max - min);
 
-const clamp = (v: number, min: number, max: number) =>
-  Math.min(Math.max(v, min), max);
+const clamp = (v: number, min: number, max: number) => Math.min(Math.max(v, min), max);
 
 const randomChar = (type: GlyphType) => {
   const pool = POOLS[type];
@@ -57,9 +56,7 @@ const randomChar = (type: GlyphType) => {
 };
 
 const pickContent = (items: React.ReactNode[] | undefined, type: GlyphType) =>
-  items && items.length > 0
-    ? items[Math.floor(Math.random() * items.length)]
-    : randomChar(type);
+  items && items.length > 0 ? items[Math.floor(Math.random() * items.length)] : randomChar(type);
 
 const spanOf = (x: number, w: number, cols: number) => {
   const from = Math.max(0, Math.floor(x / COL));
@@ -67,14 +64,7 @@ const spanOf = (x: number, w: number, cols: number) => {
   return [from, to] as const;
 };
 
-const restY = (
-  heights: number[],
-  x: number,
-  w: number,
-  h: number,
-  rot: number,
-  height: number,
-) => {
+const restY = (heights: number[], x: number, w: number, h: number, rot: number, height: number) => {
   const [from, to] = spanOf(x, w, heights.length);
   const tan = Math.tan((Math.abs(rot) * Math.PI) / 180);
   let y = Number.POSITIVE_INFINITY;
@@ -194,22 +184,16 @@ const paint = (body: Body) => {
 };
 
 const squash = (body: Body) => {
-  body.el.firstElementChild?.animate(
-    [{ transform: "scaleY(0.82)" }, { transform: "scaleY(1)" }],
-    { duration: 160, easing: "cubic-bezier(0.215, 0.61, 0.355, 1)" },
-  );
+  body.el.firstElementChild?.animate([{ transform: 'scaleY(0.82)' }, { transform: 'scaleY(1)' }], {
+    duration: 160,
+    easing: 'cubic-bezier(0.215, 0.61, 0.355, 1)',
+  });
 };
 
-function useFallingGlyphs(opts: {
-  gravity: number;
-  maxGlyphs: number;
-  deviceTilt: boolean;
-}) {
+function useFallingGlyphs(opts: { gravity: number; maxGlyphs: number; deviceTilt: boolean }) {
   const containerRef = useRef<HTMLDivElement>(null);
   const bodiesRef = useRef(new Map<number, Body>());
-  const refsRef = useRef(
-    new Map<number, (el: HTMLSpanElement | null) => void>(),
-  );
+  const refsRef = useRef(new Map<number, (el: HTMLSpanElement | null) => void>());
   const heightsRef = useRef<number[]>([]);
   const rafRef = useRef(0);
   const lastRef = useRef(0);
@@ -242,11 +226,7 @@ function useFallingGlyphs(opts: {
 
     const squareness = Math.min(1, body.eh / body.ew);
     const jitter = rand(-1, 1) * (2 + 8 * squareness);
-    const restRot = clamp(
-      groundTilt(heights, seekX, body.ew) + jitter,
-      -TILT,
-      TILT,
-    );
+    const restRot = clamp(groundTilt(heights, seekX, body.ew) + jitter, -TILT, TILT);
     const rad = (Math.abs(restRot) * Math.PI) / 180;
     body.restRot = restRot;
     body.w = body.ew * Math.cos(rad) + body.eh * Math.sin(rad);
@@ -323,10 +303,7 @@ function useFallingGlyphs(opts: {
 
       const total = body.targetY - body.y0;
       const p = total > 0 ? Math.min((body.y - body.y0) / total, 1) : 1;
-      body.x =
-        body.x0 +
-        (body.targetX - body.x0) * p * (2 - p) +
-        Math.sin(p * Math.PI) * body.sway;
+      body.x = body.x0 + (body.targetX - body.x0) * p * (2 - p) + Math.sin(p * Math.PI) * body.sway;
       const blend = p * p * p;
       body.rot = body.spin * (1 - blend) + body.restRot * blend;
 
@@ -373,42 +350,37 @@ function useFallingGlyphs(opts: {
     if (armedRef.current) return;
     armedRef.current = true;
     const DOE = window.DeviceOrientationEvent as unknown as
-      | { requestPermission?: () => Promise<string> }
-      | undefined;
-    if (typeof DOE?.requestPermission !== "function") return;
+      { requestPermission?: () => Promise<string> } | undefined;
+    if (typeof DOE?.requestPermission !== 'function') return;
     DOE.requestPermission()
-      .then((state) => state === "granted" && setTiltReady(true))
+      .then((state) => state === 'granted' && setTiltReady(true))
       .catch(() => {});
   }, []);
 
   useEffect(() => {
     const DOE = window.DeviceOrientationEvent as unknown as
-      | { requestPermission?: () => Promise<string> }
-      | undefined;
-    if (DOE && typeof DOE.requestPermission !== "function") setTiltReady(true);
+      { requestPermission?: () => Promise<string> } | undefined;
+    if (DOE && typeof DOE.requestPermission !== 'function') setTiltReady(true);
   }, []);
 
   const tiltEnabled = opts.deviceTilt;
   useEffect(() => {
     if (!tiltEnabled || !tiltReady) return;
-    if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
+    if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
 
     const onTilt = (event: DeviceOrientationEvent) => {
       const gamma = event.gamma ?? 0;
       windRef.current = gamma > TILT_ON ? 1 : gamma < -TILT_ON ? -1 : 0;
-      if (
-        windRef.current !== 0 &&
-        performance.now() - lastShakeRef.current > SHAKE_MS
-      ) {
+      if (windRef.current !== 0 && performance.now() - lastShakeRef.current > SHAKE_MS) {
         lastShakeRef.current = performance.now();
         rebuild(true);
         wake();
       }
     };
-    window.addEventListener("deviceorientation", onTilt);
+    window.addEventListener('deviceorientation', onTilt);
     return () => {
       windRef.current = 0;
-      window.removeEventListener("deviceorientation", onTilt);
+      window.removeEventListener('deviceorientation', onTilt);
     };
   }, [tiltEnabled, tiltReady, rebuild, wake]);
 
@@ -466,8 +438,7 @@ function useFallingGlyphs(opts: {
         let startY = Math.min(body.y, body.targetY - CLEARANCE);
         for (const other of bodiesRef.current.values()) {
           const overlaps =
-            other.targetX < body.targetX + body.w &&
-            body.targetX < other.targetX + other.w;
+            other.targetX < body.targetX + body.w && body.targetX < other.targetX + other.w;
           if (!other.done && overlaps) {
             startY = Math.min(startY, other.y - body.h - 8);
           }
@@ -481,10 +452,10 @@ function useFallingGlyphs(opts: {
       if (!glyph.still) {
         el.firstElementChild?.animate(
           [
-            { transform: "scale(0.5)", opacity: 0.3 },
-            { transform: "scale(1)", opacity: 1 },
+            { transform: 'scale(0.5)', opacity: 0.3 },
+            { transform: 'scale(1)', opacity: 1 },
           ],
-          { duration: 150, easing: "cubic-bezier(0.215, 0.61, 0.355, 1)" },
+          { duration: 150, easing: 'cubic-bezier(0.215, 0.61, 0.355, 1)' },
         );
       }
     },
@@ -502,7 +473,7 @@ function useFallingGlyphs(opts: {
     return callback;
   };
 
-  const addGlyph = (spawn: Omit<Glyph, "id">) => {
+  const addGlyph = (spawn: Omit<Glyph, 'id'>) => {
     const glyph: Glyph = { ...spawn, id: idRef.current++ };
     setGlyphs((prev) => {
       const next = [...prev, glyph];
@@ -566,7 +537,7 @@ type Pour = {
 };
 
 const GravityLetters = ({
-  type = "letters",
+  type = 'letters',
   items,
   gravity = 800,
   size = 28,
@@ -581,8 +552,11 @@ const GravityLetters = ({
   onPointerCancel,
   ...props
 }: GravityLettersProps) => {
-  const { containerRef, glyphs, glyphRef, addGlyph, armTilt } =
-    useFallingGlyphs({ gravity, maxGlyphs, deviceTilt });
+  const { containerRef, glyphs, glyphRef, addGlyph, armTilt } = useFallingGlyphs({
+    gravity,
+    maxGlyphs,
+    deviceTilt,
+  });
   const pourRef = useRef<Pour | null>(null);
 
   const dropAt = (clientX: number, clientY: number) => {
@@ -590,9 +564,7 @@ const GravityLetters = ({
     if (!container) return;
 
     const rect = container.getBoundingClientRect();
-    const reduce = window.matchMedia(
-      "(prefers-reduced-motion: reduce)",
-    ).matches;
+    const reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 
     addGlyph({
       content: pickContent(items, type),
@@ -640,10 +612,7 @@ const GravityLetters = ({
     <div
       ref={containerRef}
       data-slot="gravity-letters"
-      className={cn(
-        "relative touch-manipulation overflow-hidden select-none",
-        className,
-      )}
+      className={cn('relative touch-manipulation select-none overflow-hidden', className)}
       onPointerDown={(event) => {
         onPointerDown?.(event);
         if (event.button !== 0 || event.defaultPrevented) return;
@@ -680,7 +649,7 @@ const GravityLetters = ({
           <span
             key={glyph.id}
             ref={glyphRef(glyph)}
-            className="absolute top-0 left-0 font-semibold transition-opacity duration-300 will-change-transform"
+            className="absolute left-0 top-0 font-semibold transition-opacity duration-300 will-change-transform"
             style={{
               fontSize: glyph.fontSize,
               lineHeight: 1,

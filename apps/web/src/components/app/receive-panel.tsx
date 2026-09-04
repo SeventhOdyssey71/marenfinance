@@ -26,18 +26,14 @@ export function ReceivePanel() {
   return (
     <Panel
       title="Receive"
-      meta={
-        <span className="text-text-muted text-xs">Scan or share to be paid in MUSD.</span>
-      }
+      meta={<span className="text-text-muted text-xs">Scan or share to be paid in MUSD.</span>}
     >
       <div className="flex flex-col items-center gap-6 px-5 py-6">
         {/* Image outline per the interface rules: a 1px hairline offset by -1px. */}
         <div className="rounded-[var(--radius-card)] bg-white p-3 shadow-[0_0_0_1px_rgba(20,18,35,0.08)]">
           <QrCode
             value={account}
-            title={
-              handle ? `Payment QR for ${handle} (${account})` : `Payment QR for ${account}`
-            }
+            title={handle ? `Payment QR for ${handle} (${account})` : `Payment QR for ${account}`}
             className="size-44 sm:size-52"
           />
         </div>
@@ -62,8 +58,8 @@ export function ReceivePanel() {
         </div>
 
         <p className="text-text-subtle max-w-sm text-center text-xs leading-relaxed">
-          This is your address on Mezo. Anyone can send MUSD to it, on-chain, without an
-          account here.
+          This is your address on Mezo. Anyone can send MUSD to it, on-chain, without an account
+          here.
         </p>
       </div>
     </Panel>

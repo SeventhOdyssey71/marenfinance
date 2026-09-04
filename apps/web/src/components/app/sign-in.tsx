@@ -57,8 +57,8 @@ function PrivySignIn() {
       </PillAction>
 
       <p className="text-text-subtle max-w-[24rem] text-xs leading-relaxed">
-        Google creates a Mezo wallet for you: no seed phrase, no extension. You can connect
-        your own wallet instead.
+        Google creates a Mezo wallet for you: no seed phrase, no extension. You can connect your own
+        wallet instead.
       </p>
     </div>
   );

@@ -87,11 +87,7 @@ export function PillButton({
     >
       <View style={styles.inner}>
         {loading ? (
-          <ActivityIndicator
-            size="small"
-            color={text.primary}
-            style={styles.spinner}
-          />
+          <ActivityIndicator size="small" color={text.primary} style={styles.spinner} />
         ) : null}
         <Txt
           style={[

@@ -136,7 +136,13 @@ function WagmiConnectButton() {
           aria-hidden
           className="grid size-8 shrink-0 place-items-center rounded-[var(--radius-pill)] bg-violet-500 text-white transition-transform duration-[120ms] ease-out group-hover:translate-x-0.5"
         >
-          <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth={1.6} className="size-4">
+          <svg
+            viewBox="0 0 16 16"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth={1.6}
+            className="size-4"
+          >
             <path d="M3 8h10" strokeLinecap="round" />
             <path d="M9 4l4 4-4 4" strokeLinecap="round" strokeLinejoin="round" />
           </svg>
@@ -214,7 +220,13 @@ function PrivyConnectButton() {
         aria-hidden
         className="grid size-8 shrink-0 place-items-center rounded-[var(--radius-pill)] bg-violet-500 text-white transition-transform duration-[120ms] ease-out group-hover:translate-x-0.5"
       >
-        <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth={1.6} className="size-4">
+        <svg
+          viewBox="0 0 16 16"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth={1.6}
+          className="size-4"
+        >
           <path d="M3 8h10" strokeLinecap="round" />
           <path d="M9 4l4 4-4 4" strokeLinecap="round" strokeLinejoin="round" />
         </svg>

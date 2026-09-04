@@ -50,7 +50,11 @@ export default function Finance() {
 
       <SegmentedControl<Section>
         options={[
-          { key: 'vault', label: 'Vault', accessibilityLabel: 'Vault: borrow MUSD against Bitcoin' },
+          {
+            key: 'vault',
+            label: 'Vault',
+            accessibilityLabel: 'Vault: borrow MUSD against Bitcoin',
+          },
           { key: 'earn', label: 'Earn', accessibilityLabel: 'Earn on idle MUSD' },
         ]}
         value={section}

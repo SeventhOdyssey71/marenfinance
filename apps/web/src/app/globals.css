@@ -327,7 +327,13 @@
      the marketing landing keep their own type. Higher specificity than the base
      `.t-*` rules above, so it wins in-layer. */
   [data-app-theme='light'] {
-    font-family: var(--font-inter), ui-sans-serif, system-ui, -apple-system, 'Segoe UI', sans-serif;
+    font-family:
+      var(--font-inter),
+      ui-sans-serif,
+      system-ui,
+      -apple-system,
+      'Segoe UI',
+      sans-serif;
     letter-spacing: -0.02em;
   }
   [data-app-theme='light'] .t-display,

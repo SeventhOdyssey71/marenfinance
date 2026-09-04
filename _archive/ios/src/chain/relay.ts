@@ -57,7 +57,9 @@ export function normaliseUrl(raw: string | undefined | null): string | null {
  */
 export const RELAYER_URL: string | null =
   normaliseUrl(process.env.EXPO_PUBLIC_RELAYER_URL) ??
-  normaliseUrl((Constants.expoConfig?.extra as { marenRelayerUrl?: string } | undefined)?.marenRelayerUrl);
+  normaliseUrl(
+    (Constants.expoConfig?.extra as { marenRelayerUrl?: string } | undefined)?.marenRelayerUrl,
+  );
 
 /** True when a relayer URL is configured at all. Build-time. */
 export function isRelayerConfigured(): boolean {
@@ -436,7 +438,9 @@ export async function postRelay(
       title: 'Could not reach Maren’s relayer',
       detail:
         'The request never left this device, so nothing was submitted and no gas was spent. ' +
-        (error instanceof Error && /abort/i.test(error.message) ? 'It did not answer in time. ' : '') +
+        (error instanceof Error && /abort/i.test(error.message)
+          ? 'It did not answer in time. '
+          : '') +
         'You can send this yourself and pay the Bitcoin gas.',
     });
   } finally {

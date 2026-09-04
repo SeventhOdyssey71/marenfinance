@@ -102,12 +102,7 @@ export function ReceiptSheet({
   };
 
   return (
-    <Modal
-      transparent
-      visible
-      animationType={reduced ? 'none' : 'slide'}
-      onRequestClose={close}
-    >
+    <Modal transparent visible animationType={reduced ? 'none' : 'slide'} onRequestClose={close}>
       <View style={styles.backdrop}>
         {/* The scrim closes the sheet; it is decorative to the reader, so it is hidden
             from VoiceOver, which reaches the close button and Done inside instead. */}

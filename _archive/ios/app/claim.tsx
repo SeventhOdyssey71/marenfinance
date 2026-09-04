@@ -150,8 +150,8 @@ export default function Claim() {
           Collect your MUSD
         </Txt>
         <Txt variant="small" tone="muted" style={styles.subtitle}>
-          Paste a Maren claim link. You will see what it holds before you collect it, and you pay
-          no BTC gas to do so.
+          Paste a Maren claim link. You will see what it holds before you collect it, and you pay no
+          BTC gas to do so.
         </Txt>
       </View>
 
@@ -211,7 +211,12 @@ export default function Claim() {
           accessibilityHint="Reads the link’s state on Mezo before you collect it."
         />
       ) : (
-        <PreviewCard preview={preview} hasWallet={address !== null} onClaim={claim} onWallet={() => router.push('/wallet-setup')} />
+        <PreviewCard
+          preview={preview}
+          hasWallet={address !== null}
+          onClaim={claim}
+          onWallet={() => router.push('/wallet-setup')}
+        />
       )}
 
       <TxSheet runner={runner} />
@@ -288,7 +293,11 @@ function PreviewCard({
         </Num>
       </Card>
 
-      <View style={styles.feeLine} accessible accessibilityLabel="Gasless. Maren’s relayer submits the claim and pays the BTC gas.">
+      <View
+        style={styles.feeLine}
+        accessible
+        accessibilityLabel="Gasless. Maren’s relayer submits the claim and pays the BTC gas."
+      >
         <Icon name="shield" size={15} color={brand.violet400} />
         <Txt variant="small" tone="muted" style={styles.feeText}>
           Gasless. You sign; Maren’s relayer submits it and pays the BTC gas.

@@ -108,7 +108,7 @@ export function NavSidebar({
             opacity: active ? 1 : 0,
           }}
           transition={travel}
-          className="bg-violet-500 pointer-events-none absolute start-0 w-[3px] rounded-[var(--radius-pill)]"
+          className="pointer-events-none absolute start-0 w-[3px] rounded-[var(--radius-pill)] bg-violet-500"
         />
 
         {items.map((item, index) => {

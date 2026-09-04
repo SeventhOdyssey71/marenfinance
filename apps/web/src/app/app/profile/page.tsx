@@ -26,7 +26,10 @@ export default function ProfilePage() {
     return (
       <div className="flex flex-col gap-4">
         <Header />
-        <ConnectPrompt icon={<ProfileIcon className="size-6" />} title="Connect to set up your profile">
+        <ConnectPrompt
+          icon={<ProfileIcon className="size-6" />}
+          title="Connect to set up your profile"
+        >
           Claim an <span className="num">@handle</span> so people can pay you by name instead of a
           40-character address. Everything here is tied to the wallet you connect.
         </ConnectPrompt>
@@ -44,7 +47,10 @@ export default function ProfilePage() {
 
       <Panel title="Account">
         <PanelBody>
-          <StatRow label="Handle" value={handle ?? <span className="text-text-subtle text-sm">none yet</span>} />
+          <StatRow
+            label="Handle"
+            value={handle ?? <span className="text-text-subtle text-sm">none yet</span>}
+          />
           <StatRow
             label="Address"
             value={
@@ -53,7 +59,7 @@ export default function ProfilePage() {
                   href={`${chain.blockExplorers.default.url}/address/${account}`}
                   target="_blank"
                   rel="noreferrer noopener"
-                  className="num text-text hover:text-violet-500 text-sm transition-colors duration-[120ms] ease-out"
+                  className="num text-text text-sm transition-colors duration-[120ms] ease-out hover:text-violet-500"
                 >
                   {shortAddress(account, 10, 8)}
                 </a>
@@ -62,7 +68,11 @@ export default function ProfilePage() {
               )
             }
           />
-          <StatRow label="Network" value={<span className="text-text text-sm">{chain.name}</span>} last />
+          <StatRow
+            label="Network"
+            value={<span className="text-text text-sm">{chain.name}</span>}
+            last
+          />
         </PanelBody>
 
         <div className="border-t border-[var(--border-hairline)] px-5 py-4">

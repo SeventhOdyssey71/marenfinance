@@ -44,10 +44,7 @@ export function HowItWorks() {
 
       <Reveal className="mt-12 grid grid-cols-1 gap-5 md:grid-cols-3">
         {STEPS.map((s) => (
-          <article
-            key={s.n}
-            className="u-card flex flex-col p-6"
-          >
+          <article key={s.n} className="u-card flex flex-col p-6">
             <span
               className="u-display grid size-14 place-items-center rounded-[14px] text-[26px] leading-none"
               style={{ background: 'var(--accent-wash)', color: 'var(--accent-text)' }}

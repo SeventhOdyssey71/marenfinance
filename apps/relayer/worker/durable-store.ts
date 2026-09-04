@@ -38,7 +38,8 @@ export class DurableStore implements RelayStore {
     return this.#storage.transaction(async (txn) => {
       const existing = fresh(await txn.get<Entry>(key));
       const next = (existing?.value ?? 0n) + amount;
-      const expiresAt = existing?.expiresAt ?? (ttlSeconds > 0 ? Date.now() + ttlSeconds * 1000 : 0);
+      const expiresAt =
+        existing?.expiresAt ?? (ttlSeconds > 0 ? Date.now() + ttlSeconds * 1000 : 0);
       await txn.put(key, { value: next, expiresAt } satisfies Entry);
       return next;
     });

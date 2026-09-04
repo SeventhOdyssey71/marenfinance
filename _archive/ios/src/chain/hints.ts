@@ -93,7 +93,9 @@ export const NO_HINTS: Hints = { upper: ZERO_ADDRESS, lower: ZERO_ADDRESS };
  * debt matches what the sorted list ranks on (total, including gas compensation and accrued
  * interest) rather than the vault's net figure.
  */
-async function readTrovePosition(network: MezoNetwork): Promise<{ collWei: bigint; debtWei: bigint }> {
+async function readTrovePosition(
+  network: MezoNetwork,
+): Promise<{ collWei: bigint; debtWei: bigint }> {
   const vault = getMarenAddresses(network).marenVault;
   const [coll, principal, interest, pendingColl, pendingPrincipal, pendingInterest] =
     await getReadClient(network).readContract({

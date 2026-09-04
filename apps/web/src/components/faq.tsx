@@ -22,16 +22,17 @@ const items: readonly Item[] = [
       <>
         <p>
           Your position is measured by its collateral ratio. Mezo liquidates a trove at{' '}
-          <span className="num font-bold text-[color:var(--ink)]">110%</span>. Maren does not let you
-          get near that: we liquidate internally at{' '}
-          <span className="num font-bold text-[color:var(--ink)]">140%</span>, seizing the collateral
-          of an unhealthy user at a 5% penalty and repaying their share of the pooled debt.
+          <span className="num font-bold text-[color:var(--ink)]">110%</span>. Maren does not let
+          you get near that: we liquidate internally at{' '}
+          <span className="num font-bold text-[color:var(--ink)]">140%</span>, seizing the
+          collateral of an unhealthy user at a 5% penalty and repaying their share of the pooled
+          debt.
         </p>
         <p>
           That 30-point buffer exists so a fast drawdown hits Maren’s keeper long before it hits the
           protocol’s cliff. Portfolio shows your ratio, your distance to 140%, and alerts you before
-          the keeper has to act. If Bitcoin falls far enough and fast enough, a position can still be
-          liquidated. That is the nature of a collateralised loan and no design removes it.
+          the keeper has to act. If Bitcoin falls far enough and fast enough, a position can still
+          be liquidated. That is the nature of a collateralised loan and no design removes it.
         </p>
       </>
     ),
@@ -47,17 +48,19 @@ const items: readonly Item[] = [
         </p>
         <p>
           The pooled vault is the honest exception and we will not soften it:{' '}
-          <strong className="font-bold text-[color:var(--ink)]">pooled positions share one trove</strong>.
-          Maren runs a single large, conservatively managed trove and gives each depositor a
+          <strong className="font-bold text-[color:var(--ink)]">
+            pooled positions share one trove
+          </strong>
+          . Maren runs a single large, conservatively managed trove and gives each depositor a
           proportional claim inside it. Your collateral is segregated in accounting, not in custody.
           A catastrophic, faster-than-keeper drawdown could socialise losses across depositors.
         </p>
         <p>
           The mitigations are the 140/110 buffer, the 0.001 BTC deposit floor, per-block keeper
-          checks, and a protocol-owned insurance buffer funded from vault fees. They are mitigations,
-          not a guarantee. If you hold more than the protocol minimum, Maren steers you to a direct
-          trove, which carries no pooling risk at all, and the interface says so at the point of
-          decision.
+          checks, and a protocol-owned insurance buffer funded from vault fees. They are
+          mitigations, not a guarantee. If you hold more than the protocol minimum, Maren steers you
+          to a direct trove, which carries no pooling risk at all, and the interface says so at the
+          point of decision.
         </p>
       </>
     ),
@@ -110,11 +113,12 @@ const items: readonly Item[] = [
     a: (
       <>
         <p>
-          <strong className="font-bold text-[color:var(--ink)]">Not yet. Maren is pre-audit.</strong>{' '}
-          A third-party audit of{' '}
-          <span className="num text-[color:var(--ink)]">MarenVault</span> and{' '}
-          <span className="num text-[color:var(--ink)]">MarenForwarder</span> (the two contracts that
-          carry real risk) is scheduled after the full testnet deployment and before mainnet.
+          <strong className="font-bold text-[color:var(--ink)]">
+            Not yet. Maren is pre-audit.
+          </strong>{' '}
+          A third-party audit of <span className="num text-[color:var(--ink)]">MarenVault</span> and{' '}
+          <span className="num text-[color:var(--ink)]">MarenForwarder</span> (the two contracts
+          that carry real risk) is scheduled after the full testnet deployment and before mainnet.
         </p>
         <p>
           Until that audit is complete and published, treat Maren as unaudited software and do not

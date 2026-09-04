@@ -555,7 +555,10 @@ function SplitPanel({ runner }: { runner: TxRunner }) {
   const relayer = useRelayerStatus();
 
   const nextId = useRef(0);
-  const freshRow = useCallback((): SplitRow => ({ id: `row-${nextId.current++}`, value: '', amount: '' }), []);
+  const freshRow = useCallback(
+    (): SplitRow => ({ id: `row-${nextId.current++}`, value: '', amount: '' }),
+    [],
+  );
 
   const [mode, setMode] = useState<SplitMode>('even');
   const [rows, setRows] = useState<SplitRow[]>(() => [freshRow(), freshRow()]);
@@ -624,7 +627,10 @@ function SplitPanel({ runner }: { runner: TxRunner }) {
     } else if (phase.name === 'idle' && sawDelivered.current) {
       sawDelivered.current = false;
       nextId.current = 0;
-      setRows([{ id: 'row-0', value: '', amount: '' }, { id: 'row-1', value: '', amount: '' }]);
+      setRows([
+        { id: 'row-0', value: '', amount: '' },
+        { id: 'row-1', value: '', amount: '' },
+      ]);
       nextId.current = 2;
       setEvenTotal('');
       setMemo('');
@@ -702,7 +708,9 @@ function SplitPanel({ runner }: { runner: TxRunner }) {
           };
         }),
         { label: 'Total', value: <Musd wei={total} /> },
-        ...(memo ? [{ label: 'Memo', value: <span className="text-text-muted">{memo}</span> }] : []),
+        ...(memo
+          ? [{ label: 'Memo', value: <span className="text-text-muted">{memo}</span> }]
+          : []),
       ],
       gas: gasNote(
         actionIsRelayable('splitPayment'),
@@ -747,7 +755,8 @@ function SplitPanel({ runner }: { runner: TxRunner }) {
               hint={
                 rows.length > 0 && parseUnitsSafe(evenTotal) > 0n ? (
                   <span>
-                    Each of {rows.length} gets <Musd wei={amounts[0] ?? 0n} size="sm" tone="muted" />
+                    Each of {rows.length} gets{' '}
+                    <Musd wei={amounts[0] ?? 0n} size="sm" tone="muted" />
                     {(amounts[0] ?? 0n) !== (amounts[amounts.length - 1] ?? 0n)
                       ? ' (the odd wei goes to the first few)'
                       : ''}
@@ -785,7 +794,7 @@ function SplitPanel({ runner }: { runner: TxRunner }) {
             type="button"
             onClick={addRow}
             disabled={rows.length >= MAX_SPLIT_RECIPIENTS}
-            className="text-text-muted hover:text-text hover:border-[var(--border-strong)] mt-6 inline-flex h-9 items-center gap-2 rounded-[var(--radius-pill)] border border-[var(--border-hairline)] px-3.5 text-sm transition-[color,border-color] duration-[120ms] ease-out disabled:opacity-40 disabled:hover:border-[var(--border-hairline)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-violet-500"
+            className="text-text-muted hover:text-text mt-6 inline-flex h-9 items-center gap-2 rounded-[var(--radius-pill)] border border-[var(--border-hairline)] px-3.5 text-sm transition-[color,border-color] duration-[120ms] ease-out hover:border-[var(--border-strong)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-violet-500 disabled:opacity-40 disabled:hover:border-[var(--border-hairline)]"
           >
             <Plus aria-hidden className="size-4" />
             Add recipient
@@ -982,7 +991,7 @@ function SplitRecipientRow({
           onClick={() => onRemove(id)}
           disabled={!canRemove}
           aria-label={`Remove recipient ${index + 1}`}
-          className="text-text-muted hover:text-text hover:border-[var(--border-strong)] grid size-10 shrink-0 place-items-center rounded-[var(--radius-pill)] border border-[var(--border-hairline)] transition-[color,border-color] duration-[120ms] ease-out disabled:opacity-30 disabled:hover:border-[var(--border-hairline)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-violet-500"
+          className="text-text-muted hover:text-text grid size-10 shrink-0 place-items-center rounded-[var(--radius-pill)] border border-[var(--border-hairline)] transition-[color,border-color] duration-[120ms] ease-out hover:border-[var(--border-strong)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-violet-500 disabled:opacity-30 disabled:hover:border-[var(--border-hairline)]"
         >
           <Minus aria-hidden className="size-4" />
         </button>

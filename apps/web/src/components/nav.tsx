@@ -38,7 +38,7 @@ export function Nav() {
   }, [open]);
 
   return (
-    <header className="sticky top-0 z-50 nav-bar">
+    <header className="nav-bar sticky top-0 z-50">
       <div className="u-wrap">
         <div className="flex h-[68px] items-center justify-between gap-4">
           <div className="flex items-center gap-9">
@@ -96,14 +96,13 @@ export function Nav() {
         </div>
 
         {/* Mobile sheet */}
-        <div
-          id="mobile-nav"
-          hidden={!open}
-          className="u-card mx-auto mt-2 p-3 lg:hidden"
-        >
+        <div id="mobile-nav" hidden={!open} className="u-card mx-auto mt-2 p-3 lg:hidden">
           <ul className="flex flex-col">
             {links.map((l) => (
-              <li key={l.href} className="border-b border-[color:var(--border-hairline)] last:border-b-0">
+              <li
+                key={l.href}
+                className="border-b border-[color:var(--border-hairline)] last:border-b-0"
+              >
                 <a
                   href={l.href}
                   onClick={() => setOpen(false)}

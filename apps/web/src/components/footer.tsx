@@ -38,7 +38,11 @@ const columns: readonly FooterColumn[] = [
 
 const socials = [
   { label: 'Maren on X', href: 'https://x.com/marenfinance', Icon: XLogo },
-  { label: 'Maren on GitHub', href: 'https://github.com/SeventhOdyssey71/marenfinance', Icon: GitHubLogo },
+  {
+    label: 'Maren on GitHub',
+    href: 'https://github.com/SeventhOdyssey71/marenfinance',
+    Icon: GitHubLogo,
+  },
 ] as const;
 
 export function Footer() {
@@ -47,7 +51,10 @@ export function Footer() {
       {/* Closing CTA — clean dark panel */}
       <Reveal>
         <div className="rounded-[36px] bg-[color:var(--ink)] p-10 text-center sm:p-16">
-          <h2 className="u-display mx-auto max-w-[16ch] text-[clamp(30px,5vw,58px)]" style={{ color: '#fff' }}>
+          <h2
+            className="u-display mx-auto max-w-[16ch] text-[clamp(30px,5vw,58px)]"
+            style={{ color: '#fff' }}
+          >
             Spend Bitcoin. Never sell it.
           </h2>
           <p className="mx-auto mt-4 max-w-[46ch] text-[15px] font-normal leading-[1.5] text-white/65 sm:text-[17px]">
