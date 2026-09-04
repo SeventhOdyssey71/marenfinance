@@ -87,7 +87,6 @@ struct SingleAmountFlow: View {
                 .padding(.horizontal, Theme.Space.sm)
             PillButton(title: "Review", variant: .primary) { stage = .review }
                 .disabled(!amountValid)
-                .opacity(amountValid ? 1 : 0.5)
                 .padding(.horizontal, Theme.Space.md).padding(.bottom, Theme.Space.md)
         }
     }

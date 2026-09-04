@@ -221,7 +221,9 @@ struct MezoMarenClient: MarenClient {
         let annualised = musdRealised.flatMap {
             RealisedYieldMath.annualisedPercent(realisedMusd: $0, baseMusd: exp.musdBacking,
                                                 windowDays: scan.windowDays,
-                                                minWindowDays: EARN_YIELD_MIN_ANNUALISE_DAYS)
+                                                gainBearingEvents: scan.liquidationEvents,
+                                                minWindowDays: EARN_YIELD_MIN_ANNUALISE_DAYS,
+                                                minEvents: EARN_YIELD_MIN_ANNUALISE_EVENTS)
         }
 
         return RealisedYield(

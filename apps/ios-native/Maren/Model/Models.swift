@@ -110,8 +110,9 @@ struct RealisedYield: Sendable, Equatable, Codable {
     /// How many harvests seized BTC in the window (the count of realised liquidation gains).
     let liquidationEvents: Int
     /// The trailing realised gain annualised to a percent, or nil when it cannot be computed
-    /// honestly: no MUSD base, a window shorter than `EARN_YIELD_MIN_ANNUALISE_DAYS`, a stale
-    /// price, or no gain at all. A withheld percent is never shown as 0%.
+    /// honestly: no MUSD base, a window shorter than `EARN_YIELD_MIN_ANNUALISE_DAYS`, fewer
+    /// than `EARN_YIELD_MIN_ANNUALISE_EVENTS` gain-bearing harvests, a stale price, or no gain
+    /// at all. A withheld percent is never shown as 0%.
     let annualisedPercent: Decimal?
     /// When the most recent realised gain landed, or nil if there has been none.
     let lastGainAt: Date?
@@ -126,13 +127,19 @@ struct RealisedYield: Sendable, Equatable, Codable {
 /// cannot produce an honest number returns nil rather than a misleading zero.
 enum RealisedYieldMath {
     /// realisedMusd / baseMusd, annualised from `windowDays` to 365. Returns nil when the base
-    /// is non-positive (divide-by-zero), the window is shorter than `minWindowDays`, or there is
-    /// no realised gain — so the caller shows an empty state instead of a fabricated 0%.
+    /// is non-positive (divide-by-zero), the window is shorter than `minWindowDays`, the window
+    /// carries fewer than `minEvents` gain-bearing harvests, or there is no realised gain — so
+    /// the caller shows an empty state instead of a fabricated 0%. Both bars (days AND events)
+    /// must clear, matching the web/SDK `realisedYield` rule so the two surfaces never disagree.
     static func annualisedPercent(realisedMusd: Decimal,
                                   baseMusd: Decimal,
                                   windowDays: Int,
-                                  minWindowDays: Int) -> Decimal? {
-        guard realisedMusd > 0, baseMusd > 0, windowDays >= minWindowDays, windowDays > 0 else {
+                                  gainBearingEvents: Int,
+                                  minWindowDays: Int,
+                                  minEvents: Int) -> Decimal? {
+        guard realisedMusd > 0, baseMusd > 0,
+              windowDays >= minWindowDays, windowDays > 0,
+              gainBearingEvents >= minEvents else {
             return nil
         }
         return realisedMusd / baseMusd * Decimal(365) / Decimal(windowDays) * 100

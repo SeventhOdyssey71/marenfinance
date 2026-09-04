@@ -65,6 +65,13 @@ enum Theme {
         static let lg: CGFloat = 22
         static let xl: CGFloat = 32
     }
+
+    // One value for "this control is disabled", so every dimmed control matches instead of
+    // each call site guessing its own opacity. Applied by the shared button styles off the
+    // environment's isEnabled, so a plain `.disabled(_)` is all a call site ever needs.
+    enum Opacity {
+        static let disabled: Double = 0.5
+    }
 }
 
 // MARK: - Soft shadow (a whisper of drop, never an outline)

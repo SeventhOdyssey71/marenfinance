@@ -404,6 +404,9 @@ private struct EarnSection: View {
         if y.windowDays < EARN_YIELD_MIN_ANNUALISE_DAYS {
             return "Too recent to annualise honestly — realised, not a forecast."
         }
+        if y.liquidationEvents < EARN_YIELD_MIN_ANNUALISE_EVENTS {
+            return "Too few realised gains to annualise honestly. Realised, not a forecast."
+        }
         return "Realised, not a forecast."
     }
 

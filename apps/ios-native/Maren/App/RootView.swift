@@ -9,6 +9,7 @@ import SwiftUI
 struct RootView: View {
     @State private var session = MarenSession()
     @State private var router = AppRouter()
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
     /// First-run intro. Shown once, then persisted so it never returns. This is a UI flag only —
     /// no key, no wallet state — so UserDefaults is the right home for it.
     @AppStorage("hasOnboarded") private var hasOnboarded = false
@@ -63,10 +64,13 @@ struct RootView: View {
         .tint(Theme.Palette.accent)
     }
 
-    /// One tab layer: visible and interactive only when selected.
+    /// One tab layer: visible and interactive only when selected. The visible/hidden opacity
+    /// crossfades so switching tabs never flashes; hit-testing flips instantly so the incoming
+    /// tab is live the moment it is selected. Reduce Motion drops the crossfade.
     @ViewBuilder private func tab<V: View>(_ which: AppTab, @ViewBuilder _ content: () -> V) -> some View {
         content()
             .opacity(router.tab == which ? 1 : 0)
+            .animation(reduceMotion ? nil : .easeOut(duration: 0.2), value: router.tab)
             .allowsHitTesting(router.tab == which)
     }
 

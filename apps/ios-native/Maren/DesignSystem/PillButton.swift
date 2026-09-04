@@ -49,11 +49,13 @@ struct PillButton: View {
 private struct PillButtonStyle: ButtonStyle {
     let variant: PillButton.Variant
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @Environment(\.isEnabled) private var isEnabled
 
     func makeBody(configuration: Configuration) -> some View {
         configuration.label
             .background(background)
             .clipShape(Capsule())
+            .opacity(isEnabled ? 1 : Theme.Opacity.disabled)
             .scaleEffect((configuration.isPressed && !reduceMotion) ? 0.97 : 1)
             .animation(reduceMotion ? nil : .easeOut(duration: 0.2), value: configuration.isPressed)
     }
@@ -77,9 +79,11 @@ private struct PillButtonStyle: ButtonStyle {
 
 struct PressableStyle: ButtonStyle {
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @Environment(\.isEnabled) private var isEnabled
 
     func makeBody(configuration: Configuration) -> some View {
         configuration.label
+            .opacity(isEnabled ? 1 : Theme.Opacity.disabled)
             .scaleEffect((configuration.isPressed && !reduceMotion) ? 0.97 : 1)
             .animation(reduceMotion ? nil : .easeOut(duration: 0.2), value: configuration.isPressed)
     }
@@ -131,11 +135,13 @@ struct ActionTile: View {
 
 private struct ActionTileStyle: ButtonStyle {
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @Environment(\.isEnabled) private var isEnabled
 
     func makeBody(configuration: Configuration) -> some View {
         configuration.label
             .background(Theme.Palette.card, in: RoundedRectangle(cornerRadius: Theme.Radius.inset, style: .continuous))
             .softCardShadow()
+            .opacity(isEnabled ? 1 : Theme.Opacity.disabled)
             .scaleEffect((configuration.isPressed && !reduceMotion) ? 0.97 : 1)
             .animation(reduceMotion ? nil : .easeOut(duration: 0.2), value: configuration.isPressed)
     }

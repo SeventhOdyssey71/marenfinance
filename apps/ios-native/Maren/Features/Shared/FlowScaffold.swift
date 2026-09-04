@@ -219,8 +219,10 @@ struct SubmitBar: View {
             PillButton(title: submitting ? "Submitting…" : title, variant: .primary) {
                 if enabled && !submitting { action() }
             }
-            .disabled(!enabled || submitting)
-            .opacity(enabled ? 1 : 0.5)
+            // Disabled dims via the button style; while submitting the pill stays bright (it is
+            // working, not off) but ignores taps so a settling action can't be fired twice.
+            .disabled(!enabled)
+            .allowsHitTesting(!submitting)
             if submitting {
                 ProgressView()
                     .tint(.white)

@@ -121,7 +121,6 @@ struct SendFlow: View {
                 Task { await submit() }
             }
             .disabled(!canSend)
-            .opacity(canSend ? 1 : 0.5)
             .padding(.horizontal, Theme.Space.md)
             .padding(.bottom, Theme.Space.md)
         }
@@ -181,7 +180,6 @@ struct SendFlow: View {
                 .padding(.horizontal, Theme.Space.sm)
             PillButton(title: "Continue", variant: .primary) { stage = .recipient }
                 .disabled(!amountValid || overBalance)
-                .opacity(amountValid && !overBalance ? 1 : 0.5)
                 .padding(.horizontal, Theme.Space.md)
                 .padding(.bottom, Theme.Space.md)
         }

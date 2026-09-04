@@ -76,21 +76,25 @@ struct StubMarenClient: MarenClient {
     }
 
     func earnRealisedYield() async throws -> RealisedYield {
-        // Demo composition: a couple of liquidation gains realised over a ~90-day window, with
-        // the annualised figure shown only when the price path is "wired" (mirrors the feed).
+        // Demo composition: a handful of liquidation gains realised over a ~90-day window — long
+        // enough and eventful enough to clear both annualisation bars — with the annualised
+        // figure shown only when the price path is "wired" (mirrors the feed).
         let windowDays = 92
+        let events = 4
         let btc: Decimal = 0.0125
         let musd: Decimal? = priceWired ? 800 : nil
         let annualised = priceWired
             ? RealisedYieldMath.annualisedPercent(realisedMusd: 800, baseMusd: 41_200,
                                                   windowDays: windowDays,
-                                                  minWindowDays: EARN_YIELD_MIN_ANNUALISE_DAYS)
+                                                  gainBearingEvents: events,
+                                                  minWindowDays: EARN_YIELD_MIN_ANNUALISE_DAYS,
+                                                  minEvents: EARN_YIELD_MIN_ANNUALISE_EVENTS)
             : nil
         return RealisedYield(
             btcRealised: btc,
             musdRealised: musd,
             windowDays: windowDays,
-            liquidationEvents: 2,
+            liquidationEvents: events,
             annualisedPercent: annualised,
             lastGainAt: Date().addingTimeInterval(-6 * 86_400)
         )

@@ -145,4 +145,11 @@ let EARN_YIELD_LOOKBACK_BLOCKS = MEZO_MAX_LOG_RANGE * 12
 /// annualised into a percent. Below this the realised amount and its window are still shown,
 /// but the annualised figure is WITHHELD — annualising two liquidations seen over three days
 /// is a lie with a percent sign on it, exactly the forward-APY dishonesty Earn refuses.
-let EARN_YIELD_MIN_ANNUALISE_DAYS = 14
+/// Matches the web/SDK `MIN_ANNUALISE_DAYS` so both surfaces annualise on the same rule.
+let EARN_YIELD_MIN_ANNUALISE_DAYS = 30
+
+/// The fewest gain-bearing harvests a window must contain before its realised gain may be
+/// annualised. A long window carried by a single lumpy liquidation is still not something a
+/// yearly rate can be defended on, so both bars — days AND events — must clear. Matches the
+/// web/SDK `MIN_ANNUALISE_EVENTS`.
+let EARN_YIELD_MIN_ANNUALISE_EVENTS = 4
