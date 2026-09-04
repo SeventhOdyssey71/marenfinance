@@ -16,6 +16,7 @@ import {
   priceOracleAbi,
   troveManagerAbi,
 } from '../chain/abis';
+import { readEarnHistory } from '../chain/earn-history';
 import type { PriceObservation } from '../chain/price';
 import type { Balances, EarnPosition, Handle, Position, ProtocolStats } from './types';
 
@@ -203,11 +204,22 @@ export async function readBalances(ctx: LiveContext): Promise<Balances> {
 /**
  * Earn.
  *
- * `trailing` is deliberately not derivable from a single read: realised yield is the sum
- * of share-price movement over a window, which needs the vault's `Harvested` event
- * history. Until the indexer is wired, the live path reports a zero-length window with a
- * zero figure rather than inventing one — a fabricated trailing return would be exactly
- * the forward-APY dishonesty this screen exists to avoid, only backdated.
+ * `trailing` is NOT derivable from one contract read: realised yield is the vault's seized
+ * BTC accruing over a window, which lives in the `Harvested` event history, and cost basis
+ * lives in the ERC-4626 `Deposit`/`Withdraw` events. Both come from a bounded `eth_getLogs`
+ * scan in `readEarnHistory`, the same 10,000-block-window walk the Activity reader uses.
+ *
+ * TWO SCOPES, STATED HONESTLY. `depositedWei` is the CALLER'S cost basis. `trailing` is the
+ * VAULT-WIDE realised gain: `Harvested` carries no user, and attributing lumpy liquidation
+ * gains to one depositor's basis over time would need every past share balance, which is an
+ * indexer's job. So the screen shows the vault's realised figure, labelled backward-looking
+ * and vault-wide, and never annualises a lumpy gain into a forward rate. When there has been
+ * no realised gain at all, `readEarnHistory` returns a zero-length window, which the screen
+ * renders as its honest "no return to report yet" empty state rather than a fabricated one.
+ *
+ * TODAY that empty state is the correct output: `assetBreakdown()` shows zero seized BTC and
+ * there have been no harvests with a gain, so the realised yield is genuinely ~zero. This
+ * wiring is what makes a real figure appear the moment a liquidation gain actually accrues.
  */
 export async function readEarn(ctx: LiveContext): Promise<EarnPosition> {
   const maren = getMarenAddresses(ctx.network);
@@ -235,7 +247,15 @@ export async function readEarn(ctx: LiveContext): Promise<EarnPosition> {
    * are vault-wide facts, not the caller's — what backs every share, not this account's
    * slice — and the screen labels them so.
    */
-  const [shares, assets, breakdown, stalePrice] = await Promise.all([
+  /**
+   * The realised trailing yield values seized BTC at the oracle price, so the price rides
+   * in the same batch as the vault reads. It is BEST-EFFORT: a failed oracle read must not
+   * fail the whole Earn screen, and `readEarnHistory` values BTC at zero when the price is
+   * null, the same safe-direction understatement the contract makes. Today there is no
+   * realised BTC to value, so the price is not even needed; it is read here so the figure
+   * is correct on the day one does accrue.
+   */
+  const [shares, assets, breakdown, stalePrice, price] = await Promise.all([
     ctx.client.readContract({
       address: maren.marenEarn,
       abi: marenEarnAbi,
@@ -258,15 +278,28 @@ export async function readEarn(ctx: LiveContext): Promise<EarnPosition> {
       abi: marenEarnAbi,
       functionName: 'isUsingStalePrice',
     }),
+    readPrice(ctx)
+      .then((observation) => observation.priceWei)
+      .catch(() => null),
   ]);
 
   const [musdIdle, musdInPool, btcHeld, btcPending, btcValued] = breakdown;
 
+  // The bounded log scan for cost basis and realised gains. Kept out of the batch above
+  // because it is a multi-window `eth_getLogs` walk, not a single-block read, and its
+  // failure mode is a thrown transport error rather than a silent zero.
+  const { depositedWei, trailing } = await readEarnHistory(
+    ctx.client,
+    ctx.network,
+    ctx.account,
+    price,
+  );
+
   return {
     sharesWei: shares,
     assetsWei: assets,
-    depositedWei: 0n,
-    trailing: { windowDays: 0, realisedWei: 0n, liquidationEvents: 0, lastGainAt: null },
+    depositedWei,
+    trailing,
     breakdown: {
       musdIdleWei: musdIdle,
       musdInPoolWei: musdInPool,

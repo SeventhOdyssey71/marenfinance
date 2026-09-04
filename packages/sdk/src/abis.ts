@@ -808,3 +808,21 @@ export const MAREN_EARN_EVENTS = [
     'event Withdraw(address indexed sender, address indexed receiver, address indexed owner, uint256 assets, uint256 shares)',
   ),
 ] as const;
+
+/**
+ * The one event that quantifies a realised liquidation gain: `btcClaimed` is the native
+ * BTC MarenEarn pulled out of the MUSD Stability Pool in that harvest, i.e. the collateral
+ * seized from liquidated troves and credited to the vault's depositors. Summing it over a
+ * window is the ONLY on-chain figure for realised yield, because the Stability Pool has no
+ * emissions and the ERC-4626 Deposit/Withdraw events carry cost basis, not gain.
+ *
+ * It is kept out of `MAREN_EARN_EVENTS` on purpose. That set feeds the Activity reader,
+ * which renders per-account rows keyed off an indexed `owner`/`sender`; `Harvested` has no
+ * user in it (it is a vault-wide event, triggered by a keeper, not by the viewer), so it
+ * would only ever be decoded and then dropped there. The trailing-yield reader imports it
+ * separately. None of its fields are indexed, which is fine: the scan reads every harvest
+ * on the vault and there is only one vault.
+ */
+export const MAREN_EARN_HARVEST_EVENT = parseAbiItem(
+  'event Harvested(uint256 btcClaimed, uint256 btcHeld, uint256 musdCompounded, uint256 feePaid)',
+);

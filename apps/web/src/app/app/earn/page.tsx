@@ -289,8 +289,9 @@ export default function EarnPage() {
               data-contrast="earn-disclosure"
               className="text-text-muted mt-4 max-w-[68ch] text-sm leading-relaxed"
             >
-              Realised in the past, not a forecast. Maren does not display an APY for Earn because
-              there is no reliable one to display.
+              Realised in the past, not a forecast, and this is the whole vault’s gain rather than
+              your slice of it. Maren does not display an APY for Earn because there is no reliable
+              one to display.
             </p>
             <Info summary="Why there is no rate">
               The MUSD Stability Pool has no token emissions. Its entire yield is the Bitcoin seized
