@@ -182,6 +182,148 @@ struct MezoMarenClient: MarenClient {
         )
     }
 
+    /// Backward-looking realised yield for MarenEarn, from the vault's on-chain `Harvested`
+    /// events. Each harvest records the exact native BTC the vault SEIZED from liquidations
+    /// (`btcClaimed`, data word 0); summing it over a bounded trailing window is an exact,
+    /// non-overlapping quantity that needs no oracle. Its MUSD value is that BTC at the CURRENT
+    /// oracle price and is WITHHELD when the price is stale or unavailable — a value the
+    /// protocol would reject is never shown. The MUSD leg does not add `musdCompounded`: that is
+    /// a denomination change of BTC already counted, so adding it would double-count the gain.
+    ///
+    /// This is a vault-wide figure — what backs every share, not this account's slice — because
+    /// a per-user cost basis needs a deposit/withdraw ledger the chain does not expose without an
+    /// off-chain indexer. A scan that fails on every endpoint THROWS; a scan that succeeds and
+    /// finds no gains returns a `RealisedYield` with `hasReturn == false`, never a faked rate.
+    func earnRealisedYield() async throws -> RealisedYield {
+        let maren = MarenAddresses.of(chain.network)
+        guard maren.isDeployed else {
+            return RealisedYield(btcRealised: 0, musdRealised: nil, windowDays: 0,
+                                 liquidationEvents: 0, annualisedPercent: nil, lastGainAt: nil)
+        }
+
+        // The MUSD base and the live-price gate come from reads that fail over on their own;
+        // the log scan runs its own endpoint failover, mirroring recentActivity.
+        async let exposure = earnExposure()
+        async let feed = priceFeed()
+        let scan = try await scanHarvests(contract: maren.marenEarn)
+        let exp = try await exposure
+        let priceFeed = try await feed
+
+        // Value the seized BTC only when the oracle price is one the protocol would accept —
+        // both the app's own 60s gate (priceFeed .available) AND the vault's own stale flag.
+        var musdRealised: Decimal? = nil
+        if case let .available(usdPerBtc, _) = priceFeed, !exp.stalePrice {
+            musdRealised = scan.btcRealised * usdPerBtc
+        }
+
+        // Annualise only from a real MUSD gain over a long-enough window against a real base;
+        // otherwise the percent is withheld (nil), never shown as 0%.
+        let annualised = musdRealised.flatMap {
+            RealisedYieldMath.annualisedPercent(realisedMusd: $0, baseMusd: exp.musdBacking,
+                                                windowDays: scan.windowDays,
+                                                minWindowDays: EARN_YIELD_MIN_ANNUALISE_DAYS)
+        }
+
+        return RealisedYield(
+            btcRealised: scan.btcRealised,
+            musdRealised: musdRealised,
+            windowDays: scan.windowDays,
+            liquidationEvents: scan.liquidationEvents,
+            annualisedPercent: annualised,
+            lastGainAt: scan.lastGainAt
+        )
+    }
+
+    private struct HarvestScan: Sendable {
+        let btcRealised: Decimal
+        let liquidationEvents: Int
+        let windowDays: Int
+        let lastGainAt: Date?
+    }
+
+    /// Sum the BTC seized across `Harvested` events over `EARN_YIELD_LOOKBACK_BLOCKS`, in the
+    /// same parallel 10k-block `eth_getLogs` pages recentActivity uses, with the same endpoint
+    /// failover. The window's length is read from the floor block's real timestamp, not assumed.
+    private func scanHarvests(contract: String) async throws -> HarvestScan {
+        let chainId = chain.chainId
+        let topic = Self.harvestedTopic
+
+        var lastError = "no endpoints"
+        for url in chain.rpcURLs {
+            do {
+                let head = try await EthereumHttpClient(url: url, network: .custom(String(chainId))).eth_blockNumber()
+                let floor = max(0, head - EARN_YIELD_LOOKBACK_BLOCKS)
+
+                var windows: [(Int, Int)] = []
+                var from = floor
+                while from <= head {
+                    let to = min(head, from + MEZO_MAX_LOG_RANGE - 1)
+                    windows.append((from, to))
+                    from = to + 1
+                }
+
+                let raw = try await withThrowingTaskGroup(of: [RawLog].self) { group -> [RawLog] in
+                    for window in windows {
+                        group.addTask {
+                            try await Self.fetchLogs(url: url, chainId: chainId, address: contract,
+                                                     from: window.0, to: window.1)
+                        }
+                    }
+                    var all: [RawLog] = []
+                    for try await page in group { all.append(contentsOf: page) }
+                    return all
+                }
+
+                // Keep only Harvested logs; sum btcClaimed (data word 0) across them. A harvest
+                // that seized nothing (btcClaimed == 0) is not a realised gain and is not counted.
+                var btcWei = BigUInt(0)
+                var events = 0
+                var lastGainBlock = 0
+                for log in raw where log.topics.first?.lowercased() == topic {
+                    guard let data = Data(hex: log.data) else { continue }
+                    let claimed = MezoRPC.word(data, 0)
+                    if claimed > 0 {
+                        btcWei += claimed
+                        events += 1
+                        if log.block > lastGainBlock { lastGainBlock = log.block }
+                    }
+                }
+
+                // Real window length from the floor block's timestamp, plus the most-recent
+                // gain's timestamp. A block we cannot read leaves that figure unknown rather
+                // than inventing a date from an assumed block interval.
+                var wanted = [floor]
+                if lastGainBlock > 0 { wanted.append(lastGainBlock) }
+                let times = await Self.blockTimestamps(url: url, chainId: chainId, blocks: wanted)
+
+                var windowDays = 0
+                if let floorTime = times[floor] {
+                    let secs = Date().timeIntervalSince(floorTime)
+                    windowDays = secs > 0 ? Int(secs / 86_400) : 0
+                }
+                let lastGainAt = lastGainBlock > 0 ? times[lastGainBlock] : nil
+
+                return HarvestScan(
+                    btcRealised: Wei.toDecimal(btcWei) ?? 0,
+                    liquidationEvents: events,
+                    windowDays: windowDays,
+                    lastGainAt: lastGainAt
+                )
+            } catch {
+                lastError = String(describing: error)
+                continue
+            }
+        }
+        throw MezoRPCError.allEndpointsFailed(lastError)
+    }
+
+    /// topic0 of `Harvested(uint256,uint256,uint256,uint256)` — the vault's realised-gain event.
+    /// Computed with the same keccak the activity map uses; a golden test pins it to the value
+    /// Foundry's `cast keccak` produces so a wrong byte here fails loudly rather than silently
+    /// dropping every harvest.
+    static let harvestedTopic = "Harvested(uint256,uint256,uint256,uint256)"
+        .web3.keccak256.web3.hexString.lowercased()
+
     /// Activity from `eth_getLogs`, across all three Maren contracts and every event they
     /// emit — the same scan the web app runs (apps/web/src/lib/chain/logs.ts), so the two
     /// apps agree on a user's history. Vault (deposit/borrow/repay/withdraw), Pay

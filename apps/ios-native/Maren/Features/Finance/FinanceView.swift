@@ -307,6 +307,12 @@ private struct EarnSection: View {
         }
     }
 
+    // Trailing REALISED yield, computed from the vault's on-chain Harvested events — never a
+    // forward APY. Three honest states: a read that failed is explicitly unavailable; a window
+    // with no seized BTC says "no return to report yet" (never 0%); a window with gains shows
+    // the realised amount, the real observed window, and an annualised percent ONLY when it can
+    // be defended (live price, long-enough window), always framed realised / trailing / not a
+    // forecast. The lumpy-BTC explainer stays as a footer under every state.
     private var yieldCard: some View {
         MCard {
             VStack(alignment: .leading, spacing: Theme.Space.sm) {
@@ -321,11 +327,97 @@ private struct EarnSection: View {
                     .padding(.horizontal, 10).padding(.vertical, 5)
                     .background(Theme.Palette.inset, in: Capsule())
                 }
-                Text("Yield is Bitcoin from liquidations, sold into MUSD — lumpy and backward-looking, so there’s no APY to show.")
-                    .font(.text(14))
-                    .foregroundStyle(Theme.Palette.muted)
-                    .fixedSize(horizontal: false, vertical: true)
+
+                if model.isFirstLoad {
+                    yieldExplainer
+                } else if let y = model.earnYield {
+                    if y.hasReturn {
+                        realisedYieldBody(y)
+                    } else {
+                        noReturnBody(y)
+                    }
+                    yieldExplainer
+                } else {
+                    Unavailable(label: "Couldn’t read realised yield")
+                    yieldExplainer
+                }
             }
+        }
+    }
+
+    private var yieldExplainer: some View {
+        Text("Yield is Bitcoin seized at liquidation — lumpy and backward-looking, so Maren shows what was realised, never a forecast APY.")
+            .font(.text(13))
+            .foregroundStyle(Theme.Palette.muted)
+            .fixedSize(horizontal: false, vertical: true)
+    }
+
+    // A window that observed at least one seized-BTC gain. Headline is the realised MUSD value
+    // when the oracle price is live, otherwise the exact realised BTC (the MUSD figure is
+    // withheld, never guessed). The annualised percent rides beneath, or an honest reason it is
+    // held back.
+    @ViewBuilder private func realisedYieldBody(_ y: RealisedYield) -> some View {
+        if let musd = y.musdRealised {
+            MoneyText(text: MoneyFormat.musd(musd), size: 28, weight: .bold)
+        } else {
+            MoneyText(text: MoneyFormat.btc(y.btcRealised), size: 28, weight: .bold)
+        }
+        Text("Realised over the last \(y.windowDays) \(y.windowDays == 1 ? "day" : "days")")
+            .font(.text(13)).foregroundStyle(Theme.Palette.tertiary)
+
+        Text(seizedSummary(y))
+            .font(.text(13)).foregroundStyle(Theme.Palette.muted)
+            .fixedSize(horizontal: false, vertical: true)
+
+        Divider().overlay(Theme.Palette.ink.opacity(0.07))
+
+        if let pct = y.annualisedPercent {
+            HStack(spacing: 6) {
+                Text("≈ \(MoneyFormat.percent(pct)) annualised")
+                    .font(.figure(15, weight: .semibold))
+                    .foregroundStyle(Theme.Palette.ink)
+                Text("realised · trailing · not a forecast")
+                    .font(.text(12, weight: .medium))
+                    .foregroundStyle(Theme.Palette.tertiary)
+            }
+        } else {
+            Text(withheldPercentReason(y))
+                .font(.text(13)).foregroundStyle(Theme.Palette.muted)
+                .fixedSize(horizontal: false, vertical: true)
+        }
+    }
+
+    private func seizedSummary(_ y: RealisedYield) -> String {
+        let btc = MoneyFormat.btc(y.btcRealised)
+        let events = "\(y.liquidationEvents) \(y.liquidationEvents == 1 ? "liquidation" : "liquidations")"
+        if y.musdRealised != nil {
+            return "\(btc) seized across \(events), valued at the current oracle price."
+        }
+        // No MUSD value: the oracle price is stale, so it is withheld rather than guessed.
+        return "\(btc) seized across \(events). The oracle price is stale, so its MUSD value is withheld."
+    }
+
+    private func withheldPercentReason(_ y: RealisedYield) -> String {
+        if y.musdRealised == nil {
+            return "No annualised figure while the oracle price is stale — realised, not a forecast."
+        }
+        if y.windowDays < EARN_YIELD_MIN_ANNUALISE_DAYS {
+            return "Too recent to annualise honestly — realised, not a forecast."
+        }
+        return "Realised, not a forecast."
+    }
+
+    // A window that ran and found no seized BTC — the honest empty state. This is TRUE today:
+    // the vault holds zero BTC, so there is genuinely no realised gain to report, and the app
+    // says so plainly rather than printing 0%.
+    @ViewBuilder private func noReturnBody(_ y: RealisedYield) -> some View {
+        Text("No return to report yet")
+            .font(.text(17, weight: .semibold))
+            .foregroundStyle(Theme.Palette.ink)
+        if y.windowDays > 0 {
+            Text("No liquidation gains in the last \(y.windowDays) \(y.windowDays == 1 ? "day" : "days").")
+                .font(.text(13)).foregroundStyle(Theme.Palette.tertiary)
+                .fixedSize(horizontal: false, vertical: true)
         }
     }
 

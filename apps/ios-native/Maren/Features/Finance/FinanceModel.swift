@@ -16,6 +16,7 @@ final class FinanceModel {
     private(set) var balances: Balances?
     private(set) var earnBalance: Decimal?   // MUSD supplied to the Stability Pool, nil if unread
     private(set) var earnExposure: EarnExposure?   // what backs the pool, nil if unread
+    private(set) var earnYield: RealisedYield?     // trailing realised yield, nil if unread
     private(set) var priceFeed: PriceFeed = .unavailable(reason: "Not loaded")
     /// A background reload is in flight while values already on screen stay put.
     private(set) var refreshing = false
@@ -26,7 +27,7 @@ final class FinanceModel {
     }
 
     private var hasData: Bool {
-        position != nil || balances != nil || earnBalance != nil || earnExposure != nil
+        position != nil || balances != nil || earnBalance != nil || earnExposure != nil || earnYield != nil
     }
 
     /// First paint with genuinely nothing to show — the screen renders a redacted skeleton.
@@ -50,6 +51,7 @@ final class FinanceModel {
         async let price = client.priceFeed()
         async let earn = client.earnBalance()
         async let exposure = client.earnExposure()
+        async let realisedYield = client.earnRealisedYield()
 
         // Independent + tolerant: each read that FAILS keeps the last good value rather than
         // blanking the field or fabricating one — a refresh can only replace with a truer value.
@@ -58,6 +60,7 @@ final class FinanceModel {
         if let value = try? await price { self.priceFeed = value }
         self.earnBalance = try? await earn
         self.earnExposure = try? await exposure
+        self.earnYield = try? await realisedYield
         phase = .loaded
     }
 

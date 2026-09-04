@@ -235,6 +235,17 @@ final class MarenEncodingGoldenTests: XCTestCase {
         XCTAssertEqual(data.web3.hexString, expected, "claimLink calldata must match cast")
     }
 
+    // MARK: MarenEarn Harvested event topic0
+    //
+    // The realised-yield scan recognises a liquidation-gain log by topic0. A wrong byte here
+    // would silently drop every harvest and under-report yield, so it is pinned to cast.
+    // cast keccak "Harvested(uint256,uint256,uint256,uint256)"
+    func testHarvestedEventTopicMatchesCast() {
+        let expected = "0x4c0f499ffe6befa0ca7c826b0916cf87bea98de658013e76938489368d60d509"
+        XCTAssertEqual(MezoMarenClient.harvestedTopic, expected,
+                       "Harvested topic0 must match cast keccak of the event signature")
+    }
+
     // cast calldata "split(address[],uint256[],string)" "[R,R]" "[1e18,2e18]" "hi"
     // (An EMPTY memo is verified separately: web3.swift pads a 0-length string to a full zero
     //  word where cast emits none — a trailing byte the contract's decoder ignores, proven by a

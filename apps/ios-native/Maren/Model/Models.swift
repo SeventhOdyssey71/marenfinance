@@ -83,6 +83,62 @@ struct EarnExposure: Sendable, Equatable, Codable {
     let stalePrice: Bool              // the BTC valuation rests on a price the oracle would reject
 }
 
+/// Backward-looking realised yield for MarenEarn, computed from the vault's on-chain
+/// `Harvested` events — never a forward APY, never a fabricated rate.
+///
+/// WHAT IS ACTUALLY REALISED. Each harvest emits the exact native BTC the vault SEIZED from
+/// liquidations in that harvest (`btcClaimed`). Summing it over the observed window is an
+/// exact, on-chain, non-overlapping quantity that needs no oracle: `btcRealised`. Its MUSD
+/// value (`musdRealised`) is that BTC priced at the CURRENT oracle rate — so it is withheld
+/// (left nil) whenever the price is stale or unavailable, because a value the protocol itself
+/// would reject must never be shown as authoritative. The MUSD leg deliberately does NOT add
+/// the `musdCompounded` a router would later produce: that is a denomination change of BTC
+/// already counted here, and adding it would double-count the same gain.
+///
+/// This is a VAULT-WIDE figure — what every share earned, not this account's slice — because a
+/// per-user cost basis needs a deposit/withdraw ledger the chain does not expose without an
+/// off-chain indexer. The UI labels it as such.
+struct RealisedYield: Sendable, Equatable, Codable {
+    /// BTC the pool seized from liquidations across the window (exact, from `Harvested`).
+    let btcRealised: Decimal
+    /// That BTC valued in MUSD at the current oracle price; nil when the price is stale or
+    /// unavailable, so a rejected price is never rendered as a dollar figure.
+    let musdRealised: Decimal?
+    /// The real number of days the scan observed, from the floor block's timestamp — never
+    /// assumed from a block-time constant.
+    let windowDays: Int
+    /// How many harvests seized BTC in the window (the count of realised liquidation gains).
+    let liquidationEvents: Int
+    /// The trailing realised gain annualised to a percent, or nil when it cannot be computed
+    /// honestly: no MUSD base, a window shorter than `EARN_YIELD_MIN_ANNUALISE_DAYS`, a stale
+    /// price, or no gain at all. A withheld percent is never shown as 0%.
+    let annualisedPercent: Decimal?
+    /// When the most recent realised gain landed, or nil if there has been none.
+    let lastGainAt: Date?
+
+    /// True only when the pool has genuinely realised a liquidation gain in the window.
+    /// False is the honest "no return to report yet" state, NOT a 0% yield.
+    var hasReturn: Bool { liquidationEvents > 0 && btcRealised > 0 }
+}
+
+/// The pure annualisation, factored out so it is unit-testable without a network. Trailing
+/// realised yield = gain / base, scaled from the observed window up to a year. Every path that
+/// cannot produce an honest number returns nil rather than a misleading zero.
+enum RealisedYieldMath {
+    /// realisedMusd / baseMusd, annualised from `windowDays` to 365. Returns nil when the base
+    /// is non-positive (divide-by-zero), the window is shorter than `minWindowDays`, or there is
+    /// no realised gain — so the caller shows an empty state instead of a fabricated 0%.
+    static func annualisedPercent(realisedMusd: Decimal,
+                                  baseMusd: Decimal,
+                                  windowDays: Int,
+                                  minWindowDays: Int) -> Decimal? {
+        guard realisedMusd > 0, baseMusd > 0, windowDays >= minWindowDays, windowDays > 0 else {
+            return nil
+        }
+        return realisedMusd / baseMusd * Decimal(365) / Decimal(windowDays) * 100
+    }
+}
+
 /// R15 status wording. `pending` never reads as delivered, and `failed` says plainly that no
 /// funds moved rather than hiding behind "unsuccessful".
 enum ActivityStatus: Sendable, Equatable, Codable {

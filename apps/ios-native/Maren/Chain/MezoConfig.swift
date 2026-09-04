@@ -133,3 +133,16 @@ let ORACLE_MAX_PRICE_DELAY_SECONDS = 60
 /// The widest `[fromBlock, toBlock]` span Mezo's public RPC answers in one `eth_getLogs`.
 /// Measured: a wider range returns `maximum [from, to] blocks distance: 10000`.
 let MEZO_MAX_LOG_RANGE = 10_000
+
+/// How far back the realised-yield scan reads `Harvested` events, in blocks — a bounded
+/// trailing window, not a since-genesis crawl. Twelve `eth_getLogs` pages (the same fan-out
+/// order of magnitude as the activity scan), so it stays one round-trip's worth of latency.
+/// The window's LENGTH IN DAYS is never inferred from this number: it is read from the real
+/// timestamp of the floor block, so a bounded scan still reports an honest observation period.
+let EARN_YIELD_LOOKBACK_BLOCKS = MEZO_MAX_LOG_RANGE * 12
+
+/// The shortest observation window over which a lumpy, liquidation-driven gain may be
+/// annualised into a percent. Below this the realised amount and its window are still shown,
+/// but the annualised figure is WITHHELD — annualising two liquidations seen over three days
+/// is a lie with a percent sign on it, exactly the forward-APY dishonesty Earn refuses.
+let EARN_YIELD_MIN_ANNUALISE_DAYS = 14

@@ -15,6 +15,11 @@ protocol MarenClient: Sendable {
     /// What backs the Earn pool right now — its MUSD plus any Bitcoin it seized absorbing
     /// liquidations. Read live; a failure throws so the UI can show unavailable, never a zero.
     func earnExposure() async throws -> EarnExposure
+    /// Backward-looking realised yield for the Earn vault, computed from its on-chain
+    /// `Harvested` events over a bounded trailing window. A read failure throws so the UI shows
+    /// unavailable; a successful scan that found no gains returns a `RealisedYield` whose
+    /// `hasReturn` is false — the honest "no return yet" state, never a fabricated rate.
+    func earnRealisedYield() async throws -> RealisedYield
     func recentActivity() async throws -> [ActivityItem]
 }
 
@@ -68,6 +73,27 @@ struct StubMarenClient: MarenClient {
         // Demo composition: a mostly-MUSD pool that has taken on a little Bitcoin from
         // liquidations. The USD valuation is shown as fresh here (priceWired mirrors the feed).
         EarnExposure(musdBacking: 41_200, btcSeized: 0.0125, btcValuedMusd: 800, stalePrice: !priceWired)
+    }
+
+    func earnRealisedYield() async throws -> RealisedYield {
+        // Demo composition: a couple of liquidation gains realised over a ~90-day window, with
+        // the annualised figure shown only when the price path is "wired" (mirrors the feed).
+        let windowDays = 92
+        let btc: Decimal = 0.0125
+        let musd: Decimal? = priceWired ? 800 : nil
+        let annualised = priceWired
+            ? RealisedYieldMath.annualisedPercent(realisedMusd: 800, baseMusd: 41_200,
+                                                  windowDays: windowDays,
+                                                  minWindowDays: EARN_YIELD_MIN_ANNUALISE_DAYS)
+            : nil
+        return RealisedYield(
+            btcRealised: btc,
+            musdRealised: musd,
+            windowDays: windowDays,
+            liquidationEvents: 2,
+            annualisedPercent: annualised,
+            lastGainAt: Date().addingTimeInterval(-6 * 86_400)
+        )
     }
 
     func recentActivity() async throws -> [ActivityItem] {
