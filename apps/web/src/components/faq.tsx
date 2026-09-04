@@ -114,7 +114,7 @@ const items: readonly Item[] = [
           A third-party audit of{' '}
           <span className="num text-[color:var(--ink)]">MarenVault</span> and{' '}
           <span className="num text-[color:var(--ink)]">MarenForwarder</span> (the two contracts that
-          carry real risk) is scheduled after the full matsnet deployment and before mainnet.
+          carry real risk) is scheduled after the full testnet deployment and before mainnet.
         </p>
         <p>
           Until that audit is complete and published, treat Maren as unaudited software and do not
