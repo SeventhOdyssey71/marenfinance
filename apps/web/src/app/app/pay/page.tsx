@@ -23,6 +23,7 @@ import {
 import { ReceivePanel } from '@/components/app/receive-panel';
 import { SendFlow } from '@/components/app/send-flow';
 import { TxSheet, useTxRunner, type TxIntent, type TxRunner } from '@/components/app/tx';
+import { X402Teaser } from '@/components/app/x402-teaser';
 import { ArrowUpRight, LinkIcon, Minus, PayIcon, Plus } from '@/components/ui/icons';
 import { parseUnitsSafe, utf8Length } from '@/lib/copy';
 import { marenPayAbi } from '@/lib/chain/abis';
@@ -107,6 +108,8 @@ export default function PayPage() {
           Send MUSD to an @handle or a plain address, with an optional memo written on-chain.
         </ConnectPrompt>
         <GasLine />
+        {/* The demo's offer is readable without a wallet, so the door stays open here. */}
+        <X402Teaser />
       </div>
     );
   }
@@ -128,6 +131,9 @@ export default function PayPage() {
       {tab === 'link' ? <LinkPanel runner={runner} /> : null}
       {tab === 'receive' ? <ReceivePanel /> : null}
       {tab === 'handle' ? <HandleRegistration runner={runner} /> : null}
+
+      {/* Below every flow, quiet on purpose: a protocol demo, not a money surface. */}
+      <X402Teaser />
 
       <TxSheet runner={runner} />
     </div>
