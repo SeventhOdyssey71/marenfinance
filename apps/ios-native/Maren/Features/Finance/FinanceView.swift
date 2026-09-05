@@ -46,7 +46,7 @@ private struct VaultSection: View {
             .skeleton(model.isFirstLoad)
             // Screenshot/testing hook: open a flow directly. Inert in normal use.
             .onAppear {
-                switch ProcessInfo.processInfo.environment["MAREN_SCREEN"] {
+                switch ScreenshotHooks.screen {
                 case "borrow": flow = .borrow
                 case "deposit": flow = .deposit
                 default: break
@@ -579,8 +579,12 @@ struct PriceNote: View {
     }
 }
 
+// `#Preview` expands unconditionally, so this must be gated by hand or the demo stub it
+// injects would be linked into Release. See the matching note in HomeView.
+#if DEBUG
 #Preview("Finance — demo") {
     FinanceView()
         .environment(\.marenClient, StubMarenClient())
         .environment(AppRouter())
 }
+#endif

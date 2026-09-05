@@ -16,16 +16,15 @@ struct RootView: View {
     /// A screenshot/testing hook: `MAREN_SCREEN` preselects a tab and, for pay flows, presents
     /// the sheet at launch. Absent in normal use, so it changes nothing for a real user.
     @State private var launchDestination: PayDestination?
-    private let launchScreen = ProcessInfo.processInfo.environment["MAREN_SCREEN"]
+    private let launchScreen = ScreenshotHooks.screen
 
     /// The intro gates the very first launch, ahead of the wallet gate. It is bypassed for the
     /// screenshot/demo hooks (which expect the shell or a specific screen), and can be forced on
-    /// with `MAREN_SCREEN=intro` to capture it.
+    /// with `MAREN_SCREEN=intro` to capture it. Both hooks are DEBUG-only, so in Release this is
+    /// simply `!hasOnboarded`.
     private var showIntro: Bool {
         if launchScreen == "intro" { return true }
-        let screenshotMode = launchScreen != nil
-            || ProcessInfo.processInfo.environment["MAREN_DEMO"] != nil
-        return !hasOnboarded && !screenshotMode
+        return !hasOnboarded && !ScreenshotHooks.isCapturing
     }
 
     var body: some View {

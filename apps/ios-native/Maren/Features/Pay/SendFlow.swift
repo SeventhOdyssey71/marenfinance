@@ -53,15 +53,20 @@ struct SendFlow: View {
             loaded = true
             balance = try? await client.balances().musd
             balanceLoaded = true
-            // Screenshot/testing hook: jump straight to a stage. Inert in normal use.
-            switch ProcessInfo.processInfo.environment["MAREN_SCREEN"] {
+            // Screenshot/testing hook: jump straight to a stage with a sample recipient and
+            // amount typed into the form. The whole block is DEBUG-only, so neither the sample
+            // address nor the sample amount is even present in a Release binary.
+            #if DEBUG
+            let hookScreen = ScreenshotHooks.screen
+            switch hookScreen {
             case "sendamount", "sendloading":
                 recipient = "0x7094000000000000000000000000000000002242"
                 raw = "3"
-                stage = ProcessInfo.processInfo.environment["MAREN_SCREEN"] == "sendloading" ? .submitting : .amount
+                stage = hookScreen == "sendloading" ? .submitting : .amount
                 return
             default: break
             }
+            #endif
             if let prefill {
                 recipient = prefill.to
                 if let a = prefill.amount { raw = a }

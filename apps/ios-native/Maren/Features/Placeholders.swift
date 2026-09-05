@@ -7,6 +7,8 @@ import SwiftUI
 
 struct Screen<Content: View>: View {
     let title: String
+    /// Marks the screen as fed by the DEBUG demo stub. Release has no such stub, so this is
+    /// always false there and the badge itself is not compiled in.
     var badge: Bool = false
     /// Shows the shared "Refreshing" chip in the title row during a background reload, so the
     /// values already on screen stay put while fresher ones are fetched.
@@ -26,7 +28,9 @@ struct Screen<Content: View>: View {
                             .transition(.opacity)
                     }
                     Spacer()
+                    #if DEBUG
                     if badge { DemoBadge() }
+                    #endif
                 }
                 .animation(.easeInOut(duration: 0.2), value: refreshing)
                 .padding(.top, Theme.Space.xs)

@@ -27,14 +27,49 @@ protocol MarenClient: Sendable {
     func paymentRequest(_ requestId: UInt64) async throws -> PaymentRequestRecord?
 }
 
-// MARK: - StubMarenClient
+// MARK: - UnconfiguredMarenClient
+//
+// The PRODUCTION no-wallet client, and the Environment default for `\.marenClient`. There is
+// no account and no chain behind it, so it has nothing true to say — and so it says nothing.
+// Every read throws; the one read with an honest "absent" case in its own type, the price
+// feed, reports `.unavailable` with the reason. It cannot state a balance, a position, a
+// handle, an address or a hash, because it does not have one.
+//
+// This is what a view rendered outside a configured session gets. The screens already render
+// a throw and an `.unavailable` honestly, so an unwired view shows a gap, never a plausible
+// invented figure.
+
+struct UnconfiguredMarenClient: MarenClient {
+    func account() async throws -> Account { throw MarenClientError.noAccount }
+    func priceFeed() async throws -> PriceFeed {
+        .unavailable(reason: "No account is loaded, so there is no price to read.")
+    }
+    func position() async throws -> Position { throw MarenClientError.noAccount }
+    func balances() async throws -> Balances { throw MarenClientError.noAccount }
+    func earnBalance() async throws -> Decimal { throw MarenClientError.noAccount }
+    func earnExposure() async throws -> EarnExposure { throw MarenClientError.noAccount }
+    func earnRealisedYield() async throws -> RealisedYield { throw MarenClientError.noAccount }
+    func recentActivity() async throws -> [ActivityItem] { throw MarenClientError.noAccount }
+    func paymentRequest(_ requestId: UInt64) async throws -> PaymentRequestRecord? {
+        throw MarenClientError.noAccount
+    }
+}
+
+#if DEBUG
+
+// MARK: - StubMarenClient (DEBUG ONLY)
 //
 // A CLEARLY-FAKE, demo-only implementation. It returns obviously-placeholder values so
-// the foundation is exercisable before any chain is wired — the UI wears a "Demo data"
-// badge wherever this feeds it, and nothing here is presented as a real balance.
+// SwiftUI previews and the `MAREN_DEMO` screenshot shell are exercisable without a wallet —
+// the UI wears a "Demo data" badge wherever this feeds it, and nothing here is presented as
+// a real balance.
+//
+// COMPILED OUT OF RELEASE. This whole type lives inside `#if DEBUG`, so a shipping binary
+// contains none of these figures and no code path can reach them. `#Preview` blocks are
+// themselves DEBUG-only, so previews keep working unchanged.
 //
 // HONEST-DATA on purpose: `priceFeed()` returns `.unavailable`. The USD price is not
-// wired in Wave 1, so the app must show an explicit unavailable state rather than a
+// wired for the stub, so the app must show an explicit unavailable state rather than a
 // fabricated dollar figure. The BTC/MUSD figures are protocol-native demo amounts; the
 // USD *conversion* of them is what is honestly missing until a real feed lands.
 
@@ -132,3 +167,5 @@ struct StubMarenClient: MarenClient {
         throw MarenClientError.demoHasNoChain
     }
 }
+
+#endif

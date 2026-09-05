@@ -210,9 +210,16 @@ struct HealthChip: View {
     }
 }
 
-// MARK: - DemoBadge
+#if DEBUG
+
+// MARK: - DemoBadge (DEBUG ONLY)
 //
 // Honest-data discipline, worn on the sleeve: every screen fed by the stub says so.
+//
+// COMPILED OUT OF RELEASE, together with the stub it describes. The badge exists to mark
+// fabricated figures; a Release build has no fabricating client, so there is nothing for it to
+// mark and a badge on real balances would itself be the false statement. Gating it here means
+// the dangerous pairing — invented data with the badge missing — cannot be assembled at all.
 
 struct DemoBadge: View {
     var body: some View {
@@ -230,6 +237,8 @@ struct DemoBadge: View {
         .accessibilityLabel("Demo data. Figures on this screen are placeholder values, not real balances.")
     }
 }
+
+#endif
 
 // MARK: - Unavailable
 //

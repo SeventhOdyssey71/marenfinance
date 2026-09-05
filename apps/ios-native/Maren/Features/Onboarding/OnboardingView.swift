@@ -52,7 +52,7 @@ struct OnboardingView: View {
 
     /// Screenshot/testing hook. `MAREN_SCREEN` can open the flow directly on one step so each
     /// screen can be captured. Absent in normal use, so it changes nothing for a real user.
-    private let launchScreen = ProcessInfo.processInfo.environment["MAREN_SCREEN"]
+    private let launchScreen = ScreenshotHooks.screen
 
     var body: some View {
         ZStack {

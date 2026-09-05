@@ -57,7 +57,7 @@ struct UnlockGate<Content: View>: View {
     @ViewBuilder var content: Content
 
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
-    private let captureLock = ProcessInfo.processInfo.environment["MAREN_SCREEN"] == "unlock"
+    private let captureLock = ScreenshotHooks.screen == "unlock"
 
     var body: some View {
         ZStack {

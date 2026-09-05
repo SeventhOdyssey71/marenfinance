@@ -218,9 +218,14 @@ struct HomeView: View {
     }
 }
 
+// The `#Preview` macro expands unconditionally — it is NOT wrapped in `#if DEBUG` for you —
+// so a preview that injects the demo stub would drag the stub into a Release binary. Gating it
+// here is what keeps the stub genuinely absent from a shipping build.
+#if DEBUG
 #Preview("Home") {
     HomeView()
         .environment(\.marenClient, StubMarenClient())
         .environment(MarenSession())
         .environment(AppRouter())
 }
+#endif

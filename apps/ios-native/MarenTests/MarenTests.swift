@@ -1,4 +1,5 @@
 import XCTest
+import SwiftUI
 import BigInt
 import web3
 @testable import Maren
@@ -12,6 +13,118 @@ final class MarenTests: XCTestCase {
         guard case .unavailable = feed else {
             return XCTFail("Default stub should report the price feed as unavailable")
         }
+    }
+
+    // MARK: - The production no-wallet path never fabricates
+    //
+    // THE REGRESSION THIS PINS. The app used to fall back to `StubMarenClient` /
+    // `DemoMarenActions` whenever no wallet was loaded, and used them as the SwiftUI
+    // Environment defaults — so any view rendered outside a configured session was handed
+    // invented balances, an invented address and invented transaction hashes, in Release as
+    // much as in Debug. The fabricating types are now `#if DEBUG` and the production fallback
+    // is the unconfigured pair below. These tests fail the moment anything is wired back.
+    //
+    // The rule being pinned: WITH NO ACCOUNT, THERE IS NOTHING TO SAY. Every read is absent
+    // (a throw, or the type's own honest unavailable case) and every write declines.
+
+    func testUnconfiguredClientReadsReturnNoValues() async throws {
+        let client = UnconfiguredMarenClient()
+
+        // Each read must throw rather than hand back a value. `XCTAssertThrowsError` does not
+        // take an async expression, so each is asserted through a small do/catch.
+        func expectThrow<T>(_ what: String, _ read: () async throws -> T) async {
+            do {
+                let value = try await read()
+                XCTFail("Unconfigured \(what) returned \(value); with no account it must not return anything")
+            } catch {
+                // Expected: nothing to read.
+            }
+        }
+
+        await expectThrow("account") { try await client.account() }
+        await expectThrow("position") { try await client.position() }
+        await expectThrow("balances") { try await client.balances() }
+        await expectThrow("earnBalance") { try await client.earnBalance() }
+        await expectThrow("earnExposure") { try await client.earnExposure() }
+        await expectThrow("earnRealisedYield") { try await client.earnRealisedYield() }
+        await expectThrow("recentActivity") { try await client.recentActivity() }
+
+        // paymentRequest THROWS rather than returning nil: nil would be the claim "the contract
+        // holds no such request", which is a statement about a chain this client is not on.
+        await expectThrow("paymentRequest") { try await client.paymentRequest(1) }
+
+        // The price feed has an honest "absent" case in its own type, so it uses that rather
+        // than throwing. It must never be `.available` with a fabricated figure.
+        let feed = try await client.priceFeed()
+        guard case .unavailable = feed else {
+            return XCTFail("Unconfigured price feed must be unavailable, never a fabricated price")
+        }
+    }
+
+    func testUnconfiguredActionsDeclineAndResolveNothing() async {
+        let actions = UnconfiguredMarenActions()
+
+        // It says up front that it cannot settle, so the review step tells the truth.
+        XCTAssertFalse(actions.canSettle)
+
+        // Every kind of write declines with a stated reason. Crucially it is NOT `.demo` and
+        // NOT `.delivered`: a demo walk and a receipt are both claims that something happened.
+        let intents: [Intent.Kind] = [
+            .send(to: "0x0", memo: ""), .deposit, .borrow, .repay, .withdraw,
+            .earnSupply, .earnWithdraw,
+            .split(recipients: ["0x0"], amounts: [1]),
+            .request(payer: nil, memo: ""), .fulfillRequest(requestId: 1),
+            .createLink(linkKey: "0x0", expiry: 1, memo: ""),
+            .claim(PaymentLinks.ClaimLink(linkId: 1, secret: "0x00")),
+            .commitHandle(handle: "sele", secret: "0x00"),
+            .registerHandle(handle: "sele", secret: "0x00"),
+        ]
+        for kind in intents {
+            let outcome = await actions.submit(Intent(kind: kind, amount: 1, unit: .musd))
+            guard case let .declined(reason) = outcome else {
+                XCTFail("Unconfigured submit must decline, got \(outcome)")
+                continue
+            }
+            XCTAssertFalse(reason.isEmpty, "A decline must state a reason")
+        }
+
+        // No registry to ask, so nothing resolves — not a handle, and not even a well-formed
+        // address, which would otherwise read as "this recipient was checked".
+        let resolvedHandle = await actions.resolve("@sele")
+        XCTAssertNil(resolvedHandle)
+        let resolvedAddress = await actions.resolve("0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266")
+        XCTAssertNil(resolvedAddress)
+    }
+
+    // The Environment defaults are what an unwired view inherits. They must be the
+    // non-fabricating pair in EVERY configuration, so a view rendered outside a configured
+    // session shows an honest gap rather than plausible invented figures.
+    @MainActor
+    func testEnvironmentDefaultsAreNonFabricating() {
+        let values = EnvironmentValues()
+        XCTAssertTrue(values.marenClient is UnconfiguredMarenClient,
+                      "Default marenClient must not fabricate; got \(type(of: values.marenClient))")
+        XCTAssertTrue(values.marenActions is UnconfiguredMarenActions,
+                      "Default marenActions must not fabricate; got \(type(of: values.marenActions))")
+    }
+
+    // A fresh session with no wallet loaded must not reach for a fabricating client. The test
+    // bundle is a DEBUG build with no `MAREN_DEMO` set, which is exactly the shape of the
+    // Release no-wallet path, so this covers it from the session end too.
+    @MainActor
+    func testSessionWithNoWalletIsUnconfiguredNotDemo() {
+        let session = MarenSession()
+        guard session.address == nil else {
+            // A wallet is persisted on this simulator from another test or a manual run; the
+            // no-wallet branch is not what is under test then.
+            return
+        }
+        XCTAssertFalse(session.isDemo, "No wallet and no screenshot hook is not demo data")
+        XCTAssertFalse(session.hasWallet)
+        XCTAssertTrue(session.client is UnconfiguredMarenClient,
+                      "No wallet must mean no client; got \(type(of: session.client))")
+        XCTAssertTrue(session.actions is UnconfiguredMarenActions,
+                      "No wallet must mean no runner; got \(type(of: session.actions))")
     }
 
     // MoneyText is a SwiftUI view type (@MainActor), so its static `split` is main-actor

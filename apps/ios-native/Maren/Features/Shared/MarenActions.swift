@@ -111,10 +111,38 @@ protocol MarenActions: Sendable {
     func resolve(_ recipient: String) async -> String?
 }
 
-// MARK: - DemoMarenActions
+// MARK: - UnconfiguredMarenActions
+//
+// The PRODUCTION no-wallet runner, and the Environment default for `\.marenActions`. Pairs
+// with `UnconfiguredMarenClient`. There is no loaded account to sign with and no chain to
+// submit to, so every submit DECLINES with a plain sentence and nothing is ever presented as
+// having happened. `canSettle` is false, so the review step says so before the user commits.
+//
+// It never returns `.demo`: a demo walk is a claim that a flow was exercised against
+// something, and this runner is not attached to anything at all.
+
+struct UnconfiguredMarenActions: MarenActions {
+    var canSettle: Bool { false }
+
+    func submit(_ intent: Intent) async -> SubmitOutcome {
+        .declined(reason: "No wallet is loaded, so nothing was signed or submitted and no funds moved. Set up or restore a wallet first.")
+    }
+
+    /// No registry to ask and no account to ask on behalf of, so nothing resolves. Returning
+    /// nil is the honest "could not resolve", which the flows already render as such.
+    func resolve(_ recipient: String) async -> String? { nil }
+}
+
+#if DEBUG
+
+// MARK: - DemoMarenActions (DEBUG ONLY)
 //
 // Pairs with `StubMarenClient`. Walks any flow and resolves to `.demo`, which the UI renders
 // as an explicit "nothing was submitted to any chain, no gas was spent, no funds moved".
+//
+// COMPILED OUT OF RELEASE, alongside the stub client it pairs with. A shipping binary has no
+// runner that can resolve a submit to `.demo`, so a success-shaped outcome for a transaction
+// that never happened cannot be produced.
 
 struct DemoMarenActions: MarenActions {
     var canSettle: Bool { false }
@@ -131,6 +159,8 @@ struct DemoMarenActions: MarenActions {
         return PaymentLinks.isAddress(trimmed) ? trimmed : nil
     }
 }
+
+#endif
 
 // MARK: - LiveMarenActions
 //
@@ -290,8 +320,11 @@ struct LiveMarenActions: MarenActions {
 
 // MARK: - Environment injection
 
+// The default is the NON-FABRICATING runner in every configuration, Debug and Release alike.
+// A view rendered outside a configured session declines honestly rather than walking a flow
+// to a demo "success". Previews that want the demo walk inject it explicitly.
 private struct MarenActionsKey: EnvironmentKey {
-    static let defaultValue: any MarenActions = DemoMarenActions()
+    static let defaultValue: any MarenActions = UnconfiguredMarenActions()
 }
 
 extension EnvironmentValues {
