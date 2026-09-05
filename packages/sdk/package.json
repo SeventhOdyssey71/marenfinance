@@ -10,16 +10,19 @@
     ".": "./src/index.ts",
     "./chains": "./src/chains.ts",
     "./addresses": "./src/addresses.ts",
-    "./constants": "./src/constants.ts"
+    "./constants": "./src/constants.ts",
+    "./musd-abis": "./src/musd-abis.ts"
   },
   "scripts": {
     "build": "tsc --noEmit",
     "typecheck": "tsc --noEmit",
     "lint": "echo 'no linter configured yet' && exit 0",
     "test": "vitest run --passWithNoTests",
+    "generate:musd-abis": "node scripts/generate-musd-abis.mjs",
     "clean": "rm -rf dist .turbo node_modules"
   },
   "dependencies": {
+    "@mezo-org/musd-contracts": "1.1.0",
     "viem": "^2.21.55"
   },
   "devDependencies": {

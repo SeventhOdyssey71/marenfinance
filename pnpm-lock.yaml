@@ -154,6 +154,9 @@ importers:
 
   packages/sdk:
     dependencies:
+      '@mezo-org/musd-contracts':
+        specifier: 1.1.0
+        version: 1.1.0
       viem:
         specifier: ^2.21.55
         version: 2.55.16(bufferutil@4.1.0)(typescript@5.9.3)(utf-8-validate@5.0.10)(zod@4.4.3)
@@ -1907,6 +1910,9 @@ packages:
   '@metamask/utils@9.3.0':
     resolution: {integrity: sha512-w8CVbdkDrVXFJbfBSlDfafDR6BAkpDmv1bC1UJVCoVny5tW2RKAdn9i68Xf7asYT4TnUhl/hN4zfUiKQq9II4g==}
     engines: {node: '>=16.0.0'}
+
+  '@mezo-org/musd-contracts@1.1.0':
+    resolution: {integrity: sha512-pjo6v8rYAj3csiVxQ5qTSX8vmqvXrxBHbeJR/O38Qhz5DrtNzTqJQReLGsDVKhWMZ6/89JdE1584flZFZQT9Dg==}
 
   '@msgpack/msgpack@3.1.2':
     resolution: {integrity: sha512-JEW4DEtBzfe8HvUYecLU9e6+XJnKDlUAIve8FvPzF3Kzs6Xo/KuZkZJsDH0wJXl/qEZbeeE7edxDNY3kMs39hQ==}
@@ -10017,6 +10023,8 @@ snapshots:
       uuid: 9.0.1
     transitivePeerDependencies:
       - supports-color
+
+  '@mezo-org/musd-contracts@1.1.0': {}
 
   '@msgpack/msgpack@3.1.2': {}
 
