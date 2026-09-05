@@ -121,7 +121,7 @@ const MODES = [
  * `borrowCeiling`, `recommendedBorrow`, `previewBorrow`, `maxWithdrawable` — and there is
  * still no arithmetic in this file that touches a user's risk. Every gas and route
  * disclosure is still here, at one sentence each.
-=======
+ *
  * EVERY CONTROL ON THIS SCREEN IS PREFLIGHTED. Before a button is enabled or a slider is
  * given a range, `lib/chain/preflight.ts` evaluates the same conditions `MarenVault.sol`
  * will evaluate, against state read from the chain: the pause flags, the deposit cap, the
