@@ -14,7 +14,10 @@ struct ReceiveView: View {
         ScrollView {
             VStack(spacing: Theme.Space.lg) {
                 if let account {
-                    let link = PaymentLinks.buildPayment(to: primaryTarget(account))
+                    // `payTarget` is the address unless MarenRegistry has CONFIRMED a handle for
+                    // it. A device-local nickname never reaches this line: a link built from an
+                    // unconfirmed name would resolve to whoever actually registered it.
+                    let link = PaymentLinks.buildPayment(to: account.payTarget)
                     header
                     QRCode(string: link, size: 230)
                         .frame(maxWidth: .infinity)
@@ -55,6 +58,13 @@ struct ReceiveView: View {
                 StatRow(label: "Network") {
                     Text("MUSD · Mezo").font(.text(15, weight: .medium)).foregroundStyle(Theme.Palette.ink)
                 }
+                // Shown only when MarenRegistry confirmed it, because this row is a claim that
+                // paying that name pays this account.
+                if let handle = account.handle {
+                    StatRow(label: "Your name") {
+                        Text(handle).font(.text(15, weight: .medium)).foregroundStyle(Theme.Palette.ink)
+                    }
+                }
                 StatRow(label: "Wallet address", showsDivider: false, fixedValue: false) {
                     Text(MarenSession.shortAddress(account.address))
                         .font(.figure(15, weight: .medium))
@@ -74,7 +84,4 @@ struct ReceiveView: View {
         }
     }
 
-    private func primaryTarget(_ account: Account) -> String {
-        account.handle.hasPrefix("@") ? account.handle : account.address
-    }
 }

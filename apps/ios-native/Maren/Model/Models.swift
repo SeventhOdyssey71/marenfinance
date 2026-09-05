@@ -18,9 +18,57 @@ enum MarenPolicy {
     static let fixedAprPercent: Decimal = 1.00
 }
 
+/// Who the app is loaded as.
+///
+/// A NICKNAME IS NOT A HANDLE. The name typed during onboarding is a device-local label and
+/// nothing else: MarenRegistry has never heard of it, and if the registry resolves that same
+/// name to somebody else's address then putting it in a share link or a QR code sends money to
+/// a stranger. So the two are separate fields, and only ONE of them can ever be a payment
+/// target.
+///
+///   `registeredHandle` is set only when an authoritative MarenRegistry read says THIS address
+///   owns that name. It is the bare handle, with no leading "@".
+///   `nickname` is the local label. It may be shown as a name; it may never be shown as an
+///   @handle and may never be built into a link, a QR code or any other payment target.
+///
+/// `payTarget` is the single accessor every share/QR path goes through, so the fallback to the
+/// address is structural rather than something each screen has to remember.
 struct Account: Sendable, Equatable, Codable {
-    let handle: String       // e.g. "@demo"
-    let address: String      // 0x… (truncated for display)
+    let address: String                 // 0x…
+    /// The @handle MarenRegistry confirms this address owns, bare (no "@"). Nil until confirmed.
+    let registeredHandle: String?
+    /// The device-local display nickname from onboarding. Never a payment target.
+    let nickname: String?
+
+    init(address: String, registeredHandle: String? = nil, nickname: String? = nil) {
+        self.address = address
+        self.registeredHandle = registeredHandle.flatMap { $0.isEmpty ? nil : $0 }
+        self.nickname = nickname.flatMap { $0.isEmpty ? nil : $0 }
+    }
+
+    /// The registry-confirmed handle with its "@", or nil. The ONLY string in this type that
+    /// may be presented as a handle.
+    var handle: String? { registeredHandle.map { "@\($0)" } }
+
+    /// What a payment link or QR code addresses. The confirmed handle when there is one,
+    /// otherwise the address, which is always correct and always this account's.
+    var payTarget: String { handle ?? address }
+
+    /// The name to show at the top of Profile: the confirmed handle, else the nickname, else a
+    /// shortened address. Pair it with `titleCaption`, which says which of the three it is.
+    var title: String {
+        if let handle { return handle }
+        if let nickname { return nickname }
+        return address.count > 10 ? "\(address.prefix(6))…\(address.suffix(4))" : address
+    }
+
+    /// One line saying what `title` actually is, so a nickname is never mistaken for a name
+    /// anybody can pay.
+    var titleCaption: String {
+        if handle != nil { return "Registered to this address on MarenRegistry." }
+        if nickname != nil { return "A nickname saved on this device. It is not a name anyone can pay you at." }
+        return "No name claimed yet. People pay you at the address below."
+    }
 }
 
 /// A read that can be genuinely absent. Honest-data discipline: the USD price feed is
@@ -54,16 +102,30 @@ enum HealthStatus: String, Sendable, CaseIterable, Codable {
     }
 }
 
-/// A borrow position. Protocol-native figures plus a plain-language safety read. The
-/// collateral ratio and drop-to-liquidation are optional: with no debt, there is no
-/// such thing, and the UI dashes rather than boasting infinity.
+/// A borrow position.
+///
+/// TWO KINDS OF FIGURE LIVE HERE, and the difference is the whole point of the optionals.
+/// `bitcoinLocked` and `borrowed` are read straight off the vault and need no oracle, so they
+/// are always true. EVERY OTHER FIELD IS PRICE-DERIVED: the headroom, the collateral ratio, the
+/// drop to liquidation and the health that is computed from the ratio all rest on the BTC price.
+///
+/// Mezo's own `PriceFeed.fetchPrice()` reverts past 60s of staleness, so a price older than that
+/// is one the protocol itself would refuse. When the client reads such a price, every
+/// price-derived field is nil and the UI shows an honest gap. Finance must never print a
+/// collateral ratio directly above its own "price unavailable" banner.
+///
+/// The ratio and drop are also nil for the ordinary reason: with no debt there is no such thing,
+/// and the UI dashes rather than boasting infinity.
 struct Position: Sendable, Equatable, Codable {
-    let bitcoinLocked: Decimal        // BTC
-    let borrowed: Decimal             // MUSD
-    let leftToBorrow: Decimal         // MUSD, headroom under the 180% floor
+    let bitcoinLocked: Decimal        // BTC, from the vault, no oracle needed
+    let borrowed: Decimal             // MUSD, from the vault, no oracle needed
+    /// MUSD headroom under the 180% floor. Price-derived: nil when the oracle price is stale.
+    let leftToBorrow: Decimal?
     let collateralRatioPercent: Decimal?
     let dropToLiquidationPercent: Decimal?   // how far BTC can fall before liquidation
-    let health: HealthStatus
+    /// Derived from the collateral ratio, so it is absent whenever the ratio is. `.none` means
+    /// "no debt", which is a statement of fact; nil means "not computable right now".
+    let health: HealthStatus?
 }
 
 struct Balances: Sendable, Equatable, Codable {
@@ -214,7 +276,15 @@ struct ActivityItem: Sendable, Equatable, Identifiable, Codable {
     let title: String
     let subtitle: String
     let amount: String                // pre-formatted, carries its own sign + unit
-    let date: Date
+    /// When the transaction landed, from the block's own timestamp.
+    ///
+    /// OPTIONAL BECAUSE THE TIMESTAMP FETCH IS BEST-EFFORT. Block times are read in a separate
+    /// `eth_getBlockByNumber` round after the logs, and a block that cannot be read leaves the
+    /// row's time genuinely unknown. This field used to be non-optional with a
+    /// `Date(timeIntervalSince1970: 0)` fallback, which filed a real transaction under a
+    /// "January 1" header dated 1970. Nil is the honest answer, and the UI groups and labels it
+    /// as "Time unknown".
+    let date: Date?
 
     // Optional receipt detail. Defaulted so the Chain client (which does not populate them yet)
     // keeps compiling; a nil field renders as an honest gap in the receipt, never a fake value.

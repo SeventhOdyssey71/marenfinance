@@ -73,17 +73,26 @@ struct HomeView: View {
         .animation(.easeInOut(duration: 0.2), value: model.refreshing)
     }
 
-    // MARK: balance hero — one big number, in dollars, centered
+    // MARK: balance hero — one big number, in MUSD, centered
+    //
+    // MUSD IS SHOWN AS MUSD, NEVER AS DOLLARS. This figure is the raw MUSD balance read from
+    // the token contract. Rendering it as "$1,240.50" asserted a 1.00 peg that no oracle read
+    // backs, in an app that elsewhere refuses to convert BTC to USD without a live price. The
+    // coin mark and the unit under the figure say what the number actually is; a dollar figure
+    // would need a live price read and the same 60s staleness discipline as everything else.
 
     private var balanceHero: some View {
         VStack(spacing: Theme.Space.xs) {
             Text("Balance").labelStyle()
             if let musd = model.displayBalances?.musd {
-                MoneyText(text: MoneyFormat.usd(musd), size: 38, weight: .bold, tracking: -2)
+                HStack(spacing: Theme.Space.xs) {
+                    MusdCoin(size: 30)
+                    MoneyText(text: MoneyFormat.musd(musd, unit: false), size: 38, weight: .bold, tracking: -2)
+                }
             } else {
                 Unavailable(label: "Balance unavailable")
             }
-            Text("In MUSD · Mezo")
+            Text("MUSD · Mezo")
                 .font(.text(13))
                 .foregroundStyle(Theme.Palette.tertiary)
         }
@@ -106,7 +115,9 @@ struct HomeView: View {
                 HStack {
                     Text("Your Bitcoin vault").labelStyle()
                     Spacer(minLength: Theme.Space.md)
-                    if let position = model.displayPosition { HealthChip(status: position.health) }
+                    // Health comes from the collateral ratio, so it is absent when the ratio is
+                    // (no oracle price the protocol would accept). No chip rather than a guess.
+                    if let health = model.displayPosition?.health { HealthChip(status: health) }
                 }
                 vaultLine
                 PillButton(title: "Manage vault", variant: .quiet) { router.goToVault() }

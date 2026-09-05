@@ -22,7 +22,8 @@ struct ProfileView: View {
     /// the skeleton redacts to bars — never a fabricated handle or address shown to the user.
     private var displayAccount: Account? {
         if loadingAccount && account == nil {
-            return Account(handle: "@handle", address: "0x0000000000000000000000000000000000000000")
+            return Account(address: "0x0000000000000000000000000000000000000000",
+                           nickname: "Your name")
         }
         return account
     }
@@ -73,9 +74,18 @@ struct ProfileView: View {
         MCard {
             VStack(alignment: .leading, spacing: Theme.Space.sm) {
                 Text("Account").labelStyle()
-                Text(displayAccount?.handle ?? "—")
+                // The title is an @handle ONLY when MarenRegistry confirmed it. A device-local
+                // nickname shows as a plain name, and the caption underneath says which it is,
+                // so nobody reads a private label as a name others can pay.
+                Text(displayAccount?.title ?? "—")
                     .font(.display(26, weight: .bold))
                     .foregroundStyle(Theme.Palette.ink)
+                if let caption = displayAccount?.titleCaption {
+                    Text(caption)
+                        .font(.text(13))
+                        .foregroundStyle(Theme.Palette.tertiary)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
                 HStack(spacing: Theme.Space.sm) {
                     Text(displayAccount?.address ?? "—")
                         .font(.figure(14, weight: .regular))
@@ -122,7 +132,7 @@ struct ProfileView: View {
         MCard {
             VStack(alignment: .leading, spacing: Theme.Space.sm) {
                 Text("How Maren works").labelStyle()
-                Text("Deposit BTC, borrow MUSD, and pay by @handle, all on Mezo. Your first deposit pays BTC gas; borrowing and every payment after are relayed and gasless. Minimum deposit \(MoneyFormat.btc(MarenPolicy.minCollateralBtc)).")
+                Text("Deposit BTC, borrow MUSD, and pay by @handle, all on Mezo. Deposits, Earn and creating a claim link are self-paid: you sign and pay a little BTC gas. Sends, borrows, repayments and splits go through a relayer instead. Minimum deposit \(MoneyFormat.btc(MarenPolicy.minCollateralBtc)).")
                     .font(.text(15)).foregroundStyle(Theme.Palette.muted)
                     .fixedSize(horizontal: false, vertical: true)
             }

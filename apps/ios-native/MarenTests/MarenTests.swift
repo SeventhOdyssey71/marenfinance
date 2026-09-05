@@ -365,6 +365,146 @@ final class MarenTests: XCTestCase {
         XCTAssertNotEqual(first, second)
     }
 
+    // MARK: - A nickname is not a handle
+    //
+    // THE REGRESSION THIS PINS. The name typed during onboarding is a device-local label that
+    // MarenRegistry has never heard of. It used to be handed to `Account.handle` and rendered as
+    // the account's @handle, AND built into the Receive QR code and the Request share link. If
+    // the registry resolves that same name to a DIFFERENT address, a payer following that link
+    // pays a stranger. `Account` now separates the two, and only a registry-confirmed handle can
+    // ever become a payment target.
+
+    private let selfAddress = "0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266"
+
+    func testNicknameIsNeverPresentedAsAHandle() {
+        let account = Account(address: selfAddress, registeredHandle: nil, nickname: "sele")
+        XCTAssertNil(account.handle, "An unconfirmed nickname must never surface as an @handle")
+        XCTAssertEqual(account.title, "sele", "It may still be shown as a name")
+        XCTAssertFalse(account.title.hasPrefix("@"), "…but never wearing an @")
+        XCTAssertTrue(account.titleCaption.contains("nickname"),
+                      "The caption must say what the title actually is")
+    }
+
+    // The dangerous input: somebody types "@sele" as their onboarding name. It is still only a
+    // nickname, and it must not become a payment target on the strength of its punctuation.
+    func testNicknameShapedLikeAHandleIsStillOnlyANickname() {
+        let account = Account(address: selfAddress, registeredHandle: nil, nickname: "@sele")
+        XCTAssertNil(account.handle)
+        XCTAssertEqual(account.payTarget, selfAddress)
+    }
+
+    func testPayTargetIsTheAddressUntilTheRegistryConfirmsAHandle() {
+        let unconfirmed = Account(address: selfAddress, registeredHandle: nil, nickname: "sele")
+        XCTAssertEqual(unconfirmed.payTarget, selfAddress)
+
+        let confirmed = Account(address: selfAddress, registeredHandle: "sele", nickname: "Sele")
+        XCTAssertEqual(confirmed.handle, "@sele")
+        XCTAssertEqual(confirmed.payTarget, "@sele")
+        XCTAssertEqual(confirmed.title, "@sele", "A confirmed handle outranks the nickname")
+    }
+
+    // The share link and the QR code are the same string, and this is the one that can misdirect
+    // funds. An unconfirmed name must not appear anywhere in it.
+    func testShareLinkCarriesTheAddressNotTheNickname() throws {
+        let unconfirmed = Account(address: selfAddress, registeredHandle: nil, nickname: "sele")
+        let link = PaymentLinks.buildPayment(to: unconfirmed.payTarget)
+        XCTAssertFalse(link.contains("sele"), "A device-local nickname must never reach a pay link")
+        let parsed = try XCTUnwrap(PaymentLinks.parsePayment(link))
+        XCTAssertEqual(parsed.to, selfAddress)
+
+        // Once the registry confirms it, the handle is what the link addresses, and it parses
+        // back as a handle a payer's app will resolve.
+        let confirmed = Account(address: selfAddress, registeredHandle: "sele", nickname: "sele")
+        let handleLink = PaymentLinks.buildPayment(to: confirmed.payTarget)
+        XCTAssertEqual(try XCTUnwrap(PaymentLinks.parsePayment(handleLink)).to, "@sele")
+    }
+
+    // An empty string is not a handle and not a nickname. Blank values must normalise to nil so
+    // no screen can render "@" or an empty title.
+    func testBlankNamesNormaliseToNothing() {
+        let account = Account(address: selfAddress, registeredHandle: "", nickname: "")
+        XCTAssertNil(account.handle)
+        XCTAssertNil(account.nickname)
+        XCTAssertEqual(account.payTarget, selfAddress)
+        XCTAssertEqual(account.title, "0xf39F…2266")
+    }
+
+    // MARK: - Position figures follow the oracle's own staleness rule
+    //
+    // THE REGRESSION THIS PINS. `position()` read the oracle with no staleness gate, while
+    // `priceFeed()` applied Mezo's 60s rule — so Finance could show a collateral ratio and a
+    // drop-to-liquidation line computed from a price the protocol would reject, directly above
+    // its own "price unavailable" banner. Every price-derived field is now withheld together.
+
+    /// 1 BTC of collateral against 20,000 MUSD of debt at $60,000/BTC: a 300% ratio.
+    private func position(priceIsFresh: Bool) -> Position {
+        MezoMarenClient.buildPosition(
+            collWei: BigUInt(10).power(18),                  // 1 BTC
+            ratioDebtWei: BigUInt(20_000) * BigUInt(10).power(18),
+            shownDebtWei: BigUInt(20_000) * BigUInt(10).power(18),
+            priceWei: BigUInt(60_000) * BigUInt(10).power(18),
+            priceIsFresh: priceIsFresh
+        )
+    }
+
+    func testFreshPriceStillProducesEveryFigure() throws {
+        let p = position(priceIsFresh: true)
+        XCTAssertEqual(try XCTUnwrap(p.collateralRatioPercent), 300)
+        XCTAssertNotNil(p.dropToLiquidationPercent)
+        XCTAssertNotNil(p.leftToBorrow)
+        XCTAssertEqual(p.health, .healthy)
+    }
+
+    func testStalePriceWithholdsEveryPriceDerivedFigure() {
+        let p = position(priceIsFresh: false)
+        XCTAssertNil(p.collateralRatioPercent, "A ratio needs a price the protocol would accept")
+        XCTAssertNil(p.dropToLiquidationPercent, "So does the drop to liquidation")
+        XCTAssertNil(p.leftToBorrow, "Headroom is priced collateral")
+        XCTAssertNil(p.health, "Health is derived from the ratio, so it goes with it")
+    }
+
+    // The non-price fields are read straight off the vault and owe the oracle nothing, so a
+    // stale price must not blank them: that would be its own dishonesty.
+    func testStalePriceStillShowsCollateralAndDebt() {
+        let p = position(priceIsFresh: false)
+        XCTAssertEqual(p.bitcoinLocked, 1)
+        XCTAssertEqual(p.borrowed, 20_000)
+    }
+
+    // The gate is Mezo's own: `PriceFeed.fetchPrice()` reverts past 60s, so 60s is still fresh
+    // and 61s is not. A clock-skewed future timestamp reads as fresh, matching `priceFeed()`.
+    func testStalenessGateMatchesTheOracle() {
+        XCTAssertEqual(ORACLE_MAX_PRICE_DELAY_SECONDS, 60)
+        let now = Date(timeIntervalSince1970: 1_000_000)
+        func fresh(ageSeconds: Int) -> Bool {
+            MezoMarenClient.isFresh(updatedAt: BigUInt(1_000_000 - ageSeconds), now: now)
+        }
+        XCTAssertTrue(fresh(ageSeconds: 0))
+        XCTAssertTrue(fresh(ageSeconds: 59))
+        XCTAssertTrue(fresh(ageSeconds: 60), "Exactly 60s old is still inside the window")
+        XCTAssertFalse(fresh(ageSeconds: 61))
+        XCTAssertFalse(fresh(ageSeconds: 3_600))
+        XCTAssertTrue(fresh(ageSeconds: -30), "A clock-skewed future timestamp is not stale")
+    }
+
+    // MARK: - A row with no block timestamp has no date
+    //
+    // THE REGRESSION THIS PINS. Block times are fetched best-effort after the logs, and a failed
+    // `eth_getBlockByNumber` used to fall back to `Date(timeIntervalSince1970: 0)`, filing a real
+    // transaction under a "January 1" header dated 1970. The field is optional now, and the UI
+    // groups and labels the absence as "Time unknown".
+    func testActivityItemDateIsGenuinelyOptional() throws {
+        let undated = ActivityItem(id: "x", kind: .send, title: "Sent MUSD",
+                                   subtitle: "MarenPay transfer", amount: "-10.00 MUSD", date: nil)
+        XCTAssertNil(undated.date)
+
+        // It survives the Home cache round-trip as an absence, not as an epoch date.
+        let data = try JSONEncoder().encode(undated)
+        let decoded = try JSONDecoder().decode(ActivityItem.self, from: data)
+        XCTAssertNil(decoded.date)
+        XCTAssertNotEqual(decoded.date, Date(timeIntervalSince1970: 0))
+    }
+
     // The store is what survives a relaunch inside the 60-second wait. Round-trip it.
     func testPendingCommitmentSurvivesTheStore() throws {
         let handle = "goldentest_\(Int.random(in: 100_000...999_999))"

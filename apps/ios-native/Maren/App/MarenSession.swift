@@ -108,7 +108,7 @@ final class MarenSession {
     var client: any MarenClient {
         if let c = cachedClient { return c }
         let made: any MarenClient = address.map {
-            MezoMarenClient(network: network, accountAddress: $0, handle: displayName)
+            MezoMarenClient(network: network, accountAddress: $0, nickname: displayName)
         } ?? noWalletClient
         cachedClient = made
         return made

@@ -36,20 +36,44 @@ struct MezoMarenClient: MarenClient {
     /// The address reads are bound to. Reads are public, so this can be any address the app
     /// has been pointed at; the write path additionally checks the Keychain key derives it.
     let accountAddress: String
-    let handle: String
+    /// The device-local display nickname. It is carried here as a LABEL and is never promoted
+    /// to a handle: only `confirmedHandle()` can produce one of those.
+    let nickname: String
 
     private var rpc: MezoRPC { MezoRPC(chain) }
 
-    init(network: MezoNetwork = .testnet, accountAddress: String, handle: String = "") {
+    init(network: MezoNetwork = .testnet, accountAddress: String, nickname: String = "") {
         self.chain = .of(network)
         self.accountAddress = accountAddress
-        self.handle = handle
+        self.nickname = nickname
     }
 
     // MARK: reads
 
     func account() async throws -> Account {
-        Account(handle: handle.isEmpty ? shortAddress(accountAddress) : handle, address: accountAddress)
+        Account(address: accountAddress,
+                registeredHandle: await confirmedHandle(),
+                nickname: nickname)
+    }
+
+    /// The @handle MarenRegistry says this address owns, or nil.
+    ///
+    /// BOTH LEGS OF THE REGISTRY MUST AGREE. `primaryHandle(owner)` is the reverse read and
+    /// names the handle; `tryResolve(handle)` is the forward read that a payer's app actually
+    /// follows, and it must come back to this exact address. Requiring both means the name this
+    /// app prints as "@you" is the same name a stranger's payment would land on. Anything else
+    /// (no registration, a read that failed, an address mismatch) yields nil, and the account
+    /// falls back to the 0x address, which is always true.
+    private func confirmedHandle() async -> String? {
+        guard MarenAddresses.of(chain.network).isDeployed else { return nil }
+        guard let name = try? await rpc.primaryHandle(of: accountAddress), !name.isEmpty else {
+            return nil
+        }
+        guard let resolved = try? await rpc.resolveHandle(name),
+              resolved.lowercased() == accountAddress.lowercased() else {
+            return nil
+        }
+        return name
     }
 
     func priceFeed() async throws -> PriceFeed {
@@ -64,7 +88,7 @@ struct MezoMarenClient: MarenClient {
             // unavailable rather than presenting a number the protocol itself would refuse. A
             // clock-skewed future timestamp (negative age) is treated as fresh, not stale.
             let age = Date().timeIntervalSince(asOf)
-            if age > TimeInterval(ORACLE_MAX_PRICE_DELAY_SECONDS) {
+            if !Self.isFresh(updatedAt: updatedAt) {
                 return .unavailable(reason: "Mezo's price oracle is \(Int(age))s old — past the 60s the protocol accepts, so it reads as unavailable.")
             }
             return .available(usdPerBtc: usd, asOf: asOf)
@@ -75,7 +99,14 @@ struct MezoMarenClient: MarenClient {
     }
 
     func position() async throws -> Position {
-        let (priceWei, _) = try await rpc.priceObservation()
+        let (priceWei, updatedAt) = try await rpc.priceObservation()
+        // THE SAME 60s GATE `priceFeed()` APPLIES. This read used to take the oracle price with
+        // no staleness check at all, so Finance could print a collateral ratio and a
+        // drop-to-liquidation line directly above its own "price unavailable" banner, both
+        // computed from a price the protocol would have rejected. A stale price now withholds
+        // every price-derived field; collateral and debt need no oracle and still show.
+        // A clock-skewed future timestamp (negative age) is treated as fresh, matching priceFeed.
+        let priceIsFresh = Self.isFresh(updatedAt: updatedAt)
 
         // POOLED FIRST, best-effort. Most Maren loans are pooled positions held in MarenVault
         // and keyed by the user's EOA; the raw TroveManager trove is owned by the vault, not the
@@ -85,7 +116,8 @@ struct MezoMarenClient: MarenClient {
         let vault = try? await rpc.vaultPosition(accountAddress)
         if let vault, vault.debtWei > 0 {
             return Self.buildPosition(collWei: vault.collWei, ratioDebtWei: vault.debtWei,
-                                      shownDebtWei: vault.debtWei, priceWei: priceWei)
+                                      shownDebtWei: vault.debtWei, priceWei: priceWei,
+                                      priceIsFresh: priceIsFresh)
         }
 
         // Otherwise a direct trove (>= the 1,800 MUSD protocol minimum), owned by the EOA. Its
@@ -97,7 +129,8 @@ struct MezoMarenClient: MarenClient {
             if grossDebtWei > 0, trove.collWei > 0 {
                 let netPrincipal = trove.principalWei > MUSD_GAS_COMPENSATION ? trove.principalWei - MUSD_GAS_COMPENSATION : BigUInt(0)
                 return Self.buildPosition(collWei: trove.collWei, ratioDebtWei: grossDebtWei,
-                                          shownDebtWei: netPrincipal + trove.interestWei, priceWei: priceWei)
+                                          shownDebtWei: netPrincipal + trove.interestWei,
+                                          priceWei: priceWei, priceIsFresh: priceIsFresh)
             }
         }
 
@@ -108,16 +141,28 @@ struct MezoMarenClient: MarenClient {
         }
 
         // No debt on either route. Collateral may still sit in the vault with nothing borrowed.
+        // "No debt" is a fact about the vault, so the health reads `.none` either way; the
+        // headroom is priced collateral, so it is withheld when the price is stale.
         let collWei = vault?.collWei ?? trove?.collWei ?? BigUInt(0)
         let collateralValueWei = collWei * priceWei / BigUInt(10).power(18)
         return Position(
             bitcoinLocked: Wei.toDecimal(collWei) ?? 0,
             borrowed: 0,
-            leftToBorrow: Wei.toDecimal(collateralValueWei).map { $0 / (MarenPolicy.marenHealthyFloorPercent / 100) } ?? 0,
+            leftToBorrow: priceIsFresh
+                ? (Wei.toDecimal(collateralValueWei).map { $0 / (MarenPolicy.marenHealthyFloorPercent / 100) } ?? 0)
+                : nil,
             collateralRatioPercent: nil,
             dropToLiquidationPercent: nil,
-            health: .none
+            health: HealthStatus.none
         )
+    }
+
+    /// Is an oracle observation inside the 60s window Mezo's own `PriceFeed.fetchPrice()`
+    /// accepts? One rule, shared by `priceFeed()` and `position()`, so the banner and the
+    /// figures beneath it can never disagree about whether the price is usable.
+    static func isFresh(updatedAt: BigUInt, now: Date = Date()) -> Bool {
+        let asOf = Date(timeIntervalSince1970: TimeInterval(updatedAt))
+        return now.timeIntervalSince(asOf) <= TimeInterval(ORACLE_MAX_PRICE_DELAY_SECONDS)
     }
 
     /// Build a `Position` from a collateral + debt pair and the on-chain price — shared by the
@@ -125,7 +170,28 @@ struct MezoMarenClient: MarenClient {
     /// `ratioDebtWei` is the debt the collateral ratio and liquidation are measured against;
     /// `shownDebtWei` is the figure shown as "borrowed" (they differ for a direct trove's gas
     /// compensation).
-    private static func buildPosition(collWei: BigUInt, ratioDebtWei: BigUInt, shownDebtWei: BigUInt, priceWei: BigUInt) -> Position {
+    ///
+    /// `priceIsFresh` is the oracle's 60s gate. When it is false EVERY price-derived field comes
+    /// back nil, because a ratio computed from a price the protocol would reject is exactly the
+    /// kind of plausible figure this app must not print. Collateral and debt are unaffected:
+    /// they are read from the vault and owe the oracle nothing.
+    /// Internal rather than private so the stale-price rule can be pinned by a unit test with no
+    /// network: the regression it guards (a ratio printed from a price the protocol rejects) is
+    /// not something a view test would catch.
+    static func buildPosition(collWei: BigUInt, ratioDebtWei: BigUInt, shownDebtWei: BigUInt,
+                              priceWei: BigUInt, priceIsFresh: Bool) -> Position {
+        let borrowed = Wei.toDecimal(shownDebtWei) ?? 0
+        guard priceIsFresh else {
+            return Position(
+                bitcoinLocked: Wei.toDecimal(collWei) ?? 0,
+                borrowed: borrowed,
+                leftToBorrow: nil,
+                collateralRatioPercent: nil,
+                dropToLiquidationPercent: nil,
+                health: nil
+            )
+        }
+
         let collateralValueWei = collWei * priceWei / BigUInt(10).power(18)
         let ratioPercent = ratioDebtWei > 0 ? collateralValueWei * 100 / ratioDebtWei : BigUInt(0)
         let ratio = Decimal(string: String(ratioPercent)) ?? 0
@@ -148,7 +214,7 @@ struct MezoMarenClient: MarenClient {
 
         return Position(
             bitcoinLocked: Wei.toDecimal(collWei) ?? 0,
-            borrowed: Wei.toDecimal(shownDebtWei) ?? 0,
+            borrowed: borrowed,
             leftToBorrow: Wei.toDecimal(leftWei) ?? 0,
             collateralRatioPercent: ratio,
             dropToLiquidationPercent: drop,
@@ -495,7 +561,10 @@ struct MezoMarenClient: MarenClient {
         let amountWei = MezoRPC.word(data, 0)      // amount/assets is data word 0 in every one
         let amount = Wei.toDecimal(amountWei) ?? 0
         let topics = log.topics.map { $0.lowercased() }
-        let date = times[log.block] ?? Date(timeIntervalSince1970: 0)
+        // No fallback date. `blockTimestamps` is best-effort, and a block it could not read
+        // leaves this nil so the row renders as "Time unknown" rather than being filed under a
+        // fabricated January 1970 header.
+        let date = times[log.block]
         let id = (log.txHash ?? UUID().uuidString) + "-" + String(log.logIndex)
 
         func musd(_ sign: String) -> String { "\(sign)\(MoneyFormat.musd(amount, unit: false)) MUSD" }

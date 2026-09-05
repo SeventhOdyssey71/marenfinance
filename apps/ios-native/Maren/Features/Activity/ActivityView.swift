@@ -64,8 +64,14 @@ struct ActivityView: View {
 
     // Grouped by day, most recent first — a clean, scannable structure with a quiet date
     // header over each card, rather than one long undifferentiated list.
+    //
+    // A ROW WITH NO TIMESTAMP GETS ITS OWN GROUP, not a fabricated one. Block times are fetched
+    // best-effort after the logs, so a real transaction can arrive with its time unknown. It
+    // used to be filed under a January 1970 header; it now sits under "Time unknown", pinned
+    // last, because "we could not read when this happened" is a different sentence from a date.
     private struct DayGroup: Identifiable {
-        let id: Date
+        let id: String
+        let day: Date?
         let label: String
         let items: [ActivityItem]
     }
@@ -78,14 +84,21 @@ struct ActivityView: View {
 
     private var groups: [DayGroup] {
         let calendar = Calendar.current
-        let byDay = Dictionary(grouping: items) { calendar.startOfDay(for: $0.date) }
-        return byDay.keys.sorted(by: >).map { day in
+        let byDay = Dictionary(grouping: items) { $0.date.map { calendar.startOfDay(for: $0) } }
+
+        let dated: [DayGroup] = byDay.keys.compactMap { $0 }.sorted(by: >).map { day in
             let label: String
             if calendar.isDateInToday(day) { label = "Today" }
             else if calendar.isDateInYesterday(day) { label = "Yesterday" }
             else { label = Self.dayFormatter.string(from: day) }
-            return DayGroup(id: day, label: label, items: byDay[day]!.sorted { $0.date > $1.date })
+            let rows = (byDay[day] ?? []).sorted { ($0.date ?? .distantPast) > ($1.date ?? .distantPast) }
+            return DayGroup(id: String(day.timeIntervalSince1970), day: day, label: label, items: rows)
         }
+
+        let undated = byDay[Date?.none] ?? []
+        guard !undated.isEmpty else { return dated }
+        // Order within the group is the order the client returned, which is newest block first.
+        return dated + [DayGroup(id: "time-unknown", day: nil, label: "Time unknown", items: undated)]
     }
 
     private var list: some View {
@@ -106,6 +119,13 @@ struct ActivityView: View {
                                 .accessibilityHint("Opens the receipt")
                             }
                         }
+                    }
+                    if group.day == nil {
+                        Text("These transactions are real and confirmed, but Mezo did not return a timestamp for their blocks, so when they happened is not known.")
+                            .font(.text(13))
+                            .foregroundStyle(Theme.Palette.tertiary)
+                            .fixedSize(horizontal: false, vertical: true)
+                            .padding(.horizontal, Theme.Space.xs)
                     }
                 }
             }
@@ -176,9 +196,18 @@ private struct ActivityRow: View {
                         .strikethrough(item.status == .failed)
                         .lineLimit(1)
                         .fixedSize(horizontal: true, vertical: false)
-                    Text(item.date, style: .time)
-                        .font(.text(11))
-                        .foregroundStyle(Theme.Palette.tertiary)
+                    // A row whose block timestamp could not be read shows a dash, not a time.
+                    // The group header above it says "Time unknown" in full.
+                    if let date = item.date {
+                        Text(date, style: .time)
+                            .font(.text(11))
+                            .foregroundStyle(Theme.Palette.tertiary)
+                    } else {
+                        Text("—")
+                            .font(.text(11))
+                            .foregroundStyle(Theme.Palette.tertiary)
+                            .accessibilityLabel("Time unknown")
+                    }
                 }
             }
             .padding(.vertical, 12)
@@ -218,7 +247,14 @@ struct ReceiptDetail: View {
                             Text(item.status.label).font(.system(size: 15, weight: .semibold))
                         }.foregroundStyle(item.status.tone)
                     }
-                    detailRow("Time") { Text(item.date.formatted(date: .abbreviated, time: .shortened)).plainValue() }
+                    detailRow("Time") {
+                        // The block's own timestamp, or an explicit gap. Never a placeholder date.
+                        if let date = item.date {
+                            Text(date.formatted(date: .abbreviated, time: .shortened)).plainValue()
+                        } else {
+                            Unavailable(label: "Time unknown")
+                        }
+                    }
                     detailRow("Gas") { gasValue }
                     detailRow("Network", showsDivider: false) {
                         Text("Mezo testnet").plainValue()

@@ -92,7 +92,9 @@ private struct AskSection: View {
         if let account, stage != .submitting {
             // The shareable link is the existing pay link, addressed to you. It is a
             // convenience for someone who has no request id, not a substitute for one.
-            let target = account.handle.hasPrefix("@") ? account.handle : account.address
+            // Addressed to a name only when MarenRegistry confirmed the name is this account's;
+            // otherwise the address, which cannot resolve to anybody else.
+            let target = account.payTarget
             let figure = amount.map { MoneyFormat.musd($0, unit: false).replacingOccurrences(of: ",", with: "") }
             let link = PaymentLinks.buildPayment(to: target, amount: figure)
             VStack(alignment: .leading, spacing: Theme.Space.md) {

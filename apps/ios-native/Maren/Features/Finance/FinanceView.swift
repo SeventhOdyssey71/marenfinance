@@ -67,8 +67,10 @@ private struct VaultSection: View {
                             .fixedSize(horizontal: false, vertical: true)
                     }
                     Spacer(minLength: Theme.Space.md)
-                    if let position = model.displayPosition {
-                        HealthChip(status: position.health)
+                    // Health is derived from the collateral ratio, so it is absent whenever the
+                    // ratio is. No chip beats a chip computed from a price the protocol rejects.
+                    if let health = model.displayPosition?.health {
+                        HealthChip(status: health)
                     }
                 }
                 Divider().overlay(Theme.Palette.ink.opacity(0.07))
@@ -76,7 +78,9 @@ private struct VaultSection: View {
                     StatRow(label: "Bitcoin locked") { rowValue(model.displayPosition.map { MoneyFormat.btc($0.bitcoinLocked) }) }
                     StatRow(label: "Borrowed", hint: "1.00% APR") { rowValue(model.displayPosition.map { MoneyFormat.musd($0.borrowed) }) }
                     StatRow(label: "Collateral ratio") { ratioValue }
-                    StatRow(label: "Left to borrow") { rowValue(model.displayPosition.map { MoneyFormat.musd($0.leftToBorrow) }) }
+                    // Headroom is priced collateral, so a stale oracle leaves it genuinely
+                    // unknown; `rowValue` renders that as Unavailable, never as a figure.
+                    StatRow(label: "Left to borrow") { rowValue(model.displayPosition?.leftToBorrow.map { MoneyFormat.musd($0) }) }
                     StatRow(label: "Drop to liquidation", hint: "at 110%", showsDivider: false) { dropValue }
                 }
             }
@@ -204,7 +208,7 @@ private struct VaultSection: View {
                 unit: .musd,
                 explainer: "1.00% APR, simple interest, fixed for the life of this loan. You can borrow up to Maren’s 180% floor — the amount available here already stops short of it.",
                 presets: [],
-                available: p?.leftToBorrow,
+                available: p?.leftToBorrow ?? nil,
                 availableLabel: "Left to borrow",
                 gas: .sponsored,
                 submitTitle: "Borrow MUSD",

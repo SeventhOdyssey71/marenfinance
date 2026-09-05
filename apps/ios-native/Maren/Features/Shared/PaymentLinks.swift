@@ -119,13 +119,13 @@ enum PaymentLinks {
         "https://\(host)/claim?id=\(linkId)#\(secret)"
     }
 
-    /// A fresh 32-byte bearer secret as 0x hex, for a demo claimable link. Real links derive
-    /// this from an on-chain key; the shape and one-time-shown discipline are identical.
-    static func freshSecret() -> String {
-        var bytes = [UInt8](repeating: 0, count: 32)
-        _ = SecRandomCopyBytes(kSecRandomDefault, 32, &bytes)
-        return "0x" + bytes.map { String(format: "%02x", $0) }.joined()
-    }
+    // NOTE: there is deliberately no secret-minting helper here.
+    //
+    // A `freshSecret()` used to live at this spot: it called `SecRandomCopyBytes` and DISCARDED
+    // the status, so a CSPRNG failure would have returned 32 zero bytes as a bearer key that
+    // anyone could guess. It had no callers, and it has been deleted rather than left where a
+    // future flow could reach for it. The one place the app really does mint key material,
+    // `HandleCommitmentStore.newSecret()`, checks the status and returns nil on failure.
 }
 
 // MARK: - Claim handoff

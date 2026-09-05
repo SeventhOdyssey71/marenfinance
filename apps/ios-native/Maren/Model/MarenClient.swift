@@ -78,7 +78,10 @@ struct StubMarenClient: MarenClient {
     var priceWired: Bool = false
 
     func account() async throws -> Account {
-        Account(handle: "@demo", address: "0xDEMO…f00d")
+        // "demo" is presented as a REGISTERED handle here on purpose: the stub stands in for a
+        // registry that confirmed it, so the demo shell exercises the handle path. Nothing
+        // outside a DEBUG build can reach it, and the screens it feeds wear the "Demo data" badge.
+        Account(address: "0xDEMO…f00d", registeredHandle: "demo", nickname: "Sele")
     }
 
     func priceFeed() async throws -> PriceFeed {

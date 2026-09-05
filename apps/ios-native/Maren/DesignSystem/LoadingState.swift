@@ -77,8 +77,8 @@ extension ActivityItem {
     /// Three rows shaped like a real history, for the Activity/Home skeletons. Redacted before
     /// paint, so the sample titles and amounts are never visible.
     static let placeholders: [ActivityItem] = [
-        ActivityItem(id: "skeleton-1", kind: .receive, title: "Received", subtitle: "From @someone", amount: "+$120.00", date: Date()),
-        ActivityItem(id: "skeleton-2", kind: .send, title: "Sent", subtitle: "To @someone", amount: "-$45.00", date: Date()),
+        ActivityItem(id: "skeleton-1", kind: .receive, title: "Received", subtitle: "From @someone", amount: "+120.00 MUSD", date: Date()),
+        ActivityItem(id: "skeleton-2", kind: .send, title: "Sent", subtitle: "To @someone", amount: "-45.00 MUSD", date: Date()),
         ActivityItem(id: "skeleton-3", kind: .deposit, title: "Deposited", subtitle: "Bitcoin vault", amount: "0.0100 BTC", date: Date()),
     ]
 }

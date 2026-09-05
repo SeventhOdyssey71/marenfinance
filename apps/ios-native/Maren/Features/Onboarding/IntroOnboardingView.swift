@@ -115,9 +115,9 @@ private struct IntroPage: Identifiable {
             headline: "Spend Bitcoin,\nnever sell it",
             subhead: "Borrow MUSD against your BTC and keep every satoshi. Your Bitcoin stays yours."),
         IntroPage(
-            symbol: "bolt.fill",
-            headline: "Gasless by design",
-            subhead: "Maren covers the network fee on your transactions. Only your very first deposit pays its own gas."),
+            symbol: "fuelpump.fill",
+            headline: "Fees, stated\nplainly",
+            subhead: "Deposits, Earn and creating a claim link are self-paid: you sign and pay a little BTC gas. Sends, borrows and repayments are built to go through a Maren relayer, and none is configured in this build, so they decline instead of pretending to settle."),
         IntroPage(
             symbol: "checkmark.seal.fill",
             headline: "Honest by default",
@@ -125,7 +125,7 @@ private struct IntroPage: Identifiable {
         IntroPage(
             symbol: "lock.shield.fill",
             headline: "You hold the keys",
-            subhead: "Maren is non-custodial. Your key is created on this device and stays in the Secure Enclave — never on our servers."),
+            subhead: "Maren is non-custodial. Your key is created on this device and stored in the iOS Keychain, protected by Face ID when Face ID is enrolled. It never leaves this device and never reaches our servers."),
     ]
 }
 
