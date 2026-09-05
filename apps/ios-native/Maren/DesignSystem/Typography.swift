@@ -53,6 +53,15 @@ extension Font {
         .system(size: size, weight: weight, design: .rounded).monospacedDigit()
     }
 
+    /// Leading type in SF Pro Rounded — the same face as `figure`, without the monospaced
+    /// digits that only earn their keep in a column of numbers. Onboarding and the lock screen
+    /// lead in this voice; the rest of the app leads in `display` (Neue Montreal). Adding an
+    /// alias rather than repointing `display` keeps that a per-screen choice instead of a
+    /// silent change to every heading in the app.
+    static func rounded(_ size: CGFloat, weight: Font.Weight = .semibold) -> Font {
+        .system(size: size, weight: weight, design: .rounded)
+    }
+
     /// Body / leading text — Neue Montreal. `.regular` reads as Light (airy); `.medium` for emphasis.
     static func text(_ size: CGFloat, weight: Font.Weight = .regular) -> Font {
         AppFont.neue(size, weight)

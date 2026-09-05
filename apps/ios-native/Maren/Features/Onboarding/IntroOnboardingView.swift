@@ -2,16 +2,20 @@ import SwiftUI
 
 // MARK: - Intro onboarding (first-run only)
 //
-// The very first thing a new person sees: a brief splash on the Maren violet gradient, then a
-// short paged story about what the app honestly does — spend Bitcoin without selling it,
-// gasless writes, live on-chain reads — ending on a non-custodial "you hold the keys" screen.
-// Its single job is to hand off to the real key-setup flow (OnboardingView): "Get started"
-// just marks onboarding done, and RootView then shows wallet creation because no wallet exists
-// yet. No fake accounts, no data, no security decisions live here.
+// The very first thing a new person sees: a brief splash on the Maren gradient, then a short
+// paged story about what the app honestly does — spend Bitcoin without selling it, gasless
+// writes, live on-chain reads — ending on a non-custodial "you hold the keys" screen. Its single
+// job is to hand off to the real key-setup flow (OnboardingView): "Get started" just marks
+// onboarding done, and RootView then shows wallet creation because no wallet exists yet. No fake
+// accounts, no data, no security decisions live here.
 //
-// Shown once and never again (RootView persists a `hasOnboarded` flag). The whole screen
-// commits to one deliberate look — a violet→near-black gradient with white content — so it does
-// not follow the app's light theme; that is intentional, not an un-themed oversight.
+// Shown once and never again (RootView persists a `hasOnboarded` flag). It is the app's own
+// light world from the first frame: a violet wash across the top of the page falling into white,
+// with ink type on white.
+//
+// The gradient, the mark, the violet CTA and the page dots all come from OnboardingChrome, which
+// the key-setup flow builds from too, so "Get started" is a cut inside one continuous world
+// rather than a jump between two screens that merely happen to share a colour.
 
 struct IntroOnboardingView: View {
     /// Called when the person taps "Get started" or "Skip". RootView persists the flag and
@@ -26,7 +30,7 @@ struct IntroOnboardingView: View {
 
     var body: some View {
         ZStack {
-            IntroGradient().ignoresSafeArea()
+            OnboardingGradient().ignoresSafeArea()
 
             if showSplash {
                 SplashContent()
@@ -38,6 +42,9 @@ struct IntroOnboardingView: View {
                     .transition(.opacity)
             }
         }
+        // The onboarding world is light on every device, whatever the system appearance is set
+        // to — so the page, and any system chrome drawn over it, stay one thing.
+        .preferredColorScheme(.light)
         .task {
             // A brief splash, then reveal the story. Reduce Motion shortens it and drops the
             // scale so it simply cross-fades.
@@ -59,10 +66,10 @@ struct IntroOnboardingView: View {
             }
             .tabViewStyle(.page(indexDisplayMode: .never))
 
-            PageDots(count: pages.count, index: page)
+            OnboardingDots(count: pages.count, index: page)
                 .padding(.bottom, Theme.Space.lg)
 
-            IntroCTA(title: isLast ? "Get started" : "Continue", action: advance)
+            OnboardingCTA(title: isLast ? "Get started" : "Continue", action: advance)
                 .padding(.horizontal, Theme.Space.md)
                 .padding(.bottom, Theme.Space.sm)
         }
@@ -75,7 +82,7 @@ struct IntroOnboardingView: View {
             if !isLast {
                 Button("Skip", action: onComplete)
                     .font(.text(15, weight: .medium))
-                    .foregroundStyle(.white.opacity(0.72))
+                    .foregroundStyle(OnboardingPalette.heading)
                     .padding(.horizontal, Theme.Space.sm)
                     .frame(minWidth: 44, minHeight: 44)
                     .contentShape(Rectangle())
@@ -130,16 +137,16 @@ private struct IntroPageView: View {
     var body: some View {
         VStack(spacing: Theme.Space.xl) {
             Spacer(minLength: Theme.Space.lg)
-            IconHalo(symbol: page.symbol)
+            OnboardingSymbolFocal(symbol: page.symbol)
             VStack(spacing: Theme.Space.md) {
                 Text(page.headline)
-                    .font(.display(34, weight: .semibold))
-                    .foregroundStyle(.white)
+                    .font(.rounded(34, weight: .semibold))
+                    .foregroundStyle(OnboardingPalette.heading)
                     .multilineTextAlignment(.center)
                     .fixedSize(horizontal: false, vertical: true)
                 Text(page.subhead)
-                    .font(.text(16))
-                    .foregroundStyle(.white.opacity(0.74))
+                    .font(.text(16, weight: .medium))
+                    .foregroundStyle(OnboardingPalette.body)
                     .multilineTextAlignment(.center)
                     .lineSpacing(3)
                     .fixedSize(horizontal: false, vertical: true)
@@ -155,123 +162,14 @@ private struct IntroPageView: View {
     }
 }
 
-// MARK: - Illustration
-
-private struct IconHalo: View {
-    let symbol: String
-    private let diameter: CGFloat = 132
-
-    var body: some View {
-        ZStack {
-            Circle().fill(.white.opacity(0.10))
-            Circle().strokeBorder(.white.opacity(0.18), lineWidth: 1)
-            Image(systemName: symbol)
-                .font(.system(size: 56, weight: .medium))
-                .foregroundStyle(.white)
-        }
-        .frame(width: diameter, height: diameter)
-        .accessibilityHidden(true)
-    }
-}
-
 // MARK: - Splash
 
 private struct SplashContent: View {
     var body: some View {
-        VStack(spacing: Theme.Space.lg) {
-            MarkTile(size: 108)
-            Text("Maren")
-                .font(.display(30, weight: .semibold))
-                .foregroundStyle(.white)
-        }
-        .accessibilityElement(children: .ignore)
-        .accessibilityLabel("Maren")
-    }
-}
-
-/// The real MarenMark asset on a white app-icon tile — high contrast on the violet gradient,
-/// where the violet mark alone would disappear. Concentric radius: tile corner scales with
-/// size, the mark is inset so its own rounding never fights the tile's.
-private struct MarkTile: View {
-    var size: CGFloat = 108
-
-    var body: some View {
-        Image("MarenMark")
-            .resizable()
-            .scaledToFit()
-            .padding(size * 0.22)
-            .frame(width: size, height: size)
-            .background(.white, in: RoundedRectangle(cornerRadius: size * 0.26, style: .continuous))
-            .accessibilityHidden(true)
-    }
-}
-
-// MARK: - Page dots
-
-private struct PageDots: View {
-    let count: Int
-    let index: Int
-    @Environment(\.accessibilityReduceMotion) private var reduceMotion
-
-    var body: some View {
-        HStack(spacing: 8) {
-            ForEach(0..<count, id: \.self) { i in
-                Capsule()
-                    .fill(.white.opacity(i == index ? 0.95 : 0.30))
-                    .frame(width: i == index ? 22 : 7, height: 7)
-            }
-        }
-        .animation(reduceMotion ? nil : .easeInOut(duration: 0.25), value: index)
-        .accessibilityHidden(true)
-    }
-}
-
-// MARK: - CTA
-//
-// A white pill with violet text — the one high-contrast focal control on the gradient. The app's
-// PillButton primary is a violet fill, which would vanish here, so this is its light counterpart.
-
-private struct IntroCTA: View {
-    let title: String
-    let action: () -> Void
-
-    var body: some View {
-        Button(action: action) {
-            Text(title)
-                .font(.text(17, weight: .medium))
-                .foregroundStyle(Theme.Palette.accent)
-                .frame(maxWidth: .infinity, minHeight: 54)
-                .background(.white, in: Capsule())
-        }
-        .buttonStyle(IntroCTAStyle())
-    }
-}
-
-private struct IntroCTAStyle: ButtonStyle {
-    @Environment(\.accessibilityReduceMotion) private var reduceMotion
-
-    func makeBody(configuration: Configuration) -> some View {
-        configuration.label
-            .scaleEffect((configuration.isPressed && !reduceMotion) ? 0.97 : 1)
-            .animation(reduceMotion ? nil : .easeOut(duration: 0.2), value: configuration.isPressed)
-    }
-}
-
-// MARK: - Background
-
-/// The Maren brand gradient: violet (the logo/accent) deepening into a near-black violet.
-/// A single committed look, not theme-reactive.
-private struct IntroGradient: View {
-    var body: some View {
-        LinearGradient(
-            stops: [
-                .init(color: Color(hex: 0x6E4BFF), location: 0.0),
-                .init(color: Color(hex: 0x5B3DF5), location: 0.42),
-                .init(color: Color(hex: 0x2A1E52), location: 0.78),
-                .init(color: Color(hex: 0x141019), location: 1.0),
-            ],
-            startPoint: .top,
-            endPoint: .bottom
-        )
+        // The mark alone, at size, on the background. No circle, no plate, no wordmark beside
+        // it: the first thing anyone sees is the symbol, and the name is on the very next screen.
+        MarenBrandMark(size: 140)
+            .accessibilityElement(children: .ignore)
+            .accessibilityLabel("Maren")
     }
 }
