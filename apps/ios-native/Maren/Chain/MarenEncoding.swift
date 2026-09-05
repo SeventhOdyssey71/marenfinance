@@ -117,6 +117,134 @@ enum MarenEncoding {
     }
 
     // ---------------------------------------------------------------------------
+    // MarenPay.createLink / createRequest / fulfillRequest
+    // ---------------------------------------------------------------------------
+
+    /// Calldata for `MarenPay.createLink(address linkKey, uint256 amount, uint64 expiry, string memo)`
+    /// — escrow MUSD to whoever holds the one-time key. Mirrors the web `createLink` in
+    /// `apps/web/src/lib/chain/write.ts`, argument for argument.
+    ///
+    /// `expiry` IS `uint64`, NOT `uint256`. The Solidity declares `uint64 expiry`, so a
+    /// uint256 here would produce the selector `0x…` of a function MarenPay does not have and
+    /// the relayer would answer `SELECTOR_NOT_ALLOWED`. The golden test pins the uint64
+    /// selector to `cast sig "createLink(address,uint256,uint64,string)"`.
+    ///
+    /// `linkKey` is the ADDRESS of a one-time keypair; its PRIVATE key travels in the link's
+    /// URL fragment and never touches the chain. The contract escrows the MUSD under that key
+    /// and only a signature by it (see `claimLinkCalldata`) releases it.
+    static func createLinkCalldata(linkKey: String, amount: BigUInt, expiry: UInt64, memo: String) throws -> Data {
+        let enc = ABIFunctionEncoder("createLink")
+        try enc.encode(EthereumAddress(linkKey))
+        try enc.encode(amount)
+        try enc.encode(expiry)
+        try enc.encode(memo)
+        return try enc.encoded()
+    }
+
+    /// Calldata for `MarenPay.createRequest(address payer, uint256 amount, string memo)` — ask
+    /// to be paid. It moves no funds and creates no obligation; it only records the ask and
+    /// emits `RequestCreated`, whose indexed `requestId` is how the app learns the real id.
+    /// `payer` is the zero address when anyone may fulfil it, exactly as the web passes it.
+    static func createRequestCalldata(payer: String, amount: BigUInt, memo: String) throws -> Data {
+        let enc = ABIFunctionEncoder("createRequest")
+        try enc.encode(EthereumAddress(payer))
+        try enc.encode(amount)
+        try enc.encode(memo)
+        return try enc.encoded()
+    }
+
+    /// Calldata for `MarenPay.fulfillRequest(uint256 requestId)` — settle a request somebody
+    /// else created. Nothing about the payment is passed: the amount and the recipient live in
+    /// the record the contract stored at `requestId`, so the caller cannot alter either. It
+    /// pulls MUSD with `transferFrom`, so it needs a prior MarenPay allowance like any pay.
+    static func fulfillRequestCalldata(requestId: BigUInt) throws -> Data {
+        let enc = ABIFunctionEncoder("fulfillRequest")
+        try enc.encode(requestId)
+        return try enc.encoded()
+    }
+
+    // ---------------------------------------------------------------------------
+    // MarenRegistry — commit-reveal handle registration
+    // ---------------------------------------------------------------------------
+
+    /// Calldata for `MarenRegistry.commit(bytes32 commitment)` — step one of registration.
+    /// The commitment is opaque on-chain, so watching this transaction tells an observer
+    /// nothing about which handle is being claimed. The web calls this `commitHandle`; the
+    /// SOLIDITY FUNCTION IS `commit`, and the selector follows the Solidity.
+    static func commitHandleCalldata(commitment: Data) throws -> Data {
+        let enc = ABIFunctionEncoder("commit")
+        try enc.encode(Data32(data: commitment))
+        return try enc.encoded()
+    }
+
+    /// Calldata for `MarenRegistry.register(string handle, bytes32 secret)` — step two, at
+    /// least `MIN_COMMITMENT_AGE` (60s) after the commit and within `MAX_COMMITMENT_AGE`
+    /// (7 days). The web calls it `registerHandle`; the Solidity function is `register`.
+    /// The handle must arrive WITHOUT its leading `@` — the contract hashes the raw bytes.
+    static func registerHandleCalldata(handle: String, secret: Data) throws -> Data {
+        let enc = ABIFunctionEncoder("register")
+        try enc.encode(handle)
+        try enc.encode(Data32(data: secret))
+        return try enc.encoded()
+    }
+
+    /// The raw `abi.encode(handle, owner, secret)` bytes behind a commitment, BEFORE keccak256,
+    /// with abi types [string, address, bytes32]. Exposed so a golden test can assert the
+    /// encoding matches `cast abi-encode` independently of the hash.
+    static func handleCommitmentAbiEncoded(handle: String, owner: String, secret: Data) throws -> Data {
+        let enc = ABIFunctionEncoder("f")
+        try enc.encode(handle)
+        try enc.encode(EthereumAddress(owner))
+        try enc.encode(Data32(data: secret))
+        return Data(try enc.encoded().dropFirst(4))
+    }
+
+    /// `MarenRegistry.makeCommitment(handle, owner, secret)` reproduced locally:
+    ///   keccak256(abi.encode(handle, owner, secret))
+    ///
+    /// A commitment that disagrees with the contract by ONE BYTE can be published and can
+    /// never be revealed — the failure surfaces 60 seconds later as `CommitmentNotFound`,
+    /// after the user has already paid for a transaction. So this is pinned to `cast` in a
+    /// golden test AND cross-checked at runtime against the contract's own `pure`
+    /// `makeCommitment` before anything is committed (see `MezoActions.commitHandle`).
+    static func handleCommitment(handle: String, owner: String, secret: Data) throws -> Data {
+        try handleCommitmentAbiEncoded(handle: handle, owner: owner, secret: secret).web3.keccak256
+    }
+
+    /// Calldata for the free `eth_call` that asks the CONTRACT for the same digest.
+    static func makeCommitmentCalldata(handle: String, owner: String, secret: Data) throws -> Data {
+        let enc = ABIFunctionEncoder("makeCommitment")
+        try enc.encode(handle)
+        try enc.encode(EthereumAddress(owner))
+        try enc.encode(Data32(data: secret))
+        return try enc.encoded()
+    }
+
+    // ---------------------------------------------------------------------------
+    // Event topic0s — how a receipt reports the id it just minted
+    // ---------------------------------------------------------------------------
+
+    /// topic0 of `LinkCreated(uint256 indexed linkId, address indexed creator, address indexed
+    /// linkKey, uint256 amount, uint64 expiry)`. The linkId is INDEXED, so it rides in
+    /// `topics[1]` of the log and needs no data decoding. Pinned to `cast keccak` in a golden
+    /// test: a wrong byte here means the app silently fails to learn its own link id.
+    static let linkCreatedTopic =
+        "LinkCreated(uint256,address,address,uint256,uint64)".web3.keccak256.web3.hexString.lowercased()
+
+    /// topic0 of `RequestCreated(uint256 indexed requestId, address indexed requester,
+    /// address indexed payer, uint256 amount, string memo)`. requestId is `topics[1]`.
+    static let requestCreatedTopic =
+        "RequestCreated(uint256,address,address,uint256,string)".web3.keccak256.web3.hexString.lowercased()
+
+    /// topic0 of `HandleRegistered(bytes32 indexed node, address indexed owner, string handle)`.
+    static let handleRegisteredTopic =
+        "HandleRegistered(bytes32,address,string)".web3.keccak256.web3.hexString.lowercased()
+
+    /// topic0 of `Committed(bytes32 indexed commitment, uint256 committedAt)`.
+    static let committedTopic =
+        "Committed(bytes32,uint256)".web3.keccak256.web3.hexString.lowercased()
+
+    // ---------------------------------------------------------------------------
     // MarenPay.claimLink digest
     // ---------------------------------------------------------------------------
 

@@ -255,6 +255,97 @@ struct MezoRPC: Sendable {
         return "0x" + addr.map { String(format: "%02x", $0) }.joined()
     }
 
+    // MARK: MarenPay records
+
+    /// A `MarenPay.requests(requestId)` row. `status` follows the contract's enum:
+    /// 0 None, 1 Open, 2 Fulfilled, 3 Cancelled. A request that was never created reads as
+    /// `None` with a zero requester, which the UI states as "no such request" — it never
+    /// renders a zero-address requester or a zero amount as if they were a real ask.
+    struct RequestRead: Sendable, Equatable {
+        let requester: String
+        let payer: String
+        let amountWei: BigUInt
+        let createdAt: BigUInt
+        let status: Int
+
+        var exists: Bool { status != 0 }
+        var isOpen: Bool { status == 1 }
+        /// True when anyone may fulfil it (the contract stores address(0) for that).
+        var openToAnyone: Bool { payer == "0x0000000000000000000000000000000000000000" }
+
+        var statusLabel: String {
+            switch status {
+            case 1: return "Open"
+            case 2: return "Already paid"
+            case 3: return "Cancelled"
+            default: return "No such request"
+            }
+        }
+    }
+
+    /// Read one payment request. Five words: requester, payer, amount, createdAt, status.
+    /// A short reply is a decode failure, never five zeroes read as a real record.
+    func paymentRequest(_ requestId: BigUInt) async throws -> RequestRead {
+        let enc = ABIFunctionEncoder("requests")
+        try enc.encode(requestId)
+        let out = try await call(to: MarenAddresses.of(chain.network).marenPay, data: try enc.encoded())
+        guard out.count >= 160 else { throw MezoRPCError.decode("requests() returned a short result") }
+        return RequestRead(
+            requester: Self.address(out, 0),
+            payer: Self.address(out, 1),
+            amountWei: Self.word(out, 2),
+            createdAt: Self.word(out, 3),
+            status: Int(Self.word(out, 4))
+        )
+    }
+
+    // MARK: MarenRegistry — commit-reveal
+
+    /// `MarenRegistry.makeCommitment(handle, owner, secret)`, asked of the CONTRACT.
+    ///
+    /// `makeCommitment` is `pure`, so this is a free `eth_call`, and it removes an entire class
+    /// of bug: a locally computed digest that disagrees with the contract's encoding by one
+    /// byte produces a commitment that can be published and can never be revealed, and the
+    /// failure only shows up 60 seconds later as `CommitmentNotFound`. Mirrors the web's
+    /// `computeCommitment` in `apps/web/src/lib/chain/handle.ts`.
+    func makeCommitment(handle: String, owner: String, secret: Data) async throws -> Data {
+        let data = try MarenEncoding.makeCommitmentCalldata(handle: handle, owner: owner, secret: secret)
+        let out = try await call(to: MarenAddresses.of(chain.network).marenRegistry, data: data)
+        guard out.count >= 32 else { throw MezoRPCError.decode("makeCommitment returned a short result") }
+        return out.subdata(in: 0..<32)
+    }
+
+    /// `MarenRegistry.commitments(commitment)` — the block timestamp the commitment was
+    /// recorded at. Zero means it is not on-chain (yet), which is a different sentence from
+    /// "it expired", and the UI says whichever is true.
+    func handleCommittedAt(_ commitment: Data) async throws -> BigUInt {
+        let enc = ABIFunctionEncoder("commitments")
+        try enc.encode(Data32(data: commitment))
+        let out = try await call(to: MarenAddresses.of(chain.network).marenRegistry, data: try enc.encoded())
+        guard out.count >= 32 else { throw MezoRPCError.decode("commitments() returned a short result") }
+        return Self.word(out, 0)
+    }
+
+    /// `MarenRegistry.available(handle)` — false for a taken OR invalid handle. A read failure
+    /// throws, so the UI shows "couldn't check" rather than a green tick it did not earn.
+    func handleAvailable(_ handle: String) async throws -> Bool {
+        let clean = handle.hasPrefix("@") ? String(handle.dropFirst()) : handle
+        let enc = ABIFunctionEncoder("available")
+        try enc.encode(clean)
+        let out = try await call(to: MarenAddresses.of(chain.network).marenRegistry, data: try enc.encoded())
+        guard out.count >= 32 else { throw MezoRPCError.decode("available() returned a short result") }
+        return Self.word(out, 0) != 0
+    }
+
+    /// `MarenRegistry.primaryHandle(owner)` — reverse resolution. An empty string is the
+    /// contract's honest "this address has no primary handle", not a failure.
+    func primaryHandle(of owner: String) async throws -> String {
+        let enc = ABIFunctionEncoder("primaryHandle")
+        try enc.encode(EthereumAddress(owner))
+        let out = try await call(to: MarenAddresses.of(chain.network).marenRegistry, data: try enc.encoded())
+        return Self.dynamicString(out) ?? ""
+    }
+
     // MARK: word decoding
     //
     // eth_call returns ABI-encoded 32-byte words. These pull one word by index; a request for
@@ -265,6 +356,27 @@ struct MezoRPC: Sendable {
         let start = index * 32
         guard start + 32 <= data.count else { return BigUInt(0) }
         return BigUInt(data.subdata(in: start..<start + 32))
+    }
+
+    /// The low 20 bytes of word `index`, as a 0x address.
+    static func address(_ data: Data, _ index: Int) -> String {
+        let start = index * 32
+        guard start + 32 <= data.count else { return "0x0000000000000000000000000000000000000000" }
+        let raw = data.subdata(in: start + 12..<start + 32)
+        return "0x" + raw.map { String(format: "%02x", $0) }.joined()
+    }
+
+    /// A single ABI-encoded `string` return value: offset word, length word, then the bytes.
+    /// Anything short or non-UTF8 returns nil, so a truncated reply is never rendered as an
+    /// empty-but-valid handle.
+    static func dynamicString(_ data: Data) -> String? {
+        guard data.count >= 64 else { return nil }
+        let offset = Int(word(data, 0))
+        guard offset >= 0, offset + 32 <= data.count else { return nil }
+        let length = Int(BigUInt(data.subdata(in: offset..<offset + 32)))
+        guard length >= 0, offset + 32 + length <= data.count else { return nil }
+        if length == 0 { return "" }
+        return String(data: data.subdata(in: offset + 32..<offset + 32 + length), encoding: .utf8)
     }
 
     static func signedWord(_ data: Data, _ index: Int) -> BigInt {

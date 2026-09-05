@@ -146,6 +146,37 @@ enum RealisedYieldMath {
     }
 }
 
+/// A `MarenPay` payment request, as the UI needs it: a protocol-native MUSD figure, plain
+/// addresses, and a status that says what it is. Read-only, and never synthesised — a request
+/// the contract has no record of is `nil` at the client boundary, not a zero-amount row.
+struct PaymentRequestRecord: Sendable, Equatable, Codable {
+    /// The contract's own enum: 0 None, 1 Open, 2 Fulfilled, 3 Cancelled.
+    enum Status: Int, Sendable, Codable {
+        case none = 0, open = 1, fulfilled = 2, cancelled = 3
+
+        var label: String {
+            switch self {
+            case .none: return "No such request"
+            case .open: return "Open"
+            case .fulfilled: return "Already paid"
+            case .cancelled: return "Cancelled"
+            }
+        }
+    }
+
+    let id: UInt64
+    /// Who gets paid.
+    let requester: String
+    /// Who is expected to pay, or nil when anyone holding the id may fulfil it (the contract
+    /// stores the zero address for that, which is never shown as if it were an address).
+    let payer: String?
+    let amount: Decimal
+    let createdAt: Date
+    let status: Status
+
+    var isOpen: Bool { status == .open }
+}
+
 /// R15 status wording. `pending` never reads as delivered, and `failed` says plainly that no
 /// funds moved rather than hiding behind "unsuccessful".
 enum ActivityStatus: Sendable, Equatable, Codable {

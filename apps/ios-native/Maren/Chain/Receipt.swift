@@ -16,6 +16,22 @@ struct Delivered: Sendable, Equatable {
     let gasUsed: BigUInt
     /// True when a Maren relayer paid the BTC gas under ERC-2771; then the user paid nothing.
     let sponsored: Bool
+    /// The id this transaction MINTED, read out of the very receipt that proved it succeeded —
+    /// the `linkId` from `LinkCreated`, the `requestId` from `RequestCreated`.
+    ///
+    /// nil for every action that mints nothing, AND nil when the log was absent or unreadable.
+    /// It is never guessed: a link whose id could not be read is reported as such, because a
+    /// fabricated id builds a claim link that points at somebody else's escrow.
+    var mintedId: UInt64? = nil
+}
+
+/// Where a minted id lives in a receipt: the contract that emits it, the event's topic0, and
+/// which indexed topic carries the number. `LinkCreated` and `RequestCreated` both declare the
+/// id as their FIRST indexed parameter, so it rides in `topics[1]` and needs no data decoding.
+struct MintedIdSource: Sendable, Equatable {
+    let contract: String
+    let topic0: String
+    var topicIndex: Int = 1
 }
 
 enum TxOutcome: Sendable, Equatable {
@@ -31,10 +47,14 @@ enum TxOutcome: Sendable, Equatable {
 enum Receipt {
     /// The one and only success check. Polls for a receipt until `timeout`, then classifies.
     /// A missing receipt (`noResultFound`) is "not yet", not a failure — we keep waiting.
+    /// `mintedIdFrom` names an event whose indexed id this action created. It is read from the
+    /// SAME receipt that established success, so an id can only ever be reported for a
+    /// transaction the chain confirmed — and only `Receipt` can put one on a `Delivered`.
     static func confirm(
         client: EthereumHttpClient,
         hash: String,
         sponsored: Bool,
+        mintedIdFrom: MintedIdSource? = nil,
         timeout: TimeInterval = 60,
         pollInterval: TimeInterval = 2
     ) async -> TxOutcome {
@@ -50,7 +70,8 @@ enum Receipt {
                         hash: hash,
                         blockNumber: receipt.blockNumber,
                         gasUsed: receipt.gasUsed,
-                        sponsored: sponsored
+                        sponsored: sponsored,
+                        mintedId: mintedIdFrom.flatMap { mintedId(in: receipt.logs, from: $0) }
                     ))
                 case .failure:
                     return .reverted(hash: hash, blockNumber: receipt.blockNumber)
@@ -70,5 +91,23 @@ enum Receipt {
             return .unreachable(hash: hash, error: err)
         }
         return .timeout(hash: hash)
+    }
+
+    /// The id `source` names, or nil. Every guard here returns nil rather than a fallback:
+    /// a log from a different contract, a different event, a topic slot that is not there, or
+    /// a value too large for a UInt64 all mean "this receipt did not tell us the id", and that
+    /// is a state the UI is built to state plainly.
+    static func mintedId(in logs: [EthereumLog], from source: MintedIdSource) -> UInt64? {
+        let contract = source.contract.lowercased()
+        let topic0 = source.topic0.lowercased()
+        for log in logs {
+            guard log.address.asString().lowercased() == contract else { continue }
+            guard log.topics.count > source.topicIndex,
+                  log.topics[0].lowercased() == topic0 else { continue }
+            guard let value = BigUInt(hex: log.topics[source.topicIndex]),
+                  value > 0, value <= BigUInt(UInt64.max) else { return nil }
+            return UInt64(value)
+        }
+        return nil
     }
 }

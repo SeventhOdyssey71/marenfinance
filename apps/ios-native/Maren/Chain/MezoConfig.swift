@@ -11,7 +11,7 @@ import BigInt
 // Native gas currency is BTC with 18 decimals — this is an EVM chain and BTC is the gas
 // token, so it follows the 18-decimal EVM convention, NOT Bitcoin's 8.
 
-enum MezoNetwork: String, Sendable, CaseIterable {
+enum MezoNetwork: String, Sendable, CaseIterable, Codable {
     case testnet
     case mainnet
 }
@@ -111,6 +111,21 @@ struct MarenAddresses: Sendable {
         network == .mainnet ? .mainnet : .testnet
     }
 }
+
+/// `MarenRegistry.MIN_COMMITMENT_AGE` — the shortest a handle commitment may sit before it can
+/// be revealed. One minute is comfortably more than one Mezo block, which is all it takes to
+/// make front-running a registration impossible. Transcribed from the Solidity; the contract
+/// enforces it regardless, this only lets the app say how long is left instead of reverting.
+let HANDLE_MIN_COMMITMENT_AGE: UInt64 = 60
+
+/// `MarenRegistry.MAX_COMMITMENT_AGE` — 7 days, after which a commitment is dead and the claim
+/// must be started again.
+let HANDLE_MAX_COMMITMENT_AGE: UInt64 = 7 * 24 * 60 * 60
+
+/// How long a claimable link stays claimable before its creator may reclaim the escrow. The
+/// contract takes any future timestamp; Maren's own default is 7 days, which is long enough for
+/// a link to travel and short enough that abandoned escrow comes back within a week.
+let CLAIM_LINK_EXPIRY_SECONDS: UInt64 = 7 * 24 * 60 * 60
 
 /// Mezo's BTC/USD price oracle is a NATIVE CHAIN PRECOMPILE, not a deployed Chainlink/Pyth
 /// contract. It implements only `decimals()` and `latestRoundData()`.

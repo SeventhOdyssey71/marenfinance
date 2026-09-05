@@ -269,4 +269,142 @@ final class MarenEncodingGoldenTests: XCTestCase {
             "6869000000000000000000000000000000000000000000000000000000000000"
         XCTAssertEqual(data.web3.hexString, expected, "split calldata must match cast")
     }
+
+    // MARK: MarenPay.createLink(address,uint256,uint64,string)
+    //
+    // `expiry` IS uint64, not uint256 — a uint256 here is a DIFFERENT selector and the relayer
+    // would answer SELECTOR_NOT_ALLOWED, so the selector is pinned on its own as well.
+    //
+    // cast sig      "createLink(address,uint256,uint64,string)"                  -> 0xd93a901c
+    // cast calldata "createLink(address,uint256,uint64,string)" \
+    //   0x54196397D6f01b48739dB3957257cB33cD341885 1000000000000000000 1893456000 "gift"
+    func testCreateLinkCalldataMatchesCast() throws {
+        let data = try MarenEncoding.createLinkCalldata(linkKey: recipient,
+                                                        amount: BigUInt(10).power(18),
+                                                        expiry: 1_893_456_000,
+                                                        memo: "gift")
+        let expected = "0xd93a901c" +
+            "00000000000000000000000054196397d6f01b48739db3957257cb33cd341885" +
+            "0000000000000000000000000000000000000000000000000de0b6b3a7640000" +
+            "0000000000000000000000000000000000000000000000000000000070dbd880" +
+            "0000000000000000000000000000000000000000000000000000000000000080" +
+            "0000000000000000000000000000000000000000000000000000000000000004" +
+            "6769667400000000000000000000000000000000000000000000000000000000"
+        XCTAssertEqual(data.web3.hexString, expected, "createLink calldata must match cast")
+        XCTAssertEqual(data.web3.hexString.prefix(10), "0xd93a901c",
+                       "createLink selector must be the uint64-expiry one, not a uint256 lookalike")
+    }
+
+    // MARK: MarenPay.createRequest(address,uint256,string)
+    //
+    // cast sig      "createRequest(address,uint256,string)"                      -> 0xba9a7a9e
+    // cast calldata "createRequest(address,uint256,string)" \
+    //   0x54196397D6f01b48739dB3957257cB33cD341885 1000000000000000000 "dinner"
+    func testCreateRequestCalldataMatchesCast() throws {
+        let data = try MarenEncoding.createRequestCalldata(payer: recipient,
+                                                           amount: BigUInt(10).power(18),
+                                                           memo: "dinner")
+        let expected = "0xba9a7a9e" +
+            "00000000000000000000000054196397d6f01b48739db3957257cb33cd341885" +
+            "0000000000000000000000000000000000000000000000000de0b6b3a7640000" +
+            "0000000000000000000000000000000000000000000000000000000000000060" +
+            "0000000000000000000000000000000000000000000000000000000000000006" +
+            "64696e6e65720000000000000000000000000000000000000000000000000000"
+        XCTAssertEqual(data.web3.hexString, expected, "createRequest calldata must match cast")
+    }
+
+    // MARK: MarenPay.fulfillRequest(uint256)
+    //
+    // cast sig      "fulfillRequest(uint256)"     -> 0x9a91eb0d
+    // cast calldata "fulfillRequest(uint256)" 7
+    func testFulfillRequestCalldataMatchesCast() throws {
+        let data = try MarenEncoding.fulfillRequestCalldata(requestId: 7)
+        let expected = "0x9a91eb0d" +
+            "0000000000000000000000000000000000000000000000000000000000000007"
+        XCTAssertEqual(data.web3.hexString, expected, "fulfillRequest calldata must match cast")
+    }
+
+    // MARK: MarenRegistry.makeCommitment(string,address,bytes32) — the commitment digest
+    //
+    // handle "sele", owner 0xf39F…2266, secret 0x2222…2222.
+    //
+    // cast abi-encode "f(string,address,bytes32)" "sele" 0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266 \
+    //   0x2222222222222222222222222222222222222222222222222222222222222222
+    let expectedCommitmentAbiEncode =
+        "0x0000000000000000000000000000000000000000000000000000000000000060" +
+        "000000000000000000000000f39fd6e51aad88f6f4ce6ab8827279cfffb92266" +
+        "2222222222222222222222222222222222222222222222222222222222222222" +
+        "0000000000000000000000000000000000000000000000000000000000000004" +
+        "73656c6500000000000000000000000000000000000000000000000000000000"
+
+    // cast keccak <the abi-encode output above>
+    let expectedCommitment = "0xca5fcf1135c694e70219f7a7885c1a13547d5074b58615e173c67e015f4e9366"
+
+    let handleSecret = "0x2222222222222222222222222222222222222222222222222222222222222222"
+
+    func testHandleCommitmentMatchesCast() throws {
+        let secret = Data(hex: handleSecret)!
+        let encoded = try MarenEncoding.handleCommitmentAbiEncoded(handle: "sele", owner: from, secret: secret)
+        XCTAssertEqual(encoded.web3.hexString, expectedCommitmentAbiEncode,
+                       "commitment abi.encode must match cast abi-encode")
+
+        let digest = try MarenEncoding.handleCommitment(handle: "sele", owner: from, secret: secret)
+        XCTAssertEqual(digest.web3.hexString, expectedCommitment,
+                       "commitment digest must match cast keccak — a one-byte drift here is a commitment that can never be revealed")
+    }
+
+    // cast calldata "makeCommitment(string,address,bytes32)" "sele" 0xf39F…2266 0x2222…2222
+    func testMakeCommitmentCalldataMatchesCast() throws {
+        let data = try MarenEncoding.makeCommitmentCalldata(handle: "sele", owner: from,
+                                                            secret: Data(hex: handleSecret)!)
+        XCTAssertEqual(data.web3.hexString, "0xf49826be" + String(expectedCommitmentAbiEncode.dropFirst(2)),
+                       "makeCommitment calldata must match cast")
+    }
+
+    // MARK: MarenRegistry.commit(bytes32) — step one of registration
+    //
+    // cast sig      "commit(bytes32)"    -> 0xf14fcbc8
+    // cast calldata "commit(bytes32)" 0xca5fcf1135c694e70219f7a7885c1a13547d5074b58615e173c67e015f4e9366
+    func testCommitHandleCalldataMatchesCast() throws {
+        let data = try MarenEncoding.commitHandleCalldata(commitment: Data(hex: expectedCommitment)!)
+        let expected = "0xf14fcbc8" +
+            "ca5fcf1135c694e70219f7a7885c1a13547d5074b58615e173c67e015f4e9366"
+        XCTAssertEqual(data.web3.hexString, expected, "commit calldata must match cast")
+    }
+
+    // MARK: MarenRegistry.register(string,bytes32) — step two
+    //
+    // cast sig      "register(string,bytes32)"    -> 0x656afdee
+    // cast calldata "register(string,bytes32)" "sele" \
+    //   0x2222222222222222222222222222222222222222222222222222222222222222
+    func testRegisterHandleCalldataMatchesCast() throws {
+        let data = try MarenEncoding.registerHandleCalldata(handle: "sele", secret: Data(hex: handleSecret)!)
+        let expected = "0x656afdee" +
+            "0000000000000000000000000000000000000000000000000000000000000040" +
+            "2222222222222222222222222222222222222222222222222222222222222222" +
+            "0000000000000000000000000000000000000000000000000000000000000004" +
+            "73656c6500000000000000000000000000000000000000000000000000000000"
+        XCTAssertEqual(data.web3.hexString, expected, "register calldata must match cast")
+    }
+
+    // MARK: event topic0s — how a receipt reports the id it just minted
+    //
+    // cast keccak "LinkCreated(uint256,address,address,uint256,uint64)"
+    // cast keccak "RequestCreated(uint256,address,address,uint256,string)"
+    // cast keccak "HandleRegistered(bytes32,address,string)"
+    // cast keccak "Committed(bytes32,uint256)"
+    func testMintedIdEventTopicsMatchCast() {
+        XCTAssertEqual(MarenEncoding.linkCreatedTopic,
+                       "0xdf15c4cbacfc2b31e63a6e5d69d4bf8e4a7e43b4009022229982cc0ac28b5327",
+                       "LinkCreated topic0 must match cast keccak")
+        XCTAssertEqual(MarenEncoding.requestCreatedTopic,
+                       "0xfab7026c201703a6ce65999fa587d7f23b07a13c3f7f6c86456e6195e37f3c16",
+                       "RequestCreated topic0 must match cast keccak")
+        XCTAssertEqual(MarenEncoding.handleRegisteredTopic,
+                       "0xb51e24ca9479f1f48c99c45f4d89c5a1853cfab00d1852d28bb3ea9f1feb58c6",
+                       "HandleRegistered topic0 must match cast keccak")
+        XCTAssertEqual(MarenEncoding.committedTopic,
+                       "0xcc4c1525c958b2fb4f1467dc8ccd3c4d1837a460574a7980d2b9daa8dcc1507c",
+                       "Committed topic0 must match cast keccak")
+    }
 }

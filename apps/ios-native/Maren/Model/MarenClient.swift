@@ -21,6 +21,10 @@ protocol MarenClient: Sendable {
     /// `hasReturn` is false — the honest "no return yet" state, never a fabricated rate.
     func earnRealisedYield() async throws -> RealisedYield
     func recentActivity() async throws -> [ActivityItem]
+    /// One MarenPay payment request by id, or nil when the contract holds no record under that
+    /// id. A read that FAILS throws, so the UI can say "couldn't read it" — which is a
+    /// different sentence from "there is no such request", and only one of them is true.
+    func paymentRequest(_ requestId: UInt64) async throws -> PaymentRequestRecord?
 }
 
 // MARK: - StubMarenClient
@@ -119,5 +123,12 @@ struct StubMarenClient: MarenClient {
                          status: .confirmed, hash: "0xdemo00000000000000000000000000000000000000000000000000000000c3",
                          sponsored: false),
         ]
+    }
+
+    /// There is no chain behind demo data, so there is no request record to read. This THROWS
+    /// rather than returning nil: nil would mean "the contract has no such request", which is a
+    /// claim about a chain this client is not talking to.
+    func paymentRequest(_ requestId: UInt64) async throws -> PaymentRequestRecord? {
+        throw MarenClientError.demoHasNoChain
     }
 }

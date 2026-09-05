@@ -229,9 +229,201 @@ struct MezoActions {
         } catch { return .declined(reason: prepFailed) }
     }
 
-    private func confirmSelfPaid(_ hash: String) async -> ActionResult {
+    // MARK: claimable links — creation
+
+    /// Create a claimable link. SELF-PAID, and that is a fact about the chain, not a shortcut.
+    ///
+    /// `script/Deploy.s.sol` allowlists ten MarenPay selectors on `MarenRelayHub` and
+    /// `createLink` is NOT one of them — `claimLink`, its pair, is. So the hub would revert
+    /// `CallNotAllowed` and the relayer would answer `SELECTOR_NOT_ALLOWED`. Rather than
+    /// advertise a sponsorship the chain refuses, the user signs a direct transaction and pays
+    /// the BTC gas, and the review step says so before they commit. The web records exactly the
+    /// same asymmetry in `WRITE_ACTIONS.createLink`. Add this to the deploy script's allowlist
+    /// and to `apps/relayer/src/registry.ts` in one change, and only then move it to `relayCall`.
+    ///
+    /// MarenPay pulls the MUSD with `transferFrom`, so this still needs the one-time MarenPay
+    /// approval a send does. `linkKey` is the ADDRESS of a one-time keypair the caller
+    /// generated; the private key never reaches this function or the chain.
+    ///
+    /// The REAL link id comes back in the receipt: `LinkCreated` declares `linkId` as its first
+    /// indexed parameter, so `Receipt.confirm` reads it out of `topics[1]` of the same receipt
+    /// that proved the transaction succeeded. If that log is missing the id is reported as
+    /// unknown; it is never derived from a block number or a counter guess.
+    func createLink(loadedAddress: String, linkKey: String, amountWei: BigUInt, expiry: UInt64, memo: String) async -> ActionResult {
+        let key: Data
+        switch await accessKey(loadedAddress) {
+        case .ok(let k): key = k
+        case .fail(let reason): return .declined(reason: reason)
+        }
+        let maren = MarenAddresses.of(chain.network)
+        if let approveDecline = await ensureMusdAllowance(privateKey: key, loadedAddress: loadedAddress,
+                                                          spender: maren.marenPay, needed: amountWei) {
+            return .declined(reason: approveDecline)
+        }
+        do {
+            let data = try MarenEncoding.createLinkCalldata(linkKey: linkKey, amount: amountWei,
+                                                            expiry: expiry, memo: memo)
+            let hash = try await sendSelfPaid(privateKey: key, loadedAddress: loadedAddress,
+                                              to: maren.marenPay, value: 0, data: data, gasLimit: 400_000)
+            return await confirmSelfPaid(hash, mintedIdFrom: MintedIdSource(contract: maren.marenPay,
+                                                                            topic0: MarenEncoding.linkCreatedTopic))
+        } catch { return .declined(reason: prepFailed) }
+    }
+
+    // MARK: payment requests
+
+    /// Create a payment request (relayed). It moves no MUSD and needs no allowance — it only
+    /// records the ask — so unlike a send there is nothing to approve first. `payer` may be the
+    /// zero address, which the contract reads as "anyone may fulfil this".
+    ///
+    /// The real request id is read from `RequestCreated`'s indexed `requestId` in the receipt,
+    /// on exactly the same terms as `createLink` above.
+    func createRequest(loadedAddress: String, payer: String, amountWei: BigUInt, memo: String) async -> ActionResult {
+        let key: Data
+        switch await accessKey(loadedAddress) {
+        case .ok(let k): key = k
+        case .fail(let reason): return .declined(reason: reason)
+        }
+        let maren = MarenAddresses.of(chain.network)
+        do {
+            let data = try MarenEncoding.createRequestCalldata(payer: payer, amount: amountWei, memo: memo)
+            return await relayCall(privateKey: key, loadedAddress: loadedAddress, to: maren.marenPay, data: data,
+                                   mintedIdFrom: MintedIdSource(contract: maren.marenPay,
+                                                                topic0: MarenEncoding.requestCreatedTopic))
+        } catch { return .declined(reason: prepFailed) }
+    }
+
+    /// Settle a request somebody sent you (relayed). The amount and the recipient are the ones
+    /// the contract already stored, so they are read here ONLY to size the MUSD approval and to
+    /// decline early on a request that cannot be paid — never to alter what is paid.
+    func fulfillRequest(loadedAddress: String, requestId: BigUInt) async -> ActionResult {
+        let key: Data
+        switch await accessKey(loadedAddress) {
+        case .ok(let k): key = k
+        case .fail(let reason): return .declined(reason: reason)
+        }
+        let maren = MarenAddresses.of(chain.network)
+
+        // Read the record first. Paying a cancelled or already-fulfilled request reverts, and
+        // discovering that after the relayer has spent gas is the wrong order to learn it in.
+        let record: MezoRPC.RequestRead
+        do { record = try await rpc.paymentRequest(requestId) }
+        catch { return .declined(reason: "Request #\(requestId) could not be read from Mezo, so nothing was submitted.") }
+
+        guard record.exists else {
+            return .declined(reason: "There is no request #\(requestId) on Mezo, so nothing was submitted.")
+        }
+        guard record.isOpen else {
+            return .declined(reason: "Request #\(requestId) is \(record.statusLabel.lowercased()), so nothing was submitted.")
+        }
+        guard record.openToAnyone || record.payer.lowercased() == loadedAddress.lowercased() else {
+            return .declined(reason: "Request #\(requestId) names a different payer, so nothing was submitted.")
+        }
+        guard record.requester.lowercased() != loadedAddress.lowercased() else {
+            return .declined(reason: "That request is your own, and MarenPay refuses a self-payment. Nothing was submitted.")
+        }
+
+        if let approveDecline = await ensureMusdAllowance(privateKey: key, loadedAddress: loadedAddress,
+                                                          spender: maren.marenPay, needed: record.amountWei) {
+            return .declined(reason: approveDecline)
+        }
+        do {
+            let data = try MarenEncoding.fulfillRequestCalldata(requestId: requestId)
+            return await relayCall(privateKey: key, loadedAddress: loadedAddress, to: maren.marenPay, data: data)
+        } catch { return .declined(reason: prepFailed) }
+    }
+
+    // MARK: @handle registration — commit-reveal
+
+    /// Step one: publish `keccak256(abi.encode(handle, owner, secret))` (relayed).
+    ///
+    /// The digest is computed locally by the golden-tested `MarenEncoding.handleCommitment` AND
+    /// cross-checked against the contract's own `pure` `makeCommitment` before anything is
+    /// signed. If the two disagree, this declines: a commitment that does not match the
+    /// contract's encoding can be published and can NEVER be revealed, and the user would only
+    /// find out 60 seconds later, having already paid for it. If the cross-check read cannot be
+    /// reached, the locally computed value is used — it is pinned byte-for-byte to Foundry.
+    func commitHandle(loadedAddress: String, handle: String, secret: Data) async -> ActionResult {
+        let clean = Self.bareHandle(handle)
+        if let problem = Self.handleProblem(clean) { return .declined(reason: problem) }
+        return await submitCommit(loadedAddress: loadedAddress, handle: clean, secret: secret)
+    }
+
+    private func submitCommit(loadedAddress: String, handle: String, secret: Data) async -> ActionResult {
+        let key: Data
+        switch await accessKey(loadedAddress) {
+        case .ok(let k): key = k
+        case .fail(let reason): return .declined(reason: reason)
+        }
+        let maren = MarenAddresses.of(chain.network)
+        do {
+            let local = try MarenEncoding.handleCommitment(handle: handle, owner: loadedAddress, secret: secret)
+            if let onChain = try? await rpc.makeCommitment(handle: handle, owner: loadedAddress, secret: secret),
+               onChain != local {
+                return .declined(reason: "This device and MarenRegistry disagree about how to hash that commitment, so it would be impossible to reveal. Nothing was submitted.")
+            }
+            let data = try MarenEncoding.commitHandleCalldata(commitment: local)
+            return await relayCall(privateKey: key, loadedAddress: loadedAddress, to: maren.marenRegistry, data: data)
+        } catch { return .declined(reason: prepFailed) }
+    }
+
+    /// Step two: reveal the secret and take the handle (relayed). The contract enforces the
+    /// 60-second minimum age itself; this checks it first only so a user is not charged a
+    /// signature for a revert it can see coming.
+    func registerHandle(loadedAddress: String, handle: String, secret: Data) async -> ActionResult {
+        let clean = Self.bareHandle(handle)
+        if let problem = Self.handleProblem(clean) { return .declined(reason: problem) }
+        let key: Data
+        switch await accessKey(loadedAddress) {
+        case .ok(let k): key = k
+        case .fail(let reason): return .declined(reason: reason)
+        }
+        let maren = MarenAddresses.of(chain.network)
+        do {
+            let commitment = try MarenEncoding.handleCommitment(handle: clean, owner: loadedAddress, secret: secret)
+            if let committedAt = try? await rpc.handleCommittedAt(commitment) {
+                if committedAt == 0 {
+                    return .declined(reason: "MarenRegistry is not holding a commitment for @\(clean) from this address, so there is nothing to reveal. Nothing was submitted.")
+                }
+                let now = BigUInt(UInt64(Date().timeIntervalSince1970))
+                if now < committedAt + BigUInt(HANDLE_MIN_COMMITMENT_AGE) {
+                    let wait = Int((committedAt + BigUInt(HANDLE_MIN_COMMITMENT_AGE) - now))
+                    return .declined(reason: "That commitment is \(wait)s away from being revealable. Nothing was submitted.")
+                }
+                if now > committedAt + BigUInt(HANDLE_MAX_COMMITMENT_AGE) {
+                    return .declined(reason: "That commitment expired after 7 days and can no longer be revealed. Claim @\(clean) again from the start. Nothing was submitted.")
+                }
+            }
+            let data = try MarenEncoding.registerHandleCalldata(handle: clean, secret: secret)
+            return await relayCall(privateKey: key, loadedAddress: loadedAddress, to: maren.marenRegistry, data: data)
+        } catch { return .declined(reason: prepFailed) }
+    }
+
+    /// A handle with any leading `@` removed. The contract hashes the raw bytes, so the `@` is
+    /// display only and must never reach the calldata.
+    static func bareHandle(_ handle: String) -> String {
+        let trimmed = handle.trimmingCharacters(in: .whitespaces)
+        return trimmed.hasPrefix("@") ? String(trimmed.dropFirst()) : trimmed
+    }
+
+    /// `MarenRegistry._validateHandle`, transcribed. Checked before a transaction rather than
+    /// inside one: the contract is the authority and refuses anything invalid regardless, but
+    /// discovering `HandleInvalidCharacter(4, 0x2e)` after paying gas is a worse way to learn
+    /// you cannot use a full stop. Returns nil when the handle is fine.
+    static func handleProblem(_ handle: String) -> String? {
+        let clean = bareHandle(handle)
+        if clean.count < 3 { return "Handles are at least 3 characters." }
+        if clean.count > 32 { return "Handles are at most 32 characters." }
+        if let bad = clean.first(where: { !("a"..."z" ~= $0 || "0"..."9" ~= $0 || $0 == "_") }) {
+            return "“\(bad)” is not allowed. Handles use lowercase letters, digits and underscores only."
+        }
+        return nil
+    }
+
+    private func confirmSelfPaid(_ hash: String, mintedIdFrom: MintedIdSource? = nil) async -> ActionResult {
         let client = EthereumHttpClient(url: chain.rpcURLs[0], network: .custom(String(chain.chainId)))
-        let outcome = await Receipt.confirm(client: client, hash: hash, sponsored: false)
+        let outcome = await Receipt.confirm(client: client, hash: hash, sponsored: false,
+                                            mintedIdFrom: mintedIdFrom)
         if case .delivered(let d) = outcome { return .ok(d) }
         return .failed(outcome)
     }
@@ -281,7 +473,8 @@ struct MezoActions {
 
     // The shared relayed-write flow (the caller has already done Face ID): signed ForwardRequest
     // → relay → receipt. A hash is never a success on its own — `Receipt.confirm` decides.
-    private func relayCall(privateKey: Data, loadedAddress: String, to: String, data: Data) async -> ActionResult {
+    private func relayCall(privateKey: Data, loadedAddress: String, to: String, data: Data,
+                           mintedIdFrom: MintedIdSource? = nil) async -> ActionResult {
         guard let relayerURL = RelayerConfig.url else {
             return .declined(reason: MarenClientError.liveWritesUnavailable.errorDescription ?? "Live writes unavailable.")
         }
@@ -307,7 +500,8 @@ struct MezoActions {
             ]
             let accepted = try await Relayer(baseURL: relayerURL).post(body: body)
             let client = EthereumHttpClient(url: chain.rpcURLs[0], network: .custom(String(chain.chainId)))
-            let outcome = await Receipt.confirm(client: client, hash: accepted.hash, sponsored: true)
+            let outcome = await Receipt.confirm(client: client, hash: accepted.hash, sponsored: true,
+                                                mintedIdFrom: mintedIdFrom)
             if case .delivered(let d) = outcome { return .ok(d) }
             return .failed(outcome)
         } catch let refused as RelayRefused {

@@ -15,9 +15,12 @@ enum MarenClientError: LocalizedError {
     case noAccount
     case liveWritesUnavailable
     case keyMismatch
+    case demoHasNoChain
 
     var errorDescription: String? {
         switch self {
+        case .demoHasNoChain:
+            return "This build runs on demo data, so there is no Mezo record to read for that."
         case .noAccount:
             return "No account is loaded, so there is nothing to read or sign for."
         case .liveWritesUnavailable:
@@ -341,6 +344,23 @@ struct MezoMarenClient: MarenClient {
         let block: Int
         let logIndex: Int
         let txHash: String?
+    }
+
+    /// One MarenPay request, read live from `requests(uint256)`. A `None` status means the
+    /// contract holds no record under that id, which is returned as nil — never as a
+    /// zero-amount request with a zero-address requester. A transport failure throws.
+    func paymentRequest(_ requestId: UInt64) async throws -> PaymentRequestRecord? {
+        guard MarenAddresses.of(chain.network).isDeployed else { return nil }
+        let read = try await rpc.paymentRequest(BigUInt(requestId))
+        guard read.exists, let amount = Wei.toDecimal(read.amountWei) else { return nil }
+        return PaymentRequestRecord(
+            id: requestId,
+            requester: read.requester,
+            payer: read.openToAnyone ? nil : read.payer,
+            amount: amount,
+            createdAt: Date(timeIntervalSince1970: TimeInterval(read.createdAt)),
+            status: PaymentRequestRecord.Status(rawValue: read.status) ?? .none
+        )
     }
 
     func recentActivity() async throws -> [ActivityItem] {

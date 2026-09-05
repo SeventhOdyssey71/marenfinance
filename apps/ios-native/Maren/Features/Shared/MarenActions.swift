@@ -1,5 +1,6 @@
 import SwiftUI
 import BigInt
+import web3
 
 // MARK: - MarenActions — the write seam for the UI
 //
@@ -64,9 +65,20 @@ struct Intent: Sendable {
         case earnSupply
         case earnWithdraw
         case split(recipients: [String], amounts: [Decimal])
-        case request(to: String)
-        case createLink
+        /// Ask to be paid. `payer` is nil when anyone may fulfil it, which the encoder passes
+        /// to the contract as the zero address.
+        case request(payer: String?, memo: String)
+        /// Settle a request somebody else created. Nothing but the id is carried: the amount
+        /// and the recipient are the ones MarenPay already stored.
+        case fulfillRequest(requestId: UInt64)
+        /// Escrow MUSD to a one-time link. `linkKey` is the ADDRESS of the bearer keypair —
+        /// the private key stays in the flow that generated it and never enters an Intent.
+        case createLink(linkKey: String, expiry: UInt64, memo: String)
         case claim(PaymentLinks.ClaimLink)
+        /// Step one of `@handle` registration: publish the opaque commitment.
+        case commitHandle(handle: String, secret: String)
+        /// Step two: reveal the secret and take the handle.
+        case registerHandle(handle: String, secret: String)
     }
 
     let kind: Kind
@@ -76,9 +88,13 @@ struct Intent: Sendable {
 
     enum Unit: Sendable { case musd, btc }
 
+    /// Deposit sends BTC as msg.value, which no relayer can carry. Earn is off the hub's
+    /// allowlist. `createLink` is off it too — `script/Deploy.s.sol` allowlists `claimLink`
+    /// and NOT its pair `createLink` — so escrowing a link costs the creator BTC gas while
+    /// claiming it is free for the claimer. Everything else is relayed.
     var gas: GasMode {
         switch kind {
-        case .deposit, .earnSupply, .earnWithdraw: return .youPayBtc
+        case .deposit, .earnSupply, .earnWithdraw, .createLink: return .youPayBtc
         default: return .sponsored
         }
     }
@@ -118,12 +134,21 @@ struct DemoMarenActions: MarenActions {
 
 // MARK: - LiveMarenActions
 //
-// Pairs with `MezoMarenClient`. Drives the real chain layer. Every write has an encoder and is
-// wired end-to-end. The two self-paid actions — deposit and Earn (supply/withdraw) — send or
-// hold value a relayer cannot carry, so the user signs a direct tx, pays the BTC gas, and they
-// SETTLE on-chain now. The relayed actions — send, borrow, repay, withdraw, split, claim — need
-// a configured relayer; none is set in this build, so those decline honestly with the same
-// sentence the RN app uses, never a fabricated hash or receipt.
+// Pairs with `MezoMarenClient`. Drives the real chain layer. Every write has a golden-tested
+// encoder and is wired end-to-end — there is no longer a `default:` arm here, so a new Intent
+// kind cannot be added without deciding what it does on-chain.
+//
+// THE SELF-PAID SET, and why each one is in it. Deposit sends BTC as msg.value and a relayer
+// refuses value (R3). Earn supply/withdraw are not on MarenRelayHub's allowlist. Creating a
+// claimable link is not either — `script/Deploy.s.sol` allowlists `claimLink` and not its pair
+// `createLink` — so the creator pays BTC gas and the claimer pays nothing. All three sign a
+// direct tx and SETTLE on-chain now, relayer or no relayer.
+//
+// Everything else — send, borrow, repay, withdraw, split, claim a link, create and fulfil a
+// payment request, and both legs of @handle registration — is on the hub's allowlist and is
+// relayed. No relayer is configured in this build, so those decline honestly with the same
+// sentence the RN app uses, never a fabricated hash or receipt, and they light up the instant
+// MAREN_RELAYER_URL is set.
 
 struct LiveMarenActions: MarenActions {
     let network: MezoNetwork
@@ -198,9 +223,47 @@ struct LiveMarenActions: MarenActions {
             return Self.outcome(await mezo.split(loadedAddress: loadedAddress, recipients: resolvedRecipients,
                                                  amountsWei: amountsWei, totalWei: total, memo: ""))
 
-        default:
-            return .declined(reason: MarenClientError.liveWritesUnavailable.errorDescription
-                             ?? "This build has no relayer configured, so nothing was submitted.")
+        // Relayed claimable-link creation. The escrowed MUSD is pulled by MarenPay, so this
+        // needs the same one-time approval a send does; the real linkId comes back on the
+        // receipt as `Delivered.mintedId`.
+        case let .createLink(linkKey, expiry, memo):
+            guard let wei = Amount.toWei(intent.amount) else {
+                return .declined(reason: "That amount could not be read, so nothing was submitted.")
+            }
+            return Self.outcome(await mezo.createLink(loadedAddress: loadedAddress, linkKey: linkKey,
+                                                      amountWei: wei, expiry: expiry, memo: memo))
+
+        // Relayed payment request. Moves no funds; the real requestId arrives on the receipt.
+        case let .request(payer, memo):
+            guard let wei = Amount.toWei(intent.amount) else {
+                return .declined(reason: "That amount could not be read, so nothing was submitted.")
+            }
+            var payerAddress = MarenAddresses.zero
+            if let payer, !payer.trimmingCharacters(in: .whitespaces).isEmpty {
+                switch await mezo.resolveRecipient(payer) {
+                case let .ok(address): payerAddress = address
+                case let .fail(reason): return .declined(reason: reason)
+                }
+            }
+            return Self.outcome(await mezo.createRequest(loadedAddress: loadedAddress, payer: payerAddress,
+                                                         amountWei: wei, memo: memo))
+
+        // Relayed fulfilment of somebody else's request.
+        case let .fulfillRequest(requestId):
+            return Self.outcome(await mezo.fulfillRequest(loadedAddress: loadedAddress,
+                                                          requestId: BigUInt(requestId)))
+
+        // Relayed @handle registration, both legs against MarenRegistry.
+        case let .commitHandle(handle, secret):
+            guard let secretData = Data(hex: secret), secretData.count == 32 else {
+                return .declined(reason: "That commitment secret is malformed, so nothing was submitted.")
+            }
+            return Self.outcome(await mezo.commitHandle(loadedAddress: loadedAddress, handle: handle, secret: secretData))
+        case let .registerHandle(handle, secret):
+            guard let secretData = Data(hex: secret), secretData.count == 32 else {
+                return .declined(reason: "That commitment secret is malformed, so nothing was submitted.")
+            }
+            return Self.outcome(await mezo.registerHandle(loadedAddress: loadedAddress, handle: handle, secret: secretData))
         }
     }
 
