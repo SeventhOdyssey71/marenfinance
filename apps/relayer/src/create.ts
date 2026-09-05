@@ -224,6 +224,7 @@ export async function createRelayer(options: CreateRelayerOptions): Promise<Rela
   const app = buildApp({
     service,
     logger,
+    allowedOrigins: config.allowedOrigins,
     ...(options.socketIp === undefined ? {} : { socketIp: options.socketIp }),
   });
 

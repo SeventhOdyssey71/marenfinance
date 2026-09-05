@@ -1,5 +1,6 @@
 import { Hono } from 'hono';
 import type { Context } from 'hono';
+import { cors } from 'hono/cors';
 import { getConnInfo } from '@hono/node-server/conninfo';
 import { ipBucketKey, resolveClientIp } from './clientip.js';
 import { isRelayError, RelayError } from './errors.js';
@@ -20,6 +21,11 @@ import type { RelayerService } from './service.js';
 export interface AppDeps {
   readonly service: RelayerService;
   readonly logger: Logger;
+  /**
+   * Browser origins allowed to call the relayer (CORS). Empty/omitted = deny all
+   * cross-origin; the web app must appear here or its /relay POST fails a preflight.
+   */
+  readonly allowedOrigins?: readonly string[];
   /** Overridable so tests can drive socket-address resolution deterministically. */
   readonly socketIp?: (c: Context) => string | undefined;
 }
@@ -57,6 +63,25 @@ function defaultSocketIp(c: Context): string | undefined {
 export function buildApp(deps: AppDeps): Hono<{ Variables: Vars }> {
   const app = new Hono<{ Variables: Vars }>();
   const { service, logger } = deps;
+  const allowedOrigins = deps.allowedOrigins ?? [];
+
+  // CORS. The web app calls POST /relay from the browser, cross-origin, so only the
+  // explicitly configured origins are echoed back; any other Origin (or an empty
+  // allowlist) gets no allow-origin header and the browser blocks it. No cookies or
+  // credentials are used, so this never becomes a wildcard-with-credentials. Hono's
+  // cors() also answers the OPTIONS preflight. Non-browser callers (curl, health
+  // probes) send no Origin and are unaffected.
+  if (allowedOrigins.length > 0) {
+    app.use(
+      '*',
+      cors({
+        origin: (origin) => (allowedOrigins.includes(origin) ? origin : null),
+        allowMethods: ['GET', 'POST', 'OPTIONS'],
+        allowHeaders: ['content-type', 'x-request-id'],
+        maxAge: 86_400,
+      }),
+    );
+  }
 
   app.use('*', async (c, next) => {
     const requestId = c.req.header('x-request-id') ?? newRequestId();

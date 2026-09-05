@@ -69,6 +69,14 @@ export interface RelayerConfig {
   readonly trustedProxies: readonly Cidr[];
   /** An unforgeable platform header carrying the client IP, if the host sets one. */
   readonly clientIpHeader: string | null;
+  /**
+   * Browser origins allowed to call the relayer (CORS). The web app POSTs /relay
+   * from the browser, so without a matching origin here the request fails a
+   * preflight even though curl works. Empty = deny all cross-origin (same-origin
+   * and non-browser callers are unaffected). No credentials are used, so this
+   * never widens to a wildcard-with-credentials.
+   */
+  readonly allowedOrigins: readonly string[];
   /** Salt for per-IP rate-limit buckets. */
   readonly ipSalt: string;
   /** True when `ipSalt` was generated per process — unsafe on multi-instance hosts. */
@@ -602,6 +610,7 @@ export function loadConfig(env: Env): LoadedConfig {
     redis,
     trustedProxies,
     clientIpHeader,
+    allowedOrigins: splitList(env['RELAYER_ALLOWED_ORIGINS']).map((o) => o.replace(/\/+$/, '')),
     ipSalt: configuredIpSalt ?? ephemeralIpSalt(),
     ipSaltIsEphemeral: configuredIpSalt === null,
     key,

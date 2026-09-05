@@ -30,6 +30,9 @@
     "RELAYER_ALLOWED_TARGETS": "marenPay:0xe475Ff919D54E055809f516E3bed8a5c7a101836,marenRegistry:0x9e123Cdd0CD524812CF9F552d3FAB13d8143b77E,marenVault:0x46252B00AB59384518d9dB6D1f210ffF1221645b",
     "RELAYER_MAX_DAILY_SPONSORED_BTC": "0.01",
     "RELAYER_FREE_ACTIONS_PER_ADDRESS": "25",
-    "RELAYER_IP_SALT": "maren-testnet-relayer-ipsalt-v1"
+    "RELAYER_IP_SALT": "maren-testnet-relayer-ipsalt-v1",
+    // Browser origins allowed to call /relay (CORS). The web app runs here; add
+    // your own preview/custom domains as needed. Empty would deny all cross-origin.
+    "RELAYER_ALLOWED_ORIGINS": "https://marenfinance.vercel.app,http://localhost:3000"
   }
 }
