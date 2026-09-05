@@ -1,3 +1,5 @@
+import { RELAYER_CONFIGURED } from '@/lib/chain/relay';
+
 /**
  * The four things Maren honestly does, in one place.
  *
@@ -12,6 +14,14 @@
  * iOS says the key lives in that device's Secure Enclave, which is true on a phone and
  * false in a browser. The web truth is the honest, platform-correct version of the same
  * promise — your own wallet, non-custodial, never on Maren's servers.
+ *
+ * THE GASLESS PROP IS GATED, for the same reason the FAQ's gasless answer is. Every screen
+ * in the app derives its gas line from `gasNote`/`gasLine`, which say "You pay the Bitcoin
+ * gas. No relayer is running yet." when none is configured. An intro that promises "Maren
+ * covers the network fee" before the user reaches those screens is the one surface in the
+ * product that contradicts them, and it is the FIRST thing a new user reads. So the claim
+ * is written in the future tense until `NEXT_PUBLIC_RELAYER_URL` exists, at which point it
+ * flips back to the iOS wording on its own.
  */
 
 export interface ValueProp {
@@ -40,7 +50,9 @@ export const VALUE_PROPS: readonly ValueProp[] = [
   {
     key: 'gasless',
     headline: 'Gasless by design',
-    subhead: `Maren covers the network fee on your transactions. ${GASLESS_CAVEAT}`,
+    subhead: RELAYER_CONFIGURED
+      ? `Maren covers the network fee on your transactions. ${GASLESS_CAVEAT}`
+      : 'Built so Maren can cover the network fee. No relayer is running yet, so today you pay your own gas, and every screen says so before you sign.',
   },
   {
     key: 'honest',

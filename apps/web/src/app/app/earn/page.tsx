@@ -426,36 +426,6 @@ export default function EarnPage() {
         </div>
       </Panel>
 
-      {/* ------------------------------------------------------------ Savings goals */}
-      {/* A STUB, STATED AS ONE. Talise lets a user carve savings into named goals with
-          their own balances; Maren cannot honestly do that yet. MarenEarn issues one
-          fungible ERC-4626 share, and there is no on-chain record that fences off part of
-          it for a goal. Tracking that split in the browser would let the card show a goal
-          as funded while the money sits undivided in the pool — the exact "plausible
-          number that is not real" this product refuses. So the feature is previewed and
-          labelled planned, with no control that pretends to work. */}
-      <Panel
-        title="Savings goals"
-        meta={<span className="t-label text-text-subtle">Coming this sprint</span>}
-      >
-        <div className="px-5 py-5">
-          <p className="text-text-muted max-w-[68ch] text-sm leading-relaxed">
-            Name a goal, set a target, and watch your Earn balance grow toward it. This is planned
-            for a coming release; none of it is wired yet, so there is nothing on this card to
-            press.
-          </p>
-          <Info summary="Why it is not here yet">
-            A goal needs a balance of its own to track against its target, and MarenEarn issues a
-            single fungible ERC-4626 share, and there is no on-chain way to fence off part of it for
-            a “house deposit” goal without an allocation the contract does not record. Rather than
-            track that split in your browser and show a goal as funded while the money sits
-            undivided in the pool, Maren is waiting on per-goal accounting it can prove on chain.
-            Until then your whole Earn balance is the real, undivided figure shown at the top of
-            this screen.
-          </Info>
-        </div>
-      </Panel>
-
       {/* The risk statement stays. It is the one thing a depositor cannot infer from the
           screen: this is not a savings account, and the principal is at risk. */}
       <Note>
