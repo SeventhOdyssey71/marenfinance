@@ -112,3 +112,4 @@ design/
 
 # Build-time mirror of docs-site for the web /docs route (see apps/web/scripts/sync-docs.mjs)
 apps/web/docs-content/
+.env*
