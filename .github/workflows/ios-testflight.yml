@@ -79,8 +79,10 @@ permissions:
 env:
   SCHEME: Maren
   PROJECT: apps/ios-native/Maren.xcodeproj
-  # Matches project.yml's deploymentTarget of 17.0; bump both together.
-  SIMULATOR: 'platform=iOS Simulator,name=iPhone 16 Pro'
+  # NOTE: the simulator destination is NOT pinned here. Runner images retire device models
+  # without warning — macos-26 ships no "iPhone 16 Pro" at all — and a hardcoded name turns
+  # that into a red build with nothing wrong in the code. It is resolved at runtime instead,
+  # by the "Resolve a simulator" step below.
 
 jobs:
   test:
@@ -102,6 +104,33 @@ jobs:
       - name: Generate project
         working-directory: apps/ios-native
         run: xcodegen generate
+
+      # Pick whatever iPhone the runner actually has, newest iOS runtime first. These are
+      # unit tests with no UI snapshotting, so the specific model is irrelevant — only that
+      # the destination resolves. Selection is deterministic (highest runtime, then name
+      # ascending) so a rerun on the same image picks the same device.
+      - name: Resolve a simulator
+        run: |
+          SIM=$(xcrun simctl list devices available --json | python3 -c '
+          import json, re, sys
+          runtimes = json.load(sys.stdin)["devices"]
+          candidates = []
+          for runtime, devices in runtimes.items():
+              m = re.search(r"iOS-(\d+)-(\d+)", runtime)
+              if not m:
+                  continue
+              version = (int(m.group(1)), int(m.group(2)))
+              for d in devices:
+                  if d.get("isAvailable") and d["name"].startswith("iPhone"):
+                      candidates.append((version, d["name"], d["udid"]))
+          if not candidates:
+              sys.exit("no available iPhone simulator on this runner")
+          version = max(c[0] for c in candidates)
+          name, udid = min((c[1], c[2]) for c in candidates if c[0] == version)
+          print(f"{udid}\t{name}\tiOS {version[0]}.{version[1]}")')
+          UDID=$(cut -f1 <<<"$SIM"); NAME=$(cut -f2 <<<"$SIM"); OS=$(cut -f3 <<<"$SIM")
+          echo "using $NAME ($OS)  $UDID"
+          echo "SIMULATOR=id=$UDID" >> "$GITHUB_ENV"
 
       # No signing here on purpose: the Debug config sets CODE_SIGNING_REQUIRED=NO, so this
       # job runs on a fork PR with no access to secrets.
