@@ -9,11 +9,9 @@ options:
 settings:
   base:
     SWIFT_VERSION: "6.0"
-    # DEVELOPMENT_TEAM is intentionally empty at the project level. The real 10-character
-    # Apple Developer Team ID must be supplied for a device/distribution (Release) build —
-    # set it in the Maren target's Release config below, or pass
-    # DEVELOPMENT_TEAM=XXXXXXXXXX on the xcodebuild archive command. Simulator Debug builds
-    # need no team.
+    # DEVELOPMENT_TEAM is intentionally empty at the PROJECT level so simulator Debug builds
+    # and CI test runs need no Apple team and no signing at all. The real team is set on the
+    # Maren target's Release config below, which is the only configuration that signs.
     DEVELOPMENT_TEAM: ""
     CODE_SIGNING_ALLOWED: "NO"
     CODE_SIGNING_REQUIRED: "NO"
@@ -94,13 +92,13 @@ targets:
           CODE_SIGN_IDENTITY: "-"
           CODE_SIGNING_REQUIRED: "NO"
         # Release: automatic signing for a real device / App Store (TestFlight) archive.
-        # >>> ACTION REQUIRED <<< set DEVELOPMENT_TEAM to your 10-character Apple Developer
+        # Release signs with the real Maren team. CI overrides nothing here.
         # Team ID (App Store Connect → Membership) before archiving, or pass it on the
         # xcodebuild command line. Automatic signing will then provision an
         # "Apple Distribution" certificate + App Store profile for finance.maren.app.
         Release:
           CODE_SIGN_STYLE: Automatic
-          DEVELOPMENT_TEAM: ""   # <-- FILL IN: your Apple Developer Team ID
+          DEVELOPMENT_TEAM: "5N8DU2A9WH"
           CODE_SIGN_IDENTITY: "Apple Distribution"
           CODE_SIGNING_REQUIRED: "YES"
 

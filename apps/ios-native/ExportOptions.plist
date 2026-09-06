@@ -10,7 +10,7 @@
       -configuration Release -sdk iphoneos \
       -destination 'generic/platform=iOS' \
       -archivePath build/Maren.xcarchive \
-      DEVELOPMENT_TEAM=XXXXXXXXXX \
+      DEVELOPMENT_TEAM=5N8DU2A9WH \
       archive
     xcodebuild -exportArchive \
       -archivePath build/Maren.xcarchive \
@@ -18,17 +18,15 @@
       -exportPath build/export \
       -allowProvisioningUpdates
 
-  >>> ACTION REQUIRED <<< Replace the teamID placeholder below with your real 10-character
-  Apple Developer Team ID. Everything else is correct for a TestFlight/App Store upload.
+  teamID is the real Maren team. Everything else is correct for a TestFlight upload.
 -->
 <plist version="1.0">
 <dict>
     <key>method</key>
     <string>app-store</string>
 
-    <!-- Replace with your real Apple Developer Team ID (App Store Connect -> Membership). -->
     <key>teamID</key>
-    <string>REPLACE_WITH_TEAM_ID</string>
+    <string>5N8DU2A9WH</string>
 
     <!-- Let Xcode create/refresh the App Store distribution profile automatically. -->
     <key>signingStyle</key>
