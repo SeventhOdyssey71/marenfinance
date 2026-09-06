@@ -86,6 +86,12 @@ struct MarenBrandMark: View {
             .resizable()
             .scaledToFit()
             .frame(width: size)
+            // The mark is the one object the whole flow is built around, so it is the one thing
+            // that is alive: a real Metal shader turns the flat violet cut into a piece of glass
+            // with light moving through it. See DesignSystem/LiquidGlass.swift — Reduce Motion
+            // freezes it on a lit still, and a device that cannot compile the shader gets exactly
+            // the artwork above.
+            .liquidGlass(.brand)
             .accessibilityHidden(true)
     }
 }
@@ -117,6 +123,9 @@ struct OnboardingSymbolFocal: View {
             Image(systemName: symbol)
                 .font(.system(size: symbolSize, weight: .medium))
                 .foregroundStyle(OnboardingPalette.accent)
+                // The same glass as the mark, dialled back: an SF Symbol has to be read as an
+                // ICON first, so it takes less refraction than the brand cut does.
+                .liquidGlass(.symbol)
         }
         .accessibilityHidden(true)
     }

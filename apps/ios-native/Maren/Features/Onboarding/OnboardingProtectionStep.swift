@@ -72,6 +72,10 @@ struct OnboardingProtectionStep: View {
                 .font(.system(size: 54, weight: .medium))
                 .foregroundStyle(resolvedTint)
                 .contentTransition(.symbolEffect(.replace))
+                // This is the one focal whose colour changes with the outcome, so the glass is
+                // told about it: the highlight is warmed towards whatever the glyph currently
+                // is, rather than staying violet over a green shield.
+                .liquidGlass(.symbol.tinted(resolvedTint))
         }
         .accessibilityHidden(true)
     }
