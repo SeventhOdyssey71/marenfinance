@@ -19,19 +19,28 @@
 # so every upload is accepted. `manageAppVersionAndBuildNumber` is false in
 # ExportOptions.plist, so Xcode will not silently rewrite what we set here.
 #
-# SIGNING. The distribution certificate is imported from a secret into a throwaway keychain;
-# the provisioning profile is NOT stored as a secret. Xcode creates or refreshes it during
-# the build using the App Store Connect API key (`-allowProvisioningUpdates` plus
-# `-authenticationKey*`). That combination is deliberate: importing the cert means CI never
-# creates a NEW distribution certificate (a team may only hold three, and a runner that
-# minted one per build would exhaust them), while letting Xcode manage the profile means
-# nobody has to rotate a base64 blob when the profile expires.
+# WHY macos-26 AND AN SDK GATE. Apple rejects any App Store Connect upload whose binary was
+# built with an SDK older than iOS 26 ("This app was built with the iOS 18.2 SDK. All iOS and
+# iPadOS apps must be built with the iOS 26 SDK or later"). That is checked server-side on the
+# built binary, so no build flag works around it, and it is the reason this workflow exists
+# rather than a laptop upload: the dev machine had Xcode 16.2. The Xcode path is deliberately
+# NOT pinned (image updates move those); the upload job asserts the SDK instead.
+#
+# SIGNING IS FULLY MANUAL. Both the distribution certificate and the App Store provisioning
+# profile come from secrets. Cloud signing (`-allowProvisioningUpdates`) was tried and fails
+# with "Cloud signing permission error / No profiles for 'finance.maren.app' were found"
+# unless the App Store Connect key holds the ADMIN role, which this one does not (it can read
+# provisioning data but not create signing assets). Manual signing is also better for CI on
+# its own merits: a runner doing cloud signing mints a NEW distribution certificate on every
+# run, and a team may only hold three.
 #
 # REQUIRED REPOSITORY SECRETS (Settings -> Secrets and variables -> Actions):
 #
 #   IOS_DIST_CERT_P12          Apple Distribution certificate + private key, exported from
 #                              Keychain Access as .p12, then `base64 -i cert.p12 | pbcopy`.
 #   IOS_DIST_CERT_PASSWORD     The password chosen during that .p12 export.
+#   IOS_PROVISION_PROFILE      The App Store .mobileprovision for finance.maren.app, base64.
+#                              Must reference the same certificate as the .p12 above.
 #   APP_STORE_CONNECT_KEY_ID   App Store Connect -> Users and Access -> Integrations -> Keys.
 #   APP_STORE_CONNECT_ISSUER_ID  The issuer UUID shown above the key list on that page.
 #   APP_STORE_CONNECT_API_KEY  Contents of the downloaded AuthKey_XXXXXXXX.p8, base64:
@@ -76,15 +85,15 @@ env:
 jobs:
   test:
     name: Test (simulator)
-    runs-on: macos-15
+    runs-on: macos-26
     timeout-minutes: 30
     steps:
       - uses: actions/checkout@v4
 
-      # Pin Xcode rather than taking the runner default: a runner image bump that changes
-      # the default Xcode is otherwise indistinguishable from a real regression.
-      - name: Select Xcode
-        run: sudo xcode-select -s /Applications/Xcode_26.app
+      - name: Show toolchain
+        run: |
+          xcodebuild -version
+          xcodebuild -showsdks | grep -i iphone || true
 
       - name: Install XcodeGen
         run: brew install xcodegen
@@ -142,13 +151,26 @@ jobs:
     name: Archive and upload
     needs: test
     if: github.event_name == 'workflow_dispatch'
-    runs-on: macos-15
+    runs-on: macos-26
     timeout-minutes: 60
     steps:
       - uses: actions/checkout@v4
 
-      - name: Select Xcode
-        run: sudo xcode-select -s /Applications/Xcode_26.app
+      # Apple rejects the upload SERVER-SIDE if this is below 26, and only after a full
+      # archive has already run: "This app was built with the iOS 18.2 SDK. All iOS and
+      # iPadOS apps must be built with the iOS 26 SDK or later." No build flag works around
+      # it, so assert the toolchain in seconds rather than discover it in minutes. The Xcode
+      # path is deliberately not pinned: image updates move those, and the SDK is what Apple
+      # actually checks.
+      - name: Require the iOS 26 SDK or later
+        run: |
+          xcodebuild -version
+          SDK=$(xcodebuild -showsdks | sed -n 's/.*-sdk iphoneos\([0-9][0-9.]*\).*/\1/p' | sort -V | tail -1)
+          echo "highest iphoneos SDK: ${SDK:-none}"
+          if [ -z "$SDK" ] || [ "${SDK%%.*}" -lt 26 ]; then
+            echo "::error::App Store uploads require the iOS 26 SDK or later; this runner has ${SDK:-none}."
+            exit 1
+          fi
 
       - name: Install XcodeGen
         run: brew install xcodegen
@@ -186,6 +208,37 @@ jobs:
           echo "Identities in the signing keychain:"
           security find-identity -v -p codesigning "$KEYCHAIN"
 
+      # Cloud signing (-allowProvisioningUpdates) needs an App Store Connect key with the
+      # ADMIN role; a lesser key fails with "Cloud signing permission error / No profiles for
+      # 'finance.maren.app' were found" even though it can read provisioning data fine. So the
+      # profile is supplied explicitly. That is also better for CI on its own merits: a runner
+      # doing cloud signing mints a NEW distribution certificate every run, and a team may
+      # only hold three.
+      - name: Install provisioning profile
+        env:
+          PROFILE: ${{ secrets.IOS_PROVISION_PROFILE }}
+        run: |
+          set +x
+          if [ -z "$PROFILE" ]; then
+            echo "::error::IOS_PROVISION_PROFILE is not set. See the header of this workflow."
+            exit 1
+          fi
+          mkdir -p ~/Library/MobileDevice/Provisioning\ Profiles
+          echo "$PROFILE" | base64 --decode > "$RUNNER_TEMP/profile.mobileprovision"
+          PLIST=$(security cms -D -i "$RUNNER_TEMP/profile.mobileprovision")
+          UUID=$(echo "$PLIST" | plutil -extract UUID raw -)
+          NAME=$(echo "$PLIST" | plutil -extract Name raw -)
+          APPID=$(echo "$PLIST" | plutil -extract Entitlements.application-identifier raw -)
+          cp "$RUNNER_TEMP/profile.mobileprovision" \
+             ~/Library/MobileDevice/Provisioning\ Profiles/"$UUID".mobileprovision
+          echo "profile: $NAME ($UUID) for $APPID"
+          # A profile for the wrong app id produces an archive Apple then rejects.
+          case "$APPID" in
+            *finance.maren.app) : ;;
+            *) echo "::error::profile is for $APPID, expected *.finance.maren.app"; exit 1 ;;
+          esac
+          echo "PROFILE_NAME=$NAME" >> "$GITHUB_ENV"
+
       - name: Write App Store Connect API key
         env:
           ASC_KEY: ${{ secrets.APP_STORE_CONNECT_API_KEY }}
@@ -196,17 +249,15 @@ jobs:
             echo "::error::App Store Connect API key secrets are not set. See the header."
             exit 1
           fi
-          # xcodebuild's -authenticationKeyPath wants a real file; altool reads the same one.
-          mkdir -p "$RUNNER_TEMP/private_keys"
-          echo "$ASC_KEY" | base64 --decode > "$RUNNER_TEMP/private_keys/AuthKey_${ASC_KEY_ID}.p8"
+          # altool looks in ~/.appstoreconnect/private_keys for AuthKey_<id>.p8.
+          mkdir -p ~/.appstoreconnect/private_keys
+          echo "$ASC_KEY" | base64 --decode > ~/.appstoreconnect/private_keys/AuthKey_${ASC_KEY_ID}.p8
+          chmod 600 ~/.appstoreconnect/private_keys/AuthKey_${ASC_KEY_ID}.p8
 
       # project.yml holds the marketing version (1.0.0). The build number comes from the run
       # number so it is unique without anyone remembering to bump a file.
       - name: Archive
         working-directory: apps/ios-native
-        env:
-          ASC_KEY_ID: ${{ secrets.APP_STORE_CONNECT_KEY_ID }}
-          ASC_ISSUER_ID: ${{ secrets.APP_STORE_CONNECT_ISSUER_ID }}
         run: |
           set -o pipefail
           xcodebuild archive \
@@ -217,28 +268,38 @@ jobs:
             -destination 'generic/platform=iOS' \
             -archivePath "$RUNNER_TEMP/Maren.xcarchive" \
             CURRENT_PROJECT_VERSION=${{ github.run_number }} \
-            -allowProvisioningUpdates \
-            -authenticationKeyPath "$RUNNER_TEMP/private_keys/AuthKey_${ASC_KEY_ID}.p8" \
-            -authenticationKeyID "$ASC_KEY_ID" \
-            -authenticationKeyIssuerID "$ASC_ISSUER_ID" \
+            CODE_SIGN_STYLE=Manual \
+            DEVELOPMENT_TEAM=5N8DU2A9WH \
+            CODE_SIGN_IDENTITY="Apple Distribution" \
+            PROVISIONING_PROFILE_SPECIFIER="$PROFILE_NAME" \
             | xcpretty && exit ${PIPESTATUS[0]}
 
-      - name: Export .ipa
+      - name: Export ipa
         working-directory: apps/ios-native
-        env:
-          ASC_KEY_ID: ${{ secrets.APP_STORE_CONNECT_KEY_ID }}
-          ASC_ISSUER_ID: ${{ secrets.APP_STORE_CONNECT_ISSUER_ID }}
         run: |
+          cat > "$RUNNER_TEMP/ExportOptions.plist" <<PLIST
+          <?xml version="1.0" encoding="UTF-8"?>
+          <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+          <plist version="1.0">
+          <dict>
+            <key>method</key><string>app-store</string>
+            <key>teamID</key><string>5N8DU2A9WH</string>
+            <key>signingStyle</key><string>manual</string>
+            <key>signingCertificate</key><string>Apple Distribution</string>
+            <key>provisioningProfiles</key>
+            <dict><key>finance.maren.app</key><string>${PROFILE_NAME}</string></dict>
+            <key>destination</key><string>export</string>
+            <key>uploadSymbols</key><true/>
+            <key>manageAppVersionAndBuildNumber</key><false/>
+            <key>stripSwiftSymbols</key><true/>
+          </dict>
+          </plist>
+          PLIST
           set -o pipefail
           xcodebuild -exportArchive \
             -archivePath "$RUNNER_TEMP/Maren.xcarchive" \
-            -exportOptionsPlist ExportOptions.plist \
-            -exportPath "$RUNNER_TEMP/export" \
-            -allowProvisioningUpdates \
-            -authenticationKeyPath "$RUNNER_TEMP/private_keys/AuthKey_${ASC_KEY_ID}.p8" \
-            -authenticationKeyID "$ASC_KEY_ID" \
-            -authenticationKeyIssuerID "$ASC_ISSUER_ID" \
-            | xcpretty && exit ${PIPESTATUS[0]}
+            -exportOptionsPlist "$RUNNER_TEMP/ExportOptions.plist" \
+            -exportPath "$RUNNER_TEMP/export" | xcpretty && exit ${PIPESTATUS[0]}
           ls -la "$RUNNER_TEMP/export"
 
       # Kept even when the upload is skipped, so a dry run still produces something you can
@@ -259,8 +320,6 @@ jobs:
         run: |
           IPA=$(ls "$RUNNER_TEMP"/export/*.ipa | head -1)
           echo "Uploading $IPA (build ${{ github.run_number }})"
-          # altool reads the key from ~/private_keys, $RUNNER_TEMP/private_keys, or ./private_keys.
-          export API_PRIVATE_KEYS_DIR="$RUNNER_TEMP/private_keys"
           xcrun altool --upload-app -f "$IPA" -t ios \
             --apiKey "$ASC_KEY_ID" --apiIssuer "$ASC_ISSUER_ID"
 
@@ -288,4 +347,4 @@ jobs:
         if: always()
         run: |
           security delete-keychain "$RUNNER_TEMP/maren-signing.keychain-db" 2>/dev/null || true
-          rm -rf "$RUNNER_TEMP/private_keys"
+          rm -rf ~/.appstoreconnect/private_keys "$RUNNER_TEMP/profile.mobileprovision"
