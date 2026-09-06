@@ -1,0 +1,43 @@
+# What NOT to upload when deploying apps/web from this monorepo.
+#
+# The Vercel project has no Git connection, so every deploy is a CLI upload of the
+# repo root (Root Directory is apps/web, but the whole workspace is uploaded so
+# pnpm can resolve @maren/sdk). Without this file that upload is ~165 MB and fails
+# outright with "Upload aborted / fetch failed" — most of it being the native iOS
+# app and the launch film, neither of which the web build can even read.
+#
+# Keep: apps/web, packages/* (@maren/sdk is a workspace dependency), and the root
+# manifests. Everything below is either another deploy target or an artifact.
+
+# Other apps. The web build never imports from these.
+apps/ios-native
+apps/relayer
+
+# Design and marketing source. design/ alone is ~24 MB: the launch film inlines
+# every image as a base64 data URI, and the rendered masters live beside it.
+design
+_grant
+_archive
+
+# Generated docs and PDFs; the /docs route ships its own content.
+docs
+
+# Build and dependency artifacts — Vercel installs and builds from source.
+node_modules
+**/node_modules
+.next
+**/.next
+**/.turbo
+**/dist
+
+# Foundry output.
+packages/contracts/out
+packages/contracts/cache
+packages/contracts/broadcast
+
+# Local env files must never be uploaded; Vercel injects its own.
+.env
+.env.*
+!.env.example
+
+.git
