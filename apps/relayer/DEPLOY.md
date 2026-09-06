@@ -1,14 +1,30 @@
 # Deploying the Maren relayer
 
-## Status: nothing is deployed
+## Status: LIVE on Cloudflare Workers (testnet)
 
-**The relayer is not running anywhere.** No host has been provisioned, no
-account has been created, no key exists, and no BTC has been funded. This
-document and the files beside it (`Dockerfile`, `docker-compose.yml`,
-`fly.toml`, `.env.relayer.example`) prepare the deployment up to the point where
-the owner runs one command. Until that command runs, `apps/web` is correct to
-say that no relayer is running, and `RELAYER_AVAILABLE` in
-`apps/web/src/lib/chain/write.ts` is correctly `false`.
+**The relayer is deployed and accepting.** Verified on 2026-09-06:
+
+| | |
+| --- | --- |
+| URL | `https://maren-relayer.rolandojude18.workers.dev` |
+| Signer | `0xd90245ee16B2f58eD8654961BBf2fa835046df89` |
+| Balance | 0.0199 BTC on matsnet, nonce 21 (it has relayed before) |
+| Storage | Durable Object (`store: "durable"`), single instance, cron `*/2` armed |
+| Key | a `wrangler secret`, not a file |
+
+Both clients point at it: `apps/ios-native/Maren/Info.plist` sets
+`MAREN_RELAYER_URL`, and `NEXT_PUBLIC_RELAYER_URL` is set on the Vercel project
+`marenfinance` for production/preview/development. The web app derives relayer
+availability from that URL being present — the hand-edited `RELAYER_AVAILABLE`
+flag described in older notes no longer exists.
+
+> Everything below documents the standalone-server and Fly.io paths, which
+> remain valid alternatives but are **not** what is running. The live
+> deployment is Option C (Cloudflare Workers).
+
+**This header used to read "nothing is deployed", long after it was.** A stale
+status line is worse than none: it was believed over a live health check. If the
+deployment changes, change this table in the same commit.
 
 What was verified while writing this, and what was not:
 
