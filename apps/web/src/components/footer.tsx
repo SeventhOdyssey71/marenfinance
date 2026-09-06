@@ -1,4 +1,5 @@
 import Link from 'next/link';
+import { TESTFLIGHT_URL } from '@/lib/links';
 import { XLogo, GitHubLogo } from './ui/icons';
 import { Reveal } from './ui/reveal';
 
@@ -17,6 +18,7 @@ const columns: readonly FooterColumn[] = [
       { label: 'What you can do', href: '#product' },
       { label: 'How it works', href: '#how' },
       { label: 'Launch app', href: '/app' },
+      { label: 'Join the iOS beta', href: TESTFLIGHT_URL, external: true },
     ],
   },
   {

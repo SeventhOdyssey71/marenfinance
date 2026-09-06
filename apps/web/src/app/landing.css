@@ -757,24 +757,3 @@
 }
 
 /* ── Hero "TestFlight app" CTA: primary-styled but not yet live ──────────────
-   Mobile is the headline product, so this is the primary button — but the build
-   is not on TestFlight yet, so it is non-interactive (no href) and carries a
-   quiet "Soon" marker instead of pretending to link somewhere. */
-.landing .hero-btn.is-soon {
-  cursor: default;
-  gap: 9px;
-}
-.landing .hero-btn.is-soon:active {
-  transform: none;
-}
-.landing .hero-btn-soon {
-  font-family: var(--body);
-  font-size: 11px;
-  font-weight: 600;
-  letter-spacing: 0.02em;
-  padding: 2px 8px;
-  margin-left: 2px;
-  border-radius: 999px;
-  background: rgba(255, 255, 255, 0.22);
-  color: #fff;
-}
