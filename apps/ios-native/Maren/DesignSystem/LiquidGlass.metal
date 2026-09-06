@@ -94,7 +94,9 @@ static inline float band(float d, float centre, float width) {
     float sweep = mix(-1.15f, 1.15f, fract(t * 0.160f));
     // A broad glow with one crisp core line riding just behind it, at a fixed offset. Two
     // INDEPENDENT wipes read as two gradients; one glow plus its own hot line reads as a solid
-    // edge turning into the light. One pass every 6.25s: a slow turn, not a shimmer.
+    // edge turning into the light. One pass every 6.25s of SHADER time — the Swift side scales
+    // its clock (LiquidGlassStyle.speed, 2.0 by default), so the house look is a pass every
+    // ~3.1s: a turn in the light you actually catch, still well short of a shimmer.
     float wide = maren::band(d, sweep, 0.185f);
     float core = maren::band(d, sweep + 0.090f, 0.030f);
 
