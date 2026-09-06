@@ -285,10 +285,17 @@ jobs:
 
       # project.yml holds the marketing version (1.0.0). The build number comes from the run
       # number so it is unique without anyone remembering to bump a file.
+      # NOTE ON LOGGING: this does NOT pipe through xcpretty. Signing and provisioning errors
+      # are emitted in a form xcpretty drops on the floor, so a failed archive printed only
+      # "** ARCHIVE FAILED **" with no cause at all — the log is useless exactly when it is
+      # needed. The raw log goes to a file, xcpretty prettifies the happy path from that file,
+      # and on failure the raw tail is dumped so the real reason is always visible.
       - name: Archive
         working-directory: apps/ios-native
         run: |
           set -o pipefail
+          LOG="$RUNNER_TEMP/archive.log"
+          set +e
           xcodebuild archive \
             -project Maren.xcodeproj \
             -scheme "$SCHEME" \
@@ -301,7 +308,21 @@ jobs:
             DEVELOPMENT_TEAM=5N8DU2A9WH \
             CODE_SIGN_IDENTITY="Apple Distribution" \
             PROVISIONING_PROFILE_SPECIFIER="$PROFILE_NAME" \
-            | xcpretty && exit ${PIPESTATUS[0]}
+            > "$LOG" 2>&1
+          RC=$?
+          set -e
+          if [ $RC -ne 0 ]; then
+            echo "::group::xcodebuild diagnostics"
+            grep -aiE 'error:|error |No profile|no signing|does not (match|support)|entitlement|provisioning|Command .* failed' "$LOG" \
+              | sort -u | head -60
+            echo "::endgroup::"
+            echo "::group::raw tail (last 200 lines)"
+            tail -200 "$LOG"
+            echo "::endgroup::"
+            echo "::error::Archive failed (exit $RC). See the diagnostics group above."
+            exit $RC
+          fi
+          xcpretty < "$LOG" | tail -30 || true
 
       - name: Export ipa
         working-directory: apps/ios-native
