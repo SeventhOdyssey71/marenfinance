@@ -84,7 +84,7 @@ jobs:
       # Pin Xcode rather than taking the runner default: a runner image bump that changes
       # the default Xcode is otherwise indistinguishable from a real regression.
       - name: Select Xcode
-        run: sudo xcode-select -s /Applications/Xcode_16.app
+        run: sudo xcode-select -s /Applications/Xcode_26.app
 
       - name: Install XcodeGen
         run: brew install xcodegen
@@ -148,7 +148,7 @@ jobs:
       - uses: actions/checkout@v4
 
       - name: Select Xcode
-        run: sudo xcode-select -s /Applications/Xcode_16.app
+        run: sudo xcode-select -s /Applications/Xcode_26.app
 
       - name: Install XcodeGen
         run: brew install xcodegen

@@ -78,6 +78,11 @@ targets:
         INFOPLIST_KEY_UILaunchScreen_Generation: "YES"
         INFOPLIST_KEY_CFBundleDisplayName: Maren
         INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents: "YES"
+        # iPhone only. Maren is a portrait phone app, and App Store validation rejects a
+        # UNIVERSAL (iPhone+iPad) bundle that declares portrait alone: an iPad build must
+        # offer all four orientations for multitasking. Declaring the family honestly is the
+        # fix; padding the orientation list would ship an app whose layouts assume portrait.
+        TARGETED_DEVICE_FAMILY: "1"
         INFOPLIST_KEY_UISupportedInterfaceOrientations: UIInterfaceOrientationPortrait
         INFOPLIST_KEY_UIUserInterfaceStyle: Light
         INFOPLIST_KEY_NSFaceIDUsageDescription: Maren uses Face ID to unlock your signing key before every transaction, so only you can move your money.
