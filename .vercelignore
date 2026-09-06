@@ -9,31 +9,36 @@
 # Keep: apps/web, packages/* (@maren/sdk is a workspace dependency), and the root
 # manifests. Everything below is either another deploy target or an artifact.
 
+# EVERY PATH HERE IS ROOT-ANCHORED WITH A LEADING SLASH, DELIBERATELY.
+# An unanchored entry matches a directory of that name at ANY depth. A bare `docs`
+# line here did not just exclude the 21 MB /docs research tree — it also excluded
+# apps/web/src/app/docs, the route itself, and /docs began returning 404 in
+# production while building fine locally. Anchor everything.
+
 # Other apps. The web build never imports from these.
-apps/ios-native
-apps/relayer
+/apps/ios-native
+/apps/relayer
 
 # Design and marketing source. design/ alone is ~24 MB: the launch film inlines
 # every image as a base64 data URI, and the rendered masters live beside it.
-design
-_grant
-_archive
+/design
+/_grant
+/_archive
 
-# Generated docs and PDFs; the /docs route ships its own content.
-docs
+# Research notes, brand assets and generated demo/build artifacts (~21 MB).
+# NOT docs-site/ — that is the MDX + docs.json the /docs route actually reads,
+# and it must ship.
+/docs
 
 # Build and dependency artifacts — Vercel installs and builds from source.
 node_modules
-**/node_modules
 .next
-**/.next
-**/.turbo
-**/dist
+.turbo
 
 # Foundry output.
-packages/contracts/out
-packages/contracts/cache
-packages/contracts/broadcast
+/packages/contracts/out
+/packages/contracts/cache
+/packages/contracts/broadcast
 
 # Local env files must never be uploaded; Vercel injects its own.
 .env
