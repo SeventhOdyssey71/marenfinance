@@ -92,14 +92,17 @@ targets:
           CODE_SIGN_IDENTITY: "-"
           CODE_SIGNING_REQUIRED: "NO"
         # Release: automatic signing for a real device / App Store (TestFlight) archive.
-        # Release signs with the real Maren team. CI overrides nothing here.
-        # Team ID (App Store Connect → Membership) before archiving, or pass it on the
-        # xcodebuild command line. Automatic signing will then provision an
-        # "Apple Distribution" certificate + App Store profile for finance.maren.app.
+        # Automatic signing provisions the Apple Distribution certificate and the App Store
+        # profile for finance.maren.app against team 5N8DU2A9WH.
+        #
+        # CODE_SIGN_IDENTITY is deliberately ABSENT. Under automatic signing Xcode chooses
+        # the identity from the build ACTION (development for build, distribution for
+        # archive); pinning it here makes the two disagree and the archive fails with
+        # "conflicting provisioning settings ... automatically signed for development, but a
+        # conflicting code signing identity Apple Distribution has been manually specified".
         Release:
           CODE_SIGN_STYLE: Automatic
           DEVELOPMENT_TEAM: "5N8DU2A9WH"
-          CODE_SIGN_IDENTITY: "Apple Distribution"
           CODE_SIGNING_REQUIRED: "YES"
 
   MarenTests:
