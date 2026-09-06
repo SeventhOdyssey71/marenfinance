@@ -1,8 +1,24 @@
 import type { Metadata } from 'next';
 import type { ReactNode } from 'react';
+import { notFound } from 'next/navigation';
 
 import { AppShell } from '@/components/app/app-shell';
 import { AppProviders } from './providers';
+
+/**
+ * The web app is OFF in production while the launch focuses on the iOS beta.
+ *
+ * Gated rather than deleted: the whole /app subtree still builds, still runs locally,
+ * and comes back by setting MAREN_WEB_APP_ENABLED=true on the Vercel project — no code
+ * change, no revert of a large deletion. Deleting it would also silently rot the parts
+ * of packages/sdk that only this subtree exercises.
+ *
+ * Development is always on, so nobody has to set an env var to work on it. Preview
+ * deployments follow the same flag as production, so what is checked on a preview URL
+ * is what ships.
+ */
+const WEB_APP_ENABLED =
+  process.env.MAREN_WEB_APP_ENABLED === 'true' || process.env.NODE_ENV === 'development';
 
 export const metadata: Metadata = {
   title: {
@@ -30,6 +46,10 @@ export const dynamic = 'force-dynamic';
  * pre-audit disclosure — lives in `AppShell`.
  */
 export default function AppLayout({ children }: { children: ReactNode }) {
+  // Before any provider mounts: a disabled web app must not connect a wallet, open an
+  // RPC transport or read chain state just to render a 404.
+  if (!WEB_APP_ENABLED) notFound();
+
   return (
     <AppProviders>
       {/* The app is the light world; the marketing site stays dark. The attribute

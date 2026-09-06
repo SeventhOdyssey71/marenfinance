@@ -40,8 +40,10 @@ export function Hero() {
           </svg>
           Join the iOS beta
         </a>
-        <a href="/app" className="hero-btn hero-btn-ghost">
-          Open the web app
+        {/* Secondary CTA. The web app is off in production while the launch is
+            mobile-first, so this points at the docs rather than a route that 404s. */}
+        <a href="/docs" className="hero-btn hero-btn-ghost">
+          Read docs
         </a>
       </Reveal>
 

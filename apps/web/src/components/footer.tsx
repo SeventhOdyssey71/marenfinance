@@ -17,7 +17,6 @@ const columns: readonly FooterColumn[] = [
     links: [
       { label: 'What you can do', href: '#product' },
       { label: 'How it works', href: '#how' },
-      { label: 'Launch app', href: '/app' },
       { label: 'Join the iOS beta', href: TESTFLIGHT_URL, external: true },
     ],
   },
@@ -64,8 +63,8 @@ export function Footer() {
             pre-audit, so start small.
           </p>
           <div className="mt-8 flex justify-center">
-            <a href="/app" className="footer-cta">
-              Open the app
+            <a href={TESTFLIGHT_URL} target="_blank" rel="noopener noreferrer" className="footer-cta">
+              Join the iOS beta
             </a>
           </div>
         </div>

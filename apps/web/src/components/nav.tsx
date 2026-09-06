@@ -14,7 +14,6 @@ type NavLink = { href: string; label: string };
 
 const links: readonly NavLink[] = [
   { href: '#product', label: 'Product' },
-  { href: '/docs', label: 'Docs' },
   { href: '#faq', label: 'FAQ' },
 ];
 
@@ -58,8 +57,8 @@ export function Nav() {
           </div>
 
           <div className="flex items-center gap-3">
-            <a href="/app" className="nav-cta">
-              Open app
+            <a href="/docs" className="nav-cta">
+              Read docs
             </a>
 
             <button
@@ -113,8 +112,8 @@ export function Nav() {
               </li>
             ))}
             <li className="pt-3">
-              <a href="/app" className="nav-cta flex w-full justify-center">
-                Open app
+              <a href="/docs" className="nav-cta flex w-full justify-center">
+                Read docs
               </a>
             </li>
           </ul>
