@@ -96,18 +96,23 @@ targets:
           CODE_SIGN_STYLE: Manual
           CODE_SIGN_IDENTITY: "-"
           CODE_SIGNING_REQUIRED: "NO"
-        # Release: automatic signing for a real device / App Store (TestFlight) archive.
-        # Automatic signing provisions the Apple Distribution certificate and the App Store
-        # profile for finance.maren.app against team 5N8DU2A9WH.
+        # Release: MANUAL signing against the App Store profile, for a device / TestFlight
+        # archive. These live here, on the app TARGET, and must never be passed to xcodebuild
+        # as command-line build settings: command-line settings apply to every target in the
+        # graph, including the SwiftPM dependencies, and the archive then dies with
+        # "swift-nio_NIOPosix does not support provisioning profiles, but provisioning
+        # profile ... has been manually specified". A framework target cannot take a profile.
         #
-        # CODE_SIGN_IDENTITY is deliberately ABSENT. Under automatic signing Xcode chooses
-        # the identity from the build ACTION (development for build, distribution for
-        # archive); pinning it here makes the two disagree and the archive fails with
-        # "conflicting provisioning settings ... automatically signed for development, but a
-        # conflicting code signing identity Apple Distribution has been manually specified".
+        # Manual rather than automatic because CI signs with an explicitly installed profile:
+        # automatic signing needs an App Store Connect key with the ADMIN role, and a runner
+        # doing cloud signing mints a new distribution certificate on every run against a
+        # team limit of three. PROVISIONING_PROFILE_SPECIFIER matches the profile the
+        # workflow installs by name; the workflow asserts the two agree before archiving.
         Release:
-          CODE_SIGN_STYLE: Automatic
+          CODE_SIGN_STYLE: Manual
           DEVELOPMENT_TEAM: "5N8DU2A9WH"
+          CODE_SIGN_IDENTITY: "Apple Distribution"
+          PROVISIONING_PROFILE_SPECIFIER: "Maren AppStore v1"
           CODE_SIGNING_REQUIRED: "YES"
 
   MarenTests:

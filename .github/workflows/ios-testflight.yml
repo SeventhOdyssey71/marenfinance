@@ -267,6 +267,21 @@ jobs:
             *) echo "::error::profile is for $APPID, expected *.finance.maren.app"; exit 1 ;;
           esac
           echo "PROFILE_NAME=$NAME" >> "$GITHUB_ENV"
+          # project.yml is the single source of truth for which profile the app target signs
+          # with (PROVISIONING_PROFILE_SPECIFIER). Xcode matches it BY NAME, so a secret
+          # holding a differently-named profile fails deep inside the archive with an opaque
+          # message. Compare here, where the error can say exactly what is wrong.
+          EXPECTED=$(sed -n 's/^ *PROVISIONING_PROFILE_SPECIFIER: *"\(.*\)" *$/\1/p' \
+            "$GITHUB_WORKSPACE/apps/ios-native/project.yml" | head -1)
+          if [ -z "$EXPECTED" ]; then
+            echo "::error::project.yml declares no PROVISIONING_PROFILE_SPECIFIER for the Release config."
+            exit 1
+          fi
+          if [ "$NAME" != "$EXPECTED" ]; then
+            echo "::error::IOS_PROVISION_PROFILE is named '$NAME' but project.yml signs with '$EXPECTED'. Update whichever is wrong."
+            exit 1
+          fi
+          echo "profile name matches project.yml: $EXPECTED"
 
       - name: Write App Store Connect API key
         env:
@@ -304,10 +319,6 @@ jobs:
             -destination 'generic/platform=iOS' \
             -archivePath "$RUNNER_TEMP/Maren.xcarchive" \
             CURRENT_PROJECT_VERSION=${{ github.run_number }} \
-            CODE_SIGN_STYLE=Manual \
-            DEVELOPMENT_TEAM=5N8DU2A9WH \
-            CODE_SIGN_IDENTITY="Apple Distribution" \
-            PROVISIONING_PROFILE_SPECIFIER="$PROFILE_NAME" \
             > "$LOG" 2>&1
           RC=$?
           set -e
