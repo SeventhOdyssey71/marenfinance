@@ -52,6 +52,17 @@ const MUSIC = join(AUDIO, 'music.mp3');
  * decide and suppresses the band a centred vocal would occupy instead.
  */
 const CENTRE = Number(arg('centre', '1'));
+/**
+ * Voice level relative to the score, 0..1.
+ *
+ * Set below 1 because the narration read as too loud — and the cause was not its own
+ * gain. Measured on the previous master, speech windows sat at -13.6 dBFS RMS while
+ * music-only windows sat at -11.9: the sidechain scooped the bed out from under every
+ * line, so the voice was not loud so much as ALONE. Two changes together, rather than
+ * only turning the voice down: a small cut here, and gentler ducking below so the score
+ * stays audible underneath and the voice sits IN the mix instead of on top of a hole.
+ */
+const VOICE = Number(arg('voice', '0.70'));
 /** Drop the score entirely — the one option that cannot contain a voice. */
 const NO_MUSIC = process.argv.includes('--no-music');
 const DUR = 43.2;
@@ -113,10 +124,35 @@ const inputs = ['-i', VIDEO, '-i', MUSIC, ...voFiles.flatMap((f) => ['-i', f])];
 if (NO_MUSIC) console.log('score dropped (--no-music): voice over picture only');
 else console.log(`score mid-channel at ${CENTRE} (centre suppression for the vocal artefact)`);
 
-const delays = CUES.map(([, at], i) => {
+/**
+ * Every clip is levelled to a common loudness BEFORE it is placed.
+ *
+ * They are generated separately and come back 1-3 LU apart, which broke the mix in a way
+ * that was audible but easy to misread as "the voice is too loud". A threshold-based duck
+ * keyed off an uneven voice fires unevenly: measured on the previous master, the bed was
+ * pulled to -26.9 dB under one line (voice standing +0.8 dB proud of a hole) and left at
+ * -21.3 under another (voice sitting 5.1 dB UNDER the bed). So some lines leapt out and
+ * others were buried, and no single voice-gain setting could fix both.
+ *
+ * Each clip is measured, then given a static gain to VO_TARGET. Static rather than a
+ * compressor because these are finished takes: the goal is to align them with each other,
+ * not to squash the dynamics inside a performance.
+ */
+const VO_TARGET = -23;
+const clipGain = (file) => {
+  const r = spawnSync('ffmpeg', ['-i', file, '-af', 'ebur128=framelog=quiet', '-f', 'null', '-'],
+    { encoding: 'utf8' });
+  const m = (r.stderr || '').match(/I:\s+(-?[\d.]+)\s+LUFS/g);
+  if (!m) return 1;
+  const lufs = Number(m[m.length - 1].match(/(-?[\d.]+)/)[1]);
+  return 10 ** ((VO_TARGET - lufs) / 20);
+};
+
+const delays = CUES.map(([id, at], i) => {
   const ms = Math.round(at * 1000);
+  const g = clipGain(join(AUDIO, `${id}.mp3`)).toFixed(3);
   // Input index: 0 video, 1 music, voice lines start at 2.
-  return `[${i + 2}:a]adelay=${ms}|${ms}[v${i}]`;
+  return `[${i + 2}:a]volume=${g},adelay=${ms}|${ms}[v${i}]`;
 }).join(';');
 const voMix = `${CUES.map((_, i) => `[v${i}]`).join('')}amix=inputs=${CUES.length}:normalize=0[vo]`;
 
@@ -132,7 +168,8 @@ const filter = NO_MUSIC ? [
   // normalize=0: the lines never overlap, so summing must not scale them down.
   delays,
   voMix,
-  `[vo]asplit=2[voOut][voKey]`,
+  `[vo]asplit=2[voRaw][voKey]`,
+  `[voRaw]volume=${VOICE}[voOut]`,
   // The key MUST be padded to the full duration. sidechaincompress stops when its
   // shortest input ends, so an unpadded key (which runs out at the last spoken
   // word) truncates the score there — and -shortest then trims the PICTURE to
@@ -140,7 +177,12 @@ const filter = NO_MUSIC ? [
   `[voKey]apad=whole_dur=${DUR}[voKeyPad]`,
   // Score sits low to begin with; the sidechain then pulls it further under speech.
   `[1:a]stereotools=mlev=${CENTRE},volume=${(0.34 / Math.max(CENTRE, 0.35)).toFixed(2)},afade=t=in:st=0:d=1.6,afade=t=out:st=${(DUR - 2.2).toFixed(2)}:d=2.2[mus]`,
-  `[mus][voKeyPad]sidechaincompress=threshold=0.04:ratio=6:attack=20:release=380[duck]`,
+  // Gentler than it was (was threshold 0.04, ratio 6, release 380). That setting pulled
+  // the bed down about 9 dB under speech, which is a broadcast-style duck: correct when
+  // the music is wallpaper, wrong when it is a lo-fi groove the film is partly carried by.
+  // At 3.5:1 with a faster release the score dips but never disappears, and comes back
+  // between lines instead of pumping.
+  `[mus][voKeyPad]sidechaincompress=threshold=0.06:ratio=3.5:attack=25:release=250[duck]`,
   // loudnorm to -14 LUFS: the platforms this film gets posted to (YouTube, X,
   // LinkedIn) normalise playback to roughly that, so a quieter master is not
   // "subtle" — it is just turned down relative to everything around it. The raw
