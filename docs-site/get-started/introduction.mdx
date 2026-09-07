@@ -15,7 +15,8 @@ against the same contracts. Both are built for Mezo and deployed nowhere else.
   **Maren is pre-audit and lives on Mezo testnet only.** Every contract runs on Mezo matsnet
   (chain `31611`), and its mainnet addresses are all zeroes because Maren is not on mainnet: a
   third-party audit is the deliberate gate. Do not use Maren with funds you cannot afford to
-  lose. The relayer that makes actions gasless is built and tested but not yet hosted, so today
+  lose. The gasless relayer is hosted and sponsoring transactions on matsnet, but a BTC collateral
+  deposit carries native value and can never be relayed, so
   your first deposit costs BTC gas.
 </Warning>
 
@@ -24,7 +25,8 @@ against the same contracts. Both are built for Mezo and deployed nowhere else.
 Mezo already runs the hard part: a live, audited engine where BTC mints a dollar. What it does
 not have is a consumer door. The protocol requires a 2,000 MUSD minimum loan (about $3,000 of BTC
 to open responsibly), every action costs BTC gas, and once you hold MUSD there is almost nowhere
-to spend it. On-chain, MUSD is a DeFi-internal asset: only about 4.6% of its supply was created
+to spend it. On-chain, MUSD is a DeFi-internal asset. Read on Mezo mainnet on 2026-09-07,
+`getEntireSystemDebt()` was 1.07M against a 30.55M supply — about 3.5% of the token was created
 by user borrowing, across fewer than thirty troves.
 
 Maren's edge is not cheaper collateral. It is **no minimum loan size at all**. You can borrow $25
@@ -37,7 +39,9 @@ Mobile-first Bitcoin spending, shipped in the order that keeps user funds safe:
 
 <Steps>
   <Step title="Now: live on testnet">
-    Five contracts on matsnet, web app live, iOS app built and running the same screens. A real
+    Five source-verified contracts on matsnet, and the iOS app in open TestFlight beta reading and
+    writing live against them. The gasless relayer is hosted. The web client is built and runs
+    locally but is switched off in production during the beta. A real
     user has borrowed through the app.
   </Step>
   <Step title="Next: TestFlight beta">
@@ -63,7 +67,9 @@ The full trajectory, with the honest state of each phase, is on the [Roadmap](/g
     requests, and Earn all run against the real MUSD protocol.
   </Card>
   <Card title="Proven on-chain" icon="link">
-    A real user borrowed 25.7 MUSD through the app. The pooled trove is live inside Mezo's own
+    The borrow path has executed on-chain from the app — 2,110.72 MUSD drawn through the pooled
+    trove across 3 accounts, all of them ours or beta testers'. No external user has borrowed yet;
+    that is what the TestFlight beta is for. The pooled trove is live inside Mezo's own
     `TroveManager`. Every claim carries a transaction hash.
   </Card>
   <Card title="Not yet mainnet" icon="circle-half-stroke">

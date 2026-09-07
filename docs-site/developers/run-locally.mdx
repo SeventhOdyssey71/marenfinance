@@ -24,6 +24,8 @@ the iOS app, and the relayer, orchestrated with Turborepo. This is how to run it
 
 <CodeGroup>
 ```bash clone
+# The Maren monorepo is private during the grant review.
+# Reviewers: request access at exorbilabs@gmail.com and you will be added within a day.
 git clone https://github.com/SeventhOdyssey71/marenfinance.git
 cd marenfinance
 ```
@@ -44,21 +46,38 @@ pnpm install
     ```
     The web app reads live from matsnet contracts. The write path is wired and exercised on
     testnet.
+
+    <Note>
+      `/app` is served in **local development only**. It is switched off on
+      `marenfinance.vercel.app`, where `/app/*` returns 404 by design while the launch is
+      mobile-first — the iOS TestFlight beta is the shipping client. The documentation site is the
+      public surface today. The dev script also pins port 3000; pass `--port` to `next dev`
+      directly if that port is taken.
+    </Note>
   </Tab>
   <Tab title="Contracts">
     ```bash
     pnpm contracts:build   # forge build --sizes, checks the EIP-170 limit
-    pnpm contracts:test    # forge test
+    pnpm contracts:test    # forge test (the 11 fork tests SKIP without an RPC, see below)
+
+# The fork tests run against the real deployed MUSD system and need an RPC. They fail closed
+# to "skipped", never to "failed", so CI cannot depend on a public endpoint.
+MEZO_TESTNET_RPC_URL=https://rpc.test.mezo.org \
+  forge test --root packages/contracts --match-path 'test/fork/*'
+# -> 11 passed, 0 failed (about 3 minutes)
     pnpm contracts:fmt     # forge fmt --check
     ```
     All five deployed contracts sit inside the 24,576-byte EIP-170 limit; `MarenVault`, the
-    largest, is 14,508 bytes.
+    largest, is 18,055 bytes at current source, against 14,508 bytes for the build live on matsnet.
+    That gap is expected and tracked: the deployed vault predates the redemption-reconciliation work
+    in `MarenVault.sol` and will be replaced at the next deployment.
   </Tab>
   <Tab title="Tests">
     ```bash
-    pnpm test          # turbo run test across the workspace
+    pnpm test          # turbo run test across the workspace (313 contract + 299 relayer + 141 web)
     pnpm typecheck     # tsc --noEmit across packages
-    pnpm lint          # turbo run lint
+    # There is no `pnpm lint` worth running yet: the script exists in every package but is a
+# pass-through stub. `pnpm typecheck` and `forge fmt --check` are the real gates today.
     ```
   </Tab>
 </Tabs>
@@ -67,11 +86,11 @@ pnpm install
 
 | Suite | Count | Runs against |
 | --- | ---: | --- |
-| Contract unit and property tests | 311 | Foundry, including the redemption splitter and the audit regressions |
-| Fork tests | 11 | The real MUSD contracts on matsnet, including a driven redemption |
-| Relayer | 286 | Four adversarial review rounds, plus packaging and nonce serialisation |
-| Web behaviour suite | 104 | The built app, live matsnet, read-only signer |
-| Web unit tests | 108 | Preflight, revert decoding, the relayer client and its routing |
+| Contract unit and property tests | 313 | Foundry, including the redemption splitter and the audit regressions |
+| Fork tests | 11 | The real MUSD contracts on matsnet, including a driven redemption. Needs `MEZO_TESTNET_RPC_URL`, else they skip |
+| Relayer | 299 | Four adversarial review rounds, plus packaging and nonce serialisation |
+| Web behaviour suite | 104 | The built app, live matsnet, read-only signer. Run with `node apps/web/scripts/verify-behaviour.mjs` against a running `pnpm --filter @maren/web start` |
+| Web unit tests | 141 | Preflight, revert decoding, the relayer client and its routing |
 
 <Info>
   **The fork tests** run Maren's contracts against the actual deployed MUSD system rather than a

@@ -7,7 +7,10 @@ Maren's gasless design exists because the obvious answer is wrong, and being abl
 worth more than the answer itself. A user signs; Maren's relayer submits and pays the BTC gas.
 
 <Warning>
-  **The relayer is built and fully tested but not yet hosted.** Until it is, you submit your own
+  **The relayer is live on matsnet** at `maren-relayer.rolandojude18.workers.dev`, `accepting: true`,
+  with a durable nonce and quota store and a 0.01 BTC/day global gas budget. A sponsored
+  `MarenVault.borrow` of 200 MUSD settled in block 15368268, gas paid by the relayer for a signer
+  holding no BTC. Until it is, you submit your own
   transactions and pay BTC gas, and the app says so on every screen. Hosting it is one command
   plus funding a hot wallet, and it is the single biggest gap between the demo and the product.
   Even once hosted, the first deposit always costs gas. Never read "gasless" as "zero gas".
@@ -60,9 +63,14 @@ the same frame, bubbling any inner revert, so fee and work settle together or ne
 </Warning>
 
 The relayer's guarantees are narrow and worth stating precisely. It relays only to Maren
-contracts, only for known selectors. It rate-limits per address and per IP, carries a per-address
-daily sponsorship budget, and gives each new address **25 free actions** before a small MUSD fee
-is taken **inside the same transaction**, so a new user is never blocked at the door. It never
+contracts, only for known selectors. It rate-limits per address (50 actions a day) and per IP
+(200), and the whole service runs under one **global** BTC gas budget — 0.01 BTC a day on matsnet,
+visible at `/healthz` — that halts relaying for everyone when spent. Each address gets **25 lifetime
+sponsored actions**. After that, `MarenRelayHub.executeWithFee` is deployed and ready to take a
+signed MUSD fee inside the same transaction, but **no allowlisted call carries a fee argument yet,
+so no fee can be charged and the relayer answers `402 SPONSORSHIP_UNAVAILABLE` rather than
+subsidising silently.** Wiring the fee path is the next piece of work; refusing is the safe failure
+direction meanwhile. It never
 holds user funds: compromise of the relayer key costs Maren its gas float, not a user's money.
 
 ## Why ERC-4337 is a dead end on Mezo

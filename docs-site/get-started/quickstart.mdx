@@ -14,7 +14,19 @@ protocol underneath.
 </Info>
 
 <Steps>
-  <Step title="Connect a wallet on matsnet">
+  <Step title="Get the app">
+    Maren's launch is mobile-first. The iOS app is in **TestFlight beta**:
+    [join the beta](https://testflight.apple.com/join/uhmv9YPE), build 1.0.0 (5). It runs against
+    Mezo matsnet and holds its signing key in the iOS Keychain behind Face ID, so there is no
+    wallet to connect.
+
+    <Note>
+      The web client at `/app` is built and runs locally, but it is **switched off in production**
+      while the iOS beta runs — every `/app/*` URL returns 404 today. Run it yourself with
+      `pnpm --filter @maren/web dev`; see [Run locally](/developers/run-locally).
+    </Note>
+  </Step>
+  <Step title="If you are running the web client locally">
     Add the Mezo matsnet network to your wallet and switch to it. The primary RPC is
     `https://rpc.test.mezo.org`; a second endpoint is listed on [Networks](/reference/networks)
     for failover. The native gas token is **BTC with 18 decimals**, not 8, because Mezo is an
@@ -41,19 +53,24 @@ protocol underneath.
     <Note>
       **Your first deposit costs BTC gas, always.** The relayer deliberately excludes
       `MarenVault.deposit()` from its sponsored allowlist, because a gasless relay cannot carry
-      value. Everything you do after the deposit can be sponsored once the relayer is hosted.
+      value, so `deposit` is excluded from the relay allowlist by construction. After that,
+      borrow, repay, withdraw, close, every payment and every handle operation are sponsored — 25
+      free actions per address, then the relayer declines rather than charging. **Earn is not on
+      the allowlist**, so Earn deposits and withdrawals are self-paid.
       See [Gasless](/how-it-works/gasless).
     </Note>
   </Step>
 
   <Step title="Borrow MUSD, inside the range the contract will accept">
-    Drag the borrow slider. It is bounded by the same computation the deployed contract
-    enforces, in the contract's own order, so an amount you can select is an amount that
-    clears. Maren refuses new borrowing below a **180% collateral ratio**, far above the
-    protocol's 110% liquidation threshold, and marks a recommended safe level at **250%**.
-    Nobody pays gas to discover a "no". See [Preflight](/how-it-works/preflight).
+    Drag the borrow slider. Maren refuses new borrowing below a **180% collateral ratio**, far
+    above the protocol's 110% liquidation threshold, and marks a recommended safe level at
+    **250%**. A refusal states the contract's own reason with live numbers rather than making you
+    pay gas to discover it — with one known exception near the top of the range, described on
+    [Preflight](/how-it-works/preflight).
 
-    A real user did exactly this on 17 August 2026: they deposited BTC and drew **25.7 MUSD**
+    This path ran on 17 August 2026, drawing **25.73 MUSD** against an existing pooled deposit in
+    tx `0x28bb5ec1…7ef2` (block 14,948,596). Deposit and borrow are separate transactions on the
+    deployed vault; the single-transaction `depositAndBorrow` composite is written but not deployed
     in a single transaction. At the same position a 40 MUSD borrow reverts with
     `InsufficientCollateralRatio` at the account's own 180% floor.
   </Step>
@@ -68,7 +85,9 @@ protocol underneath.
       </Tab>
       <Tab title="Send a money link">
         Put MUSD into a claimable link and send it anywhere text goes. The recipient claims it
-        with or without a Maren account and needs no BTC. Unclaimed links can be cancelled and
+        with or without a Maren account and needs no BTC. A link can be reclaimed by its creator
+        **only after the expiry it was created with** — never before, because a cancel-at-will
+        would let the sender front-run a legitimate claim. Reclaiming is not sponsored, and
         refunded.
       </Tab>
       <Tab title="Request money">
@@ -89,7 +108,16 @@ protocol underneath.
 
 You can always exit: repay your share of the pooled debt and withdraw your Bitcoin. If the pooled
 trove is ever under stress, borrowing halts before withdrawals do, so exits stay open when
-entries close. You are never trapped in a position you want out of.
+entries close.
+
+<Warning>
+  **One state does freeze exits, and it is not a pause.** If the pooled trove is liquidated, closed
+  or fully redeemed, it leaves Mezo's active set and every vault mutation halts. Residual collateral
+  then sits in MUSD's `CollSurplusPool` and `MarenVault` does not call `claimCollateral`, so there is
+  no wind-down path in the contract yet. Separately, the deployed matsnet vault predates the
+  redemption-reconciliation mechanism entirely. Both are why mainnet is gated on an audit. See
+  [Risk](/security/risk).
+</Warning>
 
 <CardGroup cols={2}>
   <Card title="Understand the vault first" icon="vault" href="/product/social-vault">

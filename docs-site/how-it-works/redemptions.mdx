@@ -3,6 +3,26 @@ title: "Redemptions"
 description: "How a protocol redemption against the shared trove is split, value-neutrally, and how the H-2 reserve-excess edge was fixed."
 ---
 
+<Warning>
+  **Status: this mechanism is in the contract source and its audited test suite. It is not in the
+  deployed matsnet contract.** The vault at `0x46252B00AB59384518d9dB6D1f210ffF1221645b` predates
+  the redemption splitter entirely — `reconcileRedemption`, `settleRedemption`, `collateralOf`,
+  `redemptionCollateralPerShare`, `redemptionShortfall` and `pendingRedemptionCollateral` are all
+  absent from its dispatch table. Confirm it in one command:
+
+  ```bash
+  cast call 0x46252B00AB59384518d9dB6D1f210ffF1221645b "reconcileRedemption()" \
+    --rpc-url https://rpc.test.mezo.org
+  # -> execution reverted, data: "0x"   (no dispatch entry)
+  ```
+
+  Until the vault is redeployed, a protocol redemption against the pooled trove is **not** split by
+  the mechanism described below. Everything on this page describes
+  `packages/contracts/src/MarenVault.sol` and the two adversarial audits run against it: a design
+  and audit record, not a description of live behaviour. Redeploying is a prerequisite for the
+  vault holding real money, alongside the paid audit.
+</Warning>
+
 MUSD lets anyone redeem MUSD for BTC against the lowest-collateralised troves, at par. When that
 happens to the pooled trove, the trove loses collateral and sheds debt in one event, and the
 vault has to divide both sides across its users fairly. That is the job of the **redemption
@@ -10,20 +30,22 @@ splitter**.
 
 ## What a redemption does to the pool
 
-A redemption removes collateral from the shared trove and cancels an equal value of its debt.
-Neither side belongs to any single user, so the splitter distributes both across debt shares: the
-collateral removed is charged pro rata, and the debt relief is credited pro rata.
+In the contract source, a redemption removes collateral from the shared trove and cancels an equal
+value of its debt. Neither side belongs to any single user, so the splitter distributes both across
+debt shares: the collateral removed is charged pro rata, and the debt relief is credited pro rata.
 
 <Info>
   The splitter is **value-neutral** by design. A user charged some BTC of collateral should
   receive an equal value of debt relief, so a redemption changes what a user holds but not what it
   is worth. The audit's regression tests assert this neutrality holds for a solvent debtor, both
-  on a plain redemption and on one arriving after a recognised shortfall.
+  on a plain redemption and on one arriving after a recognised shortfall — against the source
+  contract. It is not yet an assertion about deployed bytecode.
 </Info>
 
-The relevant functions are `reconcileRedemption`, `_syncState`, `redemptionCollateralPerShare`,
-`settleRedemption`, and `collateralOf`. They were the primary target of the
-[contracts audit](/security/audits).
+The relevant functions **in source** are `reconcileRedemption`, `_syncState`,
+`redemptionCollateralPerShare`, `settleRedemption` and `collateralOf`. None of them is present in
+the currently deployed vault. They were the primary target of the
+[contracts audit](/security/audits) of that source.
 
 ## The bug that was found and fixed: H-1
 
@@ -36,7 +58,8 @@ recorded shortfall on the next sync as if it were a brand new redemption.
   The effect was a phantom redemption charged pro rata to every solvent debtor, repeatedly, with
   no debt relief attached, until the shortfall was fully socialised onto the solvent users. Both
   entrypoints that drive it are permissionless and need no price, so any passer-by could grind the
-  loop. In the measured reproduction, about 0.0336 BTC (roughly $2,122) was drained from a solvent
+  loop. In the measured Foundry reproduction against the source contract, 0.03364 BTC was drained
+  from a solvent
   debtor with nothing given in return.
 </Warning>
 
@@ -48,7 +71,8 @@ redemption arriving after a shortfall is still measured at full size.
 
 ## The reserve-excess edge, and how it was fixed: H-2
 
-An adversarial audit found one High-severity edge here, and it has since been fixed.
+An adversarial audit found one High-severity edge here, and it has since been fixed **in source**.
+The fix has not been deployed.
 
 The mechanism: debt relief is capped by the vault's MUSD reserve (`outstandingDebt =
 troveNetDebt - reserveMUSD`), but the collateral debit was not. When a redemption cancelled more
@@ -61,7 +85,7 @@ a direct claim on it.
   excess relief is exactly the part the reserve was already covering.
 </Note>
 
-The fix: the excess is now **absorbed by the protocol's own position** instead of being split
+The fix in source: the excess is **absorbed by the protocol's own position** instead of being split
 across users, so each user loses collateral worth exactly the debt they stopped owing, and the
 per-position value-neutrality claim is strictly true again. `depositProtocolCollateral` retires
 any resulting shortfall, which is the make-whole path the natspec had always promised. The pinning
@@ -70,7 +94,8 @@ test was inverted to assert users are made whole and proven to fail against the 
 <Warning>
   Residual left for the paid audit: if the protocol's own position is exhausted by a large excess,
   the remainder falls to the shortfall path. It is bounded and recorded, not silent, and the
-  make-whole path can retire it. This is the honest state.
+  make-whole path can retire it. This is the honest state — and the honest state also includes
+  that none of this reconciliation is live on matsnet yet.
 </Warning>
 
 <CardGroup cols={2}>

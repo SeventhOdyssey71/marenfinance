@@ -10,8 +10,12 @@ sizing result that decides whether the vault can serve a borrow at all.
 ## One trove, many ledgers
 
 A user's collateral is segregated in accounting, not in custody. The vault records each user's
-share of collateral and debt, and the sum of those shares equals what the single trove actually
-holds in Mezo's `TroveManager`. This is what lets the vault offer sub-minimum borrowing: the
+share of collateral and debt. Those shares sum to everything the vault custodies — what the shared
+trove holds in Mezo's `TroveManager`, **plus any BTC the vault holds idle** because it has not been
+pushed into the trove yet. The invariant is `totalCollateral == troveColl + idleCollateral`; on
+matsnet today that reads 0.156061 = 0.069061 + 0.087000 BTC.
+
+This accounting is what lets the vault offer sub-minimum borrowing: the
 trove as a whole clears the protocol's 1,800 MUSD minimum, while an individual user inside it
 borrows far less.
 
@@ -27,7 +31,8 @@ A pooled borrow can be served two ways, and the accounting differs by design:
 
 <AccordionGroup>
   <Accordion title="From new trove debt" icon="plus">
-    The vault increases the shared trove's debt via `adjustTrove` and credits the user's ledger.
+    The vault draws new trove debt with `BorrowerOperations.withdrawMUSD` and credits the user's
+ledger.
     This adds real protocol debt and is subject to the trove-wide 180% floor.
   </Accordion>
   <Accordion title="From the MUSD reserve" icon="piggy-bank">
@@ -70,7 +75,9 @@ do anything.
 
 Maren hit this in practice on matsnet, and the fix is on-chain in two transactions: the pooled
 trove's ICR moved from **153% to about 220%** by adding collateral, which opened borrowing
-headroom. The trove currently holds 0.069 BTC against 2,002.0 MUSD of debt, an ICR of **223%**,
+headroom. Read the live figures rather than trusting these: at the time of writing (2026-09-07) the
+trove held 0.069061 BTC against **2,088.9 MUSD** of debt, an ICR of **262%** at a BTC price of
+$79,048,
 with borrowing enabled.
 
 <CodeGroup>
@@ -88,8 +95,11 @@ The first argument is Mezo's `TroveManager`; the second is `MarenVault`, which o
 
 A keeper runs per-block health checks on the pooled trove. It tops up collateral, repays debt,
 and internally liquidates unhealthy users by seizing their collateral at a 5% penalty and
-repaying their share of pooled debt. Calling for liquidation is permissionless, so Maren is not a
-single point of failure, and the 5% penalty gives any caller an economic incentive to act.
+repaying their share of pooled debt. Liquidation is gated on `KEEPER_ROLE` and is **not**
+permissionless — a call from any other address reverts with `AccessControlUnauthorizedAccount` —
+and the 5% penalty goes to the insurance buffer, not to the caller. On matsnet that role is held by
+a single operator key, and **the keeper process itself is not yet written**, so keeper liveness is a
+single point of failure today. Opening liquidation to any caller is the intended design.
 
 <Warning>
   If the keeper cannot act, borrowing stops but withdrawals do not. The residual risk is a BTC

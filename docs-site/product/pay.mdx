@@ -3,8 +3,12 @@ title: "Pay"
 description: "Names, money links, and requests: moving MUSD without addresses to copy."
 ---
 
-Once you hold MUSD, Pay is how it moves. `MarenPay` takes no custody: money goes wallet to wallet
-under your own permit. It works for anyone holding MUSD, whether they borrowed it or not.
+Once you hold MUSD, Pay is how it moves. `pay`, `payToHandle` and `split` take no custody: money
+goes wallet to wallet. Money links are the deliberate exception — `createLink` escrows the MUSD in
+the contract until it is claimed, or reclaimed by its creator after expiry, and `totalEscrowed()`
+reports that balance on-chain. That escrow sits in the contract, not with the Maren team.
+
+Pay works for anyone holding MUSD, whether they borrowed it or not.
 
 ## Pay a name
 
@@ -40,7 +44,9 @@ per address, with reverse resolution for display.
 
 Put MUSD into a link and send the link anywhere text goes: WhatsApp, iMessage, anywhere. The
 recipient opens it and claims the money, **with or without a Maren account and holding no BTC**.
-Unclaimed links can be cancelled and refunded.
+A link can be reclaimed by its creator **only after the expiry it was created with** — never
+before, because a creator who could cancel at will could watch the mempool and front-run a
+legitimate claim. "Cancel sooner" means "set a shorter expiry".
 
 This is how money crosses from Maren users to people who have never held crypto, and it is the
 product's built-in growth loop: every link is an invitation carrying money.
@@ -67,7 +73,7 @@ hosted.
 <ResponseField name="pay(to, amount, memo)" type="direct transfer">
   Move MUSD to an address with an on-chain memo event.
 </ResponseField>
-<ResponseField name="payTo(handle, amount, memo)" type="pay a name">
+<ResponseField name="payToHandle(handle, amount, memo)" type="pay a name">
   Resolve a `@handle` through the registry and pay it.
 </ResponseField>
 <ResponseField name="createRequest / fulfillRequest" type="request money">

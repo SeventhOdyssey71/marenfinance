@@ -4,8 +4,11 @@ description: "An ERC-4626 vault over the MUSD Stability Pool, with no forward AP
 ---
 
 Idle MUSD can sit productively. `MarenEarn` is an ERC-4626 vault over MUSD's Stability Pool: it
-provides your MUSD to the pool, sweeps the BTC liquidation gains the pool pays out, converts
-them, and compounds them back into MUSD so `totalAssets()` grows for shareholders.
+provides your MUSD to the pool and claims the BTC liquidation gains the pool pays out. Converting
+that BTC back to MUSD needs a DEX router Maren has not yet verified on Mezo, so `swapRouter` is
+deliberately `address(0)` and `harvest()` holds the BTC rather than swapping it. Until a router is
+wired the vault is partly BTC-denominated: shareholders own that BTC, but nothing on-chain converts
+it. On matsnet today no liquidation gain has reached the vault and `harvest()` has not been called.
 
 ## Where the yield comes from
 

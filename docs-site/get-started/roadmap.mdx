@@ -21,10 +21,11 @@ way.
     Five contracts live on Mezo testnet `31611`: pooled vault, payments, name registry, ERC-4626
     Earn, and the relay hub. The full loop runs end to end: deposit BTC, borrow from 0.001 BTC,
     pay a name, send a link, request money, and Earn. The web app is live against matsnet; the
-    iOS app runs the same screens on a mock layer with identical signatures, so going live
-    replaces one file. A real user has already borrowed 25.7 MUSD through the app.
+    iOS app reads and writes live against those same contracts on matsnet, signing with a
+    secp256k1 key held in the iOS Keychain behind Face ID. The borrow path has executed on-chain
+    from the app, first on 17 August 2026 (tx `0x28bb5ec1…7ef2`).
   </Step>
-  <Step title="Phase 2: beta and gasless (next)">
+  <Step title="Phase 2: beta and gasless (shipped, 2026-09)">
     The iOS app ships to a small **TestFlight beta** on matsnet, and the **gasless relayer gets
     hosted** so users stop paying gas after their first deposit. The relayer is built and fully
     tested today; hosting it is one command plus funding a hot wallet.
@@ -75,10 +76,11 @@ Every measure of success is readable from the chain by anyone. The one that matt
 | Spend ratio | Whether people spend Bitcoin, not just borrow against it |
 
 <Info>
-  Read live on matsnet on 2026-08-25, the pilot showed 2 funded positions, 65.72 MUSD borrowed,
-  and a spend ratio of 0.0% (0 of 2 borrowers have spent). That is the honest starting point:
-  people have borrowed, and spending has not started yet. The tool will show it move, or show
-  that it does not. See [Verify on-chain](/developers/verify-on-chain).
+  Read live on matsnet on 2026-09-07, the pilot showed 3 funded positions, 2,110.72 MUSD borrowed,
+  14 payments totalling 27.70 MUSD, 39.00 MUSD of Earn TVL across 3 depositors, and a spend ratio
+  of **66.7% (2 of 3 borrowers have spent)**. These are testnet numbers from a handful of accounts,
+  most of them ours — they show the loop works end to end, not that demand exists. Regenerate them
+  with `pnpm --filter @maren/metrics start`. See [Verify on-chain](/developers/verify-on-chain).
 </Info>
 
 <CardGroup cols={2}>

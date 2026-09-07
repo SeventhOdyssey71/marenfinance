@@ -101,7 +101,9 @@ is deployed but inert.
 <Warning>
   The price oracle precompile implements only `decimals()` and `latestRoundData()` from the
   Chainlink `AggregatorV3` interface; `description()` reverts. It reverts entirely above 60
-  seconds of staleness. Pyth is also deployed on Mezo but its feeds run roughly 28 days stale and
+  seconds of staleness. Pyth is also deployed on Mezo but is not a usable substitute: measured
+  2026-09-07, BTC/USD had a `publishTime` 41.9 days old and returned $65,238 against a live oracle
+  price of $79,466 — 18% wrong — `getPriceNoOlderThan(BTC/USD, 3600)` reverts `StalePrice`, and
   ETH/USD reverts outright, so it is not a usable substitute. Maren reads the precompile, the same
   source MUSD's own liquidation engine uses. See [Networks](/reference/networks).
 </Warning>

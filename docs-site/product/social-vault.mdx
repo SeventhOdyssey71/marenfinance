@@ -10,9 +10,9 @@ per-user ledger. It exists to do one thing the protocol cannot: let a small hold
 ## The wedge: no minimum loan size
 
 MUSD requires a **minimum net debt of 1,800 MUSD**, which becomes 2,000 MUSD of total debt once
-the 200 MUSD gas compensation is counted. That is a minimum loan size. At a safe collateral
-ratio and a BTC price around $63,000, opening a trove of your own responsibly needs about
-$3,000 of Bitcoin, and a small holder cannot borrow at all.
+the 200 MUSD gas compensation is counted. That is a minimum loan size. At the 250% collateral
+ratio Maren recommends, 2,000 MUSD of total debt needs about **$5,000 of Bitcoin** — and a small
+holder cannot borrow at all.
 
 <Note>
   Maren's edge is **not** "cheaper collateral" or an "80x" headline. It is that the protocol
@@ -60,14 +60,22 @@ the same conditions before you sign.
 | Maren target CR | 250% |
 | Internal liquidation penalty | 5% |
 
-A keeper tops up collateral, repays debt, and internally liquidates unhealthy users by seizing
-collateral at a 5% penalty and repaying their share of pooled debt. A user must fall 110
-percentage points below the 250% target before the protocol has any claim on the trove.
+The contract gives a `KEEPER_ROLE` holder the ability to top up collateral, repay debt, and
+internally liquidate unhealthy users by seizing collateral at a 5% penalty and repaying their share
+of pooled debt. A user must fall 110 percentage points below the 250% target — to 140% — before
+**Maren's own** keeper may liquidate them, and 140 points, to 110%, before the MUSD protocol has any
+claim on the trove.
+
+On matsnet that role is held by a single team-operated key, every keeper action so far has been sent
+by hand, and no automated keeper is running yet. Automating it, then decentralising who may hold the
+role, is a prerequisite for the vault holding real money.
 
 <Info>
-  **Borrowing pauses before withdrawal does.** This is a hard requirement in the contract with
-  a dedicated test. If the vault must be halted, entries close first and exits stay open, so a
-  user is never trapped in a position they want out of.
+  **Borrowing pauses before withdrawal does.** This is a hard requirement in the contract with a
+  dedicated test: `withdraw`, `repay` and `closePosition` carry no pause modifier, so no guardian
+  key can trap collateral. One state does freeze exits and it is not a pause — if the pooled trove
+  is liquidated, closed or fully redeemed it leaves Mezo's active set and every vault mutation
+  halts, including withdrawals, with no wind-down path built. See [Risk](/security/risk) R-10.
 </Info>
 
 ## The risk, stated plainly

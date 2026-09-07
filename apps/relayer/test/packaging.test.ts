@@ -185,11 +185,18 @@ describe('fly.toml', () => {
 });
 
 describe('DEPLOY.md', () => {
-  it('says plainly that nothing is deployed yet', async () => {
-    // R13. The moment this stops being true, the owner edits one section; until
-    // then a document that implies a running service is a false claim.
+  it('states the live deployment, with the URL and signer a reader can check', async () => {
+    // R13, inverted. This guard used to assert DEPLOY.md said "the relayer is not running
+    // anywhere", because a document implying a running service when none existed was a false
+    // claim. The relayer is now deployed, so the same guard has to protect the opposite
+    // property: a status header is only useful if it is specific enough to be falsified.
+    // A stale "nothing is deployed" header was believed over a live health check once
+    // already — that is exactly what this test now exists to prevent.
     const deploy = await read('../DEPLOY.md');
-    expect(deploy).toMatch(/relayer is not running anywhere/i);
+    expect(deploy).toMatch(/Status:\s*LIVE on Cloudflare Workers/i);
+    expect(deploy).toMatch(/maren-relayer\.rolandojude18\.workers\.dev/);
+    // The signer address, so "live" cannot drift into a claim nobody can verify.
+    expect(deploy).toMatch(/0xd90245ee16B2f58eD8654961BBf2fa835046df89/i);
   });
 
   it('does not claim the image was built or deployed', async () => {

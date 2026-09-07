@@ -3,10 +3,23 @@ title: "Preflight"
 description: "Offer only what clears: evaluate every contract rule before asking for a signature."
 ---
 
-Preflight is the discipline behind every control in the app: **an action Maren offers is an
-action that clears.** The interface evaluates every rule the deployed contract enforces, in the
-contract's own order, before a button is enabled or a slider bound is set. A refusal states the
-same reason the revert would have given, with live numbers. Nobody pays gas to discover a "no".
+Preflight is the discipline behind every control in the app: **the interface evaluates the
+contract's rules before it asks for a signature, so a refusal is stated with live numbers instead of
+discovered by paying gas.** It runs those rules in the contract's own order, before a button is
+enabled or a slider bound is set, and a blocked action names the same reason the revert would have
+given.
+
+<Warning>
+  **Known gap, pre-audit, and it is the one place an offered action can still revert.** The borrow
+  ceiling is derived from the right getter with the wrong subtrahend: it subtracts the user's own
+  drawn principal, where Mezo checks `maxBorrowingCapacity >= netDebtChange + getTroveDebt(trove)` —
+  a figure that includes the 200 MUSD gas compensation and accrued interest, and on the pooled route
+  belongs to the whole shared trove rather than to one user. The 0.1% origination fee gross-up is
+  missing too. Measured on matsnet on 2026-09-07: `maxBorrowable()` quoted **1,556.98 MUSD** for a
+  position whose true limit simulated at **834.68 MUSD**. The fix is to carry `getTroveDebt()`
+  through and gross up for the fee. Until it lands, an amount near the top of the slider can revert.
+</Warning>
+
 
 ## The order matters
 

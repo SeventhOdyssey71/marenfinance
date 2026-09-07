@@ -23,7 +23,9 @@ cast chain-id --rpc-url https://jsonrpc-mezo.boar.network
 ## Read the live pooled trove
 
 The pooled trove is live inside Mezo's own `TroveManager`. It currently holds 0.069 BTC against
-2,002.0 MUSD of debt, an ICR of about 223%, with borrowing enabled. Read its collateral directly:
+2,088.86 MUSD of debt — an ICR of 262.8% at a BTC price of $79,466 — with borrowing enabled, read
+on 2026-09-07. Both figures move: collateral as users deposit, debt as the 1% interest accrues.
+Read them yourself:
 
 ```bash
 # arg 1: Mezo TroveManager (matsnet). arg 2: MarenVault, which owns the trove.
@@ -112,7 +114,7 @@ brand-new addresses, handles registered, Earn TVL, and the **spend ratio**: of t
 borrowed, the fraction that then spent.
 
 <Info>
-  Read live against matsnet on 2026-08-25, the tool returned: 2 funded positions, 65.72 MUSD
+  Read live against matsnet on 2026-09-07, the tool returned: 3 funded positions, 2,110.72 MUSD
   borrowed, 0 payments, 1 payment request created and 0 settled, 0 money links, 2 handles
   registered, 25.00 MUSD of Earn TVL with 1 depositor, and a **spend ratio of 0.0% (0 of 2
   borrowers have spent)**. That last number is the whole point of the pilot, and today it says what

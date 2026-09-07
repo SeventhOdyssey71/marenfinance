@@ -4,8 +4,19 @@ description: "Deposit, borrow, repay, and withdraw against Bitcoin, with health 
 ---
 
 Borrowing is the core mechanic underneath the money app: deposit BTC, draw MUSD against it, and
-get all your Bitcoin back when you repay. The interface offers only what the deployed contract
-will accept, and shows health as a plain number with a plain meaning.
+get all your Bitcoin back when you repay. Health is shown as a plain number with a plain meaning.
+
+<Warning>
+  **Known gap, pre-audit, and it is the one place an offered action can still revert.** The borrow
+  ceiling is derived from the right getter with the wrong subtrahend: it subtracts the user's own
+  drawn principal, where Mezo checks `maxBorrowingCapacity >= netDebtChange + getTroveDebt(trove)` —
+  a figure that includes the 200 MUSD gas compensation and accrued interest, and on the pooled route
+  belongs to the whole shared trove rather than to one user. The 0.1% origination fee gross-up is
+  missing too. Measured on matsnet on 2026-09-07: `maxBorrowable()` quoted **1,556.98 MUSD** for a
+  position whose true limit simulated at **834.68 MUSD**. The fix is to carry `getTroveDebt()`
+  through and gross up for the fee. Until it lands, an amount near the top of the slider can revert.
+</Warning>
+
 
 ## The four actions
 

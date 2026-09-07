@@ -18,7 +18,10 @@ Three things to take from this page:
 <CardGroup cols={3}>
   <Card title="One custodial-failure surface" icon="vault">
     The pooled vault is the only component that can lose user funds through a Maren design
-    failure. Everything else is non-custodial.
+    failure, but it is not the only place value sits inside a Maren contract: claimable payment
+    links escrow MUSD until they are claimed, and Earn holds deposits in Mezo's Stability Pool
+    where principal can fall. Direct payments, handles and direct troves move value wallet to
+    wallet and hold nothing.
   </Card>
   <Card title="Inherited MUSD risk" icon="building-columns">
     Maren inherits risk from MUSD it cannot mitigate, only disclose: upgradeable proxies and a
@@ -35,15 +38,19 @@ Ordered by expected harm, not by likelihood.
 
 | # | Risk | Who bears it | Severity | Status |
 | --- | --- | --- | --- | --- |
-| R-1 | Pooled vault socialises a loss in a fast BTC drawdown | Pooled users | Critical | Mitigated, capped, audit scope |
+| R-1 | Pooled vault socialises a loss in a fast BTC drawdown | Pooled users | Critical | Partly mitigated; reconciliation not yet deployed; paid audit pending |
 | R-2 | MUSD proxy upgrade changes behaviour underneath us | All users | Critical | Disclosed, not mitigable |
 | R-3 | Oracle failure or manipulation | All users | High | Partially mitigated |
-| R-4 | Keeper fails to act in time | Pooled users | High | Mitigated |
+| R-4 | Keeper fails to act in time | Pooled users | High | Not mitigated — keeper not yet built |
 | R-5 | Relayer key compromise | Maren treasury | Medium | Mitigated by design |
-| R-6 | Contract bug in Pay / Registry / Earn | Individual users | Medium | Audit and tests |
+| R-6 | Contract bug in Pay / Registry / Earn | Individual users | Medium | Own tests only; no third-party audit |
 | R-7 | Sponsorship abuse drains the gas budget | Maren treasury | Low | Mitigated |
-| R-8 | Handle squatting or impersonation | Individual users | Medium | Mitigated |
-| R-9 | Front-end compromise | All users | High | Standard controls |
+| R-8 | Handle squatting or impersonation | Individual users | Medium | Front-running and homoglyphs mitigated; squatting not |
+| R-9 | Front-end compromise | All users | High | Partial — simulation yes, CSP and SRI not yet |
+| R-10 | A pooled-trove liquidation freezes **all** exits, permanently | Pooled users | Critical | Disclosed, no wind-down path built |
+| R-11 | Earn can lose principal, and its withdrawable figure is optimistic | Earn depositors | High | Disclosed, not mitigated |
+| R-12 | Earn withdrawals blocked by a trove nobody in the vault owns | Earn depositors | Medium | Disclosed, not yet decoded |
+| R-13 | Admin keys: one EOA holds every privileged role | All users | High | Disclosed; multisig is a mainnet gate |
 
 ## R-1: The pooled vault
 
@@ -96,11 +103,15 @@ Findings from reading the deployed contracts, offered without editorial.
     oracle, and modify mint/burn lists. `council()` and `treasury()` both return the zero address,
     so effective control sits with a Thesis/Mezo multisig. Mezo documents immutability as a
     later-stage goal, so this is a disclosed choice. Maren cannot mitigate it, only disclose it,
-    and avoid compounding it: Maren's own upgradeable contracts sit behind a multisig **and** a
-    timelock from deployment day one.
+    and avoid compounding it. Maren's own contracts take the opposite trade-off: they are **not
+    upgradeable at all** — no proxy, no `initialize`, no admin implementation slot — so no key can
+    change their logic. The cost of that choice is that a deployed bug is fixed only by deploying a
+    new contract and migrating users, which is why the deployed vault still predates its own
+    redemption reconciliation.
   </Accordion>
   <Accordion title="MUSD's backing is not what a casual reader assumes" icon="scale-unbalanced">
-    Total supply is roughly 31.08M. Trove-backed debt is roughly 1.60M, plus an outstanding PCV
+    Total supply is roughly 30.55M (measured 2026-09-07; it moves, so re-read it rather than
+    citing this). Trove-backed debt is roughly 1.60M, plus an outstanding PCV
     bootstrap loan of roughly 14.97M. The remainder sits in protocol-owned strategies and the
     Wormhole NTT bridge. "100% Bitcoin-backed" is true of the CDP portion but not of most
     circulating MUSD today. Maren does not repeat a blanket backing claim.
@@ -124,7 +135,10 @@ Chainlink and not Pyth.
   number.
 - The feed is secured by Mezo's validator set, a correlated risk: a consensus failure is
   simultaneously a price failure.
-- Pyth is deployed on Mezo but roughly 28 days stale, with ETH/USD reverting. Maren never reads
+- Pyth is deployed on Mezo and dead on both networks. Measured 2026-09-07: BTC/USD's `publishTime`
+  was 41.9 days old and returned $65,238 against a live oracle price of $79,466 — 18% wrong —
+  `getPriceNoOlderThan(BTC/USD, 3600)` reverts `StalePrice`, and ETH/USD reverts outright. The gap
+  widens with time, so treat any Pyth figure on Mezo as unusable rather than merely old. Maren never reads
   Pyth for liquidation math.
 
 Maren's keeper treats an oracle revert as a **halt condition**, not an error to retry through: it
@@ -134,8 +148,13 @@ stops opening new debt and continues to permit withdrawals.
 
 <AccordionGroup>
   <Accordion title="R-4 Keeper" icon="robot">
-    Per-block health checks, permissionless to call for liquidation so Maren is not a single point
-    of failure, with an economic incentive via the 5% penalty. If the keeper halts, borrowing
+    **Not mitigated, and meant to be read as a single point of failure.** `liquidateUser` is
+    `onlyRole(KEEPER_ROLE)` by design: an open liquidation market pays the liquidator to push users
+    over the line, so Maren runs it at cost and the 5% penalty goes to the insurance buffer rather
+    than to the caller. The consequence is that if the keeper does not act, nobody else can. The
+    keeper process is **not yet built**, and on matsnet `KEEPER_ROLE` is held by a single operator
+    key. Exits stay open regardless — `withdraw`, `repay` and `closePosition` carry no pause
+    modifier — so a dead keeper cannot trap collateral outside the frozen state described in R-1. If the keeper halts, borrowing
     stops; withdrawals do not.
   </Accordion>
   <Accordion title="R-5 Relayer" icon="paper-plane">
@@ -158,11 +177,80 @@ stops opening new debt and continues to permit withdrawals.
   <Accordion title="R-8 Handles" icon="at">
     Commit-reveal registration prevents front-running, `[a-z0-9_]` eliminates homoglyph attacks,
     and the payment interface shows the resolved address alongside the handle before any
-    confirmation.
+    confirmation. **Squatting itself is not mitigated.** Registration is free and unpriced, so
+    nothing stops one party committing to many names up front; pricing and renewals belong in a
+    layer above `MarenRegistry` and are not built. The mitigation today is that a handle is a
+    convenience label and the resolved address is always shown before any signature.
   </Accordion>
   <Accordion title="R-9 Front-end" icon="browser">
-    Strict CSP, subresource integrity, no third-party analytics on signing paths, and transaction
+    No third-party analytics anywhere in the app, and transaction
     simulation with a human-readable summary before every signature.
+
+    **Not yet implemented:** a strict Content-Security-Policy and subresource integrity.
+    `next.config.ts` sets no security headers today. Both are mainnet gates, not shipped controls.
+
+    **Known defect, disclosed rather than held back.** The borrow slider's upper bound subtracts
+    only drawn principal from Mezo's per-trove `maxBorrowingCapacity`, where the protocol checks
+    against total trove debt — which includes the 200 MUSD gas compensation and accrued interest —
+    and it omits the 0.1% origination fee gross-up. Measured on matsnet on 2026-09-07,
+    `maxBorrowable()` quoted 1,556.98 MUSD for a position whose true limit simulated at 834.68
+    MUSD. Pressing a button the app itself labelled "Max" can therefore revert and cost gas.
+  </Accordion>
+  <Accordion title="R-10 A pooled-trove liquidation freezes every exit" icon="lock">
+    A liquidation of the pooled trove is **not** only a pro-rata loss. When the trove leaves Mezo's
+    active set, every mutation on the vault reverts — deposit, borrow, repay, withdraw, close, and
+    every admin function except `skim()` and the pause switches. Collateral the protocol did not
+    take sits in Mezo's `CollSurplusPool`, and `MarenVault` never calls `claimCollateral`, so it
+    cannot be reached. **Idle BTC held in the contract that never entered the trove is frozen
+    alongside it**, even though paying it out needs no trove, no oracle and no protocol call. There
+    is no admin recovery path: `closePooledTrove` syncs state first and so reverts in exactly that
+    state.
+
+    Freezing is the deliberate choice — paying claims first-come-first-served after a shortfall is
+    worse — but the honest description is *everyone is locked out until a wind-down mechanism is
+    designed, deployed and migrated to*, and that is a governance decision that does not exist yet.
+    Letting a debt-free account withdraw from idle collateral while frozen is the minimal fix and
+    is not built.
+  </Accordion>
+  <Accordion title="R-11 Earn can lose principal" icon="chart-line-down">
+    Earn deposits MUSD into Mezo's Stability Pool. Cantina's mUSD audit §3.4.7 establishes — and
+    Thesis explicitly agreed, marking it **Acknowledged rather than fixed** — that Stability Pool
+    liquidations can be *unprofitable*: absorbing a trove whose ratio has fallen below about 100%
+    returns depositors less value than the debt burned against them. A passive depositor, which is
+    exactly what Earn is, takes that loss. A liquidation large enough to consume the pool zeroes
+    deposits outright through the epoch mechanism. This is not a bug in Maren; it is what the
+    Stability Pool is.
+
+    Two Maren-side gaps compound it. `maxWithdraw` and `maxRedeem` are not overridden, so the figure
+    the app shows can exceed what the pool will actually pay. And BTC liquidation gains are counted
+    in `totalAssets()` at the oracle price while `swapRouter` is `address(0)`, so there is currently
+    **no path converting that BTC back to MUSD**. Fixing both is a prerequisite to Earn holding real
+    money.
+  </Accordion>
+  <Accordion title="R-12 Earn withdrawals can be blocked by a stranger's trove" icon="ban">
+    Mezo's Stability Pool refuses **every** non-zero withdrawal while any trove on the whole chain
+    sits below 110% ICR — the string is in the deployed bytecode verbatim: `StabilityPool: Cannot
+    withdraw while there are troves with ICR < MCR`. This is precisely the moment a depositor most
+    wants out, it is caused by a stranger, and no Earn depositor can clear it. Maren does not yet
+    decode this revert, so today it surfaces as a generic failure.
+  </Accordion>
+  <Accordion title="R-13 Admin keys" icon="key">
+    Maren's contracts are not upgradeable, so no key can change their logic. Three roles still carry
+    real power. `DEFAULT_ADMIN_ROLE` can raise or zero either deposit cap, set an Earn performance
+    fee up to 20% effective immediately, point Earn's harvest at an arbitrary swap router, pull Earn
+    out of the Stability Pool, and grant itself every other role. `KEEPER_ROLE` liquidates users
+    under 140% and manages the pooled trove. `GUARDIAN_ROLE` pauses deposits and borrowing — and
+    only those: `withdraw`, `repay`, `closePosition` and `liquidateUser` carry no pause modifier, so
+    no guardian key can trap collateral, pinned by `test_exitsWorkWhilePaused`. `MarenPay`,
+    `MarenRegistry` and `MarenForwarder` have **no privileged functions at all**.
+
+    `MarenRelayHub`'s `RELAY_ADMIN_ROLE` can allowlist **any** target contract, not only Maren's —
+    the contract enforces "allowlisted", not "Maren". Combined with the absence of a fee-token
+    allowlist on `executeWithFee`, that key is more powerful than the relayer key in R-5.
+
+    **Today all of these are held by one externally owned account on matsnet.** No multisig, no
+    timelock, no separation of duties. Only testnet funds are exposed. Splitting the roles across a
+    Safe with a timelock is a hard mainnet gate.
   </Accordion>
 </AccordionGroup>
 
@@ -180,14 +268,21 @@ came back clean, but each finding is now a hard rule in this repository. The loa
 - Verify funding on-chain; never trust a client-supplied digest.
 - Gates fail closed. Maren's equivalent has a test that boots with empty configuration and asserts
   the service refuses to operate.
-- Timelock and multisig the proxy admin at deployment, not later.
+- Put every privileged role behind a multisig and a timelock before the contract holds value that
+  matters. **Not yet done:** on matsnet a single externally owned account holds `DEFAULT_ADMIN_ROLE`,
+  `KEEPER_ROLE` and `GUARDIAN_ROLE` on the vault and `DEFAULT_ADMIN_ROLE` on the relay hub. Moving
+  them to a Safe with a timelock is a mainnet gate.
 - A transaction hash is not success; only a receipt with `status === 'success'` marks a payment
   delivered.
 - Do not claim an attestation you have not implemented.
 
 <Info>
-  Disclosure: **security@maren.finance** for vulnerability reports, never a public issue.
-  Acknowledgement within 48 hours, assessment within 5 working days. Contracts and audit reports
-  are published in the public repository, and incidents are disclosed with a timeline, including
-  ones caught before user harm.
+  Disclosure: **exorbilabs@gmail.com** for vulnerability reports, never a public issue.
+  Acknowledgement within 48 hours, assessment within 5 working days. `security@maren.finance`
+  replaces it once the domain is live; it does not resolve today, so it is not a channel to use.
+
+  The contracts and the audit reports in `docs/audit/` are **not public yet** — the repository is
+  private during the grant review. They are published in full, with every fix and its regression
+  test, when it opens. Incidents are disclosed with a timeline, including ones caught before user
+  harm.
 </Info>
