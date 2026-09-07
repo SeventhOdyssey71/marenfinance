@@ -1,0 +1,159 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Maren — social card</title>
+<style>
+  /* 1200x630 is the Open Graph standard and what X, LinkedIn, Slack, iMessage and
+     Discord all crop toward. Rendered at 2x and downsampled, because thin type at
+     1x picks up hinting artefacts that are very visible in a feed.
+
+     SAFE AREA. Feeds crop this differently — X shows roughly the middle 1200x600,
+     Slack scales it down to about 360px wide, iMessage rounds the corners. So the
+     headline sits well inside the frame, nothing load-bearing goes within 64px of
+     an edge, and the smallest text is 26px (13px at Slack's scale) so it survives.
+     The phone is deliberately allowed to bleed off the bottom-right: it is texture,
+     not information, and losing its lower half to a crop costs nothing. */
+  @font-face {
+    font-family: 'SF Pro Rounded';
+    src: url('SFProRounded-Regular.woff2') format('woff2');
+    font-weight: 400;
+    font-display: block;
+  }
+  @font-face {
+    font-family: 'Neue Montreal';
+    src: url('NeueMontreal-Regular.woff2') format('woff2');
+    font-weight: 400;
+    font-display: block;
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  html, body { width: 1200px; height: 630px; }
+  body {
+    background: #fafafb;                 /* --paper, the site's own canvas */
+    font-family: 'Neue Montreal', system-ui, sans-serif;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    overflow: hidden;
+    position: relative;
+  }
+
+  /* A single wide accent wash, low opacity, bottom-right. It gives the flat canvas
+     somewhere to go without becoming a "gradient card", and it sits under the phone
+     so the phone reads as lit rather than pasted on. */
+  .wash {
+    position: absolute;
+    right: -180px; bottom: -320px;
+    width: 900px; height: 900px;
+    border-radius: 50%;
+    background: radial-gradient(circle, rgba(91, 61, 245, 0.13) 0%, rgba(91, 61, 245, 0) 68%);
+    pointer-events: none;
+  }
+
+  .content {
+    position: absolute;
+    left: 76px; top: 88px;
+    width: 620px;
+  }
+
+  .brand { display: flex; align-items: center; gap: 14px; }
+  .brand img { width: 42px; height: 42px; object-fit: contain; }
+  .brand span {
+    font-family: 'SF Pro Rounded', sans-serif;
+    font-size: 34px;
+    color: #101013;
+    letter-spacing: -0.01em;
+  }
+
+  .chip {
+    display: inline-flex; align-items: center; gap: 10px;
+    margin-top: 34px;
+    padding: 11px 20px;
+    background: #ffffff;
+    border-radius: 999px;
+    box-shadow: 0 1px 2px rgba(16, 16, 19, 0.05), 0 8px 24px -12px rgba(16, 16, 19, 0.16);
+    font-size: 21px;
+    color: #4a4a52;
+    white-space: nowrap;
+  }
+  .chip i { width: 9px; height: 9px; border-radius: 50%; background: #5b3df5; display: block; }
+
+  h1 {
+    font-family: 'SF Pro Rounded', sans-serif;
+    font-size: 84px;
+    line-height: 1.02;
+    letter-spacing: -0.028em;
+    color: #101013;
+    margin-top: 30px;
+    text-wrap: balance;
+  }
+  /* The second line is muted on the site too. It carries the turn in the sentence,
+     so it has to be clearly subordinate without dropping under AA on --paper. */
+  h1 .b { color: #8a8a92; display: block; }
+
+  p.sub {
+    margin-top: 26px;
+    font-size: 27px;
+    line-height: 1.42;
+    color: #6e6e6e;                       /* --muted, AA on --paper */
+    /* Explicit px, not ch. At 20ch this wrapped to three lines and the third
+       collided with the footer — ch is sized off the "0" glyph and badly
+       underestimates a line of mixed-case prose in this face. 500px keeps it to
+       two lines with clear air above the footer, and stops well short of the
+       phone, whose left edge sits at x=724. */
+    max-width: 500px;
+    text-wrap: pretty;
+  }
+
+  .foot {
+    position: absolute;
+    left: 76px; bottom: 62px;
+    display: flex; align-items: center; gap: 16px;
+    font-size: 26px;
+    color: #8a8a92;
+  }
+  .foot .dot { width: 5px; height: 5px; border-radius: 50%; background: #c4c4cc; }
+
+  /* Real iPhone proportions, same construction as the site's .phone-16: a titanium
+     band, a black bezel, then the screen — with concentric radii so it reads as
+     hardware rather than a rounded rectangle. */
+  .phone {
+    position: absolute;
+    right: 92px; top: 138px;
+    width: 384px;
+    border-radius: 62px;
+    padding: 3px;
+    background: linear-gradient(145deg, #e0dfe4 0%, #a6a5ab 22%, #78777e 50%, #b4b3b9 78%, #e4e3e8 100%);
+    box-shadow: 0 2px 3px rgba(16,16,19,0.10), 0 60px 110px -40px rgba(16,16,19,0.40);
+  }
+  .phone .bezel { border-radius: 59px; background: #050506; padding: 9px; }
+  .phone .screen { border-radius: 50px; overflow: hidden; background: #fff; }
+  .phone .screen img { width: 100%; display: block; }
+</style>
+</head>
+<body>
+  <div class="wash"></div>
+
+  <div class="content">
+    <div class="brand">
+      <img src="maren-mark.png" alt="">
+      <span>Maren</span>
+    </div>
+
+    <div class="chip"><i></i> Bitcoin-backed dollars &middot; on Mezo</div>
+
+    <h1>Spend Bitcoin.<span class="b">Never sell it.</span></h1>
+
+    <p class="sub">Borrow MUSD against your Bitcoin. Pay anyone by @handle.</p>
+  </div>
+
+  <div class="foot">
+    <span>marenfinance.vercel.app</span>
+    <span class="dot"></span>
+    <span>iOS beta</span>
+  </div>
+
+  <div class="phone">
+    <div class="bezel"><div class="screen"><img src="app-home.png" alt=""></div></div>
+  </div>
+</body>
+</html>
