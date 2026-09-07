@@ -29,10 +29,11 @@ const items: readonly Item[] = [
           debt.
         </p>
         <p>
-          That 30-point buffer exists so a fast drawdown hits Maren’s keeper long before it hits the
-          protocol’s cliff. Portfolio shows your ratio, your distance to 140%, and alerts you before
-          the keeper has to act. If Bitcoin falls far enough and fast enough, a position can still
-          be liquidated. That is the nature of a collateralised loan and no design removes it.
+          That 30-point buffer exists so a fast drawdown reaches Maren’s liquidation threshold long
+          before it reaches the protocol’s cliff. Portfolio shows your ratio and your distance to
+          140% on every read. The keeper that would act on it is not automated yet: the contract
+          functions are deployed, but they are run by hand today. If Bitcoin falls far enough and
+          fast enough, a position can still be liquidated. That is the nature of a collateralised loan and no design removes it.
         </p>
       </>
     ),
@@ -43,8 +44,10 @@ const items: readonly Item[] = [
       <>
         <p>
           No. Payments move MUSD wallet to wallet via{' '}
-          <span className="num text-[color:var(--ink)]">transferFrom</span> under your own permit.
-          Maren never takes possession.
+          <span className="num text-[color:var(--ink)]">transferFrom</span> under your own permit,
+          and Maren never takes possession of your Bitcoin. Claimable links are the one place a
+          Maren contract holds value: the MUSD sits in escrow until it is claimed, or reclaimed by
+          you after its expiry.
         </p>
         <p>
           The pooled vault is the honest exception and we will not soften it:{' '}
@@ -56,8 +59,9 @@ const items: readonly Item[] = [
           A catastrophic, faster-than-keeper drawdown could socialise losses across depositors.
         </p>
         <p>
-          The mitigations are the 140/110 buffer, the 0.001 BTC deposit floor, per-block keeper
-          checks, and a protocol-owned insurance buffer funded from vault fees. They are
+          The mitigations are the 140/110 buffer, the 0.001 BTC deposit floor, and a protocol-owned
+          insurance buffer funded from the 5% liquidation penalty, which stands at zero because
+          nothing has been liquidated. Automated keeper monitoring is not built yet. They are
           mitigations, not a guarantee. If you hold more than the protocol minimum, Maren steers you
           to a direct trove, which carries no pooling risk at all, and the interface says so at the
           point of decision.
@@ -116,9 +120,11 @@ const items: readonly Item[] = [
           <strong className="font-bold text-[color:var(--ink)]">
             Not yet. Maren is pre-audit.
           </strong>{' '}
-          A third-party audit of <span className="num text-[color:var(--ink)]">MarenVault</span> and{' '}
-          <span className="num text-[color:var(--ink)]">MarenForwarder</span> (the two contracts
-          that carry real risk) is scheduled after the full testnet deployment and before mainnet.
+          A third-party audit of <span className="num text-[color:var(--ink)]">MarenVault</span>,{' '}
+          <span className="num text-[color:var(--ink)]">MarenEarn</span> and{' '}
+          <span className="num text-[color:var(--ink)]">MarenRelayHub</span> (the three contracts
+          that hold or move value) is scheduled after the full testnet deployment and before
+          mainnet.
         </p>
         <p>
           Until that audit is complete and published, treat Maren as unaudited software and do not

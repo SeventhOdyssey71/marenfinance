@@ -15,7 +15,7 @@ const STEPS: readonly { n: string; title: string; body: string; fill: string }[]
   {
     n: '01',
     title: 'Deposit BTC',
-    body: `Connect any EVM wallet and deposit from 0.001 BTC. ${GASLESS_CAVEAT}`,
+    body: `Get the iOS beta and deposit from 0.001 BTC. ${GASLESS_CAVEAT}`,
     fill: 'var(--lime)',
   },
   {

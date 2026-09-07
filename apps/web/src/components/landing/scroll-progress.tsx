@@ -172,7 +172,12 @@ const ScrollProgress = ({
     <div
       ref={rootRef}
       data-slot="scroll-progress"
-      className={cn('sp-root fixed bottom-6 left-1/2 z-40 -translate-x-1/2', className)}
+      // Desktop only, at the same lg breakpoint the nav collapses at. This is a fixed pill at
+      // bottom-centre, so on a narrow screen it does not sit beside the content — it sits ON it,
+      // landing squarely over the hero phone. A section indicator is a wide-viewport affordance:
+      // on mobile it costs scarce vertical space and covers the product shot it is meant to
+      // orient you within.
+      className={cn('sp-root fixed bottom-6 left-1/2 z-40 hidden -translate-x-1/2 lg:block', className)}
       {...props}
     >
       <div className="pointer-events-none invisible absolute" aria-hidden>

@@ -756,3 +756,49 @@
   }
 }
 
+
+/* ── Phone frames on small screens ─────────────────────────────────────────
+   The hero phone sat at 87vw and the showcase frames at 84vw, which on a 390px
+   handset is a 339px and a 328px phone — a picture of a phone almost the width
+   of the phone holding it, leaving no margin for the eye and pushing the copy
+   below it off-screen. Both come down here.
+
+   The radii come down WITH the widths, deliberately. Every frame is a set of
+   concentric radii (outer 66 − 3px band = bezel 63 − 9px bezel = screen 54), and
+   that chain reads as an iPhone only while the corner radius stays in proportion
+   to the width. Shrinking the width alone would leave the old 66px corners on a
+   281px body and the frame would read as a lozenge. Each value below is the
+   original scaled by the same factor as its width, with the 3px titanium band
+   held constant because it is a physical edge, not a proportion. */
+@media (max-width: 640px) {
+  .landing .phone-16 {
+    /* 87vw -> 72vw: 339px -> 281px on a 390px viewport. */
+    width: min(392px, 72vw);
+    border-radius: 55px;
+  }
+  .landing .phone-16 .bezel {
+    border-radius: 52px; /* 55 − 3px band */
+    padding: 7px;
+  }
+  .landing .phone-16 .screen {
+    border-radius: 45px; /* 52 − 7px bezel */
+  }
+
+  .landing .shot {
+    /* 84vw -> 64vw: 328px -> 250px. Smaller than the hero phone because these
+       sit in a wrapping row and need room to read as a set, not a stack. */
+    width: min(340px, 64vw);
+    border-radius: 46px;
+  }
+  .landing .shot .bezel {
+    border-radius: 43px; /* 46 − 3px band */
+    padding: 7px;
+  }
+  .landing .shot .screen {
+    border-radius: 36px; /* 43 − 7px bezel */
+  }
+  .landing .showcase-row {
+    gap: 28px;
+    margin-top: 36px;
+  }
+}
