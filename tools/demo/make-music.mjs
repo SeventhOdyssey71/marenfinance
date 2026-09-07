@@ -11,13 +11,21 @@
  * prompt that describes only instruments. Then it MEASURES the result rather than
  * trusting either.
  *
- * THE MEASUREMENT. Speech modulates its amplitude envelope hard at the syllable
- * rate, 3-8 Hz, inside the 300-3400 Hz band. Sustained instrumental music does not:
- * pads hold, and piano decays are far slower. So the fraction of envelope energy in
- * that band separates the two cleanly. Measured on this film's own assets, the
- * spoken lines score 0.32-0.37 and the rejected vocal take scored 0.328 — the score
- * was indistinguishable from the voiceover, which is exactly why it sounded like a
- * second voice underneath one.
+ * THE MEASUREMENT. A first attempt used syllabic-rate modulation (3-8 Hz envelope
+ * energy in the speech band) and had to be thrown away: it scored a solo piano
+ * control at 0.278, above the spoken lines' own threshold, because piano attacks
+ * modulate at roughly the syllable rate. A vibrato measure was worse still, ranking
+ * piano (0.306) above the suspect music (0.319).
+ *
+ * What does separate them is SIBILANCE — the broadband 5-9 kHz energy that fricatives
+ * make and struck or sustained instruments do not. Measured on this film's assets:
+ * spoken lines 0.16-0.19, solo piano 0.017. That is an order of magnitude, not a
+ * judgement call.
+ *
+ * Note what this can and cannot catch. It catches a voice with consonants. It will NOT
+ * catch a wordless "ooh" pad, which is what the rejected take actually contained — so
+ * a passing score means "no one is talking in here", not "no human sound at all". The
+ * mix's centre-channel suppression is what covers the rest.
  *
  * Takes are generated until one lands under the threshold, and the best is kept.
  *
@@ -37,37 +45,31 @@ const TRIES = Number(arg('tries', 4));
 const OUT = resolve('design/launch-film/audio');
 
 /** Anything at or above this is treated as containing a voice. */
-const SPEECH_THRESHOLD = 0.24;
+/** Voice measures 0.16-0.19 here, piano 0.017. 0.08 sits well clear of both. */
+const SPEECH_THRESHOLD = 0.08;
 
 const PROMPT = [
-  'Purely instrumental score for a calm, story-led product film. Absolutely no singing,',
-  'no vocal samples, no choir, no humming, no spoken word, no vocoder and no human voice',
-  'of any kind — the only sound sources are a warm analog synth pad, a soft repeating',
-  'piano motif, a gentle low sub pulse and light room ambience. Opens sparse and intimate,',
-  'a quiet rhythmic pulse enters around fifteen seconds, and it opens up warmly through the',
-  'final twelve seconds before resolving hopeful and unhurried, leaving air at the very end',
-  'rather than stopping abruptly. Restrained throughout, never busy. No drums, no risers,',
-  'no impacts. Clean modern production with generous headroom for a narrator to sit on top.',
+  'Clean lo-fi hip hop instrumental for a calm product film. Warm tape-saturated electric',
+  'piano playing a simple repeating motif, soft dusty vinyl crackle, a mellow upright bass',
+  'line, and a relaxed unhurried drum groove with brushed rimshots and a soft kick. Gentle',
+  'low-pass warmth throughout, slightly off-grid and human. Absolutely no singing, no vocal',
+  'samples, no choir, no humming, no spoken word, no vocoder and no human voice of any kind.',
+  'Around seventy beats per minute. Steady and understated from beginning to end so a narrator',
+  'can sit on top of it, with air at the end rather than an abrupt stop.',
 ].join(' ');
 
-/** Fraction of envelope energy in the 3-8 Hz syllabic band. See the header. */
+/** Share of spectral energy in the 5-9 kHz fricative band. See the header. */
 function speechiness(file) {
   const r = spawnSync('python3', ['-c', `
 import subprocess, numpy as np, sys
-out = subprocess.run(['ffmpeg','-v','error','-i',sys.argv[1],'-ac','1','-ar','16000','-f','f32le','-'],
+out = subprocess.run(['ffmpeg','-v','error','-i',sys.argv[1],'-ac','1','-ar','22050','-f','f32le','-'],
                      capture_output=True).stdout
 x = np.frombuffer(out, dtype=np.float32)
-if len(x) < 16000: print('0'); sys.exit()
-X = np.fft.rfft(x); f = np.fft.rfftfreq(len(x), 1/16000)
-X[(f < 300) | (f > 3400)] = 0
-env = np.abs(np.fft.irfft(X))
-k = 160
-env = env[:len(env)//k*k].reshape(-1, k).mean(axis=1)
-env = env - env.mean()
-if env.std() == 0: print('0'); sys.exit()
-E = np.abs(np.fft.rfft(env)); ef = np.fft.rfftfreq(len(env), 1/100)
-tot = E[(ef >= 0.5) & (ef <= 20)].sum()
-print(f"{(E[(ef >= 3) & (ef <= 8)].sum() / tot) if tot else 0:.4f}")
+if len(x) < 22050: print('0'); sys.exit()
+n, hop = 1024, 256
+fr = np.lib.stride_tricks.sliding_window_view(x, n)[::hop] * np.hanning(n)
+S = np.abs(np.fft.rfft(fr, axis=1)); f = np.fft.rfftfreq(n, 1/22050)
+print(f"{(S[:, (f>=5000)&(f<=9000)].sum(axis=1) / (S.sum(axis=1)+1e-12)).mean():.4f}")
 `, file], { encoding: 'utf8' });
   return Number((r.stdout || '0').trim());
 }

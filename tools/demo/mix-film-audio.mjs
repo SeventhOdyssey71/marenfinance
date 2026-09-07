@@ -35,11 +35,15 @@ const MUSIC = join(AUDIO, 'music.mp3');
 /**
  * Mid-channel level applied to the score, 0..1. 1 leaves it untouched.
  *
- * A generated "instrumental" score came back with a voice in it — audible under the
- * narration, and the reason this knob exists. Generated vocals are almost always
- * centre-panned while pads and reverb are wide, so attenuating the mid channel
- * suppresses the voice and leaves most of the music. Measured on this score: L/R
- * correlation 0.60 and side/mid energy 0.50, i.e. there is real width to keep.
+ * A generated "instrumental" score once came back with a voice in it, which is why
+ * this knob exists: generated vocals are centre-panned while pads are wide, so
+ * attenuating the mid suppresses the voice and leaves most of the music.
+ *
+ * DEFAULT IS 1 — OFF — and must stay off for the current lo-fi score. That track
+ * measures side/mid 0.018, i.e. very nearly mono, with 37% of its energy below
+ * 200 Hz: suppressing the centre would not trim a vocal off it, it would delete the
+ * kick and bass the groove is made of. Only reach for this on a WIDE score that has
+ * a voice in it, and check side/mid first.
  *
  * This is a remedy, not a detector. Two attempts to detect the voice programmatically
  * failed honestly: a syllabic-rate measure scored a solo piano control (0.278) above
@@ -47,7 +51,7 @@ const MUSIC = join(AUDIO, 'music.mp3');
  * music (0.319). Neither separated voice from instrument, so the mix stopped trying to
  * decide and suppresses the band a centred vocal would occupy instead.
  */
-const CENTRE = Number(arg('centre', '0.3'));
+const CENTRE = Number(arg('centre', '1'));
 /** Drop the score entirely — the one option that cannot contain a voice. */
 const NO_MUSIC = process.argv.includes('--no-music');
 const DUR = 43.2;
@@ -62,10 +66,12 @@ const CUES = [
   ['A1', 0.60], ['A2', 3.30], ['A3', 7.40],
   ['T2a', 10.60], ['T2b', 12.10],
   ['P1', 15.60], ['P2', 18.90], ['P3', 22.30], ['P4', 26.50], ['P5', 29.95],
-  // C1 is the honesty line and deliberately runs across the cut into the end
-  // card; a voiceover crossing a cut is normal, and truncating this one would
-  // mean dropping "pre-audit, not mainnet yet", which is the point of the line.
-  ['C1', 32.40], ['C2', 39.40],
+  // C1 IS DELIBERATELY NOT SPOKEN. The three honest lines — "Non-custodial.",
+  // "Live on Mezo testnet.", "Pre-audit. Not mainnet yet." — still rise ON SCREEN
+  // across 32.22-36.97, so the disclosure is not dropped, only un-narrated. Reading
+  // a caveat aloud in a launch film makes it the loudest thing in the room; showing
+  // it keeps it exactly as true and lets the score carry the beat instead.
+  ['C2', 38.60],
 ];
 
 const vo = JSON.parse(await readFile(join(AUDIO, 'vo.json'), 'utf8'));
