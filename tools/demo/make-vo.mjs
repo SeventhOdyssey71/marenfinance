@@ -40,23 +40,33 @@ const OUT = resolve(arg('out', 'design/launch-film/audio'));
  * One entry per beat that speaks. `id` matches the film's BEATS ids so the
  * re-timing step can line them up without a lookup table.
  *
- * The copy deliberately tracks the on-screen line rather than talking over it:
- * a voiceover that says something different from the title forces the viewer to
- * choose which to follow, and they lose both.
+ * WRITTEN AS ONE PARAGRAPH, THEN CUT AT THE BEATS. The previous script restated
+ * each on-screen title in turn, which made twelve captions rather than one story:
+ * every line was a complete thought, so nothing pulled the viewer into the next
+ * shot and the film had no momentum. Read these in sequence and they are a single
+ * continuous sentence-chain — "it" is the same Bitcoin the whole way through, and
+ * each line lands on a conjunction or a consequence that only resolves in the one
+ * after it ("But to spend it…" / "So don't sell it." / "It starts with…" / "And
+ * before you sign…" / "Then spend it").
+ *
+ * The titles still carry the claims; the voice carries the causation between them.
+ * That division is deliberate: a voiceover that duplicates the title wastes the
+ * only channel that can say WHY, and one that contradicts it makes the viewer
+ * choose which to follow.
  */
 const LINES = [
-  { id: 'A1', text: 'To spend your Bitcoin, you sell it.' },
-  { id: 'A2', text: 'And then it’s gone.' },
-  { id: 'A3', text: 'Dollars now. No Bitcoin later.' },
-  { id: 'T2a', text: 'Borrow against it instead.' },
-  { id: 'T2b', text: 'Keep every satoshi.' },
-  { id: 'P1', text: 'Deposit your Bitcoin.' },
-  { id: 'P2', text: 'Borrow dollars against it.' },
-  { id: 'P3', text: 'See how far it can fall, before you sign.' },
-  { id: 'P4', text: 'Pay anyone by handle.' },
-  { id: 'P5', text: 'Done when the chain says done.' },
+  { id: 'A1', text: 'You’ve held it for years.' },
+  { id: 'A2', text: 'But to spend it, you have to sell it. And what you sell is gone.' },
+  { id: 'A3', text: 'Dollars today. No Bitcoin tomorrow.' },
+  { id: 'T2a', text: 'So don’t sell it.' },
+  { id: 'T2b', text: 'Borrow against it, and keep every satoshi.' },
+  { id: 'P1', text: 'It starts with a deposit.' },
+  { id: 'P2', text: 'Your Bitcoin becomes a credit line you draw on.' },
+  { id: 'P3', text: 'And before you sign, you see exactly how far it can fall.' },
+  { id: 'P4', text: 'Then spend it. To a name, not an address.' },
+  { id: 'P5', text: 'Done when the chain says it’s done.' },
   { id: 'C1', text: 'Non-custodial. Live on Mezo testnet. Pre-audit, not mainnet yet.' },
-  { id: 'C2', text: 'Maren. Never sell your Bitcoin.' },
+  { id: 'C2', text: 'Maren. Spend Bitcoin. Never sell it.' },
 ];
 
 function ffprobe(file) {
@@ -85,12 +95,18 @@ for (let i = 0; i < LINES.length; i += 1) {
       previous_text: i > 0 ? LINES[i - 1].text : undefined,
       next_text: i < LINES.length - 1 ? LINES[i + 1].text : undefined,
       voice_settings: {
-        // High stability: an ad read should not wander in delivery between takes
-        // that will be butted against each other on a timeline.
-        stability: 0.55,
+        // Loosened from 0.55 for the story rewrite. High stability keeps takes
+        // consistent, which is what a caption read wants — but it also flattens the
+        // rise and fall that makes a line sound like it is going somewhere. At 0.45
+        // the reading of "But to spend it, you have to sell it" actually leans on
+        // "have to", and the clauses that hand off to the next beat keep their lift
+        // instead of landing closed. Low enough to breathe, high enough that twelve
+        // separately-generated takes still sound like one person in one session.
+        stability: 0.45,
         similarity_boost: 0.8,
-        // A little style, not none: 0 reads flat, high reads like a movie trailer.
-        style: 0.15,
+        // Raised with it. 0 reads flat, high reads like a movie trailer; this sits
+        // where a narrator is telling you something rather than selling it.
+        style: 0.28,
         use_speaker_boost: true,
       },
     }),

@@ -32,7 +32,7 @@ const AUDIO = resolve('design/launch-film/audio');
 const VIDEO = resolve(arg('video', 'design/launch-film/maren-launch-silent.mp4'));
 const OUT = resolve(arg('out', 'design/launch-film/maren-launch.mp4'));
 const MUSIC = join(AUDIO, 'music.mp3');
-const DUR = 41.4;
+const DUR = 43.2;
 
 /**
  * id -> when the line STARTS speaking, in seconds.
@@ -41,13 +41,13 @@ const DUR = 41.4;
  * arrive together rather than the read pre-announcing the title.
  */
 const CUES = [
-  ['A1', 0.60], ['A2', 4.30], ['A3', 6.95],
-  ['T2a', 10.90], ['T2b', 13.00],
-  ['P1', 15.90], ['P2', 19.20], ['P3', 22.40], ['P4', 26.80], ['P5', 29.80],
+  ['A1', 0.60], ['A2', 3.30], ['A3', 7.40],
+  ['T2a', 10.60], ['T2b', 12.10],
+  ['P1', 15.60], ['P2', 18.90], ['P3', 22.30], ['P4', 26.50], ['P5', 29.95],
   // C1 is the honesty line and deliberately runs across the cut into the end
   // card; a voiceover crossing a cut is normal, and truncating this one would
   // mean dropping "pre-audit, not mainnet yet", which is the point of the line.
-  ['C1', 32.70], ['C2', 38.60],
+  ['C1', 32.40], ['C2', 39.40],
 ];
 
 const vo = JSON.parse(await readFile(join(AUDIO, 'vo.json'), 'utf8'));
