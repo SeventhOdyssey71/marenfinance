@@ -21,7 +21,7 @@
 import { readFile } from 'node:fs/promises';
 import { existsSync } from 'node:fs';
 import { resolve, join } from 'node:path';
-import { spawn } from 'node:child_process';
+import { spawn, spawnSync } from 'node:child_process';
 
 function arg(name, fallback) {
   const i = process.argv.indexOf(`--${name}`);
@@ -32,6 +32,24 @@ const AUDIO = resolve('design/launch-film/audio');
 const VIDEO = resolve(arg('video', 'design/launch-film/maren-launch-silent.mp4'));
 const OUT = resolve(arg('out', 'design/launch-film/maren-launch.mp4'));
 const MUSIC = join(AUDIO, 'music.mp3');
+/**
+ * Mid-channel level applied to the score, 0..1. 1 leaves it untouched.
+ *
+ * A generated "instrumental" score came back with a voice in it — audible under the
+ * narration, and the reason this knob exists. Generated vocals are almost always
+ * centre-panned while pads and reverb are wide, so attenuating the mid channel
+ * suppresses the voice and leaves most of the music. Measured on this score: L/R
+ * correlation 0.60 and side/mid energy 0.50, i.e. there is real width to keep.
+ *
+ * This is a remedy, not a detector. Two attempts to detect the voice programmatically
+ * failed honestly: a syllabic-rate measure scored a solo piano control (0.278) above
+ * the spoken lines' own threshold, and a vibrato measure put piano (0.306) above the
+ * music (0.319). Neither separated voice from instrument, so the mix stopped trying to
+ * decide and suppresses the band a centred vocal would occupy instead.
+ */
+const CENTRE = Number(arg('centre', '0.3'));
+/** Drop the score entirely — the one option that cannot contain a voice. */
+const NO_MUSIC = process.argv.includes('--no-music');
 const DUR = 43.2;
 
 /**
@@ -86,6 +104,8 @@ for (const f of [VIDEO, MUSIC]) {
 // --- build the graph --------------------------------------------------------
 const voFiles = CUES.map(([id]) => join(AUDIO, `${id}.mp3`));
 const inputs = ['-i', VIDEO, '-i', MUSIC, ...voFiles.flatMap((f) => ['-i', f])];
+if (NO_MUSIC) console.log('score dropped (--no-music): voice over picture only');
+else console.log(`score mid-channel at ${CENTRE} (centre suppression for the vocal artefact)`);
 
 const delays = CUES.map(([, at], i) => {
   const ms = Math.round(at * 1000);
@@ -94,7 +114,15 @@ const delays = CUES.map(([, at], i) => {
 }).join(';');
 const voMix = `${CUES.map((_, i) => `[v${i}]`).join('')}amix=inputs=${CUES.length}:normalize=0[vo]`;
 
-const filter = [
+const filter = NO_MUSIC ? [
+  delays,
+  voMix,
+  // apad BEFORE the trim. With no score there is nothing else running to the end of
+  // the film, so the audio stream stops at the last spoken word and -shortest then
+  // trims the PICTURE to match — the master came out 42.4s instead of 43.2s and lost
+  // the end card's fade. Same failure the sidechain key had, same fix.
+  `[vo]apad=whole_dur=${DUR},atrim=0:${DUR}[aout]`,
+] : [
   // normalize=0: the lines never overlap, so summing must not scale them down.
   delays,
   voMix,
@@ -105,14 +133,14 @@ const filter = [
   // match, silently losing the end card's final second.
   `[voKey]apad=whole_dur=${DUR}[voKeyPad]`,
   // Score sits low to begin with; the sidechain then pulls it further under speech.
-  `[1:a]volume=0.34,afade=t=in:st=0:d=1.6,afade=t=out:st=${(DUR - 2.2).toFixed(2)}:d=2.2[mus]`,
+  `[1:a]stereotools=mlev=${CENTRE},volume=${(0.34 / Math.max(CENTRE, 0.35)).toFixed(2)},afade=t=in:st=0:d=1.6,afade=t=out:st=${(DUR - 2.2).toFixed(2)}:d=2.2[mus]`,
   `[mus][voKeyPad]sidechaincompress=threshold=0.04:ratio=6:attack=20:release=380[duck]`,
   // loudnorm to -14 LUFS: the platforms this film gets posted to (YouTube, X,
   // LinkedIn) normalise playback to roughly that, so a quieter master is not
   // "subtle" — it is just turned down relative to everything around it. The raw
   // mix measured -23.9 LUFS. TP=-1.5 keeps true-peak headroom for the lossy
   // re-encode those platforms will apply on upload.
-  `[duck][voOut]amix=inputs=2:normalize=0,loudnorm=I=-14:TP=-1.5:LRA=11,atrim=0:${DUR}[aout]`,
+  `[duck][voOut]amix=inputs=2:normalize=0,atrim=0:${DUR}[aout]`,
 ].join(';');
 
 const args = [
@@ -133,4 +161,29 @@ await new Promise((ok, fail) => {
   p.stderr.on('data', (d) => (err += d));
   p.on('close', (c) => (c === 0 ? ok() : fail(new Error(err.slice(-3000)))));
 });
-console.log('done');
+
+// --- two-pass loudnorm ------------------------------------------------------
+// Single-pass loudnorm ESTIMATES the correction from a running window, and with
+// sparse speech over a quiet bed it undershoots: the voice-only master measured
+// -15.8 LUFS against a -14 target. Two-pass measures the finished mix first, then
+// applies the exact correction, which is the only way to actually land on target.
+function measure(file) {
+  const r = spawnSync('ffmpeg', ['-i', file, '-af',
+    'loudnorm=I=-14:TP=-1.5:LRA=11:print_format=json', '-f', 'null', '-'], { encoding: 'utf8' });
+  const m = (r.stderr || '').match(/\{[\s\S]*?\}/g);
+  if (!m) throw new Error('loudnorm measurement failed');
+  return JSON.parse(m[m.length - 1]);
+}
+const m = measure(OUT);
+const tmp = `${OUT}.norm.mp4`;
+await new Promise((ok, fail) => {
+  const p2 = spawn('ffmpeg', ['-y', '-i', OUT, '-map', '0:v', '-map', '0:a',
+    '-af', `loudnorm=I=-14:TP=-1.5:LRA=11:measured_I=${m.input_i}:measured_TP=${m.input_tp}:` +
+           `measured_LRA=${m.input_lra}:measured_thresh=${m.input_thresh}:offset=${m.target_offset}:linear=true`,
+    '-c:v', 'copy', '-c:a', 'aac', '-b:a', '192k', '-ar', '48000',
+    '-movflags', '+faststart', tmp], { stdio: ['ignore', 'ignore', 'pipe'] });
+  let e = ''; p2.stderr.on('data', (d) => (e += d));
+  p2.on('close', (c) => (c === 0 ? ok() : fail(new Error(e.slice(-2000)))));
+});
+await (await import('node:fs/promises')).rename(tmp, OUT);
+console.log(`done (two-pass loudnorm from measured ${Number(m.input_i).toFixed(1)} LUFS)`);
