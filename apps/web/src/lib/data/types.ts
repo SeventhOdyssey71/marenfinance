@@ -41,6 +41,12 @@ export interface Position {
    * are shown — whichever binds first is the one that will stop the transaction.
    */
   vaultMaxBorrowableWei?: bigint;
+  /**
+   * `TroveManager.getTroveDebt()` for the trove this position draws against — the user's
+   * own on the direct route, the WHOLE pooled trove on the pooled route. This is what Mezo
+   * compares its per-trove ceiling against, and it is not the user's drawn principal.
+   */
+  troveTotalDebtWei?: bigint;
   /** 'direct' = the user's own trove. 'pooled' = a share of MarenVault's trove. */
   route: 'direct' | 'pooled' | 'none';
   /** Unix seconds the position was opened, for the interest narrative. */

@@ -98,8 +98,15 @@ export async function readPosition(ctx: LiveContext): Promise<Position> {
    * `multicall` here would arrive as calldata the batcher must leave alone, so the
    * portfolio would go back to five requests, one per hook, instead of one for all of them.
    */
-  const [trove, directCapacity, vaultCollateral, vaultDebt, vaultBorrowable, troveCapacity] =
-    await Promise.all([
+  const [
+    trove,
+    directCapacity,
+    vaultCollateral,
+    vaultDebt,
+    vaultBorrowable,
+    troveCapacity,
+    pooledTroveDebt,
+  ] = await Promise.all([
       ctx.client.readContract({
         address: musd.troveManager,
         abi: troveManagerAbi,
@@ -145,6 +152,21 @@ export async function readPosition(ctx: LiveContext): Promise<Position> {
         abi: marenVaultAbi,
         functionName: 'troveMaxBorrowingCapacity',
       }),
+      /**
+       * The WHOLE pooled trove's debt, which is what Mezo compares its ceiling against.
+       * MarenVault is the trove owner, so this is read for the vault's address, not the
+       * user's. Without it the pooled ceiling was computed against one depositor's slice
+       * and was effectively unbounded.
+       */
+      ctx.client
+        .readContract({
+          address: musd.troveManager,
+          abi: troveManagerAbi,
+          functionName: 'getTroveDebt',
+          args: [maren.marenVault],
+        })
+        .then((v) => v as bigint | null)
+        .catch(() => null),
     ]);
 
   const [coll, principal, interest, pendingColl, pendingPrincipal, pendingInterest] = trove;
@@ -167,6 +189,8 @@ export async function readPosition(ctx: LiveContext): Promise<Position> {
       interestWei: totalInterest,
       interestRateBps: INTEREST_RATE_BPS,
       maxBorrowingCapacityWei: directCapacity,
+      // The user IS the borrower on this route, so their total debt is the trove's.
+      troveTotalDebtWei: totalPrincipal + totalInterest,
       route: 'direct',
       openedAt: 0,
     };
@@ -181,6 +205,8 @@ export async function readPosition(ctx: LiveContext): Promise<Position> {
     interestWei: 0n,
     interestRateBps: INTEREST_RATE_BPS,
     maxBorrowingCapacityWei: troveCapacity,
+    // Trove-wide, shared by every depositor — deliberately NOT this user's `vaultDebt`.
+    troveTotalDebtWei: pooledTroveDebt ?? undefined,
     vaultMaxBorrowableWei: vaultBorrowable,
     route: vaultCollateral > 0n ? 'pooled' : 'none',
     openedAt: 0,
@@ -285,6 +311,19 @@ export async function readEarn(ctx: LiveContext): Promise<EarnPosition> {
 
   const [musdIdle, musdInPool, btcHeld, btcPending, btcValued] = breakdown;
 
+  /**
+   * Cap the withdrawable figure at what the vault can actually pay in MUSD.
+   *
+   * `maxWithdraw` is now overridden in MarenEarn to do exactly this, but the contract
+   * DEPLOYED to matsnet predates that override and still returns the full share value —
+   * which counts BTC the vault holds and has no path to sell, because `swapRouter` is
+   * unset. Quoting it tells the first redeemers they can take MUSD that the later ones
+   * will not find. This cap makes the screen honest against the deployed build, and
+   * becomes a no-op once the new one is live, since it then agrees with the contract.
+   */
+  const payableWei = musdIdle + musdInPool;
+  const withdrawableWei = assets < payableWei ? assets : payableWei;
+
   // The bounded log scan for cost basis and realised gains. Kept out of the batch above
   // because it is a multi-window `eth_getLogs` walk, not a single-block read, and its
   // failure mode is a thrown transport error rather than a silent zero.
@@ -297,7 +336,7 @@ export async function readEarn(ctx: LiveContext): Promise<EarnPosition> {
 
   return {
     sharesWei: shares,
-    assetsWei: assets,
+    assetsWei: withdrawableWei,
     depositedWei,
     trailing,
     breakdown: {

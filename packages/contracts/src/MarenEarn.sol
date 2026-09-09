@@ -165,6 +165,43 @@ contract MarenEarn is ERC4626, AccessControl, ERC2771Context, ReentrancyGuard {
         return assets == type(uint256).max ? type(uint256).max : convertToShares(assets);
     }
 
+    /// @notice The most MUSD `owner` can actually take out right now.
+    /// @dev ERC-4626 requires this to return an amount that will not revert, and the
+    ///      inherited implementation does not: it returns the full share value, which
+    ///      includes BTC this contract holds and cannot pay out in MUSD. There is no
+    ///      BTC->MUSD path while `swapRouter` is unset, so that portion is a claim
+    ///      nothing can settle, and quoting it hands the first redeemers MUSD for BTC
+    ///      the later ones will not find. Capped at what is genuinely payable: idle
+    ///      MUSD plus this vault's compounded Stability Pool deposit.
+    ///
+    ///      This does NOT model Mezo's other refusal — the Stability Pool rejects every
+    ///      non-zero withdrawal while any trove chain-wide sits below MCR, which is a
+    ///      condition no depositor caused and none can clear. Reading it here would cost
+    ///      an oracle call on a view every client polls, so the app checks it separately
+    ///      and this stays the payable-balance cap.
+    function maxWithdraw(address owner) public view override returns (uint256) {
+        uint256 byShares = super.maxWithdraw(owner);
+        uint256 payable_ = IERC20(asset()).balanceOf(address(this))
+            + stabilityPool.getCompoundedMUSDDeposit(address(this));
+        return byShares < payable_ ? byShares : payable_;
+    }
+
+    /// @notice Shares that can actually be redeemed right now. Mirrors `maxWithdraw`.
+    /// @dev Returns the FULL balance whenever liquidity does not bind, rather than routing
+    ///      every holder through `convertToShares`. That round trip loses a wei to floor
+    ///      rounding, and the loss is not cosmetic: it made `redeem(balanceOf(owner))`
+    ///      revert with `ERC4626ExceededMaxRedeem(owner, 999, 998)`, i.e. it blocked a
+    ///      full exit for someone the vault could pay in full. Only convert when the
+    ///      payable balance is genuinely the smaller number.
+    function maxRedeem(address owner) public view override returns (uint256) {
+        uint256 held = balanceOf(owner);
+        uint256 payable_ = IERC20(asset()).balanceOf(address(this))
+            + stabilityPool.getCompoundedMUSDDeposit(address(this));
+        if (super.maxWithdraw(owner) <= payable_) return held;
+        uint256 shares = convertToShares(payable_);
+        return shares < held ? shares : held;
+    }
+
     /// @dev Deposits land in the Stability Pool immediately. If `provideToSP` reverts the
     ///      whole deposit reverts — unlike the vault's collateral path there is no reason to
     ///      accept MUSD we cannot put to work.

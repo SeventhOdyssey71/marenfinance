@@ -62,6 +62,15 @@ export interface BorrowPosition {
   route: 'direct' | 'pooled' | 'none';
   /** `MarenVault.maxBorrowable`, when the pooled route has been read from chain. */
   vaultMaxBorrowableWei?: bigint;
+  /**
+   * `TroveManager.getTroveDebt()` for the trove this position draws against — the USER's
+   * trove on the direct route, the WHOLE POOLED TROVE on the pooled route.
+   *
+   * This is the figure Mezo actually checks the ceiling against, and it is not
+   * `principalWei`: it includes the 200 MUSD gas compensation and all accrued interest.
+   * On the pooled route it belongs to every depositor at once, not to this user.
+   */
+  troveTotalDebtWei?: bigint;
 }
 
 /**
@@ -133,7 +142,6 @@ export interface BorrowCeiling {
  * an opaque revert.
  */
 export function borrowCeiling(position: BorrowPosition, priceWei: bigint): BorrowCeiling {
-  const drawn = position.principalWei;
 
   /**
    * On the pooled route the contract answers this itself — `MarenVault.maxBorrowable`
@@ -146,8 +154,36 @@ export function borrowCeiling(position: BorrowPosition, priceWei: bigint): Borro
         headroomAt(position, priceWei, MAREN_POLICY.minHealthyCr))
       : headroomAt(position, priceWei, MAREN_POLICY.minHealthyCr);
 
+  /**
+   * Mezo checks `maxBorrowingCapacity >= netDebtChange + getTroveDebt(borrower)`
+   * (BorrowerOperations `_requireHasBorrowingCapacity`), where `netDebtChange` is the draw
+   * PLUS its origination fee. So two corrections against the obvious formula:
+   *
+   * 1. Subtract the trove's TOTAL debt, not the user's drawn principal. Total debt carries
+   *    the 200 MUSD gas compensation and accrued interest, and on the pooled route it is
+   *    the whole shared trove's debt rather than this user's slice — comparing a trove-wide
+   *    ceiling against one user's balance is a category error that makes the ceiling
+   *    effectively unbounded.
+   * 2. Divide out the fee, because the protocol adds it to the draw before comparing.
+   *    Quoting a gross number means the last MUSD of the range always reverts.
+   *
+   * Measured on matsnet before this fix: `maxBorrowable()` quoted 1,556.98 MUSD for a
+   * position whose true limit simulated at 834.68 — the button labelled "Max" reverted by
+   * construction. `troveTotalDebtWei` is optional only so an unmigrated caller still
+   * compiles; when it is absent the ceiling falls back to the conservative direction by
+   * using total debt from `debtWei`, never the old under-subtraction.
+   */
+  const troveDebtWei = position.troveTotalDebtWei ?? position.debtWei;
+  const rawHeadroomWei =
+    position.maxBorrowingCapacityWei > troveDebtWei
+      ? position.maxBorrowingCapacityWei - troveDebtWei
+      : 0n;
+  // The pooled route draws through MarenVault, which pays no origination fee on the
+  // reserve-served portion; the direct route always pays it. Gross down only where charged.
   const mezoHeadroomWei =
-    position.maxBorrowingCapacityWei > drawn ? position.maxBorrowingCapacityWei - drawn : 0n;
+    position.route === 'pooled'
+      ? rawHeadroomWei
+      : (rawHeadroomWei * WAD) / (WAD + BORROWING_RATE);
 
   const amountWei = ratioHeadroomWei < mezoHeadroomWei ? ratioHeadroomWei : mezoHeadroomWei;
 

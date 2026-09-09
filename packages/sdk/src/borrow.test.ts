@@ -83,11 +83,45 @@ describe('borrowCeiling', () => {
   });
 
   it('lets Mezo’s per-trove ceiling bind when it is the smaller limit', () => {
-    const position = { ...directPosition(), maxBorrowingCapacityWei: 12_100n * WAD };
+    // The ceiling is measured against the trove's TOTAL debt, so the headroom this
+    // fixture leaves is `cap - debtWei`, not `cap - principalWei`. Sized to leave a
+    // clear 100 MUSD gross before the fee is divided out.
+    const base = directPosition();
+    const position = {
+      ...base,
+      maxBorrowingCapacityWei: base.debtWei + 100n * WAD,
+      troveTotalDebtWei: base.debtWei,
+    };
     const ceiling = borrowCeiling(position, PRICE);
 
     expect(ceiling.binding).toBe('ceiling');
-    expect(ceiling.amountWei).toBe(100n * WAD);
+    // 100 MUSD of raw headroom, grossed DOWN by the 0.1% origination fee the protocol
+    // adds to the draw before it compares. Quoting the raw 100 would revert.
+    expect(ceiling.amountWei).toBe((100n * WAD * WAD) / (WAD + BORROWING_RATE));
+    expect(ceiling.amountWei).toBeLessThan(100n * WAD);
+  });
+
+  it('measures the ceiling against total trove debt, not drawn principal', () => {
+    // The bug this replaces: subtracting `principalWei` ignored the 200 MUSD gas
+    // compensation and all accrued interest, so the quote exceeded what Mezo accepts.
+    // Measured on matsnet, that overstated a live position by 722 MUSD.
+    const base = directPosition();
+    const cap = base.debtWei + 100n * WAD;
+    const correct = borrowCeiling({ ...base, maxBorrowingCapacityWei: cap,
+      troveTotalDebtWei: base.debtWei }, PRICE);
+    const naive = cap - base.principalWei;
+
+    expect(correct.mezoHeadroomWei).toBeLessThan(naive);
+    // The whole gap is the gas compensation plus interest the old formula skipped.
+    expect(naive - correct.mezoHeadroomWei).toBeGreaterThan(MUSD_GAS_COMPENSATION);
+  });
+
+  it('does not gross down the fee on the pooled route, which does not pay one', () => {
+    const base = directPosition();
+    const pooled = borrowCeiling({ ...base, route: 'pooled' as const,
+      maxBorrowingCapacityWei: base.debtWei + 100n * WAD,
+      troveTotalDebtWei: base.debtWei, vaultMaxBorrowableWei: 10_000n * WAD }, PRICE);
+    expect(pooled.mezoHeadroomWei).toBe(100n * WAD);
   });
 
   it('reports no headroom rather than a negative one', () => {
