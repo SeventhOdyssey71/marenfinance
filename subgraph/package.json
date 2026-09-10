@@ -1,0 +1,17 @@
+{
+  "name": "@maren/subgraph",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Maren activity history on Mezo matsnet, indexed by Goldsky.",
+  "scripts": {
+    "codegen": "graph codegen",
+    "build": "graph build",
+    "deploy": "goldsky subgraph deploy maren-activity/1.0.0 --path .",
+    "lint": "echo 'no linter configured yet' && exit 0",
+    "test": "echo 'no tests yet' && exit 0"
+  },
+  "dependencies": {
+    "@graphprotocol/graph-cli": "0.97.1",
+    "@graphprotocol/graph-ts": "0.38.1"
+  }
+}

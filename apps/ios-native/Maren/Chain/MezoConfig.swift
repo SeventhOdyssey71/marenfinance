@@ -141,6 +141,29 @@ let MEZO_PRICE_ORACLE_PRECOMPILE = "0x7b7c000000000000000000000000000000000015"
 /// Verified present on matsnet: 7,619 bytes of runtime code at this address.
 let MULTICALL3 = "0xcA11bde05977b3631167028862bE2a173976CA11"
 
+/// Optional Goldsky subgraph for the Activity history.
+///
+/// Mezo's public RPCs cap `eth_getLogs` at 10,000 blocks, so reading history means paging:
+/// four windows across three contracts, twelve requests at about a second each even fully
+/// parallel, plus one `eth_getBlockByNumber` per distinct block just to date the rows. A
+/// subgraph answers the same question in one query with the timestamps already on it.
+///
+/// UNSET IS A SUPPORTED STATE, not a broken one. When this is empty the client falls back to
+/// the log crawl, which is slower but needs no infrastructure and cannot go stale relative to
+/// the chain. That fallback is why shipping this is safe before the indexer is deployed.
+enum SubgraphConfig {
+    static var url: URL? {
+        let raw = (Bundle.main.object(forInfoDictionaryKey: "MAREN_SUBGRAPH_URL") as? String)
+            ?? ProcessInfo.processInfo.environment["MAREN_SUBGRAPH_URL"]
+            ?? ""
+        let trimmed = raw.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty, let u = URL(string: trimmed), u.scheme?.hasPrefix("http") == true else {
+            return nil
+        }
+        return u
+    }
+}
+
 /// 200 MUSD escrowed at trove open, in wei (1e18). `TroveManager` reports it inside the
 /// principal, so it is subtracted back out for the net drawn figure.
 let MUSD_GAS_COMPENSATION: BigUInt = BigUInt(200) * BigUInt(10).power(18)

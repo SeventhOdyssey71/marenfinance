@@ -1,0 +1,48 @@
+# One row per (event, participant).
+#
+# WHY ONE ROW PER PARTICIPANT rather than one per event with a participants array. A payment
+# has two sides, and both parties must find it in their own history. Storing an array and
+# querying with `participants_contains` works but cannot use an index, so it degrades as the
+# table grows — exactly the failure mode this subgraph exists to remove. Duplicating the row
+# per side makes `account` a plain indexed equality filter, which stays fast at any size.
+# A `Paid` event therefore writes two Activity rows with the same txHash and logIndex.
+#
+# Immutable because an event is a historical fact: once written, nothing may revise it. That
+# also lets the indexer skip the write-ahead bookkeeping mutable entities require.
+type Activity @entity(immutable: true) {
+  "txHash-logIndex-account. Unique per side of a two-sided event."
+  id: Bytes!
+
+  "The account whose history this row belongs to. The only filter the client needs."
+  account: Bytes!
+
+  "The other side, when the event has one. Null for single-sided events like Borrowed."
+  counterparty: Bytes
+
+  "Event name, exactly as emitted: Deposited, Borrowed, Paid, LinkClaimed, and so on."
+  kind: String!
+
+  "The amount in the event's own units — BTC wei for collateral, MUSD wei for everything else."
+  amount: BigInt!
+
+  "Free-text memo where the event carries one. Null otherwise."
+  memo: String
+
+  "Set for the Pay events that mint an id, so a link or request can be looked up directly."
+  refId: BigInt
+
+  "Whether this row is the sending or receiving side. Lets the client render sign and wording."
+  outgoing: Boolean!
+
+  blockNumber: BigInt!
+
+  """
+  Block timestamp, denormalised onto the row ON PURPOSE. The client previously spent an
+  eth_getBlockByNumber (~445ms on matsnet) per distinct block just to date its list.
+  Carrying it here removes that call entirely rather than making it faster.
+  """
+  timestamp: BigInt!
+
+  txHash: Bytes!
+  logIndex: BigInt!
+}

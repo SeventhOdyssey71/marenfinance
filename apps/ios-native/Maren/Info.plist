@@ -10,6 +10,11 @@
 -->
 <plist version="1.0">
 <dict>
+    <!-- Goldsky subgraph for Activity history. EMPTY IS VALID: the client falls back to the
+         bounded eth_getLogs crawl, which is slower but needs no infrastructure. Fill this in
+         after `goldsky subgraph deploy` and the Activity screen stops paging. -->
+    <key>MAREN_SUBGRAPH_URL</key>
+    <string></string>
     <key>MAREN_RELAYER_URL</key>
     <string>https://maren-relayer.rolandojude18.workers.dev</string>
     <!--

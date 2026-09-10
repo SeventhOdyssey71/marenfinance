@@ -1,0 +1,84 @@
+specVersion: 1.0.0
+description: Maren activity history on Mezo matsnet — indexed one row per participant per event.
+schema:
+  file: ./schema.graphql
+dataSources:
+  - kind: ethereum
+    name: MarenVault
+    network: mezo-testnet
+    source:
+      address: '0x46252B00AB59384518d9dB6D1f210ffF1221645b'
+      abi: MarenVault
+      # Bisected with eth_getCode: block 14911470 has no code, 14911471 does.
+      startBlock: 14911471
+    mapping:
+      kind: ethereum/events
+      apiVersion: 0.0.9
+      language: wasm/assemblyscript
+      file: ./src/mapping.ts
+      entities:
+        - Activity
+      abis:
+        - name: MarenVault
+          file: ./abis/MarenVault.json
+      eventHandlers:
+        - event: Borrowed(indexed address,uint256,uint256,uint256,bool)
+          handler: handleBorrowed
+        - event: Deposited(indexed address,uint256,uint256,bool)
+          handler: handleDeposited
+        - event: Repaid(indexed address,uint256,uint256)
+          handler: handleRepaid
+        - event: Withdrawn(indexed address,uint256,uint256)
+          handler: handleWithdrawn
+  - kind: ethereum
+    name: MarenPay
+    network: mezo-testnet
+    source:
+      address: '0xe475Ff919D54E055809f516E3bed8a5c7a101836'
+      abi: MarenPay
+      # Bisected with eth_getCode: block 14911470 has no code, 14911471 does.
+      startBlock: 14911471
+    mapping:
+      kind: ethereum/events
+      apiVersion: 0.0.9
+      language: wasm/assemblyscript
+      file: ./src/mapping.ts
+      entities:
+        - Activity
+      abis:
+        - name: MarenPay
+          file: ./abis/MarenPay.json
+      eventHandlers:
+        - event: LinkClaimed(indexed uint256,indexed address,uint256)
+          handler: handleLinkClaimed
+        - event: LinkCreated(indexed uint256,indexed address,indexed address,uint256,uint64)
+          handler: handleLinkCreated
+        - event: Paid(indexed address,indexed address,uint256,indexed bytes32,string)
+          handler: handlePaid
+        - event: PaidToHandle(indexed bytes32,indexed address,indexed address,uint256,string)
+          handler: handlePaidToHandle
+        - event: RequestCreated(indexed uint256,indexed address,indexed address,uint256,string)
+          handler: handleRequestCreated
+  - kind: ethereum
+    name: MarenEarn
+    network: mezo-testnet
+    source:
+      address: '0xE3B02b215085B99Ce61E0F5ea9763Ac637aa7826'
+      abi: MarenEarn
+      # Bisected with eth_getCode: block 14911470 has no code, 14911471 does.
+      startBlock: 14911471
+    mapping:
+      kind: ethereum/events
+      apiVersion: 0.0.9
+      language: wasm/assemblyscript
+      file: ./src/mapping.ts
+      entities:
+        - Activity
+      abis:
+        - name: MarenEarn
+          file: ./abis/MarenEarn.json
+      eventHandlers:
+        - event: Deposit(indexed address,indexed address,uint256,uint256)
+          handler: handleEarnDeposit
+        - event: Withdraw(indexed address,indexed address,indexed address,uint256,uint256)
+          handler: handleEarnWithdraw

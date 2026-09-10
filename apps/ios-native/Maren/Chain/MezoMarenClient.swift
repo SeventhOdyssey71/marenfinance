@@ -449,6 +449,14 @@ struct MezoMarenClient: MarenClient {
     func recentActivity() async throws -> [ActivityItem] {
         let maren = MarenAddresses.of(chain.network)
         guard maren.isDeployed else { return [] }
+
+        // THE FAST PATH, when a subgraph is configured. One query, timestamps already on the
+        // rows. The crawl below stays as the fallback and runs whenever this returns nil —
+        // no subgraph configured, a transport failure, or a GraphQL error — so the history is
+        // never silently truncated to whatever the indexer happened to have.
+        if let rows = await SubgraphActivity.fetch(account: accountAddress) {
+            return rows.compactMap { Self.activityItem(from: $0) }
+        }
         let acct = "0x" + String(accountAddress.dropFirst(2)).lowercased().leftPadded(to: 64)
         let names = Self.eventNamesByTopic
         let contracts = [maren.marenVault, maren.marenPay, maren.marenEarn]
@@ -546,6 +554,38 @@ struct MezoMarenClient: MarenClient {
     }
 
     // MARK: activity events + decode
+
+    /// Map one indexed row onto the same `ActivityItem` the log path produces.
+    ///
+    /// Deliberately mirrors `decodeActivity`'s titles and sign conventions word for word: a
+    /// row must read identically whether it arrived from the subgraph or the crawl, or
+    /// switching between them would look like the history changed.
+    static func activityItem(from r: SubgraphActivity.Row) -> ActivityItem? {
+        let amount = Wei.toDecimal(r.amountWei) ?? 0
+        let id = "\(r.txHash)-\(r.blockNumber)-\(r.kind)-\(r.outgoing ? "out" : "in")"
+        func musd(_ sign: String) -> String { "\(sign)\(MoneyFormat.musd(amount, unit: false)) MUSD" }
+        func btc(_ sign: String) -> String { "\(sign)\(MoneyFormat.btc(amount, unit: false)) BTC" }
+        func row(_ kind: ActivityItem.Kind, _ title: String, _ subtitle: String, _ text: String) -> ActivityItem {
+            ActivityItem(id: id, kind: kind, title: title, subtitle: subtitle, amount: text,
+                         date: r.timestamp, hash: r.txHash, memo: r.memo, counterparty: r.counterparty)
+        }
+        switch r.kind {
+        case "Deposited":   return row(.deposit, "Deposited Bitcoin", "Vault collateral", btc("+"))
+        case "Withdrawn":   return row(.withdraw, "Withdrew Bitcoin", "From your vault", btc("-"))
+        case "Borrowed":    return row(.borrow, "Borrowed MUSD", "Against BTC vault", musd("+"))
+        case "Repaid":      return row(.repay, "Repaid MUSD", "To your vault", musd("-"))
+        case "Paid", "PaidToHandle":
+            return row(r.outgoing ? .send : .receive,
+                       r.outgoing ? "Sent MUSD" : "Received MUSD", "MarenPay transfer",
+                       musd(r.outgoing ? "-" : "+"))
+        case "RequestCreated": return row(.receive, "Payment request", "MarenPay request", musd(""))
+        case "LinkCreated":    return row(.send, "Created a claim link", "Escrowed MUSD", musd("-"))
+        case "LinkClaimed":    return row(.receive, "Claim link claimed", "MarenPay link", musd("+"))
+        case "Deposit":        return row(.earnDeposit, "Moved into Earn", "MarenEarn vault", musd("-"))
+        case "Withdraw":       return row(.earnWithdraw, "Withdrew from Earn", "MarenEarn vault", musd("+"))
+        default: return nil
+        }
+    }
 
     /// Canonical signatures of every event the history renders — one copy, mirroring the
     /// SDK's MAREN_*_EVENTS. topic0 = keccak(signature).

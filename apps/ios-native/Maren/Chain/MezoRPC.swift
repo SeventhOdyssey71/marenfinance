@@ -647,3 +647,79 @@ actor BlockTimeCache {
         for (k, v) in entries { times[k] = v }
     }
 }
+
+// MARK: - Subgraph-backed activity
+
+/// Reads Activity from the Goldsky subgraph in ONE query.
+///
+/// This replaces a bounded `eth_getLogs` crawl — four 10,000-block windows across three
+/// contracts, twelve requests at roughly a second each on matsnet — and it also removes the
+/// per-block `eth_getBlockByNumber` the crawl needed to date its rows, because the indexer
+/// stores the timestamp on the row.
+///
+/// It is deliberately ALL-OR-NOTHING: any failure returns nil and the caller runs the crawl.
+/// A half-populated history is worse than a slow one, because a missing row reads as "that
+/// payment never happened" rather than as "this is still loading".
+enum SubgraphActivity {
+    struct Row: Sendable {
+        let kind: String
+        let amountWei: BigUInt
+        let counterparty: String?
+        let memo: String?
+        let outgoing: Bool
+        let blockNumber: Int
+        let timestamp: Date
+        let txHash: String
+    }
+
+    static func fetch(account: String, limit: Int = 50) async -> [Row]? {
+        guard let url = SubgraphConfig.url else { return nil }
+
+        let query = """
+        query Activity($account: Bytes!, $first: Int!) {
+          activities(where: { account: $account }, orderBy: timestamp, orderDirection: desc, first: $first) {
+            kind amount counterparty memo outgoing blockNumber timestamp txHash
+          }
+        }
+        """
+        let body: [String: Any] = [
+            "query": query,
+            "variables": ["account": account.lowercased(), "first": limit],
+        ]
+        var req = URLRequest(url: url)
+        req.httpMethod = "POST"
+        req.setValue("application/json", forHTTPHeaderField: "content-type")
+        req.timeoutInterval = 8
+        guard let payload = try? JSONSerialization.data(withJSONObject: body) else { return nil }
+        req.httpBody = payload
+
+        guard let (data, response) = try? await URLSession.shared.data(for: req),
+              let http = response as? HTTPURLResponse, http.statusCode == 200,
+              let root = try? JSONSerialization.jsonObject(with: data) as? [String: Any]
+        else { return nil }
+
+        // A GraphQL 200 can still carry errors. Treat that as a miss so the crawl runs, rather
+        // than rendering whatever partial `data` came alongside them.
+        if root["errors"] != nil { return nil }
+        guard let dataObj = root["data"] as? [String: Any],
+              let rows = dataObj["activities"] as? [[String: Any]] else { return nil }
+
+        return rows.compactMap { r in
+            guard let kind = r["kind"] as? String,
+                  let amountStr = r["amount"] as? String,
+                  let amount = BigUInt(amountStr),
+                  let tsStr = r["timestamp"] as? String, let ts = TimeInterval(tsStr),
+                  let blockStr = r["blockNumber"] as? String, let block = Int(blockStr),
+                  let tx = r["txHash"] as? String
+            else { return nil }
+            return Row(kind: kind,
+                       amountWei: amount,
+                       counterparty: r["counterparty"] as? String,
+                       memo: r["memo"] as? String,
+                       outgoing: (r["outgoing"] as? Bool) ?? true,
+                       blockNumber: block,
+                       timestamp: Date(timeIntervalSince1970: ts),
+                       txHash: tx)
+        }
+    }
+}
