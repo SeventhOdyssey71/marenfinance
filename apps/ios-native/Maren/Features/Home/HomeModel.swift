@@ -57,12 +57,21 @@ final class HomeModel {
         async let price = client.priceFeed()
         async let activity = client.recentActivity()
 
+        // The four screen-critical reads all draw from ONE batched multicall, so awaiting
+        // them costs a single round trip between them.
         if let value = try? await account { self.account = value }
         if let value = try? await position { self.position = value }
         if let value = try? await balances { self.balances = value }
         if let value = try? await price { self.priceFeed = value }
-        if let value = try? await activity { self.activity = value }
+
+        // PAINT HERE, before Activity. Activity is a multi-window `eth_getLogs` crawl — four
+        // windows across three contracts, about a second even fully parallel — and it used to
+        // gate `.loaded`, so the balance sat behind a history scan it does not depend on. The
+        // crawl is already in flight from the `async let` above; it lands a moment later and
+        // fills the list in place.
         phase = .loaded
+
+        if let value = try? await activity { self.activity = value }
 
         // Persist the fresh snapshot for the next launch.
         if let address {

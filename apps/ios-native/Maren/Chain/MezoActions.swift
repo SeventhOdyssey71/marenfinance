@@ -141,6 +141,7 @@ struct MezoActions {
                                               value: valueWei, data: data, gasLimit: 500_000)
             let client = EthereumHttpClient(url: chain.rpcURLs[0], network: .custom(String(chain.chainId)))
             let outcome = await Receipt.confirm(client: client, hash: hash, sponsored: false)
+            await MezoSnapshotStore.shared.invalidate()  // cached reads are stale now
             if case .delivered(let d) = outcome { return .ok(d) }
             return .failed(outcome)
         } catch {
@@ -424,6 +425,11 @@ struct MezoActions {
         let client = EthereumHttpClient(url: chain.rpcURLs[0], network: .custom(String(chain.chainId)))
         let outcome = await Receipt.confirm(client: client, hash: hash, sponsored: false,
                                             mintedIdFrom: mintedIdFrom)
+        // A confirmed write makes every cached read wrong. The snapshot has a 2s TTL to
+        // coalesce concurrent screen loads, and without this the refresh that fires straight
+        // after a deposit could be served the PRE-transaction balance — the exact "it went
+        // through but nothing moved" that the receipt-gating elsewhere exists to prevent.
+        await MezoSnapshotStore.shared.invalidate()
         if case .delivered(let d) = outcome { return .ok(d) }
         return .failed(outcome)
     }
@@ -502,6 +508,7 @@ struct MezoActions {
             let client = EthereumHttpClient(url: chain.rpcURLs[0], network: .custom(String(chain.chainId)))
             let outcome = await Receipt.confirm(client: client, hash: accepted.hash, sponsored: true,
                                                 mintedIdFrom: mintedIdFrom)
+            await MezoSnapshotStore.shared.invalidate()  // cached reads are stale now
             if case .delivered(let d) = outcome { return .ok(d) }
             return .failed(outcome)
         } catch let refused as RelayRefused {

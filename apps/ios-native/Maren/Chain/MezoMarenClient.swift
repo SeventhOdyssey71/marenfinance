@@ -42,6 +42,15 @@ struct MezoMarenClient: MarenClient {
 
     private var rpc: MezoRPC { MezoRPC(chain) }
 
+    /// Cache key for the coalescing snapshot store. Network-scoped so switching networks
+    /// cannot serve the other one's balances.
+    private var snapshotKey: String { "\(chain.network)|\(accountAddress.lowercased())" }
+
+    /// The one batched read every screen-level accessor below draws from.
+    private func snapshot() async throws -> MezoSnapshot {
+        try await MezoSnapshotStore.shared.snapshot(rpc: rpc, account: accountAddress, key: snapshotKey)
+    }
+
     init(network: MezoNetwork = .testnet, accountAddress: String, nickname: String = "") {
         self.chain = .of(network)
         self.accountAddress = accountAddress
@@ -78,7 +87,10 @@ struct MezoMarenClient: MarenClient {
 
     func priceFeed() async throws -> PriceFeed {
         do {
-            let (priceWei, updatedAt) = try await rpc.priceObservation()
+            let snap = try await snapshot()
+            guard let priceWei = snap.priceWei, let updatedAt = snap.priceUpdatedAt else {
+                return .unavailable(reason: "The oracle price did not fit a decimal figure.")
+            }
             guard let usd = Wei.toDecimal(priceWei) else {
                 return .unavailable(reason: "The oracle price did not fit a decimal figure.")
             }
@@ -99,7 +111,12 @@ struct MezoMarenClient: MarenClient {
     }
 
     func position() async throws -> Position {
-        let (priceWei, updatedAt) = try await rpc.priceObservation()
+        // ONE batched read. This used to be priceObservation -> vaultPosition -> trove, three
+        // requests nose to tail at ~300ms each before anything could render.
+        let snap = try await snapshot()
+        guard let priceWei = snap.priceWei, let updatedAt = snap.priceUpdatedAt else {
+            throw MezoRPCError.decode("oracle returned a non-positive price")
+        }
         // THE SAME 60s GATE `priceFeed()` APPLIES. This read used to take the oracle price with
         // no staleness check at all, so Finance could print a collateral ratio and a
         // drop-to-liquidation line directly above its own "price unavailable" banner, both
@@ -113,17 +130,16 @@ struct MezoMarenClient: MarenClient {
         // user, so a read that only hit `trove()` reported "no debt" for a real pooled borrower.
         // A pooled debt carries no per-user 200 MUSD gas compensation, so nothing is subtracted.
         // A vault read failure must NOT hide a direct trove, so it is tolerated (try?).
-        let vault = try? await rpc.vaultPosition(accountAddress)
-        if let vault, vault.debtWei > 0 {
-            return Self.buildPosition(collWei: vault.collWei, ratioDebtWei: vault.debtWei,
-                                      shownDebtWei: vault.debtWei, priceWei: priceWei,
+        if let debt = snap.vaultDebtWei, debt > 0 {
+            return Self.buildPosition(collWei: snap.vaultCollWei ?? 0, ratioDebtWei: debt,
+                                      shownDebtWei: debt, priceWei: priceWei,
                                       priceIsFresh: priceIsFresh)
         }
 
         // Otherwise a direct trove (>= the 1,800 MUSD protocol minimum), owned by the EOA. Its
         // principal includes the 200 MUSD gas compensation: the ratio is computed against the
         // gross debt, but the "borrowed" figure shown subtracts the gas comp back out.
-        let trove = try? await rpc.trove(accountAddress)
+        let trove = snap.trove
         if let trove {
             let grossDebtWei = trove.principalWei + trove.interestWei
             if grossDebtWei > 0, trove.collWei > 0 {
@@ -134,16 +150,17 @@ struct MezoMarenClient: MarenClient {
             }
         }
 
-        // If BOTH position reads failed, that is a genuine failure — throw so the UI shows an
-        // honest "couldn't load", never a false "no debt".
-        if vault == nil && trove == nil {
-            throw MezoRPCError.allEndpointsFailed("position reads failed on every endpoint")
-        }
+        // NO EQUIVALENT OF THE OLD "both reads failed" GUARD IS NEEDED, and removing it is
+        // not a loss of honesty. It existed because each read was its own request with its own
+        // `try?`, so "nil" could mean either "no position" or "the network failed" and the two
+        // had to be told apart. In one batched call the transport either succeeded — in which
+        // case a reverting sub-call genuinely means this account has no trove and no pooled
+        // position — or it threw, and `snapshot()` above has already propagated that.
 
         // No debt on either route. Collateral may still sit in the vault with nothing borrowed.
         // "No debt" is a fact about the vault, so the health reads `.none` either way; the
         // headroom is priced collateral, so it is withheld when the price is stale.
-        let collWei = vault?.collWei ?? trove?.collWei ?? BigUInt(0)
+        let collWei = snap.vaultCollWei ?? trove?.collWei ?? BigUInt(0)
         let collateralValueWei = collWei * priceWei / BigUInt(10).power(18)
         return Position(
             bitcoinLocked: Wei.toDecimal(collWei) ?? 0,
@@ -223,14 +240,13 @@ struct MezoMarenClient: MarenClient {
     }
 
     func balances() async throws -> Balances {
-        async let musd = rpc.musdBalance(accountAddress)
-        async let btc = rpc.nativeBalance(accountAddress)
-        return Balances(musd: Wei.toDecimal(try await musd) ?? 0,
-                        btc: Wei.toDecimal(try await btc) ?? 0)
+        let snap = try await snapshot()
+        return Balances(musd: Wei.toDecimal(snap.musdWei ?? 0) ?? 0,
+                        btc: Wei.toDecimal(snap.btcWei ?? 0) ?? 0)
     }
 
     func earnBalance() async throws -> Decimal {
-        Wei.toDecimal(try await rpc.earnBalance(accountAddress)) ?? 0
+        Wei.toDecimal(try await snapshot().earnSharesWei ?? 0) ?? 0
     }
 
     /// The Earn pool's live composition: MUSD backing plus any Bitcoin it seized absorbing
@@ -238,16 +254,17 @@ struct MezoMarenClient: MarenClient {
     /// so the UI can refuse to present the BTC valuation as authoritative when the oracle price
     /// is one the protocol would reject. A read failure throws — never a fabricated breakdown.
     func earnExposure() async throws -> EarnExposure {
-        async let breakdown = rpc.earnAssetBreakdown()
-        async let stale = rpc.earnIsUsingStalePrice()
-        let b = try await breakdown
+        let snap = try await snapshot()
+        guard let b = snap.earnBreakdown else {
+            throw MezoRPCError.decode("could not read the Earn vault's asset breakdown")
+        }
         let musdBacking = (Wei.toDecimal(b.musdIdleWei) ?? 0) + (Wei.toDecimal(b.musdInPoolWei) ?? 0)
         let btcSeized = (Wei.toDecimal(b.btcHeldWei) ?? 0) + (Wei.toDecimal(b.btcPendingWei) ?? 0)
         return EarnExposure(
             musdBacking: musdBacking,
             btcSeized: btcSeized,
             btcValuedMusd: Wei.toDecimal(b.btcValuedWei) ?? 0,
-            stalePrice: try await stale
+            stalePrice: snap.earnStalePrice ?? false
         )
     }
 
@@ -500,8 +517,14 @@ struct MezoMarenClient: MarenClient {
     /// Block timestamps for the rows about to render, read concurrently. A block we cannot
     /// read leaves that row's date unknown rather than inventing one from an assumed interval.
     private static func blockTimestamps(url: URL, chainId: Int, blocks: [Int]) async -> [Int: Date] {
-        await withTaskGroup(of: (Int, Date)?.self) { group -> [Int: Date] in
-            for block in blocks where block > 0 {
+        // Immutable once mined, so anything already seen this session is free. Only the
+        // genuinely new blocks cost a request.
+        let cached = await BlockTimeCache.shared.known(blocks)
+        let missing = blocks.filter { $0 > 0 && cached[$0] == nil }
+        if missing.isEmpty { return cached }
+
+        let fetched = await withTaskGroup(of: (Int, Date)?.self) { group -> [Int: Date] in
+            for block in missing {
                 group.addTask {
                     let client = EthereumHttpClient(url: url, network: .custom(String(chainId)))
                     guard let info = try? await client.eth_getBlockByNumber(.Number(block)) else { return nil }
@@ -512,6 +535,8 @@ struct MezoMarenClient: MarenClient {
             for await entry in group { if let entry { out[entry.0] = entry.1 } }
             return out
         }
+        await BlockTimeCache.shared.store(fetched)
+        return cached.merging(fetched) { _, new in new }
     }
 
     /// The Int of an `EthereumBlock`, or 0 for a non-numeric case (never reached for a log).

@@ -131,6 +131,16 @@ let CLAIM_LINK_EXPIRY_SECONDS: UInt64 = 7 * 24 * 60 * 60
 /// contract. It implements only `decimals()` and `latestRoundData()`.
 let MEZO_PRICE_ORACLE_PRECOMPILE = "0x7b7c000000000000000000000000000000000015"
 
+/// Multicall3, at its canonical CREATE2 address, deployed on both Mezo networks.
+///
+/// Every read the app makes used to be its own HTTP round trip, and matsnet answers a single
+/// `eth_call` in about 300ms at the median with a p95 over a second. Ten reads to paint one
+/// screen is therefore three seconds of nothing, and that is the whole reason the app felt
+/// like it was permanently loading. `aggregate3` collapses them into one request.
+///
+/// Verified present on matsnet: 7,619 bytes of runtime code at this address.
+let MULTICALL3 = "0xcA11bde05977b3631167028862bE2a173976CA11"
+
 /// 200 MUSD escrowed at trove open, in wei (1e18). `TroveManager` reports it inside the
 /// principal, so it is subtracted back out for the net drawn figure.
 let MUSD_GAS_COMPENSATION: BigUInt = BigUInt(200) * BigUInt(10).power(18)

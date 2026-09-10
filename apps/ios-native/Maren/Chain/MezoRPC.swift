@@ -392,3 +392,258 @@ struct MezoRPC: Sendable {
         return BigInt(magnitude)
     }
 }
+
+// MARK: - Multicall3 batching
+
+extension MezoRPC {
+    /// One read in a batch: a target contract and its encoded calldata.
+    struct BatchCall: Sendable {
+        let to: String
+        let data: Data
+    }
+
+    /// Run many `eth_call`s as ONE request via Multicall3's `aggregate3`.
+    ///
+    /// WHY THIS EXISTS. matsnet answers a single `eth_call` in ~300ms at the median, with a
+    /// p95 over a second. The app used to issue one request per read and chain several of
+    /// them in sequence, so painting the Finance screen cost five round trips nose to tail —
+    /// well over a second before anything appeared, and that is what "always loading" was.
+    /// Batched, the same reads cost one round trip regardless of how many there are.
+    ///
+    /// `allowFailure` is TRUE for every call, deliberately. Some reads are expected to revert
+    /// on a given account — `getEntireDebtAndColl` for someone with no trove, `collateralOf`
+    /// on the deployed vault — and one expected revert must not take the whole screen down
+    /// with it. A failed entry comes back as `nil` and the caller decides what that means,
+    /// which is the same contract the single-call helpers already had via `try?`.
+    ///
+    /// The encoding is written out by hand because `aggregate3` takes an array of DYNAMIC
+    /// tuples `(address,bool,bytes)[]`, and the head/tail layout that requires is not
+    /// something the generic encoder produces correctly.
+    func multicall(_ calls: [BatchCall]) async throws -> [Data?] {
+        guard !calls.isEmpty else { return [] }
+
+        func word(_ v: BigUInt) -> Data {
+            var b = v.serialize()
+            if b.count > 32 { b = b.suffix(32) }
+            return Data(repeating: 0, count: 32 - b.count) + b
+        }
+        func pad32(_ d: Data) -> Data {
+            let rem = d.count % 32
+            return rem == 0 ? d : d + Data(repeating: 0, count: 32 - rem)
+        }
+
+        // Each tuple: head = address, allowFailure, offset-to-bytes (relative to tuple start).
+        //             tail = bytes length, bytes padded to 32.
+        var tuples: [Data] = []
+        for c in calls {
+            let addr = BigUInt(Data(hex: c.to)?.suffix(20) ?? Data())
+            var t = word(addr)                      // target
+            t += word(1)                            // allowFailure = true
+            t += word(BigUInt(96))                  // 3 head words before the bytes tail
+            t += word(BigUInt(c.data.count))        // bytes length
+            t += pad32(c.data)
+            tuples.append(t)
+        }
+
+        // Array of dynamic tuples: N offsets, then the tuples themselves.
+        let headBytes = 32 * tuples.count
+        var offsets = Data()
+        var body = Data()
+        var running = headBytes
+        for t in tuples {
+            offsets += word(BigUInt(running))
+            body += t
+            running += t.count
+        }
+
+        // aggregate3((address,bool,bytes)[])
+        var payload = Data(hex: "0x82ad56cb") ?? Data()
+        payload += word(BigUInt(32))                // offset to the array
+        payload += word(BigUInt(tuples.count))      // array length
+        payload += offsets
+        payload += body
+
+        let out = try await call(to: MULTICALL3, data: payload)
+        return Self.decodeAggregate3(out, expecting: calls.count)
+    }
+
+    /// Decode `(bool success, bytes returnData)[]`. A failed call decodes to `nil`.
+    static func decodeAggregate3(_ out: Data, expecting count: Int) -> [Data?] {
+        func wordAt(_ i: Int) -> Int {
+            let lo = i * 32, hi = lo + 32
+            guard hi <= out.count else { return 0 }
+            return Int(BigUInt(out.subdata(in: lo..<hi)))
+        }
+        // out[0] = offset to array (0x20), out[1] = length.
+        let base = wordAt(0)                        // byte offset of the array
+        let len = min(count, Int(BigUInt(out.subdata(in: base..<min(base + 32, out.count)))))
+        var results = [Data?](repeating: nil, count: count)
+        let arrayStart = base + 32                  // first element offset word
+        for i in 0..<len {
+            let offWordAt = arrayStart + i * 32
+            guard offWordAt + 32 <= out.count else { continue }
+            let rel = Int(BigUInt(out.subdata(in: offWordAt..<(offWordAt + 32))))
+            let tupleStart = arrayStart + rel
+            guard tupleStart + 64 <= out.count else { continue }
+            let success = BigUInt(out.subdata(in: tupleStart..<(tupleStart + 32))) == 1
+            let bytesRel = Int(BigUInt(out.subdata(in: (tupleStart + 32)..<(tupleStart + 64))))
+            let lenAt = tupleStart + bytesRel
+            guard lenAt + 32 <= out.count else { continue }
+            let n = Int(BigUInt(out.subdata(in: lenAt..<(lenAt + 32))))
+            let dataStart = lenAt + 32
+            guard dataStart + n <= out.count else { continue }
+            // A reverting call returns success=false; its returnData is the revert payload,
+            // which is never what a caller wants, so it is dropped rather than handed back.
+            results[i] = success ? out.subdata(in: dataStart..<(dataStart + n)) : nil
+        }
+        return results
+    }
+}
+
+// MARK: - One-round-trip snapshot
+
+/// Everything the Home and Finance screens need, read at one block in one request.
+///
+/// Fields are optional because `allowFailure` is on: a read that reverts for this account —
+/// no trove, no pooled position — is a fact, not an outage, and must not fail the others.
+struct MezoSnapshot: Sendable {
+    var priceWei: BigUInt?
+    var priceUpdatedAt: BigUInt?
+    var vaultCollWei: BigUInt?
+    var vaultDebtWei: BigUInt?
+    var trove: MezoRPC.TroveRead?
+    var musdWei: BigUInt?
+    var btcWei: BigUInt?
+    var earnSharesWei: BigUInt?
+    var earnBreakdown: MezoRPC.EarnBreakdownRead?
+    var earnStalePrice: Bool?
+}
+
+extension MezoRPC {
+    /// Read the whole screen in ONE `aggregate3`.
+    ///
+    /// Ten reads at ~300ms each, several of them chained, is what made the app feel like it
+    /// never finished loading. Batched they cost one round trip, and — a second benefit that
+    /// matters for correctness, not only speed — every value comes from the SAME block, so a
+    /// collateral ratio can no longer be computed from a price read one block after the debt.
+    func fetchSnapshot(_ account: String) async throws -> MezoSnapshot {
+        let musd = MusdAddresses.of(chain.network)
+        let maren = MarenAddresses.of(chain.network)
+
+        func enc(_ fn: String) throws -> Data { try ABIFunctionEncoder(fn).encoded() }
+        func encAddr(_ fn: String, _ a: String) throws -> Data {
+            let e = ABIFunctionEncoder(fn); try e.encode(EthereumAddress(a)); return try e.encoded()
+        }
+        // Multicall3.getEthBalance(address) — the native balance, which is not an eth_call and
+        // would otherwise be the one read left outside the batch.
+        func encEthBalance(_ a: String) throws -> Data {
+            let e = ABIFunctionEncoder("getEthBalance"); try e.encode(EthereumAddress(a)); return try e.encoded()
+        }
+
+        let calls: [BatchCall] = [
+            .init(to: MEZO_PRICE_ORACLE_PRECOMPILE, data: try enc("decimals")),
+            .init(to: MEZO_PRICE_ORACLE_PRECOMPILE, data: try enc("latestRoundData")),
+            .init(to: maren.marenVault, data: try encAddr("collateral", account)),
+            .init(to: maren.marenVault, data: try encAddr("previewDebtOf", account)),
+            .init(to: musd.troveManager, data: try encAddr("getEntireDebtAndColl", account)),
+            .init(to: musd.musd, data: try encAddr("balanceOf", account)),
+            .init(to: MULTICALL3, data: try encEthBalance(account)),
+            .init(to: maren.marenEarn, data: try encAddr("balanceOf", account)),
+            .init(to: maren.marenEarn, data: try enc("assetBreakdown")),
+            .init(to: maren.marenEarn, data: try enc("isUsingStalePrice")),
+        ]
+
+        let r = try await multicall(calls)
+        var snap = MezoSnapshot()
+
+        if let d = r[0], let round = r[1] {
+            let decimals = Int(Self.word(d, 0))
+            let answer = Self.signedWord(round, 1)
+            if answer.sign != .minus, answer.magnitude > 0 {
+                snap.priceWei = answer.magnitude * BigUInt(10).power(max(0, 18 - decimals))
+                snap.priceUpdatedAt = Self.word(round, 3)
+            }
+        }
+        if let c = r[2] { snap.vaultCollWei = Self.word(c, 0) }
+        if let d = r[3] { snap.vaultDebtWei = Self.word(d, 0) }
+        if let t = r[4] {
+            snap.trove = TroveRead(collWei: Self.word(t, 0) + Self.word(t, 3),
+                                   principalWei: Self.word(t, 1) + Self.word(t, 4),
+                                   interestWei: Self.word(t, 2) + Self.word(t, 5))
+        }
+        if let m = r[5] { snap.musdWei = Self.word(m, 0) }
+        if let b = r[6] { snap.btcWei = Self.word(b, 0) }
+        if let s = r[7] { snap.earnSharesWei = Self.word(s, 0) }
+        if let b = r[8] {
+            snap.earnBreakdown = EarnBreakdownRead(musdIdleWei: Self.word(b, 0),
+                                                   musdInPoolWei: Self.word(b, 1),
+                                                   btcHeldWei: Self.word(b, 2),
+                                                   btcPendingWei: Self.word(b, 3),
+                                                   btcValuedWei: Self.word(b, 4))
+        }
+        if let s = r[9] { snap.earnStalePrice = Self.word(s, 0) == 1 }
+        return snap
+    }
+}
+
+/// Coalesces the snapshot so concurrent readers share one request.
+///
+/// Home issues `account()`, `position()`, `balances()`, `priceFeed()` and `recentActivity()`
+/// with `async let`, which is correctly concurrent — but each used to open its own reads, so
+/// "concurrent" still meant four separate round trips racing. They now await the SAME
+/// in-flight batch. The 2s TTL exists for the same reason: a screen that re-reads on appear,
+/// on tab switch and after a write should not pay for three identical batches in a row.
+actor MezoSnapshotStore {
+    static let shared = MezoSnapshotStore()
+
+    private var inFlight: [String: Task<MezoSnapshot, Error>] = [:]
+    private var cached: [String: (at: Date, value: MezoSnapshot)] = [:]
+    private let ttl: TimeInterval = 2
+
+    func snapshot(rpc: MezoRPC, account: String, key: String) async throws -> MezoSnapshot {
+        if let hit = cached[key], Date().timeIntervalSince(hit.at) < ttl { return hit.value }
+        if let running = inFlight[key] { return try await running.value }
+
+        let task = Task { try await rpc.fetchSnapshot(account) }
+        inFlight[key] = task
+        do {
+            let value = try await task.value
+            inFlight[key] = nil
+            cached[key] = (Date(), value)
+            return value
+        } catch {
+            inFlight[key] = nil
+            throw error
+        }
+    }
+
+    /// Drop the cache after a write, so the next read cannot serve pre-transaction state.
+    func invalidate() {
+        cached.removeAll()
+    }
+}
+
+/// Process-wide cache of block timestamps.
+///
+/// A block's timestamp is immutable once mined, so re-reading one is pure waste — and it is
+/// not cheap waste: `eth_getBlockByNumber` measured ~445ms on matsnet. The Activity list
+/// looks up one per distinct block it shows, on every load, so switching to the tab and back
+/// used to re-buy the same dozen timestamps it already had.
+///
+/// Unbounded on purpose within a session: an entry is 16 bytes, the list shows at most 50
+/// rows, and the app does not run long enough for this to matter. It is not persisted —
+/// correctness never depends on it, only latency.
+actor BlockTimeCache {
+    static let shared = BlockTimeCache()
+    private var times: [Int: Date] = [:]
+
+    func known(_ blocks: [Int]) -> [Int: Date] {
+        var out: [Int: Date] = [:]
+        for b in blocks { if let t = times[b] { out[b] = t } }
+        return out
+    }
+
+    func store(_ entries: [Int: Date]) {
+        for (k, v) in entries { times[k] = v }
+    }
+}
