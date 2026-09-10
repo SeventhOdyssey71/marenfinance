@@ -21,6 +21,14 @@ struct AmountFlowConfig {
     let submitTitle: String
     /// Builds the intent to submit for a validated amount.
     let makeIntent: (Decimal) -> Intent
+    /// Live risk for the amount being typed, shown on the ENTRY screen.
+    ///
+    /// Optional because most flows have no such consequence: depositing collateral or
+    /// repaying debt only ever improves your position, so a risk line there would be noise.
+    /// Borrowing is the one that can put your Bitcoin at risk, and it is the one where the
+    /// consequence used to appear for the first time on the review screen — after the number
+    /// had already been chosen.
+    var liveRisk: ((Decimal) -> LiquidationRisk?)? = nil
     /// The review rows to state back before submitting.
     let reviewRows: (Decimal) -> [ReviewRow]
 }
@@ -80,6 +88,17 @@ struct SingleAmountFlow: View {
                     .font(.text(13, weight: .medium)).foregroundStyle(Theme.Palette.warning)
             }
             Spacer(minLength: 0)
+
+            // The consequence of the number, while it is still being chosen. Placed directly
+            // above the available card and below the amount, so it sits between what you typed
+            // and what you can type — the eye passes it on the way to the keypad rather than
+            // having to go looking for it.
+            if let make = config.liveRisk, let amt = amount, amt > 0, let risk = make(amt) {
+                LiquidationRiskNote(risk: risk)
+                    .padding(.horizontal, Theme.Space.md)
+                    .transition(.opacity)
+            }
+
             if let available = config.available, let label = config.availableLabel {
                 availableCard(available, label)
             }

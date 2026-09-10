@@ -177,6 +177,14 @@ struct ReviewRow: Identifiable {
     var unavailable: Bool = false
     /// When true the value is plain text (an address, a memo), not a money figure.
     var plain: Bool = false
+    /// Severity, for rows whose number carries risk rather than just information.
+    ///
+    /// Nil means "this is a fact, render it like every other fact". Set it only where the
+    /// number IS the warning — the liquidation price and the resulting ratio on a borrow —
+    /// because a review sheet where several rows are tinted teaches the eye to ignore tint.
+    var risk: LiquidationRisk.Level? = nil
+    /// Shown beside a tinted value so the state is named, never carried by colour alone.
+    var riskLabel: String? = nil
 }
 
 struct ReviewList: View {
@@ -196,6 +204,22 @@ struct ReviewList: View {
                                 .foregroundStyle(Theme.Palette.ink)
                                 .lineLimit(1)
                                 .truncationMode(.middle)
+                        } else if let risk = row.risk {
+                            // Tinted AND named. A row that only changes colour is invisible to
+                            // a colour-blind reader, and this is the row that says whether the
+                            // user is about to put their Bitcoin at risk.
+                            HStack(spacing: 6) {
+                                Image(systemName: risk.symbol)
+                                    .font(.system(size: 12, weight: .semibold))
+                                    .foregroundStyle(risk.tint)
+                                    .accessibilityHidden(true)
+                                Text(row.value)
+                                    .font(.figure(17, weight: .semibold))
+                                    .monospacedDigit()
+                                    .foregroundStyle(risk.textTint)
+                            }
+                            .accessibilityElement(children: .combine)
+                            .accessibilityLabel("\(row.value). \(row.riskLabel ?? risk.label).")
                         } else {
                             MoneyText(text: row.value, size: 17, weight: .semibold)
                         }

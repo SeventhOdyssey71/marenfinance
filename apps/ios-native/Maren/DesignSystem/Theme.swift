@@ -39,6 +39,15 @@ enum Theme {
         static let warning = Color(hex: 0xB45309)
         static let danger = Color(hex: 0xDC2626)
 
+        // TEXT-SAFE variants of the three semantic colours, for small text sitting on a
+        // tinted panel of its own colour. Their own roles, not a reuse of the fills above:
+        // measured on a 6% tint over white, the fills give 3.24 / 4.64 / 4.41 : 1, so
+        // `success` fails AA outright for 13pt text and `danger` misses it. These pass at
+        // 4.81 / 6.54 / 5.90 : 1, and stay comfortable on plain white too.
+        static let successText = Color(hex: 0x0B7D54)
+        static let warningText = Color(hex: 0x92400E)
+        static let dangerText = Color(hex: 0xB91C1C)
+
         // Money direction in ledgers — their own roles, not reused success/danger. A
         // fresh green and a soft, desaturated red that sit easy on white.
         static let moneyIn = Color(hex: 0x12A66F)

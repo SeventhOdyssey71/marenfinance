@@ -165,16 +165,40 @@ private struct VaultSection: View {
         return debt * MarenPolicy.mezoLiquidationPercent / 100 / collateral
     }
 
+    /// The risk of a proposed (collateral, debt) pair, from the live oracle price.
+    ///
+    /// Built from `projectedRatio` rather than re-deriving a price, so this cannot drift from
+    /// the ratio the review sheet shows on the row above it.
+    private func risk(collateral: Decimal, debt: Decimal) -> LiquidationRisk? {
+        guard let ratio = projectedRatio(collateral: collateral, debt: debt),
+              let liq = liquidationPrice(collateral: collateral, debt: debt),
+              // The ratio implies the price: ratio = coll x price / debt, so price = ratio x debt / coll.
+              collateral > 0, debt > 0 else { return nil }
+        let price = ratio / 100 * debt / collateral
+        return LiquidationRisk.of(collateralBtc: collateral, debtMusd: debt, priceUsd: price)
+            ?? LiquidationRisk(dropPercent: 0, price: liq, ratioPercent: ratio)
+    }
+
     private func ratioRow(collateral: Decimal, debt: Decimal) -> ReviewRow {
         if let ratio = projectedRatio(collateral: collateral, debt: debt) {
-            return ReviewRow(label: "Resulting ratio", value: MoneyFormat.percent(ratio))
+            // Tinted only on borrow, where the ratio is the thing that can go wrong.
+            let level = risk(collateral: collateral, debt: debt)?.level
+            return ReviewRow(label: "Resulting ratio", value: MoneyFormat.percent(ratio),
+                             risk: level, riskLabel: level?.label)
         }
         return ReviewRow(label: "Resulting ratio", value: "", unavailable: true)
     }
 
     private func liquidationRow(collateral: Decimal, debt: Decimal) -> ReviewRow {
         if let liq = liquidationPrice(collateral: collateral, debt: debt) {
-            return ReviewRow(label: "Liquidation price", value: MoneyFormat.usd(liq) + " / BTC")
+            let r = risk(collateral: collateral, debt: debt)
+            return ReviewRow(
+                label: "Liquidation price",
+                value: MoneyFormat.usd(liq) + " / BTC",
+                // The hint is what the number MEANS. "$13,756 / BTC" is only frightening if you
+                // already know today's price; "can fall 43.0%" needs no such arithmetic.
+                hint: r.map { "BTC can fall \(MoneyFormat.percent($0.dropPercent))" },
+                risk: r?.level, riskLabel: r?.level.label)
         }
         return ReviewRow(label: "Liquidation price", value: "", unavailable: true)
     }
@@ -213,6 +237,9 @@ private struct VaultSection: View {
                 gas: .sponsored,
                 submitTitle: "Borrow MUSD",
                 makeIntent: { Intent(kind: .borrow, amount: $0, unit: .musd) },
+                liveRisk: { amt in
+                    self.risk(collateral: p?.bitcoinLocked ?? 0, debt: (p?.borrowed ?? 0) + amt)
+                },
                 reviewRows: { amt in
                     var rows = [ReviewRow(label: "Borrowing", value: MoneyFormat.musd(amt))]
                     let newDebt = (p?.borrowed ?? 0) + amt
