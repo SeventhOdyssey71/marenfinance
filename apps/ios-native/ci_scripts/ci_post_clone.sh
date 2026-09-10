@@ -32,5 +32,20 @@ else
 fi
 
 xcodegen generate
+
+# Xcode Cloud builds with automatic package resolution DISABLED and requires a
+# Package.resolved to already exist, which the generated project does not carry:
+#
+#   a resolved file is required when automatic dependency resolution is disabled
+#
+# The resolve is committed at apps/ios-native/Package.resolved and copied into place here.
+# Committing it rather than resolving fresh on CI is the point: it pins all 23 transitive
+# dependencies to the versions this app was actually tested against, so a new upstream
+# release cannot silently change what ships.
+RESOLVED_DIR="Maren.xcodeproj/project.xcworkspace/xcshareddata/swiftpm"
+mkdir -p "$RESOLVED_DIR"
+cp Package.resolved "$RESOLVED_DIR/Package.resolved"
+
 echo "generated:"
 ls -d Maren.xcodeproj
+echo "pinned dependencies: $(grep -c identity Package.resolved)"
