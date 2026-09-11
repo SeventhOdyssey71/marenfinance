@@ -133,7 +133,9 @@ struct MezoMarenClient: MarenClient {
         if let debt = snap.vaultDebtWei, debt > 0 {
             return Self.buildPosition(collWei: snap.vaultCollWei ?? 0, ratioDebtWei: debt,
                                       shownDebtWei: debt, priceWei: priceWei,
-                                      priceIsFresh: priceIsFresh)
+                                      priceIsFresh: priceIsFresh,
+                                      troveCapacityWei: snap.troveCapacityWei,
+                                      troveTotalDebtWei: snap.troveTotalDebtWei)
         }
 
         // Otherwise a direct trove (>= the 1,800 MUSD protocol minimum), owned by the EOA. Its
@@ -196,7 +198,9 @@ struct MezoMarenClient: MarenClient {
     /// network: the regression it guards (a ratio printed from a price the protocol rejects) is
     /// not something a view test would catch.
     static func buildPosition(collWei: BigUInt, ratioDebtWei: BigUInt, shownDebtWei: BigUInt,
-                              priceWei: BigUInt, priceIsFresh: Bool) -> Position {
+                              priceWei: BigUInt, priceIsFresh: Bool,
+                              troveCapacityWei: BigUInt? = nil,
+                              troveTotalDebtWei: BigUInt? = nil) -> Position {
         let borrowed = Wei.toDecimal(shownDebtWei) ?? 0
         guard priceIsFresh else {
             return Position(
@@ -215,7 +219,32 @@ struct MezoMarenClient: MarenClient {
 
         // Headroom under Maren's 180% floor: max debt at that ratio, minus what is drawn.
         let maxDebtAtFloorWei = collateralValueWei * 100 / BigUInt(180)
-        let leftWei = maxDebtAtFloorWei > ratioDebtWei ? maxDebtAtFloorWei - ratioDebtWei : BigUInt(0)
+        let ratioHeadroomWei = maxDebtAtFloorWei > ratioDebtWei ? maxDebtAtFloorWei - ratioDebtWei : BigUInt(0)
+
+        // MEZO'S PER-TROVE CEILING, WHICH THIS USED TO IGNORE ENTIRELY.
+        //
+        // BorrowerOperations checks `maxBorrowingCapacity >= netDebtChange + getTroveDebt()`,
+        // and that ceiling is fixed at the price the trove opened at — adding collateral does
+        // not raise it, only a refinance does. So the 180% ratio is NOT the only limit, and on
+        // the pooled trove it is frequently not the binding one.
+        //
+        // Measured on matsnet when a tester hit this: the pooled trove's ceiling was 2,749.20
+        // MUSD against 2,664.68 of debt, leaving 84.52 — while this function was offering
+        // 1,319.10 from the ratio alone. Borrowing 84 simulated clean and 90 reverted with
+        // "exceeds maxBorrowingCapacity". The relayer caught it and refused to pay, which is
+        // the fail-closed behaviour working, but the user had been shown a number that could
+        // never have worked.
+        //
+        // The ceiling is TROVE-WIDE, so it is compared against the trove's TOTAL debt, not
+        // this user's share. Then the origination fee is divided out, because the protocol
+        // adds it to the draw before comparing.
+        var leftWei = ratioHeadroomWei
+        if let cap = troveCapacityWei, let troveDebt = troveTotalDebtWei {
+            let rawCeilingHeadroom = cap > troveDebt ? cap - troveDebt : BigUInt(0)
+            let WAD = BigUInt(10).power(18)
+            let ceilingHeadroom = rawCeilingHeadroom * WAD / (WAD + BorrowingRateWei)
+            leftWei = min(leftWei, ceilingHeadroom)
+        }
 
         // How far BTC can fall before the 110% Mezo liquidation cliff.
         // liqPrice = debt * 1.1 / coll, kept in the same 1e18 price scale (the * WAD is what
@@ -682,6 +711,12 @@ struct MezoMarenClient: MarenClient {
 
 /// 1.10 expressed as a numerator over 10, to keep the drop-to-liquidation maths in integers.
 private let MezoLiquidationNumerator = BigUInt(11)
+
+/// MUSD's origination fee, 0.1%, as a 1e18 fraction. Mirrors BORROWING_RATE in
+/// packages/sdk/src/constants.ts (1e15), and read live from BorrowerOperations there.
+/// The protocol adds this to a draw BEFORE comparing against the trove ceiling, so a
+/// headroom figure that does not divide it out over-quotes by the fee.
+private let BorrowingRateWei = BigUInt(10).power(15)
 
 private extension String {
     func leftPadded(to length: Int) -> String {

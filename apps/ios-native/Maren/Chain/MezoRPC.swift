@@ -517,6 +517,10 @@ struct MezoSnapshot: Sendable {
     var earnSharesWei: BigUInt?
     var earnBreakdown: MezoRPC.EarnBreakdownRead?
     var earnStalePrice: Bool?
+    /// Mezo's per-trove borrowing ceiling for the POOLED trove, and that trove's total debt.
+    /// Both are trove-wide, not per user: the ceiling is shared by every depositor.
+    var troveCapacityWei: BigUInt?
+    var troveTotalDebtWei: BigUInt?
 }
 
 extension MezoRPC {
@@ -551,6 +555,12 @@ extension MezoRPC {
             .init(to: maren.marenEarn, data: try encAddr("balanceOf", account)),
             .init(to: maren.marenEarn, data: try enc("assetBreakdown")),
             .init(to: maren.marenEarn, data: try enc("isUsingStalePrice")),
+            // Mezo's per-trove ceiling and the pooled trove's total debt. Read for the VAULT,
+            // which owns the trove, not for the caller. Without these the app offered a
+            // borrow bounded only by the 180% ratio and ignored the ceiling entirely — which
+            // is how a tester was shown 1,319 MUSD against a real limit of 84.
+            .init(to: musd.troveManager, data: try encAddr("getTroveMaxBorrowingCapacity", maren.marenVault)),
+            .init(to: musd.troveManager, data: try encAddr("getTroveDebt", maren.marenVault)),
         ]
 
         let r = try await multicall(calls)
@@ -582,6 +592,8 @@ extension MezoRPC {
                                                    btcValuedWei: Self.word(b, 4))
         }
         if let s = r[9] { snap.earnStalePrice = Self.word(s, 0) == 1 }
+        if let c = r[10] { snap.troveCapacityWei = Self.word(c, 0) }
+        if let d = r[11] { snap.troveTotalDebtWei = Self.word(d, 0) }
         return snap
     }
 }

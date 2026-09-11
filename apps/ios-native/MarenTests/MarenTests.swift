@@ -455,6 +455,64 @@ final class MarenTests: XCTestCase {
         XCTAssertEqual(p.health, .healthy)
     }
 
+    // MARK: - Mezo's per-trove ceiling bounds "Left to borrow"
+    //
+    // THE REGRESSION THIS PINS, and it reached a real tester. `leftToBorrow` was derived from
+    // Maren's 180% ratio alone and ignored `getTroveMaxBorrowingCapacity` entirely, which is
+    // fixed at the price the trove opened at and does not rise when collateral is added. On
+    // matsnet on 2026-09-11 the pooled trove's ceiling was 2,749.20 MUSD against 2,664.68 of
+    // debt — 84.52 of headroom — while the app offered 1,319.10. Borrowing 84 simulated clean
+    // and 90 reverted with "BorrowerOps: An operation that exceeds maxBorrowingCapacity is not
+    // permitted". The relayer refused to pay for it, which is correct, but the user had been
+    // shown a number that could never have worked.
+
+    /// The live pooled trove at the moment the tester hit this, in wei.
+    private enum Matsnet {
+        static let ceiling = BigUInt("2749201745000000000000")      // 2,749.20 MUSD
+        static let troveDebt = BigUInt("2664680000000000000000")    // 2,664.68 MUSD
+    }
+
+    func testLeftToBorrowIsCappedByMezosTroveCeiling() throws {
+        // Generous collateral, so the 180% ratio is nowhere near binding: the ceiling must be.
+        let p = MezoMarenClient.buildPosition(
+            collWei: BigUInt(10).power(18),                                 // 1 BTC
+            ratioDebtWei: BigUInt(20_000) * BigUInt(10).power(18),
+            shownDebtWei: BigUInt(20_000) * BigUInt(10).power(18),
+            priceWei: BigUInt(60_000) * BigUInt(10).power(18),
+            priceIsFresh: true,
+            troveCapacityWei: Matsnet.ceiling,
+            troveTotalDebtWei: Matsnet.troveDebt
+        )
+        let left = try XCTUnwrap(p.leftToBorrow)
+        // 84.52 raw, minus the 0.1% origination fee the protocol adds before comparing.
+        XCTAssertLessThan(left, 85, "Must not exceed the 84.52 MUSD the trove ceiling allows")
+        XCTAssertGreaterThan(left, 80, "Must not be pessimistic to the point of uselessness")
+    }
+
+    func testRatioStillBindsWhenItIsTheSmallerLimit() throws {
+        // Ceiling wide open; the 180% floor is the real constraint and must still win.
+        let p = MezoMarenClient.buildPosition(
+            collWei: BigUInt(10).power(18),
+            ratioDebtWei: BigUInt(30_000) * BigUInt(10).power(18),
+            shownDebtWei: BigUInt(30_000) * BigUInt(10).power(18),
+            priceWei: BigUInt(60_000) * BigUInt(10).power(18),
+            priceIsFresh: true,
+            troveCapacityWei: BigUInt(1_000_000) * BigUInt(10).power(18),
+            troveTotalDebtWei: BigUInt(30_000) * BigUInt(10).power(18)
+        )
+        // 60,000 / 1.8 = 33,333 max debt, minus 30,000 drawn = 3,333.
+        let left = try XCTUnwrap(p.leftToBorrow)
+        XCTAssertGreaterThan(left, 3_000)
+        XCTAssertLessThan(left, 3_400)
+    }
+
+    func testMissingCeilingLeavesTheRatioHeadroomUnchanged() throws {
+        // An unreadable ceiling must not silently zero the borrow control.
+        let p = position(priceIsFresh: true)
+        XCTAssertNotNil(p.leftToBorrow)
+        XCTAssertGreaterThan(try XCTUnwrap(p.leftToBorrow), 0)
+    }
+
     func testStalePriceWithholdsEveryPriceDerivedFigure() {
         let p = position(priceIsFresh: false)
         XCTAssertNil(p.collateralRatioPercent, "A ratio needs a price the protocol would accept")

@@ -128,7 +128,8 @@ struct Relayer {
             }
             return .failure(unrecognised)
         }
-        return .failure(failureReason(status: status, code: (body?["error"] as? String)))
+        return .failure(failureReason(status: status, code: (body?["error"] as? String),
+                                      detail: (body?["detail"] as? String)))
     }
 
     private var unrecognised: RelayReason {
@@ -143,7 +144,47 @@ struct Relayer {
 
     /// Turn a relayer refusal into the app's own copy. Every branch says the same two things:
     /// nothing moved, and what to do instead. Mirrors `relayFailureReason` in relay.ts.
-    func failureReason(status: Int, code: String?) -> RelayReason {
+    /// Turn MUSD's own revert string into something a person can act on.
+    ///
+    /// The relayer already sends the reason — its `detail` reads "the forwarded call reverts
+    /// in simulation: <the protocol's own require message>" — and this app was throwing it
+    /// away, so every on-chain refusal looked identical. A tester hit "exceeds
+    /// maxBorrowingCapacity" and was told only that something reverted, with nothing to do
+    /// next and no way to know a smaller amount would have worked.
+    ///
+    /// Matching is on distinctive substrings, never whole sentences: several of these carry
+    /// the protocol's own typos ("doesnt"), and the same condition is phrased differently by
+    /// different contracts.
+    private static func explainRevert(_ detail: String?) -> String? {
+        guard let d = detail?.lowercased() else { return nil }
+        if d.contains("exceeds maxborrowingcapacity") {
+            return "This trove is at the borrowing ceiling Mezo fixed when it opened. That ceiling does not rise when collateral is added — only a refinance moves it — so a smaller amount may go through even though your collateral ratio looks healthy."
+        }
+        if d.contains("net debt must be greater than minimum") {
+            return "MUSD requires every loan to stay above its 1,800 MUSD minimum. Repaying this much would leave the position below it, so either repay less or repay all of it."
+        }
+        if d.contains("amount repaid must not be larger") {
+            return "That is more than the position currently owes. Interest accrues every block, so the figure moves — reopen the screen for the current amount."
+        }
+        if d.contains("result in icr") || d.contains("icr < mcr") {
+            return "This would put the collateral ratio below the level MUSD allows. Borrow less, or add collateral first."
+        }
+        if d.contains("result in tcr") || d.contains("tcr < ccr") {
+            return "MUSD is in Recovery Mode across the whole system, so it is refusing new debt from everyone. This is not about your position and it clears when the system recovers."
+        }
+        if d.contains("cannot withdraw while there are troves") {
+            return "MUSD's Stability Pool blocks every withdrawal while any loan on Mezo is under-collateralised. Nobody in Earn caused it and it usually clears within minutes."
+        }
+        if d.contains("oracle is stale") || d.contains("pricefeed") {
+            return "Mezo's price feed is older than the 60 seconds the protocol accepts, so it refused the call. Try again shortly."
+        }
+        if d.contains("doesnt have enough musd") || d.contains("insufficient") {
+            return "There is not enough MUSD in the account to cover this."
+        }
+        return nil
+    }
+
+    func failureReason(status: Int, code: String?, detail: String? = nil) -> RelayReason {
         let code = code ?? "UPSTREAM_ERROR"
         let ns = Relayer.nothingSent
         switch code {
@@ -171,6 +212,11 @@ struct Relayer {
             return RelayReason(name: code, title: "Maren does not sponsor this action",
                 detail: "The relayer only forwards a fixed set of calls to Maren's own contracts, and this is not one of them. \(ns) You can send it yourself.")
         case "SIMULATION_REVERTED":
+            // Lead with WHY when the protocol told us. The generic sentence is the fallback
+            // for a revert we have no plain-language reading of, not the default.
+            if let why = Self.explainRevert(detail) {
+                return RelayReason(name: code, title: "Mezo refused this", detail: "\(why) \(ns)")
+            }
             return RelayReason(name: code, title: "This would have failed on-chain",
                 detail: "The relayer ran the call against Mezo before paying for it and it reverted, so it was never broadcast. \(ns)")
         case "SUBMISSION_FAILED":
