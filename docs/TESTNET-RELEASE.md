@@ -1,6 +1,11 @@
 # Testnet release candidate
 
 Date: 13 September 2026. Baseline `d349a22` plus local uncommitted changes.
+
+Deployment update, 14 September: the web and backend rollout is recorded in
+[TESTNET-DEPLOYMENT-2026-09-14.md](TESTNET-DEPLOYMENT-2026-09-14.md). The native
+upload attempt was blocked by GitHub billing before it built an archive. The
+remaining content below preserves the candidate acceptance plan from 13 September.
 Owner: engineering, with separate backend, native, and web implementation tracks.
 
 **The candidate passed local verification. It has not been deployed or uploaded

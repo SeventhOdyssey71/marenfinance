@@ -9,8 +9,10 @@ native mobile, and backend, with verified integration and reviewable release ste
 Status: local release-candidate goal complete; hosted pilot acceptance remains open.
 
 The backend, web, and native hardening is implemented and locally verified,
-including the final native Release simulator build. Nothing has been published, committed, or uploaded in this
-pass. See [the release plan](docs/TESTNET-RELEASE.md) for the deployment order,
+including the final native Release simulator build. On 14 September, release
+revision `eddce3e` was pushed and the web/backend changes were deployed. The native
+upload was attempted but blocked by GitHub billing before any archive was built.
+See [the deployment record](docs/TESTNET-DEPLOYMENT-2026-09-14.md). See [the release plan](docs/TESTNET-RELEASE.md) for the deployment order,
 acceptance matrix, evidence, and grant handoff; mainnet remains audit-gated.
 
 ## Parallel acceptance checklist
@@ -24,7 +26,7 @@ acceptance matrix, evidence, and grant handoff; mainnet remains audit-gated.
 | P2 Medium | Activity / root + mobile             | Verified | Separate subgraph CI codegen/build added and passed locally. Native stale/partial result fallback tested. Index stays unconfigured until deployed event parity is verified.                                                                     |
 | P1 High   | Integrated checks / root             | Verified | Fresh workspace typecheck passed; release tools 26 tests passed; SDK 118 and metrics 20 passed. Formatting, copy scan, and actionlint passed.                                                                                                   |
 | P1 High   | Hosted CI/TestFlight / account owner | Blocked  | Both latest jobs failed before executing due to account billing/spending-limit annotations. Owner must resolve Billing & plans, then run the release revision.                                                                                  |
-| P1 High   | Rollout / operator                   | Open     | Commands, service identities, old-queue drain requirement and post-rollout gates prepared. Authenticated Vercel/Cloudflare access verified. Existing hosted relay correctly fails the new recovery gate.                                        |
+| P1 High   | Web/backend rollout / operator       | Verified | Website and durable Worker deployed; ingress restored; post-deployment configuration and recovery gates pass. Native distribution and device acceptance remain blocked/open separately.                                                         |
 | P1 High   | Released-device acceptance / testers | Open     | Two physical wallets must complete the matrix on the actual distributed build, including link secret recovery and relay restart. Local simulator/HTTP evidence does not substitute.                                                             |
 
 ## Findings
@@ -49,9 +51,9 @@ No P0 finding established by this bounded pass. This is not an independent audit
   stores an unfinished claim bearer key before signing. Claim creation refuses
   devices without the required biometric durable storage. Device behavior still
   needs hardware verification, especially enrollment changes and force-quit.
-- **Open: released artifact evidence.** Hosted services and the distributed iOS
-  binary have not received this candidate. Resolve CI billing, record versions,
-  follow the rollout plan, then attach receipts for the two-wallet acceptance loop.
+- **Open: released artifact evidence.** Web/backend versions are deployed and recorded. The distributed iOS binary
+  has not received this candidate. Resolve CI billing, publish the native update,
+  then attach receipts for the two-wallet acceptance loop.
 
 ### P2 Medium
 

@@ -1,0 +1,23 @@
+{
+  "date": "2026-09-14",
+  "releaseRevision": "eddce3e2de891788fd4732647d40ab21f72d30bd",
+  "branch": "release/testnet-2026-09-14",
+  "testflight": {
+    "runId": 34812345618,
+    "url": "https://github.com/SeventhOdyssey71/marenfinance/actions/runs/34812345618",
+    "buildNumber": 7,
+    "requestedUpload": true,
+    "result": "blocked-before-build",
+    "reason": "The job was not started because recent account payments have failed or your spending limit needs to be increased. Please check the Billing & plans section in your settings.",
+    "archiveProduced": false,
+    "uploaded": false,
+    "appleProcessingStarted": false,
+    "localFallback": "Only Xcode 16.2 / iOS 18.2 SDK installed; upload lane requires iOS 26 or later."
+  },
+  "ci": {
+    "runId": 34812333422,
+    "url": "https://github.com/SeventhOdyssey71/marenfinance/actions/runs/34812333422",
+    "result": "blocked-before-tests",
+    "reason": "Same account billing/spending-limit annotation as TestFlight."
+  }
+}

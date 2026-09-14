@@ -1,0 +1,563 @@
+{
+  "recordedAt": "2026-09-14T06:22:12.569Z",
+  "sourceRevision": "eddce3e2de891788fd4732647d40ab21f72d30bd",
+  "configurationDelta": {
+    "RELAYER_ALLOWED_ORIGINS": {
+      "before": "https://marenfinance.vercel.app,http://localhost:3000",
+      "after": "https://marenfinance.vercel.app,https://www.marenfinance.xyz,http://localhost:3000"
+    },
+    "reason": "Vercel confirmed existing www.marenfinance.xyz production alias; apex redirects to www."
+  },
+  "previousVersion": "ce8a20fb-1741-41a5-b094-aee9a65a8bb3",
+  "recoveryDeploymentVersion": "496e7254-497d-416b-954d-aa8536936e1e",
+  "finalVersion": "52bce9af-73f4-4d20-b613-c9cd9355a162",
+  "finalVersionTag": "testnet-eddce3e-www",
+  "finalVersionCreatedAt": "2026-09-14T06:17:58.462488Z",
+  "namespaceId": "7f85151a72eb4690b8abf783d18cded1",
+  "migrationTag": "v1",
+  "preserved": [
+    "Durable Object namespace",
+    "singleton name maren-relayer-singleton",
+    "testnet signer and secret binding",
+    "forwarder and target allowlist",
+    "daily sponsorship cap",
+    "both RPC URLs",
+    "original public and preview ingress settings"
+  ],
+  "maintenance": {
+    "observer": "maren-relayer-rollout-observer-20260914",
+    "observerVersion": "08c2f6e8-e4ac-45e1-9d0e-eb2de77def75",
+    "observerBoundToOriginalNamespace": true,
+    "observerReadOnlyPaths": ["GET /health", "GET /healthz"],
+    "observerDeleted": true,
+    "events": [
+      {
+        "event": "ingress-paused",
+        "at": "2026-09-14T06:14:55.780Z"
+      },
+      {
+        "event": "public-ingress-blocked",
+        "at": "2026-09-14T06:15:00.417Z",
+        "httpStatus": 404
+      },
+      {
+        "event": "worker-deployed",
+        "at": "2026-09-14T06:16:06.543Z",
+        "version": "496e7254-497d-416b-954d-aa8536936e1e"
+      },
+      {
+        "event": "ingress-restored",
+        "at": "2026-09-14T06:16:17.224Z"
+      }
+    ],
+    "publicRestoreNote": "First immediate check returned 404 during ingress propagation; public health and recovery check passed at 06:16:38.357Z."
+  },
+  "routingBefore": {
+    "subdomain": {
+      "enabled": true,
+      "previews_enabled": true
+    },
+    "matchingCustomDomains": [],
+    "matchingZoneRoutes": []
+  },
+  "routingPaused": {
+    "subdomain": {
+      "enabled": false,
+      "previews_enabled": false
+    },
+    "matchingCustomDomains": [],
+    "matchingZoneRoutes": []
+  },
+  "routingRestored": {
+    "subdomain": {
+      "enabled": true,
+      "previews_enabled": true
+    },
+    "matchingCustomDomains": [],
+    "matchingZoneRoutes": []
+  },
+  "drainSamples": [
+    {
+      "checkedAt": "2026-09-14T06:15:03.341Z",
+      "sourceRevision": "eddce3e2de891788fd4732647d40ab21f72d30bd",
+      "base": "https://maren-relayer-rollout-observer-20260914.rolandojude18.workers.dev",
+      "health": {
+        "ok": true,
+        "accepting": true,
+        "relayer": "0xd90245ee16B2f58eD8654961BBf2fa835046df89",
+        "balanceWei": "19999998767203088",
+        "balanceBtc": "0.01999999",
+        "nonce": 32,
+        "chainId": 31611,
+        "network": "testnet",
+        "forwarder": "0x22cC1Adfb0C91D9359746dE3F7E8cB7F2B8eA98C",
+        "rpcs": ["https://rpc.test.mezo.org", "https://mezo-testnet.drpc.org"],
+        "targets": [
+          "marenPay:0xe475Ff919D54E055809f516E3bed8a5c7a101836",
+          "marenRegistry:0x9e123Cdd0CD524812CF9F552d3FAB13d8143b77E",
+          "marenVault:0x46252B00AB59384518d9dB6D1f210ffF1221645b"
+        ],
+        "store": "durable",
+        "inFlight": 0,
+        "watching": 0,
+        "spentTodayWei": "0",
+        "committedTodayWei": "0",
+        "pendingRefunds": 0,
+        "dailyBudgetWei": "10000000000000000",
+        "problems": []
+      },
+      "healthz": {
+        "ok": true,
+        "accepting": true,
+        "relayer": "0xd90245ee16B2f58eD8654961BBf2fa835046df89",
+        "chainId": 31611,
+        "network": "testnet",
+        "keySource": "env",
+        "singleInstance": true,
+        "nonce": {
+          "next": null,
+          "inFlight": 0,
+          "queued": 0,
+          "resyncs": 0
+        },
+        "lastSubmitted": null,
+        "lastSubmittedBlock": null,
+        "budget": {
+          "day": "2026-09-14",
+          "limitWei": "10000000000000000",
+          "committedWei": "0",
+          "reservedWei": "0",
+          "inFlightWei": "0",
+          "remainingWei": "10000000000000000",
+          "committedPct": 0,
+          "reservedPct": 0,
+          "halted": false,
+          "pendingRefunds": 0
+        },
+        "store": "durable",
+        "watching": 0,
+        "warnings": [
+          "RELAYER_PRIVATE_KEY puts the raw hot key in the process environment. This is a DEVELOPMENT-ONLY mode: use RELAYER_KEYSTORE_PATH + RELAYER_KEYSTORE_PASSWORD_FILE for anything holding real BTC"
+        ],
+        "problems": []
+      },
+      "chain": [
+        {
+          "url": "https://rpc.test.mezo.org",
+          "chainId": 31611,
+          "latestNonce": 32,
+          "pendingNonce": 32
+        },
+        {
+          "url": "https://mezo-testnet.drpc.org",
+          "chainId": 31611,
+          "latestNonce": 32,
+          "pendingNonce": 32
+        }
+      ],
+      "publicTransactionsSent": 0
+    },
+    {
+      "checkedAt": "2026-09-14T06:15:36.835Z",
+      "sourceRevision": "eddce3e2de891788fd4732647d40ab21f72d30bd",
+      "base": "https://maren-relayer-rollout-observer-20260914.rolandojude18.workers.dev",
+      "health": {
+        "ok": true,
+        "accepting": true,
+        "relayer": "0xd90245ee16B2f58eD8654961BBf2fa835046df89",
+        "balanceWei": "19999998767203088",
+        "balanceBtc": "0.01999999",
+        "nonce": 32,
+        "chainId": 31611,
+        "network": "testnet",
+        "forwarder": "0x22cC1Adfb0C91D9359746dE3F7E8cB7F2B8eA98C",
+        "rpcs": ["https://rpc.test.mezo.org", "https://mezo-testnet.drpc.org"],
+        "targets": [
+          "marenPay:0xe475Ff919D54E055809f516E3bed8a5c7a101836",
+          "marenRegistry:0x9e123Cdd0CD524812CF9F552d3FAB13d8143b77E",
+          "marenVault:0x46252B00AB59384518d9dB6D1f210ffF1221645b"
+        ],
+        "store": "durable",
+        "inFlight": 0,
+        "watching": 0,
+        "spentTodayWei": "0",
+        "committedTodayWei": "0",
+        "pendingRefunds": 0,
+        "dailyBudgetWei": "10000000000000000",
+        "problems": []
+      },
+      "healthz": {
+        "ok": true,
+        "accepting": true,
+        "relayer": "0xd90245ee16B2f58eD8654961BBf2fa835046df89",
+        "chainId": 31611,
+        "network": "testnet",
+        "keySource": "env",
+        "singleInstance": true,
+        "nonce": {
+          "next": null,
+          "inFlight": 0,
+          "queued": 0,
+          "resyncs": 0
+        },
+        "lastSubmitted": null,
+        "lastSubmittedBlock": null,
+        "budget": {
+          "day": "2026-09-14",
+          "limitWei": "10000000000000000",
+          "committedWei": "0",
+          "reservedWei": "0",
+          "inFlightWei": "0",
+          "remainingWei": "10000000000000000",
+          "committedPct": 0,
+          "reservedPct": 0,
+          "halted": false,
+          "pendingRefunds": 0
+        },
+        "store": "durable",
+        "watching": 0,
+        "warnings": [
+          "RELAYER_PRIVATE_KEY puts the raw hot key in the process environment. This is a DEVELOPMENT-ONLY mode: use RELAYER_KEYSTORE_PATH + RELAYER_KEYSTORE_PASSWORD_FILE for anything holding real BTC"
+        ],
+        "problems": []
+      },
+      "chain": [
+        {
+          "url": "https://rpc.test.mezo.org",
+          "chainId": 31611,
+          "latestNonce": 32,
+          "pendingNonce": 32
+        },
+        {
+          "url": "https://mezo-testnet.drpc.org",
+          "chainId": 31611,
+          "latestNonce": 32,
+          "pendingNonce": 32
+        }
+      ],
+      "publicTransactionsSent": 0
+    }
+  ],
+  "newWorkerBeforeIngressRestore": {
+    "checkedAt": "2026-09-14T06:16:09.143Z",
+    "sourceRevision": "eddce3e2de891788fd4732647d40ab21f72d30bd",
+    "base": "https://maren-relayer-rollout-observer-20260914.rolandojude18.workers.dev",
+    "health": {
+      "ok": true,
+      "accepting": true,
+      "relayer": "0xd90245ee16B2f58eD8654961BBf2fa835046df89",
+      "balanceWei": "19999998767203088",
+      "balanceBtc": "0.01999999",
+      "nonce": 32,
+      "chainId": 31611,
+      "network": "testnet",
+      "forwarder": "0x22cC1Adfb0C91D9359746dE3F7E8cB7F2B8eA98C",
+      "rpcs": ["https://rpc.test.mezo.org", "https://mezo-testnet.drpc.org"],
+      "targets": [
+        "marenPay:0xe475Ff919D54E055809f516E3bed8a5c7a101836",
+        "marenRegistry:0x9e123Cdd0CD524812CF9F552d3FAB13d8143b77E",
+        "marenVault:0x46252B00AB59384518d9dB6D1f210ffF1221645b"
+      ],
+      "store": "durable",
+      "inFlight": 0,
+      "watching": 0,
+      "spentTodayWei": "0",
+      "committedTodayWei": "0",
+      "pendingRefunds": 0,
+      "dailyBudgetWei": "10000000000000000",
+      "problems": []
+    },
+    "healthz": {
+      "ok": true,
+      "accepting": true,
+      "relayer": "0xd90245ee16B2f58eD8654961BBf2fa835046df89",
+      "chainId": 31611,
+      "network": "testnet",
+      "keySource": "env",
+      "singleInstance": true,
+      "recovery": {
+        "durable": true,
+        "blocked": false,
+        "pending": 0,
+        "pendingRefunds": 0,
+        "oldestPendingAt": null,
+        "replacementPolicy": "rebroadcast-identical"
+      },
+      "nonce": {
+        "next": null,
+        "inFlight": 0,
+        "queued": 0,
+        "resyncs": 0
+      },
+      "lastSubmitted": null,
+      "lastSubmittedBlock": null,
+      "budget": {
+        "day": "2026-09-14",
+        "limitWei": "10000000000000000",
+        "committedWei": "0",
+        "reservedWei": "0",
+        "inFlightWei": "0",
+        "remainingWei": "10000000000000000",
+        "committedPct": 0,
+        "reservedPct": 0,
+        "halted": false,
+        "pendingRefunds": 0
+      },
+      "store": "durable",
+      "watching": 0,
+      "warnings": [
+        "RELAYER_PRIVATE_KEY puts the raw hot key in the process environment. This is a DEVELOPMENT-ONLY mode: use RELAYER_KEYSTORE_PATH + RELAYER_KEYSTORE_PASSWORD_FILE for anything holding real BTC"
+      ],
+      "problems": []
+    },
+    "chain": [
+      {
+        "url": "https://rpc.test.mezo.org",
+        "chainId": 31611,
+        "latestNonce": 32,
+        "pendingNonce": 32
+      },
+      {
+        "url": "https://mezo-testnet.drpc.org",
+        "chainId": 31611,
+        "latestNonce": 32,
+        "pendingNonce": 32
+      }
+    ],
+    "publicTransactionsSent": 0
+  },
+  "finalPublicHealth": {
+    "checkedAt": "2026-09-14T06:18:42.816Z",
+    "sourceRevision": "eddce3e2de891788fd4732647d40ab21f72d30bd",
+    "base": "https://maren-relayer.rolandojude18.workers.dev",
+    "health": {
+      "ok": true,
+      "accepting": true,
+      "relayer": "0xd90245ee16B2f58eD8654961BBf2fa835046df89",
+      "balanceWei": "19999998767203088",
+      "balanceBtc": "0.01999999",
+      "nonce": 32,
+      "chainId": 31611,
+      "network": "testnet",
+      "forwarder": "0x22cC1Adfb0C91D9359746dE3F7E8cB7F2B8eA98C",
+      "rpcs": ["https://rpc.test.mezo.org", "https://mezo-testnet.drpc.org"],
+      "targets": [
+        "marenPay:0xe475Ff919D54E055809f516E3bed8a5c7a101836",
+        "marenRegistry:0x9e123Cdd0CD524812CF9F552d3FAB13d8143b77E",
+        "marenVault:0x46252B00AB59384518d9dB6D1f210ffF1221645b"
+      ],
+      "store": "durable",
+      "inFlight": 0,
+      "watching": 0,
+      "spentTodayWei": "0",
+      "committedTodayWei": "0",
+      "pendingRefunds": 0,
+      "dailyBudgetWei": "10000000000000000",
+      "problems": []
+    },
+    "healthz": {
+      "ok": true,
+      "accepting": true,
+      "relayer": "0xd90245ee16B2f58eD8654961BBf2fa835046df89",
+      "chainId": 31611,
+      "network": "testnet",
+      "keySource": "env",
+      "singleInstance": true,
+      "recovery": {
+        "durable": true,
+        "blocked": false,
+        "pending": 0,
+        "pendingRefunds": 0,
+        "oldestPendingAt": null,
+        "replacementPolicy": "rebroadcast-identical"
+      },
+      "nonce": {
+        "next": null,
+        "inFlight": 0,
+        "queued": 0,
+        "resyncs": 0
+      },
+      "lastSubmitted": null,
+      "lastSubmittedBlock": null,
+      "budget": {
+        "day": "2026-09-14",
+        "limitWei": "10000000000000000",
+        "committedWei": "0",
+        "reservedWei": "0",
+        "inFlightWei": "0",
+        "remainingWei": "10000000000000000",
+        "committedPct": 0,
+        "reservedPct": 0,
+        "halted": false,
+        "pendingRefunds": 0
+      },
+      "store": "durable",
+      "watching": 0,
+      "warnings": [
+        "RELAYER_PRIVATE_KEY puts the raw hot key in the process environment. This is a DEVELOPMENT-ONLY mode: use RELAYER_KEYSTORE_PATH + RELAYER_KEYSTORE_PASSWORD_FILE for anything holding real BTC"
+      ],
+      "problems": []
+    },
+    "chain": [
+      {
+        "url": "https://rpc.test.mezo.org",
+        "chainId": 31611,
+        "latestNonce": 32,
+        "pendingNonce": 32
+      },
+      {
+        "url": "https://mezo-testnet.drpc.org",
+        "chainId": 31611,
+        "latestNonce": 32,
+        "pendingNonce": 32
+      }
+    ],
+    "publicTransactionsSent": 0
+  },
+  "cors": {
+    "checkedAt": "2026-09-14T06:19:07.708Z",
+    "version": "52bce9af-73f4-4d20-b613-c9cd9355a162",
+    "results": [
+      {
+        "origin": "https://marenfinance.vercel.app",
+        "status": 204,
+        "allowOrigin": "https://marenfinance.vercel.app"
+      },
+      {
+        "origin": "https://www.marenfinance.xyz",
+        "status": 204,
+        "allowOrigin": "https://www.marenfinance.xyz"
+      },
+      {
+        "origin": "http://localhost:3000",
+        "status": 204,
+        "allowOrigin": "http://localhost:3000"
+      },
+      {
+        "origin": "https://untrusted.example",
+        "status": 204,
+        "allowOrigin": null
+      }
+    ]
+  },
+  "deployedAlarmEvents": {
+    "checkedAt": "2026-09-14T06:20:39.281Z",
+    "durationSeconds": 35,
+    "events": [
+      {
+        "eventTimestamp": 1789366816113,
+        "outcome": "ok",
+        "eventKeys": ["scheduledTime"],
+        "type": null,
+        "cron": null,
+        "scheduledTime": "2026-09-14T06:20:16.113Z",
+        "exceptionsCount": 0
+      },
+      {
+        "eventTimestamp": 1789366826112,
+        "outcome": "ok",
+        "eventKeys": ["scheduledTime"],
+        "type": null,
+        "cron": null,
+        "scheduledTime": "2026-09-14T06:20:26.114Z",
+        "exceptionsCount": 0
+      }
+    ],
+    "scope": "Non-request event metadata only; no request headers, bodies, or log content retained."
+  },
+  "publicTransactionsSent": 0,
+  "limitations": [
+    "No end-to-end public relay transaction or pending-transaction restart was performed during deployment.",
+    "The updated native iOS build is not distributed: GitHub Actions billing prevented the upload lane from starting.",
+    "The previously distributed iOS build can misclassify uncertain or duplicate relayer responses as refusal and lacks the new interrupted claim recovery. It has not passed final native pilot acceptance.",
+    "Mainnet, independent audit, secure production signing and the device acceptance matrix remain separate gates."
+  ],
+  "healthAfterObserverRemoval": {
+    "checkedAt": "2026-09-14T06:22:12.569Z",
+    "sourceRevision": "eddce3e2de891788fd4732647d40ab21f72d30bd",
+    "base": "https://maren-relayer.rolandojude18.workers.dev",
+    "health": {
+      "ok": true,
+      "accepting": true,
+      "relayer": "0xd90245ee16B2f58eD8654961BBf2fa835046df89",
+      "balanceWei": "19999998767203088",
+      "balanceBtc": "0.01999999",
+      "nonce": 32,
+      "chainId": 31611,
+      "network": "testnet",
+      "forwarder": "0x22cC1Adfb0C91D9359746dE3F7E8cB7F2B8eA98C",
+      "rpcs": ["https://rpc.test.mezo.org", "https://mezo-testnet.drpc.org"],
+      "targets": [
+        "marenPay:0xe475Ff919D54E055809f516E3bed8a5c7a101836",
+        "marenRegistry:0x9e123Cdd0CD524812CF9F552d3FAB13d8143b77E",
+        "marenVault:0x46252B00AB59384518d9dB6D1f210ffF1221645b"
+      ],
+      "store": "durable",
+      "inFlight": 0,
+      "watching": 0,
+      "spentTodayWei": "0",
+      "committedTodayWei": "0",
+      "pendingRefunds": 0,
+      "dailyBudgetWei": "10000000000000000",
+      "problems": []
+    },
+    "healthz": {
+      "ok": true,
+      "accepting": true,
+      "relayer": "0xd90245ee16B2f58eD8654961BBf2fa835046df89",
+      "chainId": 31611,
+      "network": "testnet",
+      "keySource": "env",
+      "singleInstance": true,
+      "recovery": {
+        "durable": true,
+        "blocked": false,
+        "pending": 0,
+        "pendingRefunds": 0,
+        "oldestPendingAt": null,
+        "replacementPolicy": "rebroadcast-identical"
+      },
+      "nonce": {
+        "next": null,
+        "inFlight": 0,
+        "queued": 0,
+        "resyncs": 0
+      },
+      "lastSubmitted": null,
+      "lastSubmittedBlock": null,
+      "budget": {
+        "day": "2026-09-14",
+        "limitWei": "10000000000000000",
+        "committedWei": "0",
+        "reservedWei": "0",
+        "inFlightWei": "0",
+        "remainingWei": "10000000000000000",
+        "committedPct": 0,
+        "reservedPct": 0,
+        "halted": false,
+        "pendingRefunds": 0
+      },
+      "store": "durable",
+      "watching": 0,
+      "warnings": [
+        "RELAYER_PRIVATE_KEY puts the raw hot key in the process environment. This is a DEVELOPMENT-ONLY mode: use RELAYER_KEYSTORE_PATH + RELAYER_KEYSTORE_PASSWORD_FILE for anything holding real BTC"
+      ],
+      "problems": []
+    },
+    "chain": [
+      {
+        "url": "https://rpc.test.mezo.org",
+        "chainId": 31611,
+        "latestNonce": 32,
+        "pendingNonce": 32
+      },
+      {
+        "url": "https://mezo-testnet.drpc.org",
+        "chainId": 31611,
+        "latestNonce": 32,
+        "pendingNonce": 32
+      }
+    ],
+    "publicTransactionsSent": 0
+  }
+}

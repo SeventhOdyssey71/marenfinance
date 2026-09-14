@@ -1,5 +1,9 @@
 # Production and grant readiness
 
+Latest hosted status: [14 September deployment report](TESTNET-DEPLOYMENT-2026-09-14.md).
+Web/backend changes have been deployed; the new TestFlight upload is blocked by
+GitHub billing. The analysis below includes the prior candidate assessment.
+
 Reviewed 13 September 2026 against local source at `d349a22` plus the uncommitted
 hardening changes described below. The current release checklist and rollout order
 are in [TESTNET-RELEASE.md](TESTNET-RELEASE.md). This is the broader execution checklist;

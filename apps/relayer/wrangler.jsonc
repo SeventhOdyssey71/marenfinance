@@ -10,7 +10,7 @@
   // the nonce sequence and the daily budget. SQLite storage backs both the DO's
   // state and the DurableStore counters, and its alarm drives the settlement sweep.
   "durable_objects": {
-    "bindings": [{ "name": "RELAYER", "class_name": "RelayerDO" }]
+    "bindings": [{ "name": "RELAYER", "class_name": "RelayerDO" }],
   },
   "migrations": [{ "tag": "v1", "new_sqlite_classes": ["RelayerDO"] }],
 
@@ -33,6 +33,6 @@
     "RELAYER_IP_SALT": "maren-testnet-relayer-ipsalt-v1",
     // Browser origins allowed to call /relay (CORS). The web app runs here; add
     // your own preview/custom domains as needed. Empty would deny all cross-origin.
-    "RELAYER_ALLOWED_ORIGINS": "https://marenfinance.vercel.app,http://localhost:3000"
-  }
+    "RELAYER_ALLOWED_ORIGINS": "https://marenfinance.vercel.app,https://www.marenfinance.xyz,http://localhost:3000",
+  },
 }

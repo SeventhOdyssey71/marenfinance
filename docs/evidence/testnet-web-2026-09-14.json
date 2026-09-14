@@ -1,0 +1,34 @@
+{
+  "checkedAt": "2026-09-14T06:15:25.068Z",
+  "releaseRevision": "eddce3e2de891788fd4732647d40ab21f72d30bd",
+  "deploymentId": "dpl_Fcb43TS1JJMSkLSVdNYHREnm9FNH",
+  "scope": "Public rendered HTML and new release copy only; not a browser interaction or wallet transaction test.",
+  "passed": true,
+  "checks": [
+    {
+      "path": "/",
+      "httpStatus": 200,
+      "passed": true,
+      "sha256": "b4ca837f49524bfab05888b84f64f4308254f6b9b668c47001798f3dd6a9762a",
+      "markers": [
+        "iOS beta · Mezo testnet",
+        "Testnet only · pre-audit · no real funds",
+        "https://testflight.apple.com/join/uhmv9YPE"
+      ]
+    },
+    {
+      "path": "/docs",
+      "httpStatus": 200,
+      "passed": true,
+      "sha256": "e3b7158d6f16383815f426a76caaa4b7669b67986997b4ba71dd6c8caacc40c1",
+      "markers": ["</html>"]
+    },
+    {
+      "path": "/claim",
+      "httpStatus": 200,
+      "passed": true,
+      "sha256": "f881c8448efb05e718f5d1e18f8a70f2d477460ed0815154dfb6ab03611db8c1",
+      "markers": ["</html>"]
+    }
+  ]
+}

@@ -2,19 +2,30 @@
 
 ## Status: LIVE on Cloudflare Workers (testnet)
 
-**The relayer is deployed and accepting.** Verified on 2026-09-06:
+**The hardened testnet relayer was deployed on 14 September 2026 and is accepting.**
+Final Worker version: `52bce9af-73f4-4d20-b613-c9cd9355a162`, tag
+`testnet-eddce3e-www`. The source is `eddce3e2de891788fd4732647d40ab21f72d30bd`
+plus the verified `https://www.marenfinance.xyz` CORS origin. The original signer,
+Durable Object namespace, singleton, targets, budget and RPC settings were retained.
 
-Rechecked `/healthz` on 13 September 2026: accepting on chain 31611, durable quota
-storage, and no reported boot problems. See the [current release checklist](../../docs/PRODUCTION-READINESS.md)
-for verification limits and outstanding mainnet gates. The local RPC-probe hardening
-and the durable recovery implementation are local changes awaiting deployment.
-The currently observed endpoint is not evidence that either change is running.
+[Deployment evidence](evidence/deployment-2026-09-14.json) records the trigger-only
+ingress pause, two drained legacy snapshots, recovery verification before reopening,
+restored ingress, CORS checks, and temporary observer removal. `/health` and
+`/healthz` pass; recovery is durable, unblocked and empty. Both RPCs report latest
+and pending nonce 32. Two successful deployed alarm events were observed ten
+seconds apart. No public transactions were sent during this rollout.
+
+**Native pilot acceptance remains open.** GitHub Actions billing prevented the
+updated iOS upload lane from starting. The previously distributed app can still
+misclassify uncertain/duplicate relay responses as refusal and lacks the new
+interrupted claim recovery. Deploying this backend and the website does not
+finalize the native pilot. See the [release checklist](../../docs/PRODUCTION-READINESS.md).
 
 |         |                                                                        |
 | ------- | ---------------------------------------------------------------------- |
 | URL     | `https://maren-relayer.rolandojude18.workers.dev`                      |
 | Signer  | `0xd90245ee16B2f58eD8654961BBf2fa835046df89`                           |
-| Balance | 0.0199 BTC on matsnet, nonce 21 (it has relayed before)                |
+| Balance | 0.019999998767203088 BTC on matsnet, nonce 32 (14 September 2026)      |
 | Storage | Durable Object (`store: "durable"`), single instance, cron `*/2` armed |
 | Key     | a `wrangler secret`, not a file                                        |
 
@@ -143,11 +154,11 @@ authorization. It starts no public fork and sends no public transactions.
 
 The seven Anvil fork integration tests separately verify Mezo RPC behavior,
 local signing, raw broadcast and receipts. Wrangler dry-run verifies the real
-Worker bundle. An observed deployed recovery exercise remains a release acceptance
-step: a successful local runtime check does not prove Cloudflare deployment or
-public alarm/cron delivery.
+Worker bundle. The 14 September deployment additionally verified the live recovery
+health state and two successful alarm events. A public transaction interrupted
+across restart was not exercised during rollout and remains a pilot acceptance case.
 
-Before first rollout, pause incoming relays and let the old process's pending
+For migration from a legacy in-memory deployment, pause incoming relays and let the old process's pending
 watcher/refund queue drain. Existing in-memory transactions cannot be reconstructed
 by deploying this journal. Retain old hashes and compare reserved/committed spend
 before resuming; do not reset durable counters to hide legacy reservations.
@@ -188,14 +199,14 @@ pnpm cf:deploy                              # wrangler deploy
 Local dev needs no account: `pnpm cf:dev` runs the whole worker in miniflare,
 reading the key from a gitignored `.dev.vars` (`RELAYER_PRIVATE_KEY=0x…`).
 
-Verification record, updated 13 September 2026:
+Verification record, updated 14 September 2026:
 
 | Claim                                                   | Evidence and limit                                                                                                                                            |
 | ------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Existing Cloudflare testnet deployment                  | The public endpoint was observed on 6 and 13 September 2026, as recorded above. This does not establish that it runs the local recovery changes.              |
+| Existing Cloudflare testnet deployment                  | Final version `52bce9af-73f4-4d20-b613-c9cd9355a162` was deployed and verified on 14 September; namespace and signer retained.                                |
 | Current relayer source and Worker compile               | 327 relayer tests passed, including 16 storage fault tests and seven Anvil fork tests; source/Worker typechecks and Wrangler bundle dry-run passed.           |
 | Actual local DO persistence and alarms                  | `test:runtime` passed six checks with SQLite storage across full local Wrangler restarts, actual alarms, and an unforked local Anvil; no public transactions. |
-| New journal behavior on the deployed Cloudflare service | Not yet deployed or observed by this verification pass. Drain legacy queues and verify the new recovery health fields and alarm/cron behavior after rollout.  |
+| New journal behavior on the deployed Cloudflare service | Live recovery fields and deep health passed after deployment; two successful alarms observed. No public transaction/restart acceptance was attempted.         |
 
 For real funds, prefer a keystore over `RELAYER_PRIVATE_KEY` here too — but on
 Workers the key is a `wrangler secret`, not a file, so Step 2's keystore-file

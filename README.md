@@ -67,7 +67,12 @@ last few hours".
 **Mainnet is not deployed.** The mainnet entries in `addresses.ts` are all zeroes and the
 deployment block is `null`, which callers must handle as unavailable rather than empty.
 
-### Release status (13 September 2026)
+### Release status (14 September 2026)
+
+The web and backend finalization changes have been deployed. The new TestFlight
+build remains blocked by GitHub Actions billing. See the
+[deployment report](docs/TESTNET-DEPLOYMENT-2026-09-14.md) for version IDs, live
+checks, and the remaining native/device acceptance gates.
 
 The testnet relayer is hosted on Cloudflare and `/healthz` reports accepting requests.
 Both clients have relay submission code. Deposits, token approvals when needed, and
