@@ -1,6 +1,6 @@
 ---
-title: "Quickstart"
-description: "Connect on matsnet, deposit BTC, borrow MUSD, and spend it."
+title: 'Quickstart'
+description: 'Connect on matsnet, deposit BTC, borrow MUSD, and spend it.'
 ---
 
 The whole product loop on Mezo testnet: fund an account, deposit Bitcoin, borrow MUSD against it,
@@ -8,9 +8,8 @@ and pay someone. Every step runs against the five contracts live on matsnet and 
 protocol underneath.
 
 <Info>
-  Everything here happens on **Mezo matsnet, chain `31611`**. There is no real money at risk,
-  and there is no Maren mainnet deployment to point at. Testnet BTC is the gas token, same as
-  mainnet.
+  Everything here happens on **Mezo matsnet, chain `31611`**. There is no real money at risk, and
+  there is no Maren mainnet deployment to point at. Testnet BTC is the gas token, same as mainnet.
 </Info>
 
 <Steps>
@@ -25,6 +24,7 @@ protocol underneath.
       while the iOS beta runs — every `/app/*` URL returns 404 today. Run it yourself with
       `pnpm --filter @maren/web dev`; see [Run locally](/developers/run-locally).
     </Note>
+
   </Step>
   <Step title="If you are running the web client locally">
     Add the Mezo matsnet network to your wallet and switch to it. The primary RPC is
@@ -37,12 +37,13 @@ protocol underneath.
       `testnet-rpc.mezo.org`). Use the endpoints on the [Networks](/reference/networks) page,
       each verified with a live `cast chain-id` rather than copied from a doc.
     </Warning>
+
   </Step>
 
-  <Step title="Fund the account with a little testnet BTC">
-    You need a small amount of matsnet BTC for gas. Your first deposit is a transaction you submit
-    and pay for yourself, always: see the note below.
-  </Step>
+<Step title="Fund the account with a little testnet BTC">
+  You need a small amount of matsnet BTC for gas. A BTC deposit is a transaction you submit and pay
+  for yourself, always: see the note below.
+</Step>
 
   <Step title="Deposit Bitcoin into the Social Vault">
     Deposit from as little as **0.001 BTC**. The vault holds one shared MUSD trove and gives
@@ -51,14 +52,13 @@ protocol underneath.
     approval step.
 
     <Note>
-      **Your first deposit costs BTC gas, always.** The relayer deliberately excludes
-      `MarenVault.deposit()` from its sponsored allowlist, because a gasless relay cannot carry
-      value, so `deposit` is excluded from the relay allowlist by construction. After that,
-      borrow, repay, withdraw, close, every payment and every handle operation are sponsored — 25
-      free actions per address, then the relayer declines rather than charging. **Earn is not on
-      the allowlist**, so Earn deposits and withdrawals are self-paid.
+      **BTC deposits cost BTC gas.** The relayer excludes `MarenVault.deposit()` because it
+      carries native value. Eligible borrowing, repayment and payment actions can be sponsored
+      while the service is available and within quota. Link creation, approvals and actions
+      outside the allowlist require your own gas. The confirmation screen shows who pays.
       See [Gasless](/how-it-works/gasless).
     </Note>
+
   </Step>
 
   <Step title="Borrow MUSD, inside the range the contract will accept">
@@ -73,6 +73,7 @@ protocol underneath.
     deployed vault; the single-transaction `depositAndBorrow` composite is written but not deployed
     in a single transaction. At the same position a 40 MUSD borrow reverts with
     `InsufficientCollateralRatio` at the account's own 180% floor.
+
   </Step>
 
   <Step title="Spend the MUSD">
@@ -95,6 +96,7 @@ protocol underneath.
         Both parties see the settled request in Activity with the transaction hash attached.
       </Tab>
     </Tabs>
+
   </Step>
 
   <Step title="Check it in Activity">
@@ -113,8 +115,8 @@ entries close.
 <Warning>
   **One state does freeze exits, and it is not a pause.** If the pooled trove is liquidated, closed
   or fully redeemed, it leaves Mezo's active set and every vault mutation halts. Residual collateral
-  then sits in MUSD's `CollSurplusPool` and `MarenVault` does not call `claimCollateral`, so there is
-  no wind-down path in the contract yet. Separately, the deployed matsnet vault predates the
+  then sits in MUSD's `CollSurplusPool` and `MarenVault` does not call `claimCollateral`, so there
+  is no wind-down path in the contract yet. Separately, the deployed matsnet vault predates the
   redemption-reconciliation mechanism entirely. Both are why mainnet is gated on an audit. See
   [Risk](/security/risk).
 </Warning>

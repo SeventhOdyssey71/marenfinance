@@ -16,6 +16,7 @@ struct ProfileView: View {
     @State private var showSetup = false
     @State private var protection: KeyProtection?
     @State private var loadingAccount = true
+    @AppStorage("finance.maren.swift.backupPending") private var backupPending = false
     private let capability = Keystore.shared.capability()
 
     /// While the account read is in flight and nothing has arrived, a neutral placeholder that
@@ -41,9 +42,6 @@ struct ProfileView: View {
                     .font(.text(13)).foregroundStyle(Theme.Palette.tertiary)
                     .fixedSize(horizontal: false, vertical: true)
             }
-            if session.address != nil {
-                PillButton(title: "Sign out", variant: .quiet) { session.signOut() }
-            }
         }
         .task {
             loadingAccount = true
@@ -64,9 +62,7 @@ struct ProfileView: View {
         // Keychain item — honestly reported as biometric-protected. In-session, the setup
         // callback supplies the real protection, so this only fills the cold-start gap.
         Task {
-            if protection == nil, await Keystore.shared.hasKey() {
-                protection = .keychainBiometric(label: capability.displayName)
-            }
+            protection = await Keystore.shared.protection()
         }
     }
 
@@ -121,7 +117,11 @@ struct ProfileView: View {
                     }
                     Spacer(minLength: 0)
                 }
-                PillButton(title: protection == nil ? "Set up wallet" : "Manage wallet", variant: .quiet) {
+                if backupPending {
+                    Text("Your private key still needs a backup. Save it before removing this wallet or changing devices.")
+                        .font(.text(14)).foregroundStyle(Theme.Palette.warning)
+                }
+                PillButton(title: protection == nil ? "Restore wallet" : (backupPending ? "Back up wallet" : "Manage wallet"), variant: .quiet) {
                     showSetup = true
                 }
             }
@@ -157,7 +157,7 @@ struct ProfileView: View {
         switch protection {
         case let .keychainBiometric(label): return "Protected by \(label)"
         case .sessionOnly: return "Held for this session only"
-        case .none: return "No wallet yet"
+        case .none: return "Restore your signing key"
         }
     }
     private var keySubtitle: String {

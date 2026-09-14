@@ -153,14 +153,12 @@ let MULTICALL3 = "0xcA11bde05977b3631167028862bE2a173976CA11"
 /// the chain. That fallback is why shipping this is safe before the indexer is deployed.
 enum SubgraphConfig {
     static var url: URL? {
-        let raw = (Bundle.main.object(forInfoDictionaryKey: "MAREN_SUBGRAPH_URL") as? String)
-            ?? ProcessInfo.processInfo.environment["MAREN_SUBGRAPH_URL"]
-            ?? ""
-        let trimmed = raw.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !trimmed.isEmpty, let u = URL(string: trimmed), u.scheme?.hasPrefix("http") == true else {
-            return nil
+        #if DEBUG
+        if let raw = ProcessInfo.processInfo.environment["MAREN_SUBGRAPH_URL"] {
+            return RelayerConfig.normalise(raw)
         }
-        return u
+        #endif
+        return RelayerConfig.normalise((Bundle.main.object(forInfoDictionaryKey: "MAREN_SUBGRAPH_URL") as? String) ?? "")
     }
 }
 

@@ -54,7 +54,7 @@ export type RequiredRpcMethod = (typeof REQUIRED_RPC_METHODS)[number];
 export interface EndpointReport {
   readonly url: string;
   readonly ok: boolean;
-  /** Methods the endpoint does not serve (JSON-RPC -32601, or unreachable). */
+  /** Methods that failed to return usable data after retries. */
   readonly missing: readonly RequiredRpcMethod[];
   readonly chainId: number | null;
   readonly reason: string | null;
@@ -82,12 +82,34 @@ interface JsonRpcResponse {
   error?: { code?: number; message?: string };
 }
 
-/** JSON-RPC "method not found". The exact signal dRPC returns. */
-const METHOD_NOT_FOUND = -32601;
+// A method existing is insufficient: these probes must return data the relay
+// path can actually use. In particular, an RPC error on eth_chainId must never
+// turn into an unknown chain that passes the network check.
+const QUANTITY = /^0x(?:0|[1-9a-f][0-9a-f]*)$/i;
+
+function usableResult(method: RequiredRpcMethod, result: unknown): boolean {
+  switch (method) {
+    case 'eth_chainId':
+    case 'eth_estimateGas':
+      return typeof result === 'string' && QUANTITY.test(result) && BigInt(result) > 0n;
+    case 'eth_getTransactionCount':
+      return typeof result === 'string' && QUANTITY.test(result);
+    case 'eth_call':
+      // The probe calls MUSD.decimals(), not an arbitrary contract function.
+      return (
+        typeof result === 'string' && /^0x[0-9a-f]{64}$/i.test(result) && BigInt(result) === 18n
+      );
+    case 'eth_getBlockByNumber': {
+      if (result === null || typeof result !== 'object') return false;
+      const block = result as Record<string, unknown>;
+      return typeof block['number'] === 'string' && QUANTITY.test(block['number']);
+    }
+  }
+}
 
 async function rpcCall(
   url: string,
-  method: string,
+  method: RequiredRpcMethod,
   params: unknown[],
   fetchImpl: typeof fetch,
   timeoutMs: number,
@@ -106,12 +128,10 @@ async function rpcCall(
     }
     const payload = (await response.json()) as JsonRpcResponse;
     if (payload.error !== undefined) {
-      if (payload.error.code === METHOD_NOT_FOUND) {
-        return { supported: false, reason: payload.error.message ?? 'method not found' };
-      }
-      // Any OTHER JSON-RPC error means the method exists and the node processed
-      // it — a revert or an invalid-params complaint still proves capability.
-      return { supported: true, reason: payload.error.message ?? 'rpc error' };
+      return { supported: false, reason: payload.error?.message ?? 'rpc error' };
+    }
+    if (!usableResult(method, payload.result)) {
+      return { supported: false, reason: 'missing or invalid probe result' };
     }
     return { supported: true, result: payload.result };
   } catch (error) {

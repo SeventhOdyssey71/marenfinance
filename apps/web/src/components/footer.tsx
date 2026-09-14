@@ -1,6 +1,6 @@
 import Link from 'next/link';
 import { TESTFLIGHT_URL } from '@/lib/links';
-import { XLogo, GitHubLogo } from './ui/icons';
+import { XLogo } from './ui/icons';
 import { Reveal } from './ui/reveal';
 
 /**
@@ -30,21 +30,14 @@ const columns: readonly FooterColumn[] = [
   {
     heading: 'Network',
     links: [
-      { label: 'Mezo Explorer', href: 'https://explorer.mezo.org', external: true },
+      { label: 'Testnet Explorer', href: 'https://explorer.test.mezo.org', external: true },
       { label: 'mezo.org', href: 'https://mezo.org', external: true },
       { label: 'Mezo docs', href: 'https://info.mezo.org', external: true },
     ],
   },
 ];
 
-const socials = [
-  { label: 'Maren on X', href: 'https://x.com/marenfinance', Icon: XLogo },
-  {
-    label: 'Maren on GitHub',
-    href: 'https://github.com/SeventhOdyssey71/marenfinance',
-    Icon: GitHubLogo,
-  },
-] as const;
+const socials = [{ label: 'Maren on X', href: 'https://x.com/marenfinance', Icon: XLogo }] as const;
 
 export function Footer() {
   return (
@@ -59,11 +52,16 @@ export function Footer() {
             Spend Bitcoin. Never sell it.
           </h2>
           <p className="mx-auto mt-4 max-w-[46ch] text-[15px] font-normal leading-[1.5] text-white/65 sm:text-[17px]">
-            Deposit from 0.001 BTC, draw MUSD, and spend it without keeping a gas balance. Maren is
-            pre-audit, so start small.
+            Try deposits, borrowing and payments with testnet funds. Eligible transactions are
+            sponsored while the relayer is available.
           </p>
           <div className="mt-8 flex justify-center">
-            <a href={TESTFLIGHT_URL} target="_blank" rel="noopener noreferrer" className="footer-cta">
+            <a
+              href={TESTFLIGHT_URL}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="footer-cta"
+            >
               Join the iOS beta
             </a>
           </div>
@@ -80,7 +78,7 @@ export function Footer() {
             Maren
           </span>
           <p className="mt-3 max-w-[34ch] text-[14px] font-medium leading-[1.55] text-[color:var(--muted)]">
-            Bitcoin-backed liquidity, gasless-by-design spending, and yield. Built on Mezo.
+            Bitcoin-backed borrowing and payments. Built for iPhone, on Mezo testnet.
           </p>
           <ul className="mt-5 flex items-center gap-2.5">
             {socials.map(({ label, href, Icon }) => (
@@ -134,8 +132,7 @@ export function Footer() {
       {/* Copyright */}
       <div className="mt-10 flex flex-col items-start justify-between gap-2 border-t border-[color:var(--border-hairline)] pt-6 sm:flex-row sm:items-center">
         <span className="text-[12.5px] font-medium leading-[1.5] text-[color:var(--muted)]">
-          © {new Date().getFullYear()} Maren Finance. Pre-audit software. Deposit only what you can
-          afford to lose.
+          © {new Date().getFullYear()} Maren Finance. Pre-audit software. Testnet funds only.
         </span>
         <span
           className="inline-flex items-center gap-2.5 text-[12.5px] font-semibold uppercase tracking-[0.06em] text-[color:var(--ink)]"
@@ -143,7 +140,7 @@ export function Footer() {
         >
           <span aria-hidden className="size-2 rounded-[3px] bg-[color:var(--lime)]" />
           Built on Mezo
-          <span className="num font-medium text-[color:var(--muted)]">31612 · 31611</span>
+          <span className="num font-medium text-[color:var(--muted)]">Testnet · 31611</span>
         </span>
       </div>
     </footer>

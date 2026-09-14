@@ -65,10 +65,13 @@ which is currently zero by construction.
 
 ## The app
 
-One product, two clients sharing one SDK, so a rule enforced on one is the rule on the
-other. The iOS app is the headline client and runs the same screens on a mock layer
-with identical signatures, going live by replacing one file; the web app runs live
-against matsnet today.
+Status correction, 13 September 2026: the headline client is native SwiftUI with live
+matsnet reads and writes. The TypeScript SDK serves the web and relayer; Swift has its
+own chain implementation with encoding golden tests. The relayer is hosted on Cloudflare.
+The public release is iOS-first: landing, docs, and claims are available on the website,
+while the web dashboard is deliberately disabled. The current acceptance checklist is
+`docs/PRODUCTION-READINESS.md`; historical chain figures elsewhere in this document retain
+their original observation date.
 
 ### Home
 

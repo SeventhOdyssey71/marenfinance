@@ -1,19 +1,20 @@
 ---
-title: "Gasless"
-description: "An ERC-2771 relayer, why ERC-4337 is a dead end on Mezo, and the deposit exception."
+title: 'Gasless'
+description: 'An ERC-2771 relayer, why ERC-4337 is a dead end on Mezo, and the deposit exception.'
 ---
 
 Maren's gasless design exists because the obvious answer is wrong, and being able to say why is
 worth more than the answer itself. A user signs; Maren's relayer submits and pays the BTC gas.
 
 <Warning>
-  **The relayer is live on matsnet** at `maren-relayer.rolandojude18.workers.dev`, `accepting: true`,
-  with a durable nonce and quota store and a 0.01 BTC/day global gas budget. A sponsored
-  `MarenVault.borrow` of 200 MUSD settled in block 15368268, gas paid by the relayer for a signer
-  holding no BTC. Until it is, you submit your own
-  transactions and pay BTC gas, and the app says so on every screen. Hosting it is one command
-  plus funding a hot wallet, and it is the single biggest gap between the demo and the product.
-  Even once hosted, the first deposit always costs gas. Never read "gasless" as "zero gas".
+  **The relayer is hosted on matsnet** at `maren-relayer.rolandojude18.workers.dev`. It sponsors
+  eligible calls when healthy, funded and within its quota. Availability is checked by the
+  client; read who pays on the confirmation screen before signing.
+
+**BTC deposits require your own BTC for gas.** Link creation and approvals can also require
+gas. If sponsorship is unavailable, the client may offer a direct transaction with its fee
+shown first. Keep a small testnet BTC balance. This beta uses testnet funds only.
+
 </Warning>
 
 ## The mechanism: EIP-2612 permit plus ERC-2771 relaying
@@ -23,9 +24,8 @@ Gas" feature. No bundler, no vendor, no EntryPoint.
 
 <Steps>
   <Step title="The user signs, holding no BTC">
-    The user produces an EIP-712 `ForwardRequest` and, where MUSD moves, an EIP-2612 `permit`.
-    No transaction is created. MUSD supports `permit`, so approval and action are one signed
-    message.
+    The user produces an EIP-712 `ForwardRequest` and, where MUSD moves, an EIP-2612 `permit`. No
+    transaction is created. MUSD supports `permit`, so approval and action are one signed message.
   </Step>
   <Step title="The relayer verifies and simulates">
     The relayer checks the signature against its allowlist and per-address budget, then simulates
@@ -46,20 +46,21 @@ the same frame, bubbling any inner revert, so fee and work settle together or ne
 
 <Info>
   This design exists because a natural alternative is broken. OpenZeppelin's
-  `ERC2771Forwarder.executeBatch` takes an `atomic` flag, but the flag governs validation only:
-  a failed inner call does not revert the batch. A batched fee leg would settle even when the
-  work leg reverts, charging a user for an action that did not happen. `MarenRelayHub` therefore
-  reverts `executeBatch` with `BatchExecutionDisabled()`. This was verified with a test that
-  drives a batch whose work leg reverts and asserts the fee leg settled anyway.
+  `ERC2771Forwarder.executeBatch` takes an `atomic` flag, but the flag governs validation only: a
+  failed inner call does not revert the batch. A batched fee leg would settle even when the work leg
+  reverts, charging a user for an action that did not happen. `MarenRelayHub` therefore reverts
+  `executeBatch` with `BatchExecutionDisabled()`. This was verified with a test that drives a batch
+  whose work leg reverts and asserts the fee leg settled anyway.
 </Info>
 
 ## The deposit exception
 
 <Warning>
-  Value is never relayed. `RelayedCall` has no `value` field, and `execute` rejects a non-zero
-  one. That is why `MarenVault.deposit()` is deliberately **absent** from the relay allowlist:
-  a deposit carries BTC as `msg.value`, which a meta-transaction cannot carry. A user pays for
-  their first deposit; everything after it can be sponsored.
+  Value is never relayed. `RelayedCall` has no `value` field, and `execute` rejects a non-zero one.
+  That is why `MarenVault.deposit()` is deliberately **absent** from the relay allowlist: a deposit
+  carries BTC as `msg.value`, which this relay path cannot carry. Every BTC deposit needs user-paid
+  gas. Other actions are sponsored only if their selector is allowed and the relayer is available;
+  link creation and approvals can require user-paid gas too.
 </Warning>
 
 The relayer's guarantees are narrow and worth stating precisely. It relays only to Maren
@@ -79,13 +80,13 @@ ERC-4337 EntryPoint v0.7 **is** deployed on Mezo, at
 `0x0000000071727De22E5E9d8BAf0edAc6f37da032`, byte-identical to the Ethereum L1 deployment. It
 is also completely inert.
 
-| Check | Result |
-| --- | --- |
-| UserOperations ever processed | Zero, per the explorer index |
-| Contract verified on the explorer | No |
-| Blockscout account-abstraction indexer | `501 Service is disabled` |
-| `debug_traceCall` on Mezo RPCs | Not implemented, absent from the mezod source |
-| Pimlico, Biconomy, ZeroDev, Alchemy, Gelato | Not listed for Mezo |
+| Check                                       | Result                                        |
+| ------------------------------------------- | --------------------------------------------- |
+| UserOperations ever processed               | Zero, per the explorer index                  |
+| Contract verified on the explorer           | No                                            |
+| Blockscout account-abstraction indexer      | `501 Service is disabled`                     |
+| `debug_traceCall` on Mezo RPCs              | Not implemented, absent from the mezod source |
+| Pimlico, Biconomy, ZeroDev, Alchemy, Gelato | Not listed for Mezo                           |
 
 The root cause is one row. Every ERC-7562-compliant bundler validates a UserOperation by tracing
 it, which requires `debug_traceCall`. Mezo's RPCs do not implement it, so no compliant bundler can
@@ -93,9 +94,9 @@ run against Mezo. An EntryPoint with correct bytecode that has processed nothing
 
 <Note>
   The "zero UserOperations" figure is from the explorer index, not an exhaustive log sweep. As a
-  control against it being an indexing artefact, the same endpoints return over 100,000
-  transactions for MUSD. The indexer works; the zero is real as far as the index goes. A team that
-  picked ERC-4337 from a diagram would spend weeks discovering this.
+  control against it being an indexing artefact, the same endpoints return over 100,000 transactions
+  for MUSD. The indexer works; the zero is real as far as the index goes. A team that picked
+  ERC-4337 from a diagram would spend weeks discovering this.
 </Note>
 
 ## Interoperate with x402
@@ -116,9 +117,9 @@ insufficient balance, not on "transaction type not supported". Combined with the
 passkey-authorised accounts.
 
 <Info>
-  Treat acceptance as the verified claim and live usage as unverified: no delegated account has
-  been observed on-chain yet. Maren does not depend on EIP-7702 for launch. It is the direction of
-  travel once the simpler ERC-2771 mechanism is live and audited.
+  Treat acceptance as the verified claim and live usage as unverified: no delegated account has been
+  observed on-chain yet. Maren does not depend on EIP-7702 for launch. It is the direction of travel
+  once the simpler ERC-2771 mechanism is live and audited.
 </Info>
 
 <CardGroup cols={2}>

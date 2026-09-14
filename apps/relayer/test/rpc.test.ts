@@ -209,7 +209,7 @@ describe('capability preflight', () => {
     expect(report.reason).toMatch(/expected 31611/);
   });
 
-  it('treats a revert as proof the method exists', async () => {
+  it('rejects RPC errors even when they prove the method exists', async () => {
     const revertingNode = (async (_url: string | URL | Request, init?: RequestInit) => {
       const { method } = JSON.parse(String(init?.body)) as { method: string };
       if (method === 'eth_chainId') {
@@ -225,8 +225,60 @@ describe('capability preflight', () => {
       probeContract: PROBE_CONTRACT,
       probeAccount: PROBE_ACCOUNT,
       fetchImpl: revertingNode,
+      retryDelayMs: 0,
     });
-    expect(report.ok).toBe(true);
+    expect(report.ok).toBe(false);
+    expect(report.missing).toContain('eth_call');
+    expect(report.missing).toContain('eth_estimateGas');
+  });
+
+  it.each([
+    ['eth_chainId', undefined],
+    ['eth_chainId', '0x7b7bgarbage'],
+    ['eth_chainId', '31611'],
+    ['eth_chainId', '0x0'],
+    ['eth_getBlockByNumber', null],
+    ['eth_getBlockByNumber', {}],
+    ['eth_call', '0x'],
+    ['eth_call', `0x${'0'.repeat(63)}6`],
+    ['eth_estimateGas', '0x0'],
+    ['eth_getTransactionCount', null],
+  ])('rejects unusable %s result %j after retrying', async (badMethod, result) => {
+    let attempts = 0;
+    const malformed = (async (url: string | URL | Request, init?: RequestInit) => {
+      const { method } = JSON.parse(String(init?.body)) as { method: string };
+      if (method !== badMethod) return healthyNode()(url, init);
+      attempts += 1;
+      return new Response(JSON.stringify({ result }));
+    }) as typeof fetch;
+    const report = await probeEndpoint('https://bad.test', {
+      expectedChainId: CHAIN_ID,
+      probeContract: PROBE_CONTRACT,
+      probeAccount: PROBE_ACCOUNT,
+      fetchImpl: malformed,
+      retryDelayMs: 0,
+    });
+    expect(report.ok).toBe(false);
+    expect(report.missing).toContain(badMethod);
+    expect(attempts).toBe(2);
+  });
+
+  it('refuses an RPC whose chain id errors while other methods work', async () => {
+    const unknownChain = (async (url: string | URL | Request, init?: RequestInit) => {
+      const { method } = JSON.parse(String(init?.body)) as { method: string };
+      return method === 'eth_chainId'
+        ? new Response(JSON.stringify({ error: { code: -32000, message: 'backend unavailable' } }))
+        : healthyNode()(url, init);
+    }) as typeof fetch;
+    const result = await preflightRpcs(['https://unknown-chain.test'], {
+      expectedChainId: CHAIN_ID,
+      probeContract: PROBE_CONTRACT,
+      probeAccount: PROBE_ACCOUNT,
+      fetchImpl: unknownChain,
+      retryDelayMs: 0,
+    });
+    expect(result.usable).toEqual([]);
+    expect(result.problems.join(' ')).toContain('refusing to relay');
   });
 
   it('one dead backup is a warning; losing the last endpoint is fatal', async () => {

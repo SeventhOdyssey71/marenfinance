@@ -1,11 +1,11 @@
 import type { Metadata, Viewport } from 'next';
 import type { ReactNode } from 'react';
-import { satoshi, geistMono, anton, inter, caveat, neueMontreal, sfProRounded } from './fonts';
+import { satoshi, geistMono, neueMontreal, sfProRounded } from './fonts';
 import './globals.css';
 
 const title = 'Maren Finance: Spend Bitcoin. Never sell it.';
 const description =
-  'Bitcoin-backed liquidity. Deposit from 0.001 BTC, draw MUSD, and spend it without holding a gas balance. Built on Mezo.';
+  'Join the Maren iOS beta on Mezo testnet. Borrow MUSD against testnet Bitcoin and pay by handle. Pre-audit; testnet funds only.';
 
 /**
  * The origin every relative metadata URL is resolved against — including the social card.
@@ -79,7 +79,7 @@ export default function RootLayout({ children }: Readonly<{ children: ReactNode 
   return (
     <html
       lang="en"
-      className={`${satoshi.variable} ${geistMono.variable} ${anton.variable} ${inter.variable} ${caveat.variable} ${neueMontreal.variable} ${sfProRounded.variable}`}
+      className={`${satoshi.variable} ${geistMono.variable} ${neueMontreal.variable} ${sfProRounded.variable}`}
     >
       <body className="bg-bg text-text antialiased">{children}</body>
     </html>

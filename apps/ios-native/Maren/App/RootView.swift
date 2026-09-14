@@ -16,6 +16,13 @@ struct RootView: View {
     /// A screenshot/testing hook: `MAREN_SCREEN` preselects a tab and, for pay flows, presents
     /// the sheet at launch. Absent in normal use, so it changes nothing for a real user.
     @State private var launchDestination: PayDestination?
+    @State private var pendingLink: PaymentLinks.Scanned?
+    @State private var incomingLink: IncomingLink?
+    @State private var walletUnlocked = false
+    private struct IncomingLink: Identifiable {
+        let id = UUID()
+        let payload: PaymentLinks.Scanned
+    }
     private let launchScreen = ScreenshotHooks.screen
 
     /// The intro gates the very first launch, ahead of the wallet gate. It is bypassed for the
@@ -33,7 +40,10 @@ struct RootView: View {
             if showIntro {
                 IntroOnboardingView { hasOnboarded = true }
             } else if session.hasWallet {
-                UnlockGate {
+                UnlockGate(onStateChange: { unlocked in
+                    walletUnlocked = unlocked
+                    if unlocked { openPendingLink() }
+                }) {
                     ZStack(alignment: .bottom) {
                         // All four tabs stay in the hierarchy so switching preserves scroll and
                         // model state; only the selected one is visible and receives touches.
@@ -61,6 +71,26 @@ struct RootView: View {
         .environment(\.marenActions, SettleBroadcaster(base: session.actions))
         .environment(\.isDemoData, session.isDemo)
         .tint(Theme.Palette.accent)
+        .background(PrivacyShield())
+        .onOpenURL { url in
+            guard let parsed = PaymentLinks.parse(url.absoluteString) else { return }
+            // Keep bearer material in memory. Arrival never signs or submits anything.
+            pendingLink = parsed
+            if session.hasWallet && walletUnlocked { openPendingLink() }
+        }
+        .sheet(item: $incomingLink) { link in
+            switch link.payload {
+            case .payment(let payload): SendFlow(prefill: payload)
+            case .claim: ClaimFlow()
+            }
+        }
+    }
+
+    private func openPendingLink() {
+        guard incomingLink == nil, let pendingLink else { return }
+        if case .claim(let claim) = pendingLink { ClaimHandoff.shared.stash(claim) }
+        incomingLink = IncomingLink(payload: pendingLink)
+        self.pendingLink = nil
     }
 
     /// One tab layer: visible and interactive only when selected. The visible/hidden opacity
@@ -71,6 +101,7 @@ struct RootView: View {
             .opacity(router.tab == which ? 1 : 0)
             .animation(reduceMotion ? nil : .easeOut(duration: 0.2), value: router.tab)
             .allowsHitTesting(router.tab == which)
+            .accessibilityHidden(router.tab != which)
     }
 
     private func applyLaunchScreen() {

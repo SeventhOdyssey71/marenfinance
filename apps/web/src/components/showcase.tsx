@@ -35,7 +35,7 @@ export function Showcase() {
               <div className="bezel">
                 <div className="screen">
                   {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img src={s.src} alt={s.label} />
+                  <img src={s.src} alt={s.label} loading="lazy" decoding="async" />
                 </div>
               </div>
             </div>

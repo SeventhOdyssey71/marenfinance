@@ -142,7 +142,6 @@ export interface BorrowCeiling {
  * an opaque revert.
  */
 export function borrowCeiling(position: BorrowPosition, priceWei: bigint): BorrowCeiling {
-
   /**
    * On the pooled route the contract answers this itself — `MarenVault.maxBorrowable`
    * is the same 180% calculation done on-chain against the same ledger, so we use its
@@ -181,9 +180,7 @@ export function borrowCeiling(position: BorrowPosition, priceWei: bigint): Borro
   // The pooled route draws through MarenVault, which pays no origination fee on the
   // reserve-served portion; the direct route always pays it. Gross down only where charged.
   const mezoHeadroomWei =
-    position.route === 'pooled'
-      ? rawHeadroomWei
-      : (rawHeadroomWei * WAD) / (WAD + BORROWING_RATE);
+    position.route === 'pooled' ? rawHeadroomWei : (rawHeadroomWei * WAD) / (WAD + BORROWING_RATE);
 
   const amountWei = ratioHeadroomWei < mezoHeadroomWei ? ratioHeadroomWei : mezoHeadroomWei;
 

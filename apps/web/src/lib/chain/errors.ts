@@ -282,13 +282,17 @@ export interface RevertReason {
   detail: string;
   /** The Solidity error name, shown small for anyone who wants to grep the source. */
   name: string | null;
+  /** A signed request may still settle; never offer a self-paid replacement. */
+  submissionUnknown?: boolean;
+  /** Deterministic transaction hash, when the relayer journal supplies one. */
+  hash?: Hex;
 }
 
 /**
  * A failure that already knows how to describe itself.
  *
  * Some refusals never touch the chain and therefore have no revert data to decode: a
- * relayer answering `402 SPONSORSHIP_UNAVAILABLE`, or a fetch that never left the device.
+ * relayer answering `402 SPONSORSHIP_UNAVAILABLE`, or an uncertain relayer response.
  * Throwing one of these carries the finished copy through the same `throw` that a
  * contract revert travels along, so `explainError` hands it back unchanged and the sheet
  * renders it identically. The alternative — a second error channel beside the one every

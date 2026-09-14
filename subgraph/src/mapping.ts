@@ -1,11 +1,6 @@
 import { Address, BigInt, Bytes, ethereum } from '@graphprotocol/graph-ts';
 import { Activity } from '../generated/schema';
-import {
-  Deposited,
-  Withdrawn,
-  Borrowed,
-  Repaid,
-} from '../generated/MarenVault/MarenVault';
+import { Deposited, Withdrawn, Borrowed, Repaid } from '../generated/MarenVault/MarenVault';
 import {
   Paid,
   PaidToHandle,
@@ -81,17 +76,51 @@ export function handlePaid(e: Paid): void {
 export function handlePaidToHandle(e: PaidToHandle): void {
   // The text field here is `handle`, not `memo` — this event records WHICH @handle was paid,
   // which is the more useful thing to show anyway: "paid @sele" beats an empty memo line.
-  record(e, e.params.from, e.params.to, 'PaidToHandle', e.params.amount, e.params.handle, null, true);
-  record(e, e.params.to, e.params.from, 'PaidToHandle', e.params.amount, e.params.handle, null, false);
+  record(
+    e,
+    e.params.from,
+    e.params.to,
+    'PaidToHandle',
+    e.params.amount,
+    e.params.handle,
+    null,
+    true,
+  );
+  record(
+    e,
+    e.params.to,
+    e.params.from,
+    'PaidToHandle',
+    e.params.amount,
+    e.params.handle,
+    null,
+    false,
+  );
 }
 
 export function handleRequestCreated(e: RequestCreated): void {
   // The requester is asking the payer for money: outgoing is false for the requester,
   // because nothing has left either account yet and the requester expects to RECEIVE.
-  record(e, e.params.requester, e.params.payer, 'RequestCreated', e.params.amount,
-    e.params.memo, e.params.requestId, false);
-  record(e, e.params.payer, e.params.requester, 'RequestCreated', e.params.amount,
-    e.params.memo, e.params.requestId, true);
+  record(
+    e,
+    e.params.requester,
+    e.params.payer,
+    'RequestCreated',
+    e.params.amount,
+    e.params.memo,
+    e.params.requestId,
+    false,
+  );
+  record(
+    e,
+    e.params.payer,
+    e.params.requester,
+    'RequestCreated',
+    e.params.amount,
+    e.params.memo,
+    e.params.requestId,
+    true,
+  );
 }
 
 export function handleLinkCreated(e: LinkCreated): void {

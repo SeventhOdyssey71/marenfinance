@@ -11,7 +11,7 @@ export function Hero() {
   return (
     <section id="top" className="u-wrap hero">
       <Reveal className="flex justify-center">
-        <span className="hero-eyebrow">Bitcoin-backed dollars · on Mezo</span>
+        <span className="hero-eyebrow">iOS beta · Mezo testnet</span>
       </Reveal>
 
       <Reveal as="h1" delay={60} className="hero-title">
@@ -21,7 +21,8 @@ export function Hero() {
       </Reveal>
 
       <Reveal as="p" delay={100} className="hero-sub">
-        Borrow MUSD against your Bitcoin and pay anyone by @handle. Gasless, in one clean app.
+        Borrow MUSD against your Bitcoin and pay anyone by @handle. Try the full loop with testnet
+        funds.
       </Reveal>
 
       <Reveal delay={140} className="hero-actions">
@@ -48,7 +49,7 @@ export function Hero() {
       </Reveal>
 
       <Reveal as="p" delay={180} className="hero-trust">
-        Non-custodial · your keys, your Bitcoin
+        Testnet only · pre-audit · no real funds
       </Reveal>
 
       <Reveal delay={220} className="hero-stage">

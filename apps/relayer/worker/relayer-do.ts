@@ -17,6 +17,7 @@ export interface WorkerEnv {
   RELAYER_FREE_ACTIONS_PER_ADDRESS?: string;
   RELAYER_IP_SALT?: string;
   RELAYER_PRIVATE_KEY?: string;
+  RELAYER_ALLOWED_ORIGINS?: string;
 }
 
 // Workers-safe pino sink. Pino's default destination is sonic-boom over a file
@@ -69,11 +70,9 @@ export class RelayerDO extends DurableObject<WorkerEnv> {
     return relayer.app.fetch(request);
   }
 
-  // The stuck-tx sweep the standalone server runs on a setInterval: settlement
-  // reconciliation (converges reserved budget on real cost) plus the
-  // deferred-refund drain. Running it on a self-rescheduling alarm also keeps
-  // this instance warm, so the in-memory pending set and nonce cache persist
-  // between requests.
+  // Alarms reload and reconcile the durable signed-transaction journal. An
+  // interrupted broadcast retains its reservation and is retried using exactly
+  // the same bytes/hash; settlement/refunds and counters commit atomically.
   override async alarm(): Promise<void> {
     const relayer = await this.#relayer;
     try {

@@ -1,5 +1,6 @@
 import SwiftUI
 import LocalAuthentication
+import UIKit
 
 // MARK: - UnlockGate
 //
@@ -11,24 +12,34 @@ import LocalAuthentication
 // biometric gate on the key, which fires again on every signature regardless of this screen.
 // That is why this gate DEGRADES OPEN: a device that cannot evaluate a policy at all must not
 // be able to shut someone out of their own app, because the thing that actually needs
-// protecting — the key — is still protected either way. The lock screen below is a facelift
-// only; every line of the decision logic in `AppLock` is unchanged.
+// protecting — the key — is still protected either way. Backgrounding re-locks the UI;
+// the window shield also covers any presented payment or backup sheet.
 
 @MainActor
 @Observable
 final class AppLock {
+    static let shared = AppLock()
     /// Locked until proven otherwise, but only meaningful once we know a key exists.
-    private(set) var locked = false
+    private(set) var locked = false {
+        didSet { NotificationCenter.default.post(name: .marenLockChanged, object: nil) }
+    }
     private(set) var determined = false
+    private(set) var authenticating = false
+    private var generation = 0
+    private var hasKey = false
 
     func prepare() async {
-        let hasKey = await Keystore.shared.hasKey()
+        hasKey = await Keystore.shared.hasKey()
         locked = hasKey
         determined = true
         if hasKey { await authenticate() }
     }
 
     func authenticate() async {
+        guard !authenticating else { return }
+        authenticating = true
+        let attempt = generation
+        defer { authenticating = false }
         let context = LAContext()
         context.localizedFallbackTitle = ""
         var policyError: NSError?
@@ -40,7 +51,13 @@ final class AppLock {
         }
         let ok = (try? await context.evaluatePolicy(.deviceOwnerAuthentication,
                                                     localizedReason: "Unlock Maren")) ?? false
+        guard generation == attempt else { return }
         locked = !ok
+    }
+
+    func suspend() {
+        generation += 1
+        locked = hasKey
     }
 
     /// Screenshot/testing hook: `MAREN_SCREEN=unlock` presents the lock screen without asking
@@ -53,19 +70,29 @@ final class AppLock {
 }
 
 struct UnlockGate<Content: View>: View {
-    @State private var lock = AppLock()
+    @State private var lock = AppLock.shared
+    var onStateChange: (Bool) -> Void = { _ in }
     @ViewBuilder var content: Content
 
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @Environment(\.scenePhase) private var scenePhase
     private let captureLock = ScreenshotHooks.screen == "unlock"
 
     var body: some View {
         ZStack {
             content
+                .opacity(lock.determined && !lock.locked ? 1 : 0)
+                .allowsHitTesting(lock.determined && !lock.locked)
+                .accessibilityHidden(!lock.determined || lock.locked)
+            if !lock.determined {
+                Theme.Palette.canvas.ignoresSafeArea()
+                ProgressView().accessibilityLabel("Unlocking wallet")
+            }
             if lock.determined && lock.locked {
                 UnlockScreen(kind: Keystore.shared.capability()) {
                     Task { await lock.authenticate() }
                 }
+                .disabled(lock.authenticating)
                 .transition(.opacity)
             }
         }
@@ -73,6 +100,14 @@ struct UnlockGate<Content: View>: View {
         .task {
             if captureLock { lock.presentForCapture() } else { await lock.prepare() }
         }
+        .onChange(of: scenePhase) { _, phase in
+            guard !captureLock else { return }
+            if phase == .background { lock.suspend() }
+            if phase == .active && lock.determined && lock.locked {
+                Task { await lock.authenticate() }
+            }
+        }
+        .onChange(of: lock.determined && !lock.locked) { _, unlocked in onStateChange(unlocked) }
     }
 }
 
@@ -183,9 +218,78 @@ private struct UnlockScreen: View {
     private var subhead: String {
         switch kind.kind {
         case .faceID, .touchID:
-            return "Your balances are hidden until \(kind.displayName) confirms it is you. Your key stays in the Keychain either way."
+            return "Your balances are hidden until this device confirms it is you. Signing still requires your wallet's protection check."
         default:
-            return "Your balances are hidden until this device confirms it is you. Your key stays in the Keychain either way."
+            return "Your balances are hidden until this device confirms it is you."
         }
+    }
+}
+
+/// Cover the entire window, including presented sheets, before the app switcher snapshots it.
+/// An inactive Face ID prompt hides the screen but does not restart app authentication.
+struct PrivacyShield: UIViewRepresentable {
+    func makeUIView(context: Context) -> ShieldAnchor { ShieldAnchor() }
+    func updateUIView(_ uiView: ShieldAnchor, context: Context) {}
+
+    final class ShieldAnchor: UIView {
+        private var shield: UIView?
+        private var lockScreen: UIHostingController<WindowUnlockScreen>?
+
+        init() {
+            super.init(frame: .zero)
+            NotificationCenter.default.addObserver(self, selector: #selector(hideContent),
+                name: UIApplication.willResignActiveNotification, object: nil)
+            NotificationCenter.default.addObserver(self, selector: #selector(revealContent),
+                name: UIApplication.didBecomeActiveNotification, object: nil)
+            NotificationCenter.default.addObserver(self, selector: #selector(revealContent),
+                name: .marenLockChanged, object: nil)
+        }
+        required init?(coder: NSCoder) { fatalError("init(coder:) has not been implemented") }
+        deinit { NotificationCenter.default.removeObserver(self) }
+
+        @objc private func hideContent() {
+            guard shield == nil, let window else { return }
+            let cover = UIView(frame: window.bounds)
+            cover.backgroundColor = .systemBackground
+            cover.autoresizingMask = [.flexibleWidth, .flexibleHeight]
+            cover.accessibilityViewIsModal = true
+            cover.accessibilityLabel = "Maren is hidden"
+            let label = UILabel(frame: cover.bounds)
+            label.text = "Maren"
+            label.textAlignment = .center
+            label.font = .systemFont(ofSize: 28, weight: .semibold)
+            label.autoresizingMask = [.flexibleWidth, .flexibleHeight]
+            cover.addSubview(label)
+            window.addSubview(cover)
+            shield = cover
+        }
+        @objc private func revealContent() {
+            guard UIApplication.shared.applicationState == .active else { return }
+            if AppLock.shared.locked {
+                hideContent()
+                guard lockScreen == nil, let shield else { return }
+                let host = UIHostingController(rootView: WindowUnlockScreen())
+                host.view.frame = shield.bounds
+                host.view.autoresizingMask = [.flexibleWidth, .flexibleHeight]
+                shield.addSubview(host.view)
+                lockScreen = host
+            } else {
+                lockScreen?.view.removeFromSuperview(); lockScreen = nil
+                shield?.removeFromSuperview(); shield = nil
+            }
+        }
+    }
+}
+
+private extension Notification.Name {
+    static let marenLockChanged = Notification.Name("finance.maren.privacyLockChanged")
+}
+
+private struct WindowUnlockScreen: View {
+    @State private var lock = AppLock.shared
+    var body: some View {
+        UnlockScreen(kind: Keystore.shared.capability()) {
+            Task { await lock.authenticate() }
+        }.disabled(lock.authenticating)
     }
 }

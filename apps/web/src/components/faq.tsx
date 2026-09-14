@@ -22,8 +22,8 @@ const items: readonly Item[] = [
       <>
         <p>
           Your position is measured by its collateral ratio. Mezo liquidates a trove at{' '}
-          <span className="num font-bold text-[color:var(--ink)]">110%</span>. Maren does not let
-          you get near that: we liquidate internally at{' '}
+          <span className="num font-bold text-[color:var(--ink)]">110%</span>. Maren’s internal
+          liquidation threshold is{' '}
           <span className="num font-bold text-[color:var(--ink)]">140%</span>, seizing the
           collateral of an unhealthy user at a 5% penalty and repaying their share of the pooled
           debt.
@@ -33,7 +33,8 @@ const items: readonly Item[] = [
           before it reaches the protocol’s cliff. Portfolio shows your ratio and your distance to
           140% on every read. The keeper that would act on it is not automated yet: the contract
           functions are deployed, but they are run by hand today. If Bitcoin falls far enough and
-          fast enough, a position can still be liquidated. That is the nature of a collateralised loan and no design removes it.
+          fast enough, a position can still be liquidated. That is the nature of a collateralised
+          loan and no design removes it.
         </p>
       </>
     ),
@@ -43,11 +44,10 @@ const items: readonly Item[] = [
     a: (
       <>
         <p>
-          No. Payments move MUSD wallet to wallet via{' '}
+          You control the signing keys. Payments move MUSD wallet to wallet via{' '}
           <span className="num text-[color:var(--ink)]">transferFrom</span> under your own permit,
-          and Maren never takes possession of your Bitcoin. Claimable links are the one place a
-          Maren contract holds value: the MUSD sits in escrow until it is claimed, or reclaimed by
-          you after its expiry.
+          while deposited Bitcoin is held by the vault’s smart contracts. Claimable links hold MUSD
+          in escrow until claimed or reclaimed after expiry. Earn also holds deposited MUSD.
         </p>
         <p>
           The pooled vault is the honest exception and we will not soften it:{' '}
@@ -90,24 +90,21 @@ const items: readonly Item[] = [
         ) : (
           <p>
             <strong className="font-bold text-[color:var(--ink)]">
-              Today it means nothing: you pay your own gas.
+              Sponsorship is not configured for this web client.
             </strong>{' '}
-            Maren is built so that it will not stay that way, but the service that would pay for you
-            is not running anywhere, and the app says so on every screen rather than quoting this
-            page back at you.
+            The iOS testnet beta has a hosted relayer. Availability and eligibility are checked per
+            action, and the confirmation screen shows who pays.
           </p>
         )}
         <p>
-          {RELAYER_CONFIGURED
-            ? 'It works like this: y'
-            : 'When it does run, it means Maren pays the Bitcoin fee rather than that the fee stopped existing. Y'}
+          {RELAYER_CONFIGURED ? 'It works like this: y' : 'For eligible sponsored calls, y'}
           ou sign; Maren checks what you signed, tries the call, and pays. Whatever submits for you
           can only ever touch Maren’s own contracts, and can never move your Bitcoin.
         </p>
         <p>
-          One thing is exempt permanently, and it is the first thing you will do: depositing Bitcoin
-          sends Bitcoin, and nobody can submit a transaction carrying value on your behalf. Your{' '}
-          <span className="text-[color:var(--ink)]">first deposit costs gas</span> and always will.
+          BTC deposits carry native value and require your own BTC for gas. Link creation and
+          approvals can also require gas. Keep a small testnet BTC balance and check the fee shown
+          before signing.
         </p>
       </>
     ),
@@ -122,14 +119,13 @@ const items: readonly Item[] = [
           </strong>{' '}
           A third-party audit of <span className="num text-[color:var(--ink)]">MarenVault</span>,{' '}
           <span className="num text-[color:var(--ink)]">MarenEarn</span> and{' '}
-          <span className="num text-[color:var(--ink)]">MarenRelayHub</span> (the three contracts
-          that hold or move value) is scheduled after the full testnet deployment and before
-          mainnet.
+          <span className="num text-[color:var(--ink)]">MarenRelayHub</span> (the three contracts in
+          the planned audit scope) is required before mainnet.
         </p>
         <p>
           Until that audit is complete and published, treat Maren as unaudited software and do not
-          deposit more than you can afford to lose. Mainnet launches with the vault capped, and the
-          cap is raised only as the position proves out.
+          send any real funds. This beta uses testnet funds only. Mainnet launches with the vault
+          capped, and the cap is raised only as the position proves out.
         </p>
       </>
     ),
@@ -187,7 +183,7 @@ function AccordionItem({
         </button>
       </h3>
 
-      <div className={`u-faq-body ${open ? 'is-open' : ''}`}>
+      <div className={`u-faq-body ${open ? 'is-open' : ''}`} inert={!open} aria-hidden={!open}>
         <div>
           <div
             id={panelId}

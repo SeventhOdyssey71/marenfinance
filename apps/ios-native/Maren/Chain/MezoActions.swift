@@ -463,7 +463,9 @@ struct MezoActions {
     /// `needed`; otherwise sends a one-time self-paid MAX approve and returns nil on success or a
     /// decline reason on failure. Only the first send ever pays this gas.
     private func ensureMusdAllowance(privateKey: Data, loadedAddress: String, spender: String, needed: BigUInt) async -> String? {
-        let current = (try? await rpc.musdAllowance(owner: loadedAddress, spender: spender)) ?? BigUInt(0)
+        let current: BigUInt
+        do { current = try await rpc.musdAllowance(owner: loadedAddress, spender: spender) }
+        catch { return "The MUSD allowance could not be checked. No approval or payment was submitted." }
         if current >= needed { return nil }
         do {
             let data = try MarenEncoding.approveCalldata(spender: spender, amount: BigUInt(2).power(256) - 1)
@@ -471,7 +473,7 @@ struct MezoActions {
                                               to: MusdAddresses.of(chain.network).musd, value: 0, data: data, gasLimit: 120_000)
             let client = EthereumHttpClient(url: chain.rpcURLs[0], network: .custom(String(chain.chainId)))
             if case .delivered = await Receipt.confirm(client: client, hash: hash, sponsored: false) { return nil }
-            return "The one-time MUSD approval did not confirm, so nothing was sent."
+            return "The one-time MUSD approval has not confirmed. It may still settle and spend BTC gas. The payment has not been submitted. Check the approval on the explorer before retrying: \(hash)"
         } catch {
             return "The one-time MUSD approval could not be submitted, so nothing was sent."
         }
@@ -512,6 +514,17 @@ struct MezoActions {
             if case .delivered(let d) = outcome { return .ok(d) }
             return .failed(outcome)
         } catch let refused as RelayRefused {
+            if refused.reason.submissionMayExist {
+                if let hash = refused.reason.knownHash {
+                    let client = EthereumHttpClient(url: chain.rpcURLs[0], network: .custom(String(chain.chainId)))
+                    let outcome = await Receipt.confirm(client: client, hash: hash, sponsored: true,
+                                                        mintedIdFrom: mintedIdFrom)
+                    await MezoSnapshotStore.shared.invalidate()
+                    if case .delivered(let delivered) = outcome { return .ok(delivered) }
+                    return .failed(outcome)
+                }
+                return .failed(.submissionUnknown(reason: refused.reason.detail))
+            }
             return .declined(reason: refused.reason.detail)
         } catch {
             return .declined(reason: prepFailed)
@@ -523,12 +536,19 @@ struct MezoActions {
     private func sendSelfPaid(privateKey: Data, loadedAddress: String, to: String, value: BigUInt, data: Data, gasLimit: Int) async throws -> String {
         let account = try EthereumAccount(keyStorage: InMemoryKeyStorage(privateKey))
         let client = EthereumHttpClient(url: chain.rpcURLs[0], network: .custom(String(chain.chainId)))
-        let gasPrice = (try? await client.eth_gasPrice()) ?? BigUInt(2_000_000)
+        let gasPrice = try await client.eth_gasPrice()
+        let nonce = try await client.eth_getTransactionCount(address: account.address, block: .Pending)
         let tx = EthereumTransaction(
             from: EthereumAddress(loadedAddress), to: EthereumAddress(to),
-            value: value, data: data, nonce: nil, gasPrice: gasPrice,
+            value: value, data: data, nonce: nonce, gasPrice: gasPrice,
             gasLimit: BigUInt(gasLimit), chainId: chain.chainId
         )
-        return try await client.eth_sendRawTransaction(tx, withAccount: account)
+        guard let raw = try account.sign(transaction: tx).raw else { throw EthereumClientError.encodeIssue }
+        // Establish the identity BEFORE external submission. Even a lost RPC response leaves
+        // a real hash to reconcile; never misclassify an attempted broadcast as a decline.
+        let hash = raw.web3.keccak256.web3.hexString
+        _ = try? await client.networkProvider.send(method: "eth_sendRawTransaction",
+                                                   params: [raw.web3.hexString], receive: String.self)
+        return hash
     }
 }

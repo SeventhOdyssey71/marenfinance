@@ -1,30 +1,24 @@
 import Foundation
 
 // MARK: - Relayer client
-//
-// The phone-side MarenRelayHub relayer client, mirroring `apps/ios/src/chain/relay.ts`. It
-// POSTs the eight-field ForwardRequest body to `{RELAYER_URL}/relay` exactly as that file
-// does, and it NEVER decides a transaction succeeded: a 202 carries a hash, and a hash is
-// not a receipt — `Receipt.confirm` is what turns it into `delivered`. A relayer that
-// refuses, times out or cannot be reached produces a typed `RelayRefused`, which the action
-// layer renders as an honest "nothing was submitted", never a fabricated hash.
-//
-// The live write path is GATED on a configured relayer URL. None is set in this repo as it
-// ships, so `RelayerConfig.url` is nil and the app declines writes honestly — identical to
-// the RN app.
+// Signed requests go to the configured relayer; only a successful chain receipt confirms
+// settlement. Lost responses and ambiguous broadcasts stay uncertain, with no retry or
+// self-pay recommendation. A known local hash is retained for receipt reconciliation.
 
 enum RelayerConfig {
     /// Read from `MAREN_RELAYER_URL` in the app's Info.plist (injected at build time). Absent
-    /// here, so the live write path is dormant until a relayer is actually hosted. A signed
+    /// values disable sponsorship. A signed
     /// ForwardRequest exposes the user's address, target and amount, so a plain-`http://`
     /// remote host is refused; only https, or http to localhost, is accepted.
     static var url: URL? {
         // A process-environment MAREN_RELAYER_URL wins, so a dev/sim run can point at a local
         // relayer without a rebuild; the Info.plist value (a real build's hosted relayer) is the
         // default under it. Both go through the same https-or-localhost guard.
+        #if DEBUG
         if let env = ProcessInfo.processInfo.environment["MAREN_RELAYER_URL"], let u = normalise(env) {
             return u
         }
+        #endif
         if let raw = Bundle.main.object(forInfoDictionaryKey: "MAREN_RELAYER_URL") as? String,
            let u = normalise(raw) {
             return u
@@ -36,11 +30,13 @@ enum RelayerConfig {
         var s = raw.trimmingCharacters(in: .whitespacesAndNewlines)
         while s.hasSuffix("/") { s = String(s.dropLast()) }
         guard !s.isEmpty else { return nil }
-        let lower = s.lowercased()
-        let isHttps = lower.hasPrefix("https://")
-        let isLocal = lower.hasPrefix("http://localhost") || lower.hasPrefix("http://127.0.0.1") || lower.hasPrefix("http://[::1]")
-        guard isHttps || isLocal else { return nil }
-        return URL(string: s)
+        guard let parts = URLComponents(string: s), let host = parts.host?.lowercased(),
+              !host.isEmpty, parts.user == nil, parts.password == nil,
+              parts.query == nil, parts.fragment == nil else { return nil }
+        let scheme = parts.scheme?.lowercased()
+        let isLocal = ["localhost", "127.0.0.1", "[::1]", "::1"].contains(host)
+        guard scheme == "https" || (scheme == "http" && isLocal) else { return nil }
+        return parts.url
     }
 
     static var isConfigured: Bool { url != nil }
@@ -57,6 +53,8 @@ struct RelayReason: Error, Sendable, Equatable {
     let name: String
     let title: String
     let detail: String
+    var submissionMayExist: Bool = false
+    var knownHash: String? = nil
 }
 
 struct RelayRefused: Error, Sendable, Equatable {
@@ -73,9 +71,7 @@ struct Relayer {
     let baseURL: URL
     var session: URLSession = .shared
 
-    /// POST the signed request and return the hash the relayer broadcast under. The signature
-    /// has already been given by this point, which is why every failure is explicit that
-    /// nothing was submitted.
+    /// POST the signed request. A transport error cannot prove whether the relayer saw it.
     func post(body: [String: String]) async throws -> RelayAccepted {
         var request = URLRequest(url: baseURL.appendingPathComponent("relay"))
         request.httpMethod = "POST"
@@ -92,13 +88,8 @@ struct Relayer {
             data = d
             status = (response as? HTTPURLResponse)?.statusCode ?? 0
         } catch {
-            // Reaching the relayer failed, so it never saw the request. Unlike a broadcast
-            // that vanished, this one provably did not happen — say so.
-            throw RelayRefused(reason: RelayReason(
-                name: "RELAYER_UNREACHABLE",
-                title: "Could not reach Maren's relayer",
-                detail: "The request never left this device, so nothing was submitted and no gas was spent. You can send this yourself and pay the Bitcoin gas."
-            ))
+            // A lost response can follow a successful broadcast. Never invite a second payment.
+            throw RelayRefused(reason: Self.uncertainResponse)
         }
 
         let parsed = try? JSONSerialization.jsonObject(with: data) as? [String: Any]
@@ -121,24 +112,37 @@ struct Relayer {
                hash.range(of: "^0x[0-9a-fA-F]{64}$", options: .regularExpression) != nil,
                (body["state"] as? String) == "submitted" {
                 let payer = body["payer"] as? String
-                if let expectedPayer, let payer, payer.lowercased() != expectedPayer.lowercased() {
+                if let expectedPayer, payer?.lowercased() != expectedPayer.lowercased() {
                     return .failure(unrecognised)
                 }
                 return .success(RelayAccepted(hash: hash, payer: payer ?? ""))
             }
             return .failure(unrecognised)
         }
-        return .failure(failureReason(status: status, code: (body?["error"] as? String),
-                                      detail: (body?["detail"] as? String)))
+        var reason = failureReason(status: status, code: (body?["error"] as? String),
+                                   detail: (body?["detail"] as? String))
+        if (body?["error"] as? String) == "SUBMISSION_UNCERTAIN",
+           let meta = body?["meta"] as? [String: Any], let hash = meta["hash"] as? String,
+           hash.range(of: "^0x[0-9a-fA-F]{64}$", options: .regularExpression) != nil {
+            reason.knownHash = hash
+        }
+        return .failure(reason)
     }
 
     private var unrecognised: RelayReason {
         RelayReason(
             name: "RELAYER_ANSWER_UNRECOGNISED",
             title: "Maren's relayer answered with something unrecognisable",
-            detail: "It accepted the request but did not return a broadcast this app can tie back to what you signed, so nothing is being reported as sent. Check Activity before retrying."
+            detail: "It accepted the request but did not return a broadcast this app can tie back to what you signed. Check Activity and your balances before retrying; this action may still settle.",
+            submissionMayExist: true
         )
     }
+
+    static let uncertainResponse = RelayReason(
+        name: "SUBMISSION_UNKNOWN", title: "Submission status unknown",
+        detail: "The connection ended before Maren could verify the response. The signed action may already be on its way. Check Activity and your balances before trying again or sending it yourself.",
+        submissionMayExist: true
+    )
 
     private static let nothingSent = "Nothing was submitted and no gas was spent."
 
@@ -198,7 +202,10 @@ struct Relayer {
         case "RELAYER_NOT_ACCEPTING", "RELAYER_SHUTTING_DOWN", "STORE_UNAVAILABLE":
             return RelayReason(name: code, title: "Maren's relayer is not taking work",
                 detail: "The service that would have paid your gas is not accepting requests. \(ns) Try again, or send it yourself.")
-        case "NONCE_MISMATCH", "DUPLICATE_REQUEST_IN_FLIGHT":
+        case "DUPLICATE_REQUEST_IN_FLIGHT":
+            return RelayReason(name: code, title: "This action is already in progress",
+                detail: "An identical signed action is still in progress and may settle. Check Activity and your balances before trying again or sending it yourself.", submissionMayExist: true)
+        case "NONCE_MISMATCH":
             return RelayReason(name: code, title: "This action was signed against a stale position in the queue",
                 detail: "Another action from this account is still in flight. \(ns) Wait for it to confirm and try again.")
         case "REQUEST_EXPIRED", "DEADLINE_TOO_FAR":
@@ -219,12 +226,10 @@ struct Relayer {
             }
             return RelayReason(name: code, title: "This would have failed on-chain",
                 detail: "The relayer ran the call against Mezo before paying for it and it reverted, so it was never broadcast. \(ns)")
-        case "SUBMISSION_FAILED":
-            return RelayReason(name: code, title: "The relayer could not broadcast this",
-                detail: "The transaction was accepted and then failed to reach the chain. \(ns) Check Activity before retrying.")
+        case "SUBMISSION_FAILED", "SUBMISSION_UNCERTAIN", "SUBMISSION_UNKNOWN":
+            return Self.uncertainResponse
         default:
-            return RelayReason(name: code, title: "Maren's relayer refused this",
-                detail: "The relayer answered \(status) and did not submit anything. \(ns) You can send this yourself and pay the Bitcoin gas.")
+            return Self.uncertainResponse
         }
     }
 }

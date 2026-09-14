@@ -60,6 +60,7 @@ struct SingleAmountFlow: View {
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
         .background(Theme.Palette.canvas)
+        .interactiveDismissDisabled(stage == .submitting)
     }
 
     private func header(_ title: String) -> some View {
@@ -71,6 +72,7 @@ struct SingleAmountFlow: View {
                     .foregroundStyle(Theme.Palette.muted).frame(width: 44, height: 44)
             }
             .accessibilityLabel("Close")
+            .disabled(stage == .submitting)
         }
         .padding(.horizontal, Theme.Space.md).padding(.top, Theme.Space.sm)
     }
@@ -217,6 +219,7 @@ struct SingleAmountFlow: View {
     }
 
     private func submit(_ amount: Decimal) async {
+        guard stage == .review else { return }
         stage = .submitting
         outcome = await actions.submit(config.makeIntent(amount))
         stage = .done

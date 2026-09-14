@@ -1,17 +1,6 @@
-/*
- * ── Maren landing — "UGLYCASH" clean sticker-pop ────────────────────────────
- *
- * Corrected read of the real ugly.cash: the structure is NOT a black hairline
- * around everything (that reads as busy). Surfaces are soft WHITE rounded cards
- * on a paper-cream canvas, separated by tone and a whisper of shadow — no black
- * outlines. The loud energy comes from the huge black condensed type, saturated
- * colour FILLS (used full-bleed, not as thin accents), small tilted sticker
- * badges, and glassmorphic glowing pills on the primary CTAs. Anton carries the
- * ultra-condensed headlines, Inter everything else, Caveat one handwritten note.
- *
- * Everything is scoped under `.landing` so it never touches `/app`, `/docs`, or
- * the shared @theme tokens. Anton / Inter / Caveat come from next/font on <html>.
- */
+/* Maren landing: near-white surfaces, SF Pro Rounded display, Neue Montreal body,
+ * and violet accents. Fonts are self-hosted; this page needs no font service.
+ * Styles are scoped to .landing so /app and /docs keep their own themes. */
 
 .landing {
   /* ── Surfaces ── */
@@ -46,8 +35,7 @@
   --display:
     var(--font-sf-rounded), ui-rounded, 'SF Pro Rounded', -apple-system, system-ui, sans-serif;
   --body: var(--font-neue), ui-sans-serif, system-ui, -apple-system, 'Segoe UI', sans-serif;
-  --condensed: var(--font-anton), 'Arial Narrow', 'Roboto Condensed', sans-serif;
-  --hand: var(--font-caveat), ui-sans-serif, cursive;
+  --hand: ui-sans-serif, cursive;
 
   /* ── The one accent: Maren violet, from the logo. Used sparingly on a B&W page. ── */
   --accent: #5b3df5;
@@ -756,7 +744,6 @@
   }
 }
 
-
 /* ── Phone frames on small screens ─────────────────────────────────────────
    The hero phone sat at 87vw and the showcase frames at 84vw, which on a 390px
    handset is a 339px and a 328px phone — a picture of a phone almost the width
@@ -801,4 +788,20 @@
     gap: 28px;
     margin-top: 36px;
   }
+}
+
+/* The public page remains readable before JavaScript or if it fails to load. */
+.landing .landing-skip {
+  position: fixed;
+  top: 8px;
+  left: 16px;
+  z-index: 100;
+  transform: translateY(-160%);
+  padding: 12px 20px;
+  background: var(--ink);
+  color: white;
+  border-radius: 8px;
+}
+.landing .landing-skip:focus {
+  transform: none;
 }

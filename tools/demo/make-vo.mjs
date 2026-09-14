@@ -72,8 +72,13 @@ const LINES = [
 function ffprobe(file) {
   return new Promise((ok, fail) => {
     const p = spawn('ffprobe', [
-      '-v', 'error', '-show_entries', 'format=duration',
-      '-of', 'default=noprint_wrappers=1:nokey=1', file,
+      '-v',
+      'error',
+      '-show_entries',
+      'format=duration',
+      '-of',
+      'default=noprint_wrappers=1:nokey=1',
+      file,
     ]);
     let out = '';
     p.stdout.on('data', (d) => (out += d));

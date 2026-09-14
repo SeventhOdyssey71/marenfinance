@@ -1,3 +1,5 @@
+import { randomUUID } from 'node:crypto';
+import type { RecoveryCoordinator, RecoveryRecord } from './recovery.js';
 import { getAddress, isAddress, type Address, type Hash } from 'viem';
 import { admitCall } from './calldata.js';
 import type { KeySourceKind, RelayerConfig } from './config.js';
@@ -133,6 +135,7 @@ export interface BudgetView {
  * that is otherwise fine. `/healthz` reads only process state and two counters.
  */
 export interface HealthzView {
+  readonly recovery?: RecoveryCoordinator['summary'];
   readonly ok: boolean;
   readonly accepting: boolean;
   readonly relayer: Address | null;
@@ -182,6 +185,7 @@ export interface RelayerServiceDeps {
   readonly chain: ChainAdapter | null;
   readonly nonces: NonceManager | null;
   readonly watcher: TxWatcher | null;
+  readonly recovery?: RecoveryCoordinator;
   readonly now?: () => number;
 }
 
@@ -220,6 +224,7 @@ export class RelayerService {
   get accepting(): boolean {
     return (
       !this.#draining &&
+      (this.#deps.recovery?.accepting ?? true) &&
       this.#deps.problems.length === 0 &&
       this.#deps.chain !== null &&
       this.#deps.nonces !== null &&
@@ -362,7 +367,7 @@ export class RelayerService {
     // Upper bound on what this can cost us: the gas the user signed for, at the
     // maximum fee we are willing to pay. Reserving the bound rather than the
     // estimate means concurrent requests cannot collectively overshoot the cap.
-    const projectedGasCostWei = request.gas * fees.maxFeePerGas;
+    let projectedGasCostWei = request.gas * fees.maxFeePerGas;
 
     const day = this.#day();
 
@@ -394,7 +399,35 @@ export class RelayerService {
     // returned. Those are per-request unique under any correct store, which
     // makes the decision serialisable no matter how many requests race. If we
     // lose, we refund and reject.
-    const reserved = await this.#reserve(payer, ctx.ipHash, day, projectedGasCostWei);
+    const recovery = this.#deps.recovery;
+    // The outer transaction includes forwarder overhead. Durable reservations
+    // cover its actual gas limit, not only the inner gas the user signed.
+    const durableGasLimit = recovery ? await chain.simulate(request) : undefined;
+    if (durableGasLimit !== undefined && durableGasLimit > request.gas) {
+      projectedGasCostWei = durableGasLimit * fees.maxFeePerGas;
+    }
+    const recoveryRecord: RecoveryRecord | undefined = recovery
+      ? {
+          id: randomUUID(),
+          requestId: ctx.requestId,
+          scope: recovery.scope,
+          dedupeKey: `maren:recovery:nonce:${recovery.scope}:${payer.toLowerCase()}:${request.nonce}`,
+          payer,
+          ipHash: ctx.ipHash,
+          day,
+          reservedWei: projectedGasCostWei,
+          createdAt: this.#now(),
+          state: 'reserved',
+        }
+      : undefined;
+    const reserved =
+      recovery && recoveryRecord
+        ? await recovery.reserve(recoveryRecord)
+        : await this.#reserve(payer, ctx.ipHash, day, projectedGasCostWei);
+    const release = async (): Promise<void> => {
+      if (recovery && recoveryRecord) await recovery.release(recoveryRecord.id);
+      else await this.#release(payer, ctx.ipHash, day, projectedGasCostWei);
+    };
 
     // Reconstruct the usage this request actually saw, by subtracting its own
     // contribution from the post-increment values. Feeding that back through
@@ -410,7 +443,7 @@ export class RelayerService {
       projectedGasCostWei,
     });
     if (!confirmed.ok) {
-      await this.#release(payer, ctx.ipHash, day, projectedGasCostWei);
+      await release();
       this.#rejectPolicy(confirmed.error, ctx, payer);
     }
     const decision = confirmed.ok ? confirmed : preCheck;
@@ -425,8 +458,8 @@ export class RelayerService {
     // in a smaller form as latching the halt on reserved rather than committed
     // spend (see `#commitSpend`).
 
-    // Everything from here holds a reservation, so every failure path must give
-    // it back or we leak budget on each error.
+    // Everything from here holds a reservation. The durable journal refunds
+    // only provably unsigned work; uncertain signed intents retain their hold.
     //
     // The reservation is held across BOTH the balance read and the simulation
     // and the broadcast, with no reclaim timer. Every exit path below refunds,
@@ -447,7 +480,7 @@ export class RelayerService {
       }
 
       // 6. simulation --------------------------------------------------------
-      const gasLimit = await chain.simulate(request);
+      const gasLimit = durableGasLimit ?? (await chain.simulate(request));
 
       // 7. submission --------------------------------------------------------
       // The reservation stands once broadcast succeeds. If the transaction
@@ -456,24 +489,36 @@ export class RelayerService {
       // budget.
       pending = await nonces.submit(
         fees,
-        (submitCtx) => chain.sendExecute(request, submitCtx, gasLimit),
+        async (submitCtx) => {
+          if (!recovery || !recoveryRecord) return chain.sendExecute(request, submitCtx, gasLimit);
+          const hash = await recovery.submit(recoveryRecord.id, request, submitCtx, gasLimit);
+          nonces.reserveThrough(submitCtx.nonce);
+          return hash;
+        },
         { requestId: ctx.requestId, reservedWei: projectedGasCostWei, reservedDay: day, payer },
       );
-      // The reservation is now COMMITTED: it was broadcast and will not be
-      // refunded. Only committed spend may latch the day-long halt.
-      await this.#commitSpend(day, projectedGasCostWei);
+      // Durable submission commits atomically with the prepared intent before
+      // broadcasting. The legacy path commits only after its RPC ACK.
+      if (!recovery) await this.#commitSpend(day, projectedGasCostWei);
     } catch (error) {
-      await this.#release(payer, ctx.ipHash, day, projectedGasCostWei);
+      await release();
       logger.error(
-        { event: 'relay.reservation_released', requestId: ctx.requestId, payer, err: error },
-        'request failed after reservation; quota and budget released',
+        {
+          event: recovery ? 'relay.durable_request_interrupted' : 'relay.reservation_released',
+          requestId: ctx.requestId,
+          payer,
+          err: error,
+        },
+        recovery
+          ? 'request interrupted; durable journal determines whether reservation can be released'
+          : 'request failed after reservation; quota and budget released',
       );
       throw isRelayError(error)
         ? error
         : unavailable('SUBMISSION_FAILED', 'the transaction could not be broadcast');
     }
 
-    this.#deps.watcher?.track(pending);
+    if (!recovery) this.#deps.watcher?.track(pending);
 
     // Broadcast, therefore real, therefore worth a warning. See the note above
     // the reservation for why this is not done where the counters are debited.
@@ -571,6 +616,9 @@ export class RelayerService {
     let spentToday: bigint | null = null;
     let committedToday: bigint | null = null;
     const problems = [...this.#deps.problems];
+    if (this.#deps.recovery && !this.#deps.recovery.accepting) {
+      problems.push('durable transaction journal write uncertain; recovery restart required');
+    }
 
     if (chain !== null) {
       try {
@@ -596,7 +644,12 @@ export class RelayerService {
     if (balanceWei !== null && balanceWei < MIN_BALANCE_WEI) {
       problems.push('relayer hot key balance is below the minimum operating balance');
     }
-    if (this.#budgetHaltedOn === this.#day()) {
+    if (
+      this.#budgetHaltedOn === this.#day() ||
+      (this.#deps.recovery &&
+        committedToday !== null &&
+        committedToday >= config.policy.maxDailySpendWei)
+    ) {
       problems.push('daily BTC sponsorship budget is exhausted');
     }
 
@@ -614,10 +667,11 @@ export class RelayerService {
       targets: [...config.targets.values()].map((t) => `${t.name}:${t.address}`),
       store: store.kind,
       inFlight: nonces?.inFlight ?? 0,
-      watching: watcher?.size ?? 0,
+      watching: (watcher?.size ?? 0) + (this.#deps.recovery?.summary.pending ?? 0),
       spentTodayWei: spentToday?.toString() ?? null,
       committedTodayWei: committedToday?.toString() ?? null,
-      pendingRefunds: this.#pendingRefunds.length,
+      pendingRefunds:
+        this.#pendingRefunds.length + (this.#deps.recovery?.summary.pendingRefunds ?? 0),
       dailyBudgetWei: config.policy.maxDailySpendWei.toString(),
       problems,
     };
@@ -642,6 +696,9 @@ export class RelayerService {
     const { config, chain, nonces, watcher, store } = this.#deps;
     const day = this.#day();
     const problems = [...this.#deps.problems];
+    if (this.#deps.recovery && !this.#deps.recovery.accepting) {
+      problems.push('durable transaction journal write uncertain; recovery restart required');
+    }
 
     let reserved: bigint | null = null;
     let committed: bigint | null = null;
@@ -656,7 +713,11 @@ export class RelayerService {
         `${this.#pendingRefunds.length} reservation refund(s) could not be written to the quota store`,
       );
     }
-    const halted = this.#budgetHaltedOn === day;
+    const halted =
+      this.#budgetHaltedOn === day ||
+      Boolean(
+        this.#deps.recovery && committed !== null && committed >= config.policy.maxDailySpendWei,
+      );
     if (halted) {
       problems.push('daily BTC sponsorship budget is exhausted');
     }
@@ -676,7 +737,8 @@ export class RelayerService {
       committedPct: committed === null ? null : pctOf(committed, limit),
       reservedPct: reserved === null ? null : pctOf(reserved, limit),
       halted,
-      pendingRefunds: this.#pendingRefunds.length,
+      pendingRefunds:
+        this.#pendingRefunds.length + (this.#deps.recovery?.summary.pendingRefunds ?? 0),
     };
 
     const last = nonces?.lastSubmission ?? null;
@@ -688,6 +750,7 @@ export class RelayerService {
       network: config.network,
       keySource: config.key?.kind ?? null,
       singleInstance: true,
+      ...(this.#deps.recovery ? { recovery: this.#deps.recovery.summary } : {}),
       nonce: {
         next: nonces?.nextNonce ?? null,
         inFlight: nonces?.inFlight ?? 0,
@@ -701,7 +764,7 @@ export class RelayerService {
       lastSubmittedBlock: this.#lastSettledBlock?.toString() ?? null,
       budget,
       store: store.kind,
-      watching: watcher?.size ?? 0,
+      watching: (watcher?.size ?? 0) + (this.#deps.recovery?.summary.pending ?? 0),
       warnings: this.#deps.warnings ?? [],
       problems,
     };

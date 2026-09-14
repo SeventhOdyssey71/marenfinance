@@ -455,17 +455,22 @@ persisting the refund queue alongside the counters), not calling them at the hea
 request — neither has a request to attach to when there is no traffic. Nonce allocation
 is also per instance only.
 
-### Deploying standalone — the only supported target
+### Deploying standalone — alternative to the active Cloudflare testnet deployment
 
 **[`DEPLOY.md`](./DEPLOY.md) is the step-by-step version of this section**: a
 Dockerfile, a `docker-compose.yml`, a `fly.toml`, how to create and mount the
 keystore, how much BTC to fund, a curl smoke test, and the list of gates that
-mainnet is still behind. It also states plainly that **the relayer is not
-running anywhere yet**: nothing in this repository has been deployed.
+mainnet is still behind. The active deployment is the single Cloudflare Durable
+Object described in that runbook; standalone remains an alternative.
 
-`pnpm --filter @maren/relayer start`. This is the shape that gets the stuck-transaction
-sweeper, and therefore the only one where settlement reconciliation and deferred refund
-draining actually run.
+`pnpm --filter @maren/relayer start` runs the standalone stuck-transaction sweeper.
+Cloudflare runs sweeps through its object alarm and cron backstop. Its local durable
+journal implementation persists signed transaction intent, nonce, original budget
+day, and atomic refund/settlement accounting across restarts. Lost broadcast responses
+retain the known hash and reservation; alarms rebroadcast identical signed bytes.
+`/healthz.recovery` exposes pending age and blocked recovery state. See the runbook's
+Option C for rollout/draining requirements and limits. These local changes do not
+establish which revision is currently deployed.
 
 The `start` script is `node --import tsx src/server.ts`, deliberately **not**
 `tsx src/server.ts`. The tsx CLI wrapper runs the program as a child process and does

@@ -949,3 +949,17 @@ html[data-theme='light'] .maren-docs {
     transition-duration: 0.001ms !important;
   }
 }
+
+@media (max-width: 480px) {
+  .maren-docs .doc-topbar {
+    gap: 12px;
+    padding-inline: 12px;
+  }
+  .maren-docs .doc-topbar-spacer {
+    display: none;
+  }
+  .maren-docs .doc-toplink {
+    white-space: nowrap;
+    font-size: 12px;
+  }
+}

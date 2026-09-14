@@ -4,13 +4,19 @@
 
 **The relayer is deployed and accepting.** Verified on 2026-09-06:
 
-| | |
-| --- | --- |
-| URL | `https://maren-relayer.rolandojude18.workers.dev` |
-| Signer | `0xd90245ee16B2f58eD8654961BBf2fa835046df89` |
-| Balance | 0.0199 BTC on matsnet, nonce 21 (it has relayed before) |
+Rechecked `/healthz` on 13 September 2026: accepting on chain 31611, durable quota
+storage, and no reported boot problems. See the [current release checklist](../../docs/PRODUCTION-READINESS.md)
+for verification limits and outstanding mainnet gates. The local RPC-probe hardening
+and the durable recovery implementation are local changes awaiting deployment.
+The currently observed endpoint is not evidence that either change is running.
+
+|         |                                                                        |
+| ------- | ---------------------------------------------------------------------- |
+| URL     | `https://maren-relayer.rolandojude18.workers.dev`                      |
+| Signer  | `0xd90245ee16B2f58eD8654961BBf2fa835046df89`                           |
+| Balance | 0.0199 BTC on matsnet, nonce 21 (it has relayed before)                |
 | Storage | Durable Object (`store: "durable"`), single instance, cron `*/2` armed |
-| Key | a `wrangler secret`, not a file |
+| Key     | a `wrangler secret`, not a file                                        |
 
 Both clients point at it: `apps/ios-native/Maren/Info.plist` sets
 `MAREN_RELAYER_URL`, and `NEXT_PUBLIC_RELAYER_URL` is set on the Vercel project
@@ -26,7 +32,7 @@ flag described in older notes no longer exists.
 status line is worse than none: it was believed over a live health check. If the
 deployment changes, change this table in the same commit.
 
-What was verified while writing this, and what was not:
+Historical standalone packaging checks (record retained; original run date was not recorded):
 
 | Claim                                                                                                                    | Verified?                                                                                                 |
 | ------------------------------------------------------------------------------------------------------------------------ | --------------------------------------------------------------------------------------------------------- |
@@ -34,14 +40,14 @@ What was verified while writing this, and what was not:
 | That dependency set boots the server and answers `GET /healthz` with 503 plus its reasons                                | Yes, run locally as `node --import tsx src/server.ts` on a prod-only tree                                 |
 | The Docker image builds                                                                                                  | **No.** No Docker daemon was available. The install and start steps inside it are the ones verified above |
 | The Fly.io deployment works                                                                                              | **No.** No Fly account was created and nothing was deployed                                               |
-| The relayer relays a real transaction on matsnet                                                                         | **No.** That needs a funded key, which is step 3 below                                                    |
+| This standalone packaging check sent a real transaction on matsnet                                                       | **No.** That needs a funded key, which is step 3 below                                                    |
 
-## Scope: testnet, standalone. Mainnet is a separate decision
+## Scope: testnet, single signer. Mainnet is a separate decision
 
-`README.md` records the merged decision: **the standalone server is the only
-supported target**, and the serverless (Vercel) path is refused in code because
-the stuck-transaction sweeper has no process to run in there. Everything in this
-document is about running one process on one host, on **testnet (matsnet, 31611)**.
+The standalone server and the single Durable Object deployment in Option C are
+supported testnet targets. The stateless Vercel path is refused in code because
+the stuck-transaction sweeper has no durable execution context there. The active
+deployment is the Cloudflare testnet instance identified above.
 
 Mainnet is not covered by that decision and is not enabled by this document. The
 [mainnet gates](#mainnet-gates) at the end are the list of things that have to be
@@ -97,6 +103,55 @@ machines at once).
 
 ### Option C: Cloudflare Workers (Durable Object)
 
+The local implementation now journals transaction intent and counter reservations
+atomically before external submission. It signs the transaction locally, persists
+its exact bytes/hash and nonce, then broadcasts. A lost RPC response returns the
+known hash with `success: false`; the alarm checks receipts and resends identical
+bytes. It never refunds an uncertain broadcast based on age or a missing mempool
+entry. Settlement and safe pre-broadcast refunds update the original day's
+counters and delete the intent in one storage transaction, so retries after a
+lost storage response cannot double-credit another reservation.
+
+`/healthz.recovery` reports `durable`, `blocked`, `pending`, `pendingRefunds`,
+`oldestPendingAt`, and `replacementPolicy: "rebroadcast-identical"`. An uncertain
+journal preparation write returns `SUBMISSION_UNCERTAIN` with `meta.hash` and
+`meta.statusUrl`, and blocks new submissions until the object restarts and restores
+its nonce floor. Clients must poll the known hash and must not self-pay or retry
+that intent automatically. Changed signer/chain/forwarder configuration with pending
+records refuses startup. Restore the old configuration and settle its journal
+before rotating any of these values. Never delete the DO, its journal, or budget
+keys to clear an alert; that discards authoritative recovery/accounting state.
+
+Limits for this pilot: durable transactions do not bump fees or move to a new
+nonce. A stuck transaction or external use of the signer can therefore hold
+budget and block the nonce sequence until an operator investigates. Monitor oldest
+pending age and inspect the known hash on-chain; a timeout is not proof that it
+failed. The standalone memory/Redis paths retain their legacy in-memory recovery
+limitations. Broadcast delivery is at least once; journal accounting is atomic
+and idempotent, not a claim of exactly-once RPC delivery or chain finality.
+
+Verification on 13 September 2026: `test/recovery.test.ts` reconstructs the
+service against a transactional storage model with injected failures before/after
+commit. The separate `pnpm --filter @maren/relayer test:runtime` check runs actual
+local workerd with SQLite Durable Object storage and a disposable, unforked Anvil.
+It verifies unsigned-reservation refunds on restart, persistence before broadcast,
+real alarm delivery/rebroadcast/settlement, duplicate alarm accounting, accepted
+transactions with lost responses, and settled counters after another restart.
+It uses the production `DurableStore`, `RecoveryCoordinator`, and chain adapter;
+a local STOP contract accepts encoded calldata, so it does not retest forwarder
+authorization. It starts no public fork and sends no public transactions.
+
+The seven Anvil fork integration tests separately verify Mezo RPC behavior,
+local signing, raw broadcast and receipts. Wrangler dry-run verifies the real
+Worker bundle. An observed deployed recovery exercise remains a release acceptance
+step: a successful local runtime check does not prove Cloudflare deployment or
+public alarm/cron delivery.
+
+Before first rollout, pause incoming relays and let the old process's pending
+watcher/refund queue drain. Existing in-memory transactions cannot be reconstructed
+by deploying this journal. Retain old hashes and compare reserved/committed spend
+before resuming; do not reset durable counters to hide legacy reservations.
+
 This is the one serverless-shaped target that is **not** refused, and the reason
 is the whole of why Vercel was. The two mechanisms the standalone server owns —
 the stuck-transaction sweep (settlement reconciliation + deferred-refund drain)
@@ -119,7 +174,8 @@ being dropped:
 
 Files: `wrangler.jsonc`, `worker/index.ts` (front door → single DO),
 `worker/relayer-do.ts` (boots `createRelayer` with `startWatcher: false`), and
-`worker/durable-store.ts`. The relayer's own code is unchanged.
+`worker/durable-store.ts`, plus the shared recovery coordinator in
+`src/recovery.ts`.
 
 ```bash
 cd apps/relayer
@@ -132,14 +188,14 @@ pnpm cf:deploy                              # wrangler deploy
 Local dev needs no account: `pnpm cf:dev` runs the whole worker in miniflare,
 reading the key from a gitignored `.dev.vars` (`RELAYER_PRIVATE_KEY=0x…`).
 
-| Claim                                                                              | Verified?                                                                                          |
-| ---------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------- |
-| The worker bundles and boots (`createRelayer`, pino, viem, the DO, `DurableStore`) | Yes, `pnpm cf:dev` in miniflare                                                                    |
-| It answers `/health` + `/healthz` with `accepting: true`, `store: "durable"`       | Yes, locally                                                                                       |
-| It reads the signer's real balance and nonce from Mezo testnet through the worker  | Yes — `/health` returned the on-chain balance and nonce (viem `http()` transport works on Workers) |
-| The 296 unit tests, `worker/tsconfig` typecheck, and `src` build all pass          | Yes                                                                                                |
-| The alarm/cron sweep fires on Cloudflare's schedule                                | **No.** Verified wired; not observed on a real deployment (crons don't auto-fire in local dev)     |
-| An actual `wrangler deploy` to Cloudflare                                          | **No.** Needs `wrangler login` (interactive) and the Workers Paid plan — both owner-only           |
+Verification record, updated 13 September 2026:
+
+| Claim                                                   | Evidence and limit                                                                                                                                            |
+| ------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Existing Cloudflare testnet deployment                  | The public endpoint was observed on 6 and 13 September 2026, as recorded above. This does not establish that it runs the local recovery changes.              |
+| Current relayer source and Worker compile               | 327 relayer tests passed, including 16 storage fault tests and seven Anvil fork tests; source/Worker typechecks and Wrangler bundle dry-run passed.           |
+| Actual local DO persistence and alarms                  | `test:runtime` passed six checks with SQLite storage across full local Wrangler restarts, actual alarms, and an unforked local Anvil; no public transactions. |
+| New journal behavior on the deployed Cloudflare service | Not yet deployed or observed by this verification pass. Drain legacy queues and verify the new recovery health fields and alarm/cron behavior after rollout.  |
 
 For real funds, prefer a keystore over `RELAYER_PRIVATE_KEY` here too — but on
 Workers the key is a `wrangler secret`, not a file, so Step 2's keystore-file

@@ -17,11 +17,11 @@ This replaces all of it with a single GraphQL query whose rows already carry the
 Eleven events across three contracts, from block `14,911,471` — the deployment block, found
 by bisecting `eth_getCode`, not guessed.
 
-| Contract | Events |
-| --- | --- |
-| `MarenVault` | `Deposited`, `Withdrawn`, `Borrowed`, `Repaid` |
-| `MarenPay` | `Paid`, `PaidToHandle`, `RequestCreated`, `LinkCreated`, `LinkClaimed` |
-| `MarenEarn` | `Deposit`, `Withdraw` |
+| Contract     | Events                                                                 |
+| ------------ | ---------------------------------------------------------------------- |
+| `MarenVault` | `Deposited`, `Withdrawn`, `Borrowed`, `Repaid`                         |
+| `MarenPay`   | `Paid`, `PaidToHandle`, `RequestCreated`, `LinkCreated`, `LinkClaimed` |
+| `MarenEarn`  | `Deposit`, `Withdraw`                                                  |
 
 The ABIs in `abis/` are generated from the Foundry build output rather than hand-written, and
 the event signatures in `subgraph.yaml` are derived from those ABIs, so neither can drift from
@@ -78,7 +78,14 @@ query Activity($account: Bytes!, $first: Int!) {
     orderDirection: desc
     first: $first
   ) {
-    kind amount counterparty memo outgoing blockNumber timestamp txHash
+    kind
+    amount
+    counterparty
+    memo
+    outgoing
+    blockNumber
+    timestamp
+    txHash
   }
 }
 ```

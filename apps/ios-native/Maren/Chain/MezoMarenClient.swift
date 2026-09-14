@@ -483,8 +483,9 @@ struct MezoMarenClient: MarenClient {
         // rows. The crawl below stays as the fallback and runs whenever this returns nil —
         // no subgraph configured, a transport failure, or a GraphQL error — so the history is
         // never silently truncated to whatever the indexer happened to have.
-        if let rows = await SubgraphActivity.fetch(account: accountAddress) {
-            return rows.compactMap { Self.activityItem(from: $0) }
+        if let rows = await SubgraphActivity.fetch(account: accountAddress, chain: chain) {
+            let items = rows.compactMap { Self.activityItem(from: $0) }
+            if items.count == rows.count { return items }
         }
         let acct = "0x" + String(accountAddress.dropFirst(2)).lowercased().leftPadded(to: 64)
         let names = Self.eventNamesByTopic

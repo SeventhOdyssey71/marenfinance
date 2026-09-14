@@ -57,7 +57,7 @@ docs-site/
 - **No fabricated numbers, addresses, or APYs.** Addresses come from
   `../packages/sdk/src/addresses.ts`; protocol constants from `../packages/sdk/src/constants.ts`;
   facts and transaction hashes from `../docs/src/progress.md`.
-- **Never write "zero gas".** The relayer is built and tested but not hosted, and the first
-  deposit always costs gas.
+- **Describe sponsorship per action.** The relayer is hosted on testnet. The first
+  deposit, approvals when required, and link creation still need BTC gas.
 - Keep the pre-audit and testnet-only framing prominent, including the `<Warning>` on the
   introduction.

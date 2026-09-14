@@ -73,11 +73,7 @@ function WalletOnlySignIn() {
   return (
     <div className="flex flex-col items-start gap-3 sm:min-w-[15rem]">
       <ConnectButton />
-      <Note>
-        Google sign-in is not configured yet. Set{' '}
-        <code className="num text-text-muted">NEXT_PUBLIC_PRIVY_APP_ID</code> to turn it on;
-        connecting a wallet works now.
-      </Note>
+      <Note>Use a wallet that supports Mezo. Funds will arrive at the address you connect.</Note>
     </div>
   );
 }

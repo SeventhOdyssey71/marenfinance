@@ -76,7 +76,7 @@ struct ScanView: View {
 
     private var pasteFallback: some View {
         VStack(alignment: .leading, spacing: Theme.Space.sm) {
-            TextEntryCard(label: "Or paste a link", placeholder: "https://maren.finance/…", text: $pasted,
+            TextEntryCard(label: "Or paste a link", placeholder: "https://\(PaymentLinks.host)/…", text: $pasted,
                           footnote: rejected ? "That is not a Maren payment or claim link." : nil)
             SubmitBar(title: "Open link", enabled: !pasted.trimmingCharacters(in: .whitespaces).isEmpty) {
                 handle(pasted)

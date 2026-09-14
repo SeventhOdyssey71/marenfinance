@@ -1,0 +1,67 @@
+{
+  "checkedAt": "2026-09-13T16:53:52.362Z",
+  "releaseSurface": "ios-first (web dashboard intentionally disabled)",
+  "requiresDrainedDurableRecovery": true,
+  "scope": "Testnet HTTP availability and relay configuration only. Does not prove transaction settlement, user traction, deployed source parity, or mainnet safety.",
+  "passed": false,
+  "checks": [
+    {
+      "name": "browser relay CORS",
+      "status": "pass",
+      "httpStatus": 204,
+      "detail": null,
+      "durationMs": 798
+    },
+    {
+      "name": "relayer health",
+      "status": "fail",
+      "httpStatus": 200,
+      "detail": "durable transaction recovery unavailable or blocked; recovery backlog is not drained",
+      "durationMs": 1262
+    },
+    {
+      "name": "web /",
+      "status": "pass",
+      "httpStatus": 200,
+      "detail": null,
+      "durationMs": 591
+    },
+    {
+      "name": "web /app",
+      "status": "pass",
+      "httpStatus": 404,
+      "detail": null,
+      "durationMs": 1749
+    },
+    {
+      "name": "web /app/finance",
+      "status": "pass",
+      "httpStatus": 404,
+      "detail": null,
+      "durationMs": 1694
+    },
+    {
+      "name": "web /app/pay",
+      "status": "pass",
+      "httpStatus": 404,
+      "detail": null,
+      "durationMs": 1658
+    },
+    {
+      "name": "web /claim",
+      "status": "pass",
+      "httpStatus": 200,
+      "detail": null,
+      "durationMs": 1566
+    },
+    {
+      "name": "web /docs",
+      "status": "pass",
+      "httpStatus": 200,
+      "detail": null,
+      "durationMs": 571
+    }
+  ],
+  "localCommit": "d349a2272a59357df946a8546026f97307bbf2ca",
+  "localChanges": true
+}

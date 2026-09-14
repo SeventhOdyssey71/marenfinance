@@ -1,0 +1,11 @@
+{
+  "$schema": "../../node_modules/wrangler/config-schema.json",
+  "name": "maren-relayer-local-recovery-check",
+  "main": "worker.ts",
+  "compatibility_date": "2025-06-01",
+  "compatibility_flags": ["nodejs_compat"],
+  "durable_objects": {
+    "bindings": [{ "name": "RECOVERY", "class_name": "RecoveryCheckDO" }],
+  },
+  "migrations": [{ "tag": "v1", "new_sqlite_classes": ["RecoveryCheckDO"] }],
+}

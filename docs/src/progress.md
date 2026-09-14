@@ -24,16 +24,23 @@ with the evidence.
 
 ## What was built
 
-The codebase is a single monorepo with five parts, sharing one SDK so that every
-number a user sees is computed in exactly one place.
+Status correction, 13 September 2026: the iOS app is now native SwiftUI with live chain
+reads and writes, and the testnet relayer is hosted on Cloudflare. The public website
+serves landing, docs, and claims; the dashboard is intentionally disabled for the
+iOS-first release. The SDK below serves TypeScript clients; Swift uses its own chain
+implementation with encoding golden tests. See `docs/PRODUCTION-READINESS.md` for the
+current check results. Historical transaction observations below retain their dates.
 
-| Component | What it is                                                                                                                                                                      |
-| --------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Contracts | Five Solidity contracts on matsnet: pooled vault, payments, name registry, ERC-4626 yield vault, ERC-2771 relay hub                                                             |
-| SDK       | One TypeScript package holding every protocol constant, address, and piece of position math. iOS and web call the same functions                                                |
-| Web app   | Portfolio, Vault, Pay, Earn, Activity. Live contract reads; the write path is wired and exercised on testnet                                                                    |
-| iOS app   | Expo, 18 screens, verified in the simulator including the degraded states. Runs on a mock data layer whose functions carry the live signatures, so going live replaces one file |
-| Relayer   | Gasless transaction service: verifies, simulates, submits, settles gas. Built and fully tested, not yet hosted                                                                  |
+The codebase is a single monorepo with five main parts. The TypeScript clients share
+an SDK; the native client implements the same protocol rules in Swift.
+
+| Component | What it is                                                                                                          |
+| --------- | ------------------------------------------------------------------------------------------------------------------- |
+| Contracts | Five Solidity contracts on matsnet: pooled vault, payments, name registry, ERC-4626 yield vault, ERC-2771 relay hub |
+| SDK       | TypeScript protocol constants, addresses, position math, and ABIs shared by the web and relayer                     |
+| Web app   | Portfolio, Vault, Pay, Earn, Activity. Live contract reads; the write path is wired and exercised on testnet        |
+| iOS app   | Native SwiftUI app with live matsnet reads and writes, Keychain-backed signing, and a TestFlight invite             |
+| Relayer   | Gasless transaction service hosted on Cloudflare testnet: verifies, simulates, submits, and reconciles gas          |
 
 Two design decisions shape everything else.
 

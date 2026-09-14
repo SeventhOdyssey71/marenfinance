@@ -107,67 +107,67 @@ export async function readPosition(ctx: LiveContext): Promise<Position> {
     troveCapacity,
     pooledTroveDebt,
   ] = await Promise.all([
-      ctx.client.readContract({
+    ctx.client.readContract({
+      address: musd.troveManager,
+      abi: troveManagerAbi,
+      functionName: 'getEntireDebtAndColl',
+      args: [ctx.account],
+    }),
+    /**
+     * Only meaningful when the account has a trove of its own. An account that does not
+     * is the common case, and MUSD is entitled to revert on it, so the failure is
+     * absorbed here and the DIRECT branch below insists on a real value rather than
+     * substituting a zero — a borrowing ceiling of "0" and "we could not read your
+     * borrowing ceiling" are different sentences and only one of them is true.
+     */
+    ctx.client
+      .readContract({
         address: musd.troveManager,
         abi: troveManagerAbi,
-        functionName: 'getEntireDebtAndColl',
+        functionName: 'getTroveMaxBorrowingCapacity',
         args: [ctx.account],
-      }),
-      /**
-       * Only meaningful when the account has a trove of its own. An account that does not
-       * is the common case, and MUSD is entitled to revert on it, so the failure is
-       * absorbed here and the DIRECT branch below insists on a real value rather than
-       * substituting a zero — a borrowing ceiling of "0" and "we could not read your
-       * borrowing ceiling" are different sentences and only one of them is true.
-       */
-      ctx.client
-        .readContract({
-          address: musd.troveManager,
-          abi: troveManagerAbi,
-          functionName: 'getTroveMaxBorrowingCapacity',
-          args: [ctx.account],
-        })
-        .then((value) => value as bigint | null)
-        .catch(() => null),
-      ctx.client.readContract({
-        address: maren.marenVault,
-        abi: marenVaultAbi,
-        functionName: 'collateral',
-        args: [ctx.account],
-      }),
-      ctx.client.readContract({
-        address: maren.marenVault,
-        abi: marenVaultAbi,
-        functionName: 'previewDebtOf',
-        args: [ctx.account],
-      }),
-      ctx.client.readContract({
-        address: maren.marenVault,
-        abi: marenVaultAbi,
-        functionName: 'maxBorrowable',
-        args: [ctx.account],
-      }),
-      ctx.client.readContract({
-        address: maren.marenVault,
-        abi: marenVaultAbi,
-        functionName: 'troveMaxBorrowingCapacity',
-      }),
-      /**
-       * The WHOLE pooled trove's debt, which is what Mezo compares its ceiling against.
-       * MarenVault is the trove owner, so this is read for the vault's address, not the
-       * user's. Without it the pooled ceiling was computed against one depositor's slice
-       * and was effectively unbounded.
-       */
-      ctx.client
-        .readContract({
-          address: musd.troveManager,
-          abi: troveManagerAbi,
-          functionName: 'getTroveDebt',
-          args: [maren.marenVault],
-        })
-        .then((v) => v as bigint | null)
-        .catch(() => null),
-    ]);
+      })
+      .then((value) => value as bigint | null)
+      .catch(() => null),
+    ctx.client.readContract({
+      address: maren.marenVault,
+      abi: marenVaultAbi,
+      functionName: 'collateral',
+      args: [ctx.account],
+    }),
+    ctx.client.readContract({
+      address: maren.marenVault,
+      abi: marenVaultAbi,
+      functionName: 'previewDebtOf',
+      args: [ctx.account],
+    }),
+    ctx.client.readContract({
+      address: maren.marenVault,
+      abi: marenVaultAbi,
+      functionName: 'maxBorrowable',
+      args: [ctx.account],
+    }),
+    ctx.client.readContract({
+      address: maren.marenVault,
+      abi: marenVaultAbi,
+      functionName: 'troveMaxBorrowingCapacity',
+    }),
+    /**
+     * The WHOLE pooled trove's debt, which is what Mezo compares its ceiling against.
+     * MarenVault is the trove owner, so this is read for the vault's address, not the
+     * user's. Without it the pooled ceiling was computed against one depositor's slice
+     * and was effectively unbounded.
+     */
+    ctx.client
+      .readContract({
+        address: musd.troveManager,
+        abi: troveManagerAbi,
+        functionName: 'getTroveDebt',
+        args: [maren.marenVault],
+      })
+      .then((v) => v as bigint | null)
+      .catch(() => null),
+  ]);
 
   const [coll, principal, interest, pendingColl, pendingPrincipal, pendingInterest] = trove;
 

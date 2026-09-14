@@ -1,50 +1,57 @@
 import SwiftUI
 import web3
+import BigInt
 
-// MARK: - Claimable link (create)
-//
-// Escrow MUSD to whoever holds a one-time link. Amount, review, submit, and the link is shown
-// ONCE. The bearer secret lives in the URL fragment (never sent to a server), is a bearer
-// token — anyone with the string can claim — and is therefore shown a single time, shared by
-// the user, and NEVER logged or persisted anywhere in this app.
-//
-// THE LINK ID IS NEVER INVENTED. `MarenPay.createLink` mints the id itself and reports it in
-// `LinkCreated`, whose indexed `linkId` `Receipt.confirm` reads out of the same receipt that
-// proved the transaction succeeded. If that log cannot be read, this screen says the escrow
-// landed but the id did not arrive, and points at the explorer — because a guessed id builds a
-// link that points at somebody else's escrow, which is the worst thing this screen could do.
+// MARK: - Claimable link creation and recovery
+// A biometric Keychain draft is written before submission. One unsaved link per wallet can
+// be resumed after restart, even if the app died before recording the transaction hash.
+// Only a confirmed receipt supplies the link id; no counter or block-number guesses.
 
 struct ClaimableLinkFlow: View {
     @Environment(\.marenActions) private var actions
     @Environment(\.dismiss) private var dismiss
+    @Environment(MarenSession.self) private var session
+    @Environment(\.isDemoData) private var isDemoData
 
     private enum Stage: Equatable { case entry, review, submitting, created, idUnknown, walked, failed }
     @State private var stage: Stage = .entry
     @State private var amountText = ""
-    /// Held only for the lifetime of this view, in memory. Generated at submit, revealed once.
+    /// The share URL is derived from the persisted draft after a receipt supplies its id.
     @State private var link: String?
     /// The bearer key on its own, for the branch where the escrow landed but the id did not.
     @State private var secret: String?
     @State private var outcome: SubmitOutcome?
+    @State private var savedDraft: PendingClaimLink?
+    @State private var recovering = true
+    @State private var recoveryNote: String?
 
     private var amount: Decimal? { Amount.parse(amountText) }
 
     /// The expiry this link is created with, fixed at the moment the screen opens so the review
     /// step and the submitted calldata can never quote different dates.
-    private let expiry = UInt64(Date().timeIntervalSince1970) + CLAIM_LINK_EXPIRY_SECONDS
+    @State private var expiry = UInt64(Date().timeIntervalSince1970) + CLAIM_LINK_EXPIRY_SECONDS
     private var expiryDate: Date { Date(timeIntervalSince1970: TimeInterval(expiry)) }
 
     var body: some View {
-        FlowScreen(title: "Claimable link") {
-            switch stage {
-            case .entry: entry
-            case .review, .submitting: review
-            case .created: created
-            case .idUnknown: idUnknownView
-            case .walked: walkedView
-            case .failed: failedView
+        FlowScreen(title: "Claimable link", canDismiss: stage != .submitting && !recovering) {
+            if recovering {
+                ProgressView("Checking saved link…")
+            } else {
+                switch stage {
+                case .entry: entry
+                case .review, .submitting: review
+                case .created: created
+                case .idUnknown: idUnknownView
+                case .walked: walkedView
+                case .failed: failedView
+                }
+                if let recoveryNote {
+                    Text(recoveryNote).font(.text(14)).foregroundStyle(Theme.Palette.warning)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
             }
         }
+        .task { await loadSavedLink() }
     }
 
     @ViewBuilder private var entry: some View {
@@ -53,7 +60,7 @@ struct ClaimableLinkFlow: View {
             .foregroundStyle(Theme.Palette.muted)
             .fixedSize(horizontal: false, vertical: true)
         AmountField(unit: "MUSD", text: $amountText)
-        GasNote(mode: .youPayBtc, detail: "MarenRelayHub allowlists claiming a link but not creating one, so you sign this and pay the Bitcoin gas yourself. Whoever claims it pays nothing.")
+        GasNote(mode: .youPayBtc, detail: "You pay BTC gas to create the escrow. Maren sponsors claiming when sponsorship is available.")
         SubmitBar(title: "Review", enabled: amount != nil) { stage = .review }
     }
 
@@ -73,7 +80,7 @@ struct ClaimableLinkFlow: View {
                 .font(.system(size: 13))
                 .foregroundStyle(Theme.Palette.tertiary)
                 .fixedSize(horizontal: false, vertical: true)
-            GasNote(mode: .youPayBtc, detail: "MarenRelayHub allowlists claiming a link but not creating one, so you sign this and pay the Bitcoin gas yourself. Whoever claims it pays nothing.")
+            GasNote(mode: .youPayBtc, detail: "You pay BTC gas to create the escrow. Maren sponsors claiming when sponsorship is available.")
             SubmitBar(title: "Create link", submitting: stage == .submitting) {
                 Task { await submit(amount) }
             }
@@ -87,7 +94,7 @@ struct ClaimableLinkFlow: View {
         stage = .submitting
 
         // The one-time keypair. Its ADDRESS goes on-chain as the link key; its PRIVATE key goes
-        // in the URL fragment and is never sent to a server, never logged, and never stored.
+        // in the URL fragment. The recoverable copy stays only in biometric Keychain.
         guard let secretHex = HandleCommitmentStore.newSecret(),
               let secretData = Data(hex: secretHex),
               let linkKey = try? Keystore.address(of: secretData) else {
@@ -96,10 +103,33 @@ struct ClaimableLinkFlow: View {
             return
         }
 
+        if !isDemoData {
+            guard let owner = session.address else {
+                outcome = .declined(reason: "Restore a wallet before creating a claimable link.")
+                stage = .failed
+                return
+            }
+            do {
+                let chain = MezoChain.of(.testnet)
+                let client = EthereumHttpClient(url: chain.rpcURLs[0], network: .custom(String(chain.chainId)))
+                let head = try await client.eth_blockNumber()
+                let draft = PendingClaimLink(owner: owner, secret: secretHex, linkKey: linkKey,
+                    amount: NSDecimalNumber(decimal: amount).stringValue, expiry: expiry, startBlock: head)
+                // Durability precedes signing/broadcast. Failure stops creation entirely.
+                try await Keystore.shared.savePendingClaim(draft)
+                savedDraft = draft
+            } catch {
+                outcome = .declined(reason: "A recoverable claim key could not be saved in biometric Keychain. Nothing was escrowed. Enable Face ID or Touch ID, or reopen Claimable link to recover an existing draft.")
+                stage = .failed
+                return
+            }
+        }
+
         let result = await actions.submit(
             Intent(kind: .createLink(linkKey: linkKey, expiry: expiry, memo: ""), amount: amount, unit: .musd)
         )
         outcome = result
+        await recordOutcome(result)
 
         switch result {
         case .demo:
@@ -114,9 +144,93 @@ struct ClaimableLinkFlow: View {
                 secret = secretHex
                 stage = .idUnknown
             }
-        case .declined, .failed:
+        case .failed(let tx):
+            // The escrow may land after the wait ends. Keep its bearer key available rather
+            // than discarding the only way the recipient can claim it.
+            if case .reverted = tx { stage = .failed }
+            else { secret = secretHex; stage = .idUnknown }
+        case .declined:
             stage = .failed
         }
+    }
+
+    private func loadSavedLink() async {
+        defer { recovering = false }
+        guard !isDemoData, let owner = session.address else { return }
+        do {
+            guard let draft = try await Keystore.shared.loadPendingClaim(owner: owner) else { return }
+            savedDraft = draft
+            secret = draft.secret
+            expiry = draft.expiry
+            amountText = draft.amount
+            if let id = draft.linkId {
+                link = PaymentLinks.buildClaim(linkId: id, secret: draft.secret)
+                stage = .created
+            } else {
+                if let hash = draft.txHash { outcome = .failed(.timeout(hash: hash)) }
+                stage = .idUnknown
+            }
+        } catch {
+            outcome = .declined(reason: "The saved claim could not be unlocked. Nothing new was submitted. Close this screen and try again to recover it.")
+            stage = .failed
+        }
+    }
+
+    private func recordOutcome(_ result: SubmitOutcome) async {
+        guard var draft = savedDraft else { return }
+        let definitelyNoEscrow = !draft.retain(after: result)
+        do {
+            if definitelyNoEscrow {
+                try await Keystore.shared.clearPendingClaim(owner: draft.owner)
+                savedDraft = nil
+            } else {
+                try await Keystore.shared.savePendingClaim(draft, replacing: true)
+                savedDraft = draft
+            }
+        } catch {
+            // The original durable draft still contains the secret and indexed bearer address.
+            recoveryNote = "The original recovery key remains saved. Reopen Claimable link to recover the transaction if these details could not be updated."
+        }
+    }
+
+    private func recoverSavedLink() async {
+        guard let draft = savedDraft else { return }
+        recovering = true
+        recoveryNote = nil
+        defer { recovering = false }
+        do {
+            let chain = MezoChain.of(.testnet)
+            guard let hash = try await draft.recoverHash(chain: chain) else {
+                recoveryNote = "No matching escrow was found in the checked blocks. It may still be pending or may not have been submitted. Your recovery key remains saved; this does not authorize another payment."
+                return
+            }
+            let client = EthereumHttpClient(url: chain.rpcURLs[0], network: .custom(String(chain.chainId)))
+            let result = await Receipt.confirm(client: client, hash: hash, sponsored: false,
+                mintedIdFrom: MintedIdSource(contract: MarenAddresses.of(.testnet).marenPay,
+                                            topic0: MarenEncoding.linkCreatedTopic), timeout: 10)
+            let submitted: SubmitOutcome
+            if case .delivered(let delivered) = result { submitted = .delivered(delivered) }
+            else { submitted = .failed(result) }
+            outcome = submitted
+            await recordOutcome(submitted)
+            if case .delivered(let delivered) = result, let id = delivered.mintedId {
+                link = PaymentLinks.buildClaim(linkId: id, secret: draft.secret)
+                stage = .created
+            } else if case .reverted = result { stage = .failed }
+        } catch {
+            recoveryNote = "Mezo could not be reached. Your claim recovery key is still saved on this device. Try recovering again when the connection returns."
+        }
+    }
+
+    private func acknowledgeSaved() async {
+        if let draft = savedDraft {
+            do { try await Keystore.shared.clearPendingClaim(owner: draft.owner) }
+            catch { recoveryNote = "The saved recovery copy could not be removed. You can close this screen and try again later."; return }
+        }
+        savedDraft = nil
+        secret = nil
+        link = nil
+        dismiss()
     }
 
     @ViewBuilder private var created: some View {
@@ -136,27 +250,28 @@ struct ClaimableLinkFlow: View {
                         Image(systemName: "eye.trianglebadge.exclamationmark")
                             .font(.system(size: 13, weight: .bold)).foregroundStyle(Theme.Palette.warning)
                             .accessibilityHidden(true)
-                        Text("Shown once, save it now").labelStyle().foregroundStyle(Theme.Palette.warning)
+                        Text("Save your link").labelStyle().foregroundStyle(Theme.Palette.warning)
                     }
                     Text(link)
                         .font(.figure(13, weight: .regular))
                         .foregroundStyle(Theme.Palette.ink)
                         .textSelection(.enabled)
                         .fixedSize(horizontal: false, vertical: true)
-                    Text("This link holds the claim secret. Anyone with it can claim the funds, and Maren cannot show it to you again.")
+                    Text("Anyone with this link can claim the funds. A recovery copy stays in this device’s biometric Keychain until you confirm that you saved it. Reopen Claimable link to find it.")
                         .font(.system(size: 13))
                         .foregroundStyle(Theme.Palette.tertiary)
                         .fixedSize(horizontal: false, vertical: true)
                 }
             }
             HStack(spacing: Theme.Space.sm) {
-                CopyButton(value: link, describes: "the claim link", style: .filled)
+                CopyButton(value: link, describes: "the claim link", style: .filled, sensitive: true)
                 ShareLink(item: link) {
                     Label("Share", systemImage: "square.and.arrow.up").pillLabel()
                 }
                 .accessibilityLabel("Share the claim link")
             }
-            PillButton(title: "Done", variant: .quiet) { dismiss() }
+            PillButton(title: "I saved the link", variant: .primary) { Task { await acknowledgeSaved() } }
+            PillButton(title: "Keep for later", variant: .quiet) { dismiss() }
         }
     }
 
@@ -168,14 +283,14 @@ struct ClaimableLinkFlow: View {
             HStack(spacing: Theme.Space.sm) {
                 Image(systemName: "exclamationmark.triangle.fill").font(.system(size: 18, weight: .bold))
                     .foregroundStyle(Theme.Palette.warning).accessibilityHidden(true)
-                Text("Escrowed, id not read").font(.system(size: 22, weight: .bold)).foregroundStyle(Theme.Palette.ink)
+                Text("Keep your claim key").font(.system(size: 22, weight: .bold)).foregroundStyle(Theme.Palette.ink)
             }
-            Text("The receipt confirmed the MUSD is escrowed, but it did not carry a LinkCreated log this app could read, so Maren does not know the link's id and will not guess one. Find the id on the explorer and pair it with the key below to build the link. You can reclaim the escrow after \(expiryDate.formatted(date: .abbreviated, time: .shortened)).")
+            Text("Maren could not read a confirmed link id. A recovery copy is saved in this device’s biometric Keychain. Reopen Claimable link to recover it, or save this key elsewhere before confirming that you saved it. If the escrow confirms, pair the LinkCreated id with this key to recover the link. Unclaimed escrow becomes reclaimable after \(expiryDate.formatted(date: .abbreviated, time: .shortened)).")
                 .font(.system(size: 14)).foregroundStyle(Theme.Palette.muted)
                 .fixedSize(horizontal: false, vertical: true)
             MCard {
                 VStack(alignment: .leading, spacing: Theme.Space.sm) {
-                    Text("Claim key, shown once").labelStyle().foregroundStyle(Theme.Palette.warning)
+                    Text("Claim recovery key").labelStyle().foregroundStyle(Theme.Palette.warning)
                     Text(secret)
                         .font(.figure(13, weight: .regular))
                         .foregroundStyle(Theme.Palette.ink)
@@ -183,7 +298,11 @@ struct ClaimableLinkFlow: View {
                         .fixedSize(horizontal: false, vertical: true)
                 }
             }
-            CopyButton(value: secret, describes: "the claim key", style: .filled)
+            CopyButton(value: secret, describes: "the claim key", style: .filled, sensitive: true)
+            if savedDraft != nil {
+                PillButton(title: "Recover link", variant: .primary) { Task { await recoverSavedLink() } }
+                PillButton(title: "I saved the recovery key", variant: .quiet) { Task { await acknowledgeSaved() } }
+            }
             if let outcome {
                 OutcomeView(outcome: outcome, network: .testnet) { dismiss() }
             }

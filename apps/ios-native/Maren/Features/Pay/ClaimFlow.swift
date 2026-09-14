@@ -18,7 +18,7 @@ struct ClaimFlow: View {
     @State private var outcome: SubmitOutcome?
 
     var body: some View {
-        FlowScreen(title: "Claim") {
+        FlowScreen(title: "Claim", canDismiss: stage != .submitting) {
             switch stage {
             case .open: openStep
             case .ready, .submitting: readyStep
@@ -35,13 +35,13 @@ struct ClaimFlow: View {
     }
 
     @ViewBuilder private var openStep: some View {
-        Text("Paste a Maren claim link, or scan its QR. The claim signs your own address, so an observer who saw the link cannot redirect the funds to themselves.")
+        Text("Paste a Maren claim link, or scan its QR. Anyone with the complete link can claim its funds. Only share it with the intended recipient.")
             .font(.system(size: 15))
             .foregroundStyle(Theme.Palette.muted)
             .fixedSize(horizontal: false, vertical: true)
         TextEntryCard(
             label: "Claim link",
-            placeholder: "https://maren.finance/claim?id=…",
+            placeholder: "https://\(PaymentLinks.host)/claim?id=…",
             text: $pasted,
             footnote: parseError ? "That is not a valid Maren claim link." : nil
         )

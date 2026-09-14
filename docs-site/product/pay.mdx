@@ -1,6 +1,6 @@
 ---
-title: "Pay"
-description: "Names, money links, and requests: moving MUSD without addresses to copy."
+title: 'Pay'
+description: 'Names, money links, and requests: moving MUSD without addresses to copy.'
 ---
 
 Once you hold MUSD, Pay is how it moves. `pay`, `payToHandle` and `split` take no custody: money
@@ -21,23 +21,23 @@ per address, with reverse resolution for display.
 
 <Steps>
   <Step title="Commit">
-    Submit a hash of your desired handle plus a secret. Nobody watching the mempool can tell
-    which name you are claiming.
+    Submit a hash of your desired handle plus a secret. Nobody watching the mempool can tell which
+    name you are claiming.
   </Step>
   <Step title="Reveal">
-    Submit the handle and secret. The registry checks the commit and assigns the name. On
-    matsnet, `@sele` was registered this way, with the reveal landing at 119,726 gas.
+    Submit the handle and secret. The registry checks the commit and assigns the name. On matsnet,
+    `@sele` was registered this way, with the reveal landing at 119,726 gas.
   </Step>
   <Step title="Resolve">
-    `resolve("sele")` returns the owner address on-chain. The payment interface always shows
-    the resolved address alongside the handle before you confirm, so you see where money is
-    actually going.
+    `resolve("sele")` returns the owner address on-chain. The payment interface always shows the
+    resolved address alongside the handle before you confirm, so you see where money is actually
+    going.
   </Step>
 </Steps>
 
 <Note>
-  Restricting handles to `[a-z0-9_]` eliminates homoglyph attacks, and showing the resolved
-  address before confirmation is the second line of defence. See [handle risk](/security/risk).
+  Restricting handles to `[a-z0-9_]` eliminates homoglyph attacks, and showing the resolved address
+  before confirmation is the second line of defence. See [handle risk](/security/risk).
 </Note>
 
 ## Money links
@@ -53,9 +53,8 @@ product's built-in growth loop: every link is an invitation carrying money.
 
 <Info>
   `createLink` / `claimLink` are built and exercised on testnet. Polishing money links for
-  non-crypto recipients is Phase 3 work, planned rather than shipped. The pilot metric that
-  matters here is **claims made by addresses brand new to Maren**, which is the growth loop
-  working.
+  non-crypto recipients is Phase 3 work, planned rather than shipped. The pilot metric that matters
+  here is **claims made by addresses brand new to Maren**, which is the growth loop working.
 </Info>
 
 ## Requests
@@ -67,7 +66,7 @@ app.
 
 ## The full payment surface
 
-`MarenPay` uses `ERC2771Context`, so its actions can be relayed gaslessly once the relayer is
+`MarenPay` uses `ERC2771Context`, so eligible actions can be sponsored when the relayer is
 hosted.
 
 <ResponseField name="pay(to, amount, memo)" type="direct transfer">
@@ -88,6 +87,6 @@ hosted.
 
 <Warning>
   Cash out to a bank and pay at a shop are **planned, not built**. Cashout integrates licensed
-  off-ramp partners rather than taking custody of fiat; merchant payments settle in MUSD over
-  Mezo's x402 rail. Both are Phase 3 design work. Nothing in the app pretends otherwise.
+  off-ramp partners rather than taking custody of fiat; merchant payments settle in MUSD over Mezo's
+  x402 rail. Both are Phase 3 design work. Nothing in the app pretends otherwise.
 </Warning>

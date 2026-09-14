@@ -114,7 +114,8 @@ struct OnboardingView: View {
                         onLater: {
                             OnboardingFlags.backupPending = true
                             finish()
-                        }
+                        },
+                        allowLater: { if case .sessionOnly = protection { return false }; return true }()
                     )
                 }
             }

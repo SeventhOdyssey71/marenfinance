@@ -101,7 +101,7 @@ $0.0092 | What 100,000 gas costs
 
 - **Not audited.** No third party has reviewed a line of it
 - **Not on mainnet.** That is gated on the audit, deliberately
-- **The relayer is not hosted.** Gasless is implemented and tested, and running nowhere
+- **Demand is not proven.** The testnet relayer is hosted; independent pilot usage is the next evidence gate
 
 <!-- slide: stat | kicker: The ask -->
 

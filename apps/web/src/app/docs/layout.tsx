@@ -1,6 +1,6 @@
 import type { ReactNode } from 'react';
 import { DocsShell } from '@/components/docs/shell';
-import { getGithubHref, getNav } from '@/lib/docs/source';
+import { getNav } from '@/lib/docs/source';
 import './docs.css';
 
 // The docs are read from static in-repo MDX at build time, so the whole subtree
@@ -12,13 +12,10 @@ const themeInit = `(function(){try{var t=localStorage.getItem('maren-docs-theme'
 
 export default function DocsLayout({ children }: { children: ReactNode }) {
   const nav = getNav();
-  const githubHref = getGithubHref();
   return (
     <div className="maren-docs">
       <script dangerouslySetInnerHTML={{ __html: themeInit }} />
-      <DocsShell nav={nav} githubHref={githubHref}>
-        {children}
-      </DocsShell>
+      <DocsShell nav={nav}>{children}</DocsShell>
     </div>
   );
 }

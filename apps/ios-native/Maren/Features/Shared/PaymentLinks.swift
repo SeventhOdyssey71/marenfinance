@@ -17,7 +17,22 @@ import Foundation
 // logged anywhere in this app.
 
 enum PaymentLinks {
-    static let host = "maren.finance"
+    static let host = "marenfinance.vercel.app"
+    private static let acceptedHosts = [host, "maren.finance"]
+
+    private static func components(_ raw: String, route: String) -> URLComponents? {
+        guard var value = URLComponents(string: raw), value.user == nil, value.password == nil,
+              value.port == nil else { return nil }
+        if value.scheme?.lowercased() == "maren" {
+            guard value.host?.lowercased() == route, value.path.isEmpty else { return nil }
+            value.scheme = "https"; value.host = host; value.path = "/" + route
+        }
+        guard value.scheme?.lowercased() == "https",
+              acceptedHosts.contains(value.host?.lowercased() ?? ""), value.path == "/" + route else { return nil }
+        let names = (value.queryItems ?? []).map(\.name)
+        guard Set(names).count == names.count else { return nil }
+        return value
+    }
 
     private static let addressPattern = "^0x[0-9a-fA-F]{40}$"
     /// MarenRegistry handles: 3–32 chars of [a-z0-9_].
@@ -48,7 +63,11 @@ enum PaymentLinks {
     static func isAddress(_ s: String) -> Bool { matches(s, addressPattern) }
     static func isHandle(_ s: String) -> Bool { matches(s, handlePattern) }
     static func isRecipient(_ s: String) -> Bool { isAddress(s) || isHandle(s) }
-    static func isAmount(_ s: String) -> Bool { matches(s, amountPattern) }
+    static func isAmount(_ s: String) -> Bool {
+        guard s.count <= 37, matches(s, amountPattern) else { return false }
+        let pieces = s.split(separator: ".", omittingEmptySubsequences: false)
+        return pieces.count < 2 || pieces[1].count <= Amount.decimals
+    }
 
     private static func matches(_ s: String, _ pattern: String) -> Bool {
         s.range(of: pattern, options: .regularExpression) != nil
@@ -60,10 +79,7 @@ enum PaymentLinks {
         let value = raw.trimmingCharacters(in: .whitespacesAndNewlines)
         if isAddress(value) { return PaymentPayload(to: value, amount: nil) }
 
-        guard let comps = URLComponents(string: value),
-              comps.scheme?.lowercased() == "https",
-              comps.host?.lowercased() == host,
-              comps.path == "/pay" else { return nil }
+        guard let comps = components(value, route: "pay") else { return nil }
 
         let items = comps.queryItems ?? []
         guard let to = items.first(where: { $0.name == "to" })?.value, isRecipient(to) else {
@@ -78,10 +94,7 @@ enum PaymentLinks {
 
     static func parseClaim(_ raw: String) -> ClaimLink? {
         let value = raw.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard let comps = URLComponents(string: value),
-              comps.scheme?.lowercased() == "https",
-              comps.host?.lowercased() == host,
-              comps.path == "/claim" else { return nil }
+        guard let comps = components(value, route: "claim") else { return nil }
 
         guard let id = comps.queryItems?.first(where: { $0.name == "id" })?.value,
               matches(id, "^\\d+$"), let linkId = UInt64(id), linkId > 0 else { return nil }
@@ -89,7 +102,7 @@ enum PaymentLinks {
         // Only the fragment. Anything not exactly a 32-byte hex key is rejected, so a truncated
         // or tampered fragment fails closed.
         let secret = comps.fragment ?? ""
-        guard matches(secret, secretPattern) else { return nil }
+        guard matches(secret, secretPattern), Keystore.normalise(secret) != nil else { return nil }
         return ClaimLink(linkId: linkId, secret: secret.lowercased())
     }
 

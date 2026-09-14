@@ -51,7 +51,9 @@ function run(cmd, args) {
     const p = spawn(cmd, args, { stdio: ['ignore', 'ignore', 'pipe'] });
     let err = '';
     p.stderr.on('data', (d) => (err += d));
-    p.on('close', (code) => (code === 0 ? ok() : fail(new Error(`${cmd} exited ${code}\n${err.slice(-4000)}`))));
+    p.on('close', (code) =>
+      code === 0 ? ok() : fail(new Error(`${cmd} exited ${code}\n${err.slice(-4000)}`)),
+    );
   });
 }
 
@@ -89,7 +91,8 @@ try {
     window.requestAnimationFrame = () => 0;
     // #ui is the control bar, #hint the keyboard legend. Both are opacity-based and get
     // re-shown by the film's own idle timer, so remove them from layout outright.
-    for (const id of ['ui', 'hint']) document.getElementById(id)?.style.setProperty('display', 'none');
+    for (const id of ['ui', 'hint'])
+      document.getElementById(id)?.style.setProperty('display', 'none');
     // eslint-disable-next-line no-undef
     return DUR;
   });
@@ -118,15 +121,23 @@ try {
   log(`encoding -> ${out}`);
   await run('ffmpeg', [
     '-y',
-    '-framerate', String(fps),
-    '-i', join(frameDir, 'f%06d.png'),
-    '-vf', 'scale=1920:1080:flags=lanczos',
-    '-c:v', 'libx264',
-    '-preset', 'slow',
-    '-crf', String(crf),
+    '-framerate',
+    String(fps),
+    '-i',
+    join(frameDir, 'f%06d.png'),
+    '-vf',
+    'scale=1920:1080:flags=lanczos',
+    '-c:v',
+    'libx264',
+    '-preset',
+    'slow',
+    '-crf',
+    String(crf),
     // yuv420p is what QuickTime, Keynote, Twitter and every browser will actually play.
-    '-pix_fmt', 'yuv420p',
-    '-movflags', '+faststart',
+    '-pix_fmt',
+    'yuv420p',
+    '-movflags',
+    '+faststart',
     out,
   ]);
   log(`done: ${out}`);

@@ -1,0 +1,22 @@
+{
+  "name": "@maren/release",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "attest": "node --import tsx attest.ts",
+    "test": "node --test check.test.mjs && vitest run",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@maren/sdk": "workspace:*",
+    "@maren/relayer": "workspace:*",
+    "viem": "^2.21.55"
+  },
+  "devDependencies": {
+    "@types/node": "^22.10.2",
+    "tsx": "^4.19.2",
+    "typescript": "^5.7.2",
+    "vitest": "^2.1.8"
+  }
+}

@@ -433,6 +433,8 @@ struct OnboardingCopyButton: View {
     let value: String
     var describes: String
     var title: String = "Copy"
+    var sensitive: Bool = false
+    var onCopied: () -> Void = {}
 
     @State private var copied = false
     @State private var resetTask: Task<Void, Never>?
@@ -450,7 +452,11 @@ struct OnboardingCopyButton: View {
     }
 
     private func copy() {
-        UIPasteboard.general.string = value
+        if sensitive {
+            UIPasteboard.general.setItems([["public.utf8-plain-text": value]],
+                options: [.localOnly: true, .expirationDate: Date().addingTimeInterval(120)])
+        } else { UIPasteboard.general.string = value }
+        onCopied()
         OnboardingHaptics.success()
         UIAccessibility.post(notification: .announcement, argument: "Copied")
         withAnimation(reduceMotion ? nil : .easeOut(duration: 0.2)) { copied = true }

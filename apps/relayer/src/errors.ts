@@ -40,6 +40,7 @@ export type RelayErrorCode =
   // --- execution -----------------------------------------------------------
   | 'SIMULATION_REVERTED'
   | 'SUBMISSION_FAILED'
+  | 'SUBMISSION_UNCERTAIN'
   | 'RELAYER_UNDERFUNDED'
   // --- posture (R8) --------------------------------------------------------
   | 'RELAYER_NOT_ACCEPTING'

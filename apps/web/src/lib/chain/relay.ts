@@ -518,15 +518,28 @@ export interface RelayErrorBody {
  * the same slot a Solidity error name occupies, because that is the field the sheet
  * already renders small at the bottom for anyone who wants to grep the source.
  *
- * Every branch here says the same two things in different words: nothing was submitted,
- * and what to do next. A refusal that leaves a user unsure whether their money moved is
- * the failure this app spends the most code preventing.
+ * Only recognised pre-submission refusals can promise nothing was sent. An uncertain
+ * journal acknowledgement, lost response or unknown error may still settle and must
+ * never invite a self-paid replacement.
  */
 export function relayFailureReason(status: number, body: RelayErrorBody | null): RevertReason {
   const code = body?.error ?? 'UPSTREAM_ERROR';
   const nothingSent = 'Nothing was submitted and no gas was spent.';
 
   switch (code) {
+    case 'SUBMISSION_UNCERTAIN': {
+      const hash = body?.meta?.['hash'];
+      return {
+        name: code,
+        title: 'Submission outcome unknown',
+        detail:
+          'The relayer could not confirm whether its signed transaction was saved or submitted. It may still be broadcast during recovery. Check its status before trying again; do not send a replacement payment.',
+        submissionUnknown: true,
+        ...(typeof hash === 'string' && /^0x[0-9a-fA-F]{64}$/.test(hash)
+          ? { hash: hash as Hash }
+          : {}),
+      };
+    }
     case 'SPONSORSHIP_FEE_REQUIRED':
     case 'SPONSORSHIP_UNAVAILABLE':
     case 'FEE_BELOW_REQUIRED':
@@ -557,8 +570,15 @@ export function relayFailureReason(status: number, body: RelayErrorBody | null):
         title: 'Maren’s relayer is not taking work',
         detail: `The service that would have paid your gas is not accepting requests. ${nothingSent} Try again, or send it yourself.`,
       };
-    case 'NONCE_MISMATCH':
     case 'DUPLICATE_REQUEST_IN_FLIGHT':
+      return {
+        name: code,
+        title: 'An earlier request is still pending',
+        detail:
+          'A signed request from this account is already being processed and may still settle. Wait for its outcome and check the receiving wallet or your activity; do not send a replacement payment.',
+        submissionUnknown: true,
+      };
+    case 'NONCE_MISMATCH':
       return {
         name: code,
         title: 'This action was signed against a stale position in the queue',
@@ -597,17 +617,12 @@ export function relayFailureReason(status: number, body: RelayErrorBody | null):
         title: 'This would have failed on-chain',
         detail: `The relayer ran the call against Mezo before paying for it and it reverted, so it was never broadcast. ${nothingSent}`,
       };
-    case 'SUBMISSION_FAILED':
-      return {
-        name: code,
-        title: 'The relayer could not broadcast this',
-        detail: `The transaction was accepted and then failed to reach the chain. ${nothingSent} Check Activity before retrying.`,
-      };
     default:
       return {
         name: code,
-        title: 'Maren’s relayer refused this',
-        detail: `The relayer answered ${status} and did not submit anything. ${nothingSent} You can send this yourself and pay the Bitcoin gas.`,
+        title: 'Submission outcome unknown',
+        detail: `The relayer answered ${status} without a recognised submission result. The signed request may still be processed. Check the receiving wallet or your activity before trying again; do not send a replacement payment.`,
+        submissionUnknown: true,
       };
   }
 }
@@ -676,6 +691,7 @@ export function decodeRelayResponse(
     return {
       failure: {
         name: 'RELAYER_ANSWER_UNRECOGNISED',
+        submissionUnknown: true,
         title: 'Maren’s relayer answered with something unrecognisable',
         detail:
           'It accepted the request but did not return a broadcast this app can tie back ' +
@@ -717,9 +733,8 @@ export interface PostRelayOptions {
 /**
  * POST the signed request, and return the hash the relayer broadcast under.
  *
- * The signature has already been given by this point, which is why every failure below is
- * explicit about the fact that nothing was submitted. A user who signed and then saw a
- * blank error would have no way to know whether their money moved.
+ * The signature has already been given. Lost responses have an unknown outcome;
+ * a fetch error is not proof that the POST never reached the server.
  */
 export async function postRelay(
   url: string,
@@ -741,20 +756,16 @@ export async function postRelay(
     });
     status = response.status;
     parsed = await response.json().catch(() => null);
-  } catch (error) {
-    // Reaching the relayer failed, so it never saw the request. That is worth stating
-    // plainly rather than reporting as an unknown outcome: unlike a broadcast that
-    // vanished, this one provably did not happen.
-    noteRelayerRefusal(options.now?.() ?? Date.now());
+  } catch {
+    // A lost response does not prove that the POST failed to reach the relayer.
+    // Keep this separate from a definite refusal and never trigger self-pay fallback.
     throw new ExplainedError({
       name: 'RELAYER_UNREACHABLE',
-      title: 'Could not reach Maren’s relayer',
+      title: 'Submission outcome unknown',
+      submissionUnknown: true,
       detail:
-        'The request never left this device, so nothing was submitted and no gas was spent. ' +
-        (error instanceof Error && /abort/i.test(error.message)
-          ? 'It did not answer in time. '
-          : '') +
-        'You can send this yourself and pay the Bitcoin gas.',
+        'The relayer response was lost after your signed request was sent. It may still be processed. ' +
+        'Check the receiving wallet or your activity before trying again; do not send a replacement payment.',
     });
   } finally {
     clearTimeout(timer);

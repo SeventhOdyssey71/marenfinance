@@ -5,6 +5,7 @@ import {
   createWalletClient,
   defineChain,
   http,
+  keccak256,
   parseAbi,
   type Address,
   type Hash,
@@ -15,6 +16,7 @@ import { createViemAdapter } from '../src/chain.js';
 import { loadConfig } from '../src/config.js';
 import { preflightRpcs } from '../src/rpc.js';
 import { settle } from '../src/receipt.js';
+import { parseForwardRequest } from '../src/forwarder.js';
 import { isRelayError } from '../src/errors.js';
 import { makeEnv, signedRequest } from './helpers.js';
 
@@ -130,7 +132,7 @@ if (fork === null) {
     );
   }
   console.warn(
-    `[anvil] SKIPPING 6 chain integration tests: ${detail}. ` +
+    `[anvil] SKIPPING 7 chain integration tests: ${detail}. ` +
       'These cover real simulation, broadcast and receipt settlement — a green run without ' +
       'them has NOT exercised the chain layer. Set MEZO_TESTNET_RPC_URL to make this fatal.',
   );
@@ -268,6 +270,34 @@ describe.skipIf(fork === null)('anvil fork of Mezo testnet', () => {
     expect(settlement.state).toBe('confirmed');
     expect(settlement.success).toBe(true);
     expect(settlement.gasCostWei).toBeGreaterThan(0n);
+  });
+
+  it('signs locally without consuming a nonce and broadcasts the persisted hash', async () => {
+    const accepter = await deploy(ACCEPTER_INIT_CODE);
+    const { config } = loadConfig(
+      makeEnv({ RELAYER_FORWARDER_ADDRESS: accepter, RELAYER_RPC_URLS: ANVIL_URL }),
+    );
+    const adapter = createViemAdapter({
+      config,
+      privateKey: ANVIL_KEY,
+      chain: anvilChain,
+      rpcUrls: [ANVIL_URL],
+    });
+    const request = parseForwardRequest(await signedRequest());
+    const gasLimit = await adapter.simulate(request);
+    const fees = await adapter.estimateFees();
+    const nonce = await adapter.transactionCount(adapter.account);
+    const raw = await adapter.prepareExecute!(request, { nonce, ...fees }, gasLimit);
+    const knownHash = keccak256(raw);
+    expect(await adapter.transactionCount(adapter.account)).toBe(nonce);
+    expect(await adapter.getReceipt(knownHash)).toBeNull();
+    expect(await adapter.broadcastRaw!(raw)).toBe(knownHash);
+    await publicClient.waitForTransactionReceipt({ hash: knownHash });
+    expect((await settle(adapter, knownHash)).state).toBe('confirmed');
+    // Nodes may report already-known/nonce-too-low on an exact-byte repeat.
+    // Either response must leave only one paid transaction at this nonce.
+    await adapter.broadcastRaw!(raw).catch(() => undefined);
+    expect(await adapter.transactionCount(adapter.account)).toBe(nonce + 1);
   });
 
   it('reads the relayer balance and nonce for /health', async () => {

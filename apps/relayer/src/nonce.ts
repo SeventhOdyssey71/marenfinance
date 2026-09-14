@@ -90,6 +90,7 @@ export class NonceManager {
   readonly #options: NonceManagerOptions;
   #queue: Promise<unknown> = Promise.resolve();
   #next: number | null = null;
+  #reservedFloor = 0;
   #inFlight = 0;
   #queued = 0;
   #resyncs = 0;
@@ -124,6 +125,13 @@ export class NonceManager {
   /** Last nonce we believe we have used, or null before the first sync. */
   get nextNonce(): number | null {
     return this.#next;
+  }
+
+  /** Restored durable intents reserve their nonce even if an RPC mempool has
+   * forgotten them. Invalidating the cache must never drop this floor. */
+  reserveThrough(nonce: number): void {
+    this.#reservedFloor = Math.max(this.#reservedFloor, nonce + 1);
+    if (this.#next !== null) this.#next = Math.max(this.#next, this.#reservedFloor);
   }
 
   /** Force a resync from the chain on the next allocation. */
@@ -224,7 +232,10 @@ export class NonceManager {
       this.#inFlight += 1;
       try {
         if (this.#next === null) {
-          this.#next = await this.#options.getTransactionCount(this.#options.address);
+          this.#next = Math.max(
+            this.#reservedFloor,
+            await this.#options.getTransactionCount(this.#options.address),
+          );
         }
         let nonce = this.#next;
         let hash: Hash;

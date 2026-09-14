@@ -18,12 +18,17 @@
 # Other apps. The web build never imports from these.
 /apps/ios-native
 /apps/relayer
+# Release verification imports the backend and is not part of the web build.
+/tools/release
 
 # Design and marketing source. design/ alone is ~24 MB: the launch film inlines
 # every image as a base64 data URI, and the rendered masters live beside it.
 /design
 /_grant
 /_archive
+/applestyle.md
+/motion.md
+/goal-report.md
 
 # Research notes, brand assets and generated demo/build artifacts (~21 MB).
 # NOT docs-site/ — that is the MDX + docs.json the /docs route actually reads,

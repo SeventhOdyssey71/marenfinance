@@ -436,13 +436,12 @@ describe('the health probe', () => {
 });
 
 describe('error mapping', () => {
-  it('turns every relayer code into copy that says nothing was submitted', () => {
+  it('states nothing was submitted only for recognised definitive refusals', () => {
     const codes = [
       'MALFORMED_REQUEST',
       'INVALID_SIGNATURE',
       'SIGNER_MISMATCH',
       'NONCE_MISMATCH',
-      'DUPLICATE_REQUEST_IN_FLIGHT',
       'REQUEST_EXPIRED',
       'DEADLINE_TOO_FAR',
       'TARGET_NOT_ALLOWED',
@@ -457,13 +456,10 @@ describe('error mapping', () => {
       'IP_RATE_LIMIT',
       'GLOBAL_DAILY_BUDGET_EXHAUSTED',
       'SIMULATION_REVERTED',
-      'SUBMISSION_FAILED',
       'RELAYER_UNDERFUNDED',
       'RELAYER_NOT_ACCEPTING',
       'RELAYER_SHUTTING_DOWN',
       'STORE_UNAVAILABLE',
-      'NOT_FOUND',
-      'UPSTREAM_ERROR',
     ];
     for (const code of codes) {
       const reason = relayFailureReason(402, { error: code, detail: 'operator prose', meta: {} });
@@ -485,6 +481,41 @@ describe('error mapping', () => {
     const reason = relayFailureReason(418, { error: 'SOMETHING_NEW', detail: '', meta: {} });
     expect(reason.name).toBe('SOMETHING_NEW');
     expect(reason.detail).toContain('418');
+    expect(reason.submissionUnknown).toBe(true);
+  });
+
+  it('does not assume a legacy submission failure means the signed request was refused', () => {
+    const reason = relayFailureReason(503, { error: 'SUBMISSION_FAILED', detail: '' });
+    expect(reason.submissionUnknown).toBe(true);
+    expect(reason.detail).not.toMatch(/nothing was submitted|no gas was spent|send this yourself/i);
+  });
+
+  it('preserves a journal hash without claiming a definite refusal', () => {
+    const hash = `0x${'ab'.repeat(32)}`;
+    const reason = relayFailureReason(503, {
+      error: 'SUBMISSION_UNCERTAIN',
+      detail: '',
+      meta: { hash },
+    });
+    expect(reason.submissionUnknown).toBe(true);
+    expect(reason.hash).toBe(hash);
+    expect(reason.detail).not.toMatch(/nothing was submitted|no gas was spent|send this yourself/i);
+    expect(isStickyRefusal('SUBMISSION_UNCERTAIN')).toBe(false);
+    expect(
+      relayFailureReason(503, {
+        error: 'SUBMISSION_UNCERTAIN',
+        detail: '',
+        meta: { hash: 'https://other.test' },
+      }).hash,
+    ).toBeUndefined();
+  });
+
+  it('keeps an earlier in-flight request separate from a definitive refusal', () => {
+    const reason = relayFailureReason(409, { error: 'DUPLICATE_REQUEST_IN_FLIGHT', detail: '' });
+    expect(reason.submissionUnknown).toBe(true);
+    expect(reason.detail).toMatch(/may still settle/);
+    expect(reason.detail).not.toMatch(/nothing was submitted|no gas was spent|send this yourself/i);
+    expect(isStickyRefusal('DUPLICATE_REQUEST_IN_FLIGHT')).toBe(false);
   });
 
   it('separates refusals that should stop routing from ones about this request only', () => {
@@ -579,6 +610,28 @@ describe('postRelay', () => {
 
   const body = { ...fixture.body };
 
+  it('does not downgrade health to a self-pay route after an uncertain journal response', async () => {
+    await probeRelayer('https://r.test', {
+      fetchImpl: (async () =>
+        new Response(JSON.stringify({ accepting: true }), { status: 200 })) as typeof fetch,
+    });
+    const error = await postRelay('https://r.test', body, {
+      fetchImpl: (async () =>
+        new Response(
+          JSON.stringify({ error: 'SUBMISSION_UNCERTAIN', meta: { hash: `0x${'ab'.repeat(32)}` } }),
+          { status: 503 },
+        )) as typeof fetch,
+    }).catch((e: unknown) => e);
+    expect(error).toBeInstanceOf(ExplainedError);
+    expect((error as ExplainedError).reason.submissionUnknown).toBe(true);
+    const health = await probeRelayer('https://r.test', {
+      fetchImpl: (async () => {
+        throw new Error('must use cached health');
+      }) as typeof fetch,
+    });
+    expect(health.accepting).toBe(true);
+  });
+
   it('posts the eight-field body to /relay and returns the broadcast hash', async () => {
     let seenUrl = '';
     let seenBody: unknown = null;
@@ -637,7 +690,7 @@ describe('postRelay', () => {
     expect(after.accepting).toBe(false);
   });
 
-  it('says plainly that a request which never left the device submitted nothing', async () => {
+  it('treats a lost POST response as an unknown outcome', async () => {
     const error = await postRelay('https://r.test', body, {
       fetchImpl: (async () => {
         throw new TypeError('Failed to fetch');
@@ -645,8 +698,11 @@ describe('postRelay', () => {
     }).catch((e: unknown) => e);
 
     expect(error).toBeInstanceOf(ExplainedError);
-    expect((error as ExplainedError).reason.detail).toMatch(/never left this device/);
-    expect((error as ExplainedError).reason.detail).toMatch(/no gas was spent/);
+    expect((error as ExplainedError).reason.submissionUnknown).toBe(true);
+    expect((error as ExplainedError).reason.detail).toMatch(/may still be processed/);
+    expect((error as ExplainedError).reason.detail).not.toMatch(
+      /nothing was submitted|no gas was spent|send this yourself/i,
+    );
   });
 
   it('does not knock down health for a refusal about this one request', async () => {

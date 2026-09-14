@@ -105,7 +105,9 @@ actor Keystore {
     static func normalise(_ input: String) -> Data? {
         var s = input.trimmingCharacters(in: .whitespacesAndNewlines)
         if s.hasPrefix("0x") || s.hasPrefix("0X") { s = String(s.dropFirst(2)) }
-        guard s.count == 64, s.allSatisfy({ $0.isHexDigit }) else { return nil }
+        guard s.count == 64, s.utf8.allSatisfy({ (48...57).contains($0) || (65...70).contains($0) || (97...102).contains($0) }),
+              let scalar = BigUInt(s, radix: 16), scalar > 0,
+              scalar < BigUInt("fffffffffffffffffffffffffffffffebaaedce6af48a03bbfd25e8cd0364141", radix: 16)! else { return nil }
         return Data(hex: s)
     }
 
@@ -119,7 +121,7 @@ actor Keystore {
     /// Persist a key. Returns how it ended up being held so the caller can tell the truth —
     /// this never silently degrades.
     func store(privateKey: Data) throws -> KeyProtection {
-        guard privateKey.count == 32 else { throw KeystoreError.invalidPrivateKey }
+        guard privateKey.count == 32, Self.normalise(privateKey.web3.hexString) != nil else { throw KeystoreError.invalidPrivateKey }
         let cap = capability()
 
         guard cap.available, cap.enrolled else {
@@ -205,6 +207,13 @@ actor Keystore {
         return status == errSecSuccess || status == errSecInteractionNotAllowed
     }
 
+    func protection() -> KeyProtection? {
+        if sessionKey != nil {
+            return .sessionOnly(reason: "This key is held only while Maren is running. Back it up before closing the app.")
+        }
+        return hasKey() ? .keychainBiometric(label: capability().displayName) : nil
+    }
+
     func clear() {
         sessionKey = nil
         SecItemDelete(baseQuery() as CFDictionary)
@@ -216,5 +225,131 @@ actor Keystore {
             kSecAttrService as String: service,
             kSecAttrAccount as String: account,
         ]
+    }
+}
+
+/// A single recoverable escrow creation per wallet. Stored only in biometric Keychain.
+/// No raw wallet signing key is included; `secret` is the link's separate bearer key.
+struct PendingClaimLink: Codable, Sendable, Equatable {
+    let owner: String
+    let secret: String
+    let linkKey: String
+    let amount: String
+    let expiry: UInt64
+    let startBlock: Int
+    var txHash: String?
+    var linkId: UInt64?
+
+    func validated(owner expectedOwner: String) -> Bool {
+        guard PaymentLinks.isAddress(owner), owner.lowercased() == expectedOwner.lowercased(),
+              let key = Keystore.normalise(secret),
+              let derived = try? Keystore.address(of: key), derived.lowercased() == linkKey.lowercased(),
+              Amount.parse(amount) != nil, startBlock >= 0, expiry > 0 else { return false }
+        if let txHash, txHash.range(of: "^0x[0-9a-fA-F]{64}$", options: .regularExpression) == nil { return false }
+        if let linkId, linkId == 0 || txHash == nil { return false }
+        return true
+    }
+
+    /// Returns false only when the action proves no escrow was created.
+    mutating func retain(after result: SubmitOutcome) -> Bool {
+        switch result {
+        case .delivered(let delivered):
+            txHash = delivered.hash; linkId = delivered.mintedId
+        case .failed(let tx):
+            switch tx {
+            case .reverted: return false
+            case .timeout(let hash), .unreachable(let hash, _): txHash = hash
+            case .delivered(let delivered): txHash = delivered.hash; linkId = delivered.mintedId
+            case .submissionUnknown: break
+            }
+        case .declined, .demo: return false
+        }
+        return true
+    }
+
+    /// A restart may precede saving the returned hash. LinkCreated indexes the unique bearer
+    /// address, so logs can recover the exact transaction without guessing an escrow id.
+    func recoverHash(chain: MezoChain) async throws -> String? {
+        if let txHash { return txHash }
+        let client = EthereumHttpClient(url: chain.rpcURLs[0], network: .custom(String(chain.chainId)))
+        let head = try await client.eth_blockNumber()
+        var from = startBlock
+        let topics: [String?] = [MarenEncoding.linkCreatedTopic, nil,
+            "0x" + String(repeating: "0", count: 24) + owner.dropFirst(2).lowercased(),
+            "0x" + String(repeating: "0", count: 24) + linkKey.dropFirst(2).lowercased()]
+        // One hundred RPC windows cover 1,000,000 blocks. A partial scan never means failure.
+        for _ in 0..<100 {
+            guard from <= head else { return nil }
+            let to = min(head, from + MEZO_MAX_LOG_RANGE - 1)
+            let logs = try await client.eth_getLogs(addresses: [EthereumAddress(MarenAddresses.of(chain.network).marenPay)],
+                topics: topics, fromBlock: .Number(from), toBlock: .Number(to))
+            if let hash = matchingHash(in: logs, contract: MarenAddresses.of(chain.network).marenPay) { return hash }
+            from = to + 1
+        }
+        return nil
+    }
+
+    func matchingHash(in logs: [EthereumLog], contract: String) -> String? {
+        let ownerTopic = "0x" + String(repeating: "0", count: 24) + owner.dropFirst(2).lowercased()
+        let keyTopic = "0x" + String(repeating: "0", count: 24) + linkKey.dropFirst(2).lowercased()
+        return logs.first { log in
+            log.removed != true && log.address.asString().lowercased() == contract.lowercased()
+                && log.topics.count == 4 && log.topics[0].lowercased() == MarenEncoding.linkCreatedTopic
+                && log.topics[2].lowercased() == ownerTopic && log.topics[3].lowercased() == keyTopic
+        }?.transactionHash
+    }
+}
+
+extension Keystore {
+    private func claimQuery(owner: String) -> [String: Any] {
+        [kSecClass as String: kSecClassGenericPassword,
+         kSecAttrService as String: "finance.maren.swift.pendingClaim.v1",
+         kSecAttrAccount as String: owner.lowercased()]
+    }
+
+    func loadPendingClaim(owner: String) throws -> PendingClaimLink? {
+        var query = claimQuery(owner: owner)
+        query[kSecReturnData as String] = true
+        query[kSecUseOperationPrompt as String] = "Recover your saved Maren claim link"
+        var result: CFTypeRef?
+        let status = SecItemCopyMatching(query as CFDictionary, &result)
+        if status == errSecItemNotFound { return nil }
+        guard status == errSecSuccess, let data = result as? Data,
+              let record = try? JSONDecoder().decode(PendingClaimLink.self, from: data),
+              record.validated(owner: owner) else {
+            throw KeystoreError.keychainRefused("The pending claim could not be unlocked. Nothing new was created.")
+        }
+        return record
+    }
+
+    func savePendingClaim(_ record: PendingClaimLink, replacing: Bool = false) throws {
+        guard record.validated(owner: record.owner) else { throw KeystoreError.invalidPrivateKey }
+        let data = try JSONEncoder().encode(record)
+        let query = claimQuery(owner: record.owner)
+        if replacing {
+            let status = SecItemUpdate(query as CFDictionary, [kSecValueData as String: data] as CFDictionary)
+            guard status == errSecSuccess else { throw KeystoreError.keychainRefused("Claim recovery details could not be updated.") }
+            return
+        }
+        let cap = capability()
+        guard cap.available, cap.enrolled,
+              let access = SecAccessControlCreateWithFlags(nil, kSecAttrAccessibleWhenUnlockedThisDeviceOnly,
+                  .biometryCurrentSet, nil) else {
+            throw KeystoreError.keychainRefused("Claim creation needs biometric Keychain storage so the link can survive an interrupted app. Enrol Face ID or Touch ID first.")
+        }
+        var add = query
+        add[kSecValueData as String] = data
+        add[kSecAttrAccessControl as String] = access
+        // Do not overwrite an unsaved link. The owner must recover/save it first.
+        guard SecItemAdd(add as CFDictionary, nil) == errSecSuccess else {
+            throw KeystoreError.keychainRefused("An unsaved claim may already exist, or secure storage is unavailable. Reopen Claimable link to recover it before creating another.")
+        }
+    }
+
+    func clearPendingClaim(owner: String) throws {
+        let status = SecItemDelete(claimQuery(owner: owner) as CFDictionary)
+        guard status == errSecSuccess || status == errSecItemNotFound else {
+            throw KeystoreError.keychainRefused("The saved recovery copy could not be removed.")
+        }
     }
 }

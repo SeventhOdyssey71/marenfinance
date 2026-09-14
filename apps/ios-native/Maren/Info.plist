@@ -10,6 +10,15 @@
 -->
 <plist version="1.0">
 <dict>
+    <key>CFBundleURLTypes</key>
+    <array>
+        <dict>
+            <key>CFBundleURLName</key>
+            <string>finance.maren.app.handoff</string>
+            <key>CFBundleURLSchemes</key>
+            <array><string>maren</string></array>
+        </dict>
+    </array>
     <!-- Goldsky subgraph for Activity history. EMPTY IS VALID: the client falls back to the
          bounded eth_getLogs crawl, which is slower but needs no infrastructure. Fill this in
          after `goldsky subgraph deploy` and the Activity screen stops paging. -->

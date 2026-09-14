@@ -1,7 +1,7 @@
 # Maren Finance nightly.
 #
-# Two gates that are deliberately NOT on the pull-request path, for two different
-# reasons, and both runnable on a laptop:
+# Live deployment checks, fork tests, and coverage gates kept off the pull-request
+# path. Each can also run locally:
 #
 #   cd packages/contracts
 #   MEZO_TESTNET_RPC_URL=https://rpc.test.mezo.org forge test --match-path 'test/fork/*' --threads 1 -vv
@@ -45,7 +45,7 @@ on:
     # 05:17 UTC daily. Early enough to be waiting when the day starts, and off the hour
     # because GitHub's scheduler queues on-the-hour crons behind everyone else's.
     - cron: '17 5 * * *'
-  # So the same two gates can be run on demand without waiting for tomorrow.
+  # Run the same checks on demand without waiting for tomorrow.
   workflow_dispatch:
 
 concurrency:
@@ -56,6 +56,47 @@ permissions:
   contents: read
 
 jobs:
+  release-configuration:
+    name: Testnet deployment configuration
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - name: Attest deployed contracts and client alignment
+        run: pnpm release:attest --out ../../testnet-configuration.json
+      - name: Retain dated observations, including failures
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: testnet-configuration
+          path: testnet-configuration.json
+          if-no-files-found: error
+
+  release-http:
+    name: Public testnet HTTP checks
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Check the intended iOS-first release
+        run: node tools/release/check.mjs --out release-evidence.json
+      - name: Retain dated observations, including failures
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: testnet-http-evidence
+          path: release-evidence.json
+          if-no-files-found: error
+
   fork:
     name: Fork suite (live matsnet)
     runs-on: ubuntu-latest
@@ -99,7 +140,7 @@ jobs:
       # -vv so a revert reason is in the log. A fork failure is read once, at breakfast,
       # by someone who does not want to re-run it locally to find out what happened.
       #
-      # Read the summary line: "8 skipped" means matsnet was unreachable and this run
+      # Read the summary line: skipped fork tests mean matsnet was unreachable and this run
       # proved nothing. Anything other than 0 failed is real protocol drift.
       - name: Fork tests against matsnet
         env:

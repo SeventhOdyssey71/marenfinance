@@ -1,0 +1,66 @@
+{
+  "checkedAt": "2026-09-13T13:32:11.088Z",
+  "releaseSurface": "ios-first (web dashboard intentionally disabled)",
+  "scope": "Testnet HTTP availability and relay configuration only. Does not prove transaction settlement, user traction, deployed source parity, or mainnet safety.",
+  "passed": true,
+  "checks": [
+    {
+      "name": "browser relay CORS",
+      "status": "pass",
+      "httpStatus": 204,
+      "detail": null,
+      "durationMs": 1165
+    },
+    {
+      "name": "relayer health",
+      "status": "pass",
+      "httpStatus": 200,
+      "detail": null,
+      "durationMs": 1245
+    },
+    {
+      "name": "web /",
+      "status": "pass",
+      "httpStatus": 200,
+      "detail": null,
+      "durationMs": 1014
+    },
+    {
+      "name": "web /app",
+      "status": "pass",
+      "httpStatus": 404,
+      "detail": null,
+      "durationMs": 1359
+    },
+    {
+      "name": "web /app/finance",
+      "status": "pass",
+      "httpStatus": 404,
+      "detail": null,
+      "durationMs": 2000
+    },
+    {
+      "name": "web /app/pay",
+      "status": "pass",
+      "httpStatus": 404,
+      "detail": null,
+      "durationMs": 1969
+    },
+    {
+      "name": "web /claim",
+      "status": "pass",
+      "httpStatus": 200,
+      "detail": null,
+      "durationMs": 1987
+    },
+    {
+      "name": "web /docs",
+      "status": "pass",
+      "httpStatus": 200,
+      "detail": null,
+      "durationMs": 843
+    }
+  ],
+  "localCommit": "d349a2272a59357df946a8546026f97307bbf2ca",
+  "localChanges": true
+}

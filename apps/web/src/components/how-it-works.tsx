@@ -15,7 +15,7 @@ const STEPS: readonly { n: string; title: string; body: string; fill: string }[]
   {
     n: '01',
     title: 'Deposit BTC',
-    body: `Get the iOS beta and deposit from 0.001 BTC. ${GASLESS_CAVEAT}`,
+    body: `Get the iOS beta, fund it with testnet BTC, and deposit from 0.001 BTC. ${GASLESS_CAVEAT}`,
     fill: 'var(--lime)',
   },
   {
@@ -41,7 +41,7 @@ export function HowItWorks() {
           Deposit. Draw. Spend.
         </h2>
         <p className="mt-4 max-w-[52ch] text-[15px] font-normal leading-[1.5] text-[color:var(--muted)] sm:text-[17px]">
-          Three steps, one signature each. Borrow against Bitcoin without selling it, then move the
+          Three steps on Mezo testnet. Borrow against Bitcoin without selling it, then move the
           dollars you draw the way you already move money.
         </p>
       </Reveal>

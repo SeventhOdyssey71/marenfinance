@@ -35,6 +35,8 @@ struct MintedIdSource: Sendable, Equatable {
 }
 
 enum TxOutcome: Sendable, Equatable {
+    /// Submission was attempted but its response did not establish a transaction hash.
+    case submissionUnknown(reason: String)
     case delivered(Delivered)
     /// The chain accepted the transaction and then reverted it. Funds did not move.
     case reverted(hash: String, blockNumber: BigUInt)

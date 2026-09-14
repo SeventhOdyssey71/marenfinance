@@ -218,6 +218,31 @@ importers:
         specifier: ^0.1.100
         version: 0.1.100
 
+  tools/release:
+    dependencies:
+      '@maren/relayer':
+        specifier: workspace:*
+        version: link:../../apps/relayer
+      '@maren/sdk':
+        specifier: workspace:*
+        version: link:../../packages/sdk
+      viem:
+        specifier: ^2.21.55
+        version: 2.55.16(bufferutil@4.1.0)(typescript@5.9.3)(utf-8-validate@5.0.10)(zod@4.4.3)
+    devDependencies:
+      '@types/node':
+        specifier: ^22.10.2
+        version: 22.19.21
+      tsx:
+        specifier: ^4.19.2
+        version: 4.23.12
+      typescript:
+        specifier: ^5.7.2
+        version: 5.9.3
+      vitest:
+        specifier: ^2.1.8
+        version: 2.1.9(@types/node@22.19.21)(lightningcss@1.33.0)(terser@5.50.0)
+
 packages:
 
   '@adobe/css-tools@4.5.0':

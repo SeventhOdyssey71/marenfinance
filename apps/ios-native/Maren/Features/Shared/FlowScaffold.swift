@@ -14,6 +14,7 @@ import UIKit
 struct FlowScreen<Content: View>: View {
     let title: String
     var subtitle: String? = nil
+    var canDismiss: Bool = true
     @ViewBuilder var content: Content
     @Environment(\.dismiss) private var dismiss
 
@@ -36,10 +37,12 @@ struct FlowScreen<Content: View>: View {
                 ToolbarItem(placement: .cancellationAction) {
                     Button("Close") { dismiss() }
                         .tint(Theme.Palette.ink)
+                        .disabled(!canDismiss)
                 }
             }
             .toolbarBackground(Theme.Palette.card, for: .navigationBar)
         }
+        .interactiveDismissDisabled(!canDismiss)
     }
 }
 
@@ -383,7 +386,7 @@ struct OutcomeView: View {
         case let .reverted(hash, _): return hash
         case let .timeout(hash): return hash
         case let .unreachable(hash, _): return hash
-        case .delivered: return nil
+        case .delivered, .submissionUnknown: return nil
         }
     }
 
@@ -394,7 +397,8 @@ struct OutcomeView: View {
         case .demo: return Theme.Palette.accentText
         case .delivered: return Theme.Palette.success
         case .declined: return Theme.Palette.warning
-        case .failed: return Theme.Palette.danger
+        case .failed(.reverted): return Theme.Palette.danger
+        case .failed: return Theme.Palette.warning
         }
     }
 
@@ -403,7 +407,8 @@ struct OutcomeView: View {
         case .demo: return "flask.fill"
         case .delivered: return "checkmark"
         case .declined: return "hand.raised"
-        case .failed: return "xmark"
+        case .failed(.reverted): return "xmark"
+        case .failed: return "clock"
         }
     }
 
@@ -417,6 +422,7 @@ struct OutcomeView: View {
             case .reverted: return "Failed, no funds moved"
             case .timeout: return "Still awaiting a receipt"
             case .unreachable: return "Could not reach the chain"
+            case .submissionUnknown: return "Submission status unknown"
             case .delivered: return "Confirmed"
             }
         }
@@ -438,6 +444,7 @@ struct OutcomeView: View {
                 return "No receipt arrived inside the wait. This is not a failure — it may still land. Check the explorer before retrying."
             case let .unreachable(_, error):
                 return "The chain could not be reached to confirm this, so whether it landed is unknown. \(error)"
+            case let .submissionUnknown(reason): return reason
             case .delivered:
                 return "Confirmed."
             }

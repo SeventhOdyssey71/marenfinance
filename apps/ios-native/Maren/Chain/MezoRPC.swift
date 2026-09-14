@@ -684,11 +684,20 @@ enum SubgraphActivity {
         let txHash: String
     }
 
-    static func fetch(account: String, limit: Int = 50) async -> [Row]? {
+    static func fetch(account: String, chain: MezoChain, limit: Int = 50) async -> [Row]? {
         guard let url = SubgraphConfig.url else { return nil }
+        var chainHead: Int?
+        for rpcURL in chain.rpcURLs {
+            if let head = try? await EthereumHttpClient(url: rpcURL, network: .custom(String(chain.chainId))).eth_blockNumber() {
+                chainHead = head
+                break
+            }
+        }
+        guard let chainHead else { return nil }
 
         let query = """
         query Activity($account: Bytes!, $first: Int!) {
+          _meta { block { number } hasIndexingErrors }
           activities(where: { account: $account }, orderBy: timestamp, orderDirection: desc, first: $first) {
             kind amount counterparty memo outgoing blockNumber timestamp txHash
           }
@@ -710,28 +719,41 @@ enum SubgraphActivity {
               let root = try? JSONSerialization.jsonObject(with: data) as? [String: Any]
         else { return nil }
 
+        return decode(root, chainHead: chainHead)
+    }
+
+    static func decode(_ root: [String: Any], chainHead: Int) -> [Row]? {
         // A GraphQL 200 can still carry errors. Treat that as a miss so the crawl runs, rather
         // than rendering whatever partial `data` came alongside them.
         if root["errors"] != nil { return nil }
         guard let dataObj = root["data"] as? [String: Any],
+              let meta = dataObj["_meta"] as? [String: Any],
+              (meta["hasIndexingErrors"] as? Bool) == false,
+              let block = meta["block"] as? [String: Any],
+              let indexedHead = block["number"] as? Int, indexedHead >= chainHead,
               let rows = dataObj["activities"] as? [[String: Any]] else { return nil }
 
-        return rows.compactMap { r in
+        var result: [Row] = []
+        for r in rows {
             guard let kind = r["kind"] as? String,
                   let amountStr = r["amount"] as? String,
                   let amount = BigUInt(amountStr),
                   let tsStr = r["timestamp"] as? String, let ts = TimeInterval(tsStr),
                   let blockStr = r["blockNumber"] as? String, let block = Int(blockStr),
-                  let tx = r["txHash"] as? String
+                  let tx = r["txHash"] as? String,
+                  tx.range(of: "^0x[0-9a-fA-F]{64}$", options: .regularExpression) != nil,
+                  let outgoing = r["outgoing"] as? Bool,
+                  ts.isFinite, ts >= 0, block >= 0
             else { return nil }
-            return Row(kind: kind,
+            result.append(Row(kind: kind,
                        amountWei: amount,
                        counterparty: r["counterparty"] as? String,
                        memo: r["memo"] as? String,
-                       outgoing: (r["outgoing"] as? Bool) ?? true,
+                       outgoing: outgoing,
                        blockNumber: block,
                        timestamp: Date(timeIntervalSince1970: ts),
-                       txHash: tx)
+                       txHash: tx))
         }
+        return result
     }
 }

@@ -1,6 +1,6 @@
 ---
-title: "Roadmap"
-description: "Where Maren is heading: mobile-first Bitcoin spending, shipped audit-first."
+title: 'Roadmap'
+description: 'Where Maren is heading: mobile-first Bitcoin spending, shipped audit-first.'
 ---
 
 Maren's direction is simple: **let anyone spend Bitcoin from their phone without selling it.**
@@ -9,9 +9,9 @@ Bitcoin reaches mainnet before an independent audit, and the pooled vault launch
 way.
 
 <Info>
-  This page states plans as plans. What already exists is on [What is
-  real today](/get-started/introduction) and proven, transaction by transaction, in the repo.
-  Everything below the current phase is planned, not shipped.
+  This page states plans as plans. What already exists is on [What is real
+  today](/get-started/introduction) and proven, transaction by transaction, in the repo. Everything
+  below the current phase is planned, not shipped.
 </Info>
 
 ## The phases
@@ -19,21 +19,21 @@ way.
 <Steps>
   <Step title="Phase 1: the engine (now, live on matsnet)">
     Five contracts live on Mezo testnet `31611`: pooled vault, payments, name registry, ERC-4626
-    Earn, and the relay hub. The full loop runs end to end: deposit BTC, borrow from 0.001 BTC,
-    pay a name, send a link, request money, and Earn. The web app is live against matsnet; the
-    iOS app reads and writes live against those same contracts on matsnet, signing with a
-    secp256k1 key held in the iOS Keychain behind Face ID. The borrow path has executed on-chain
-    from the app, first on 17 August 2026 (tx `0x28bb5ec1…7ef2`).
+    Earn, and the relay hub. The full loop runs end to end: deposit BTC, borrow from 0.001 BTC, pay
+    a name, send a link, request money, and Earn. The web app is live against matsnet; the iOS app
+    reads and writes live against those same contracts on matsnet, signing with a secp256k1 key held
+    in the iOS Keychain behind Face ID. The borrow path has executed on-chain from the app, first on
+    17 August 2026 (tx `0x28bb5ec1…7ef2`).
   </Step>
   <Step title="Phase 2: beta and gasless (shipped, 2026-09)">
-    The iOS app ships to a small **TestFlight beta** on matsnet, and the **gasless relayer gets
-    hosted** so users stop paying gas after their first deposit. The relayer is built and fully
-    tested today; hosting it is one command plus funding a hot wallet.
+    The iOS app has a **TestFlight beta** invite on matsnet and the **gasless relayer is hosted** on
+    Cloudflare. Eligible actions are sponsored while the service is available; deposits, approvals
+    when needed, and link creation still require BTC. The public website serves landing, docs, and
+    claims; its dashboard is intentionally disabled for the iOS-first release.
   </Step>
   <Step title="Phase 3: audit (the gate to mainnet)">
-    An independent third-party audit of `MarenVault` and `MarenRelayHub`, the two contracts that
-    carry risk, with findings and remediations published. No Maren contract reaches mainnet before
-    this.
+    An independent third-party audit including `MarenVault`, `MarenEarn` and `MarenRelayHub`, with
+    findings and remediations published. No Maren contract reaches mainnet before this.
   </Step>
   <Step title="Phase 4: capped mainnet">
     Mainnet launch on chain `31612` with a hard-capped pooled vault. The cap is raised only as the
@@ -51,11 +51,11 @@ way.
 The pooled vault is the one component that can lose user funds through a Maren design failure, so
 its cap is gated on proof, not time. See [Risk](/security/risk) for the full picture.
 
-| Phase | Cap | Gate |
-| --- | --- | --- |
-| Mainnet launch | 5 BTC | 14 days, no keeper failure |
-| Post-audit | 25 BTC | Critical and High findings resolved |
-| Post-traction | 100 BTC | 60 days of clean liquidation history |
+| Phase          | Cap     | Gate                                 |
+| -------------- | ------- | ------------------------------------ |
+| Mainnet launch | 5 BTC   | 14 days, no keeper failure           |
+| Post-audit     | 25 BTC  | Critical and High findings resolved  |
+| Post-traction  | 100 BTC | 60 days of clean liquidation history |
 
 <Note>
   **If the team cannot satisfy itself the pooled vault is safe, Maren ships without it.** Direct
@@ -67,18 +67,18 @@ its cap is gated on proof, not time. See [Risk](/security/risk) for the full pic
 Every measure of success is readable from the chain by anyone. The one that matters most is the
 **spend ratio**: of the addresses that borrowed, the fraction that then spent what they borrowed.
 
-| Metric | What it shows |
-| --- | --- |
-| Funded positions below the protocol minimum | Borrowers who could not exist without Maren |
-| MUSD borrowed through the pooled vault | New MUSD in circulation, attributable on-chain |
-| Payments settled against names and links | The money-app claim, measured |
-| Link claims by brand-new addresses | The growth loop working |
-| Spend ratio | Whether people spend Bitcoin, not just borrow against it |
+| Metric                                      | What it shows                                            |
+| ------------------------------------------- | -------------------------------------------------------- |
+| Funded positions below the protocol minimum | Borrowers who could not exist without Maren              |
+| MUSD borrowed through the pooled vault      | New MUSD in circulation, attributable on-chain           |
+| Payments settled against names and links    | The money-app claim, measured                            |
+| Link claims by brand-new addresses          | The growth loop working                                  |
+| Spend ratio                                 | Whether people spend Bitcoin, not just borrow against it |
 
 <Info>
   Read live on matsnet on 2026-09-07, the pilot showed 3 funded positions, 2,110.72 MUSD borrowed,
-  14 payments totalling 27.70 MUSD, 39.00 MUSD of Earn TVL across 3 depositors, and a spend ratio
-  of **66.7% (2 of 3 borrowers have spent)**. These are testnet numbers from a handful of accounts,
+  14 payments totalling 27.70 MUSD, 39.00 MUSD of Earn TVL across 3 depositors, and a spend ratio of
+  **66.7% (2 of 3 borrowers have spent)**. These are testnet numbers from a handful of accounts,
   most of them ours — they show the loop works end to end, not that demand exists. Regenerate them
   with `pnpm --filter @maren/metrics start`. See [Verify on-chain](/developers/verify-on-chain).
 </Info>

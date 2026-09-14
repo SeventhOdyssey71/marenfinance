@@ -107,8 +107,10 @@ describe('borrowCeiling', () => {
     // Measured on matsnet, that overstated a live position by 722 MUSD.
     const base = directPosition();
     const cap = base.debtWei + 100n * WAD;
-    const correct = borrowCeiling({ ...base, maxBorrowingCapacityWei: cap,
-      troveTotalDebtWei: base.debtWei }, PRICE);
+    const correct = borrowCeiling(
+      { ...base, maxBorrowingCapacityWei: cap, troveTotalDebtWei: base.debtWei },
+      PRICE,
+    );
     const naive = cap - base.principalWei;
 
     expect(correct.mezoHeadroomWei).toBeLessThan(naive);
@@ -118,9 +120,16 @@ describe('borrowCeiling', () => {
 
   it('does not gross down the fee on the pooled route, which does not pay one', () => {
     const base = directPosition();
-    const pooled = borrowCeiling({ ...base, route: 'pooled' as const,
-      maxBorrowingCapacityWei: base.debtWei + 100n * WAD,
-      troveTotalDebtWei: base.debtWei, vaultMaxBorrowableWei: 10_000n * WAD }, PRICE);
+    const pooled = borrowCeiling(
+      {
+        ...base,
+        route: 'pooled' as const,
+        maxBorrowingCapacityWei: base.debtWei + 100n * WAD,
+        troveTotalDebtWei: base.debtWei,
+        vaultMaxBorrowableWei: 10_000n * WAD,
+      },
+      PRICE,
+    );
     expect(pooled.mezoHeadroomWei).toBe(100n * WAD);
   });
 

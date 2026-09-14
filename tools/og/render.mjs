@@ -44,7 +44,9 @@ function run(cmd, args) {
     const p = spawn(cmd, args, { stdio: ['ignore', 'ignore', 'pipe'] });
     let err = '';
     p.stderr.on('data', (d) => (err += d));
-    p.on('close', (c) => (c === 0 ? ok() : fail(new Error(`${cmd} exited ${c}\n${err.slice(-2000)}`))));
+    p.on('close', (c) =>
+      c === 0 ? ok() : fail(new Error(`${cmd} exited ${c}\n${err.slice(-2000)}`)),
+    );
   });
 }
 
@@ -71,13 +73,24 @@ try {
   // or a half-painted screenshot, and the card ships with the wrong font.
   await page.evaluate(async () => {
     await document.fonts.ready;
-    await Promise.all([...document.images].map((i) => (i.complete ? null : i.decode().catch(() => null))));
+    await Promise.all(
+      [...document.images].map((i) => (i.complete ? null : i.decode().catch(() => null))),
+    );
   });
 
   const raw = join(dir, 'raw.png');
   await page.screenshot({ path: raw, animations: 'disabled' });
   await mkdir(dirname(OUT), { recursive: true });
-  await run('ffmpeg', ['-y', '-i', raw, '-vf', `scale=1200:630:flags=lanczos`, '-pix_fmt', 'rgb24', OUT]);
+  await run('ffmpeg', [
+    '-y',
+    '-i',
+    raw,
+    '-vf',
+    `scale=1200:630:flags=lanczos`,
+    '-pix_fmt',
+    'rgb24',
+    OUT,
+  ]);
   process.stdout.write(`wrote ${OUT} (1200x630, rendered at ${SCALE}x)\n`);
 } finally {
   await browser?.close();

@@ -482,7 +482,7 @@
 
 @layer utilities {
   /* One-shot entrance — BRAND.md §6: fires once, never on scroll-back */
-  .reveal {
+  .reveal-ready {
     opacity: 0;
     transform: translateY(22px);
   }
@@ -499,7 +499,8 @@
   }
 
   @media (prefers-reduced-motion: reduce) {
-    .reveal {
+    .reveal,
+    .reveal-ready {
       opacity: 1;
       transform: none;
     }

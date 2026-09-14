@@ -7,5 +7,6 @@
     // the base config keeps the two global libs from clashing.
     "types": ["node", "@cloudflare/workers-types"]
   },
-  "include": ["**/*.ts"]
+  "include": ["**/*.ts", "../test/runtime/worker.ts"],
+  "exclude": ["../node_modules", "../dist"]
 }

@@ -23,9 +23,12 @@ const PROGRESS_SECTIONS = [
 export default function HomePage() {
   return (
     <div className="landing">
+      <a href="#main" className="landing-skip">
+        Skip to content
+      </a>
       <Nav />
 
-      <main id="main">
+      <main id="main" tabIndex={-1}>
         <Hero />
         <Showcase />
         <HowItWorks />

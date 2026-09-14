@@ -42,6 +42,9 @@ export interface ChainAdapter extends ForwarderReader, ReceiptReader {
    * a doomed transaction. Returns the gas limit to submit with.
    */
   simulate(request: ForwardRequest): Promise<bigint>;
+  /** Durable deployments sign locally, persist raw bytes, then broadcast. */
+  prepareExecute?(request: ForwardRequest, ctx: SubmitContext, gasLimit: bigint): Promise<Hex>;
+  broadcastRaw?(raw: Hex): Promise<Hash>;
   sendExecute(request: ForwardRequest, ctx: SubmitContext, gasLimit: bigint): Promise<Hash>;
 }
 
@@ -203,6 +206,24 @@ export function createViemAdapter(deps: ViemAdapterDeps): ChainAdapter {
       const buffered = (estimate * 125n) / 100n;
       const ceiling = (config.policy.maxGasPerRequest * 125n) / 100n + 100_000n;
       return buffered > ceiling ? ceiling : buffered;
+    },
+
+    async prepareExecute(request, ctx, gasLimit) {
+      return account.signTransaction({
+        chainId: chain.id,
+        type: 'eip1559',
+        to: forwarder,
+        data: encodeExecute(request),
+        value: 0n,
+        gas: gasLimit,
+        nonce: ctx.nonce,
+        maxFeePerGas: ctx.maxFeePerGas,
+        maxPriorityFeePerGas: ctx.maxPriorityFeePerGas,
+      });
+    },
+
+    async broadcastRaw(raw) {
+      return publicClient.sendRawTransaction({ serializedTransaction: raw });
     },
 
     async sendExecute(request, ctx, gasLimit) {

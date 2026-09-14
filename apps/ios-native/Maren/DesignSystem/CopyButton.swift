@@ -21,6 +21,7 @@ struct CopyButton: View {
     /// Visible verb for `.inline` / `.filled` (ignored by `.icon`).
     var title: String = "Copy"
     var style: Style = .icon
+    var sensitive: Bool = false
 
     @State private var copied = false
     @State private var resetTask: Task<Void, Never>?
@@ -66,7 +67,10 @@ struct CopyButton: View {
     }
 
     private func copy() {
-        UIPasteboard.general.string = value
+        if sensitive {
+            UIPasteboard.general.setItems([["public.utf8-plain-text": value]],
+                options: [.localOnly: true, .expirationDate: Date().addingTimeInterval(120)])
+        } else { UIPasteboard.general.string = value }
         UINotificationFeedbackGenerator().notificationOccurred(.success)
         UIAccessibility.post(notification: .announcement, argument: "Copied")
         withAnimation(reduceMotion ? nil : .easeOut(duration: 0.2)) { copied = true }

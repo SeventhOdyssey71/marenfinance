@@ -18,15 +18,20 @@ type RevealProps = {
 export function Reveal({ children, delay = 0, as, className = '' }: RevealProps) {
   const Tag = (as ?? 'div') as ElementType;
   const ref = useRef<HTMLElement | null>(null);
+  const [armed, setArmed] = useState(false);
   const [shown, setShown] = useState(false);
 
   useEffect(() => {
     const el = ref.current;
     if (!el) return;
-    if (typeof IntersectionObserver === 'undefined') {
+    if (
+      window.matchMedia('(prefers-reduced-motion: reduce)').matches ||
+      typeof IntersectionObserver === 'undefined'
+    ) {
       setShown(true);
       return;
     }
+    setArmed(true);
     const io = new IntersectionObserver(
       (entries) => {
         for (const entry of entries) {
@@ -45,7 +50,7 @@ export function Reveal({ children, delay = 0, as, className = '' }: RevealProps)
   return (
     <Tag
       ref={ref}
-      className={`reveal ${shown ? 'reveal-in' : ''} ${className}`}
+      className={`reveal ${armed ? 'reveal-ready' : ''} ${shown ? 'reveal-in' : ''} ${className}`}
       style={shown && delay ? { animationDelay: `${delay}ms` } : undefined}
     >
       {children}

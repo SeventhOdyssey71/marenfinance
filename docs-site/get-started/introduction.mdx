@@ -1,23 +1,22 @@
 ---
-title: "Maren Finance"
-description: "Spend Bitcoin. Never sell it. A money app for Bitcoin, built on Mezo."
+title: 'Maren Finance'
+description: 'Spend Bitcoin. Never sell it. A money app for Bitcoin, built on Mezo.'
 ---
 
 Maren is a money app for Bitcoin, built on [Mezo](https://mezo.org). Deposit Bitcoin, borrow
 MUSD against it from as little as 0.001 BTC, and spend it: pay a `@name`, send a money link,
-request money, and put idle MUSD to work. Your Bitcoin stays yours the whole time, and when you
-repay you get all of it back.
+request money, and put idle MUSD to work. Your collateral backs the loan and can be liquidated
+if its value falls too far. Repay the debt to withdraw the remaining collateral.
 
-It is built mobile-first. The iOS app is the headline product; a web app runs the same screens
-against the same contracts. Both are built for Mezo and deployed nowhere else.
+It is built mobile-first. The iOS TestFlight beta is the public client. The web dashboard runs
+locally and is disabled in production; payment-link claims remain available in the browser.
 
 <Warning>
-  **Maren is pre-audit and lives on Mezo testnet only.** Every contract runs on Mezo matsnet
-  (chain `31611`), and its mainnet addresses are all zeroes because Maren is not on mainnet: a
-  third-party audit is the deliberate gate. Do not use Maren with funds you cannot afford to
-  lose. The gasless relayer is hosted and sponsoring transactions on matsnet, but a BTC collateral
-  deposit carries native value and can never be relayed, so
-  your first deposit costs BTC gas.
+  **Maren is pre-audit and lives on Mezo testnet only.** Every contract runs on Mezo matsnet (chain
+  `31611`), and its mainnet addresses are all zeroes because Maren is not on mainnet: a third-party
+  audit is the deliberate gate. Use testnet funds only. The gasless relayer is hosted and sponsoring
+  transactions on matsnet, but a BTC collateral deposit carries native value and cannot be relayed.
+  BTC deposits, link creation and approvals can require your own BTC gas.
 </Warning>
 
 ## Why Maren
@@ -41,16 +40,17 @@ Mobile-first Bitcoin spending, shipped in the order that keeps user funds safe:
   <Step title="Now: live on testnet">
     Five source-verified contracts on matsnet, and the iOS app in open TestFlight beta reading and
     writing live against them. The gasless relayer is hosted. The web client is built and runs
-    locally but is switched off in production during the beta. A real
-    user has borrowed through the app.
+    locally but is switched off in production during the beta. A real user has borrowed through the
+    app.
   </Step>
-  <Step title="Next: TestFlight beta">
-    The iOS app goes to a small beta cohort on matsnet, and the gasless relayer gets hosted so
-    users stop paying gas after their first deposit.
+  <Step title="Next: verified testnet pilot">
+    Verify installation and restoration on the distributed iOS build, complete the transaction loop,
+    and gather independent tester feedback. Exercise relayer recovery across restarts and confirm
+    the deployed contracts match the reviewed release.
   </Step>
   <Step title="Then: audit">
-    An independent audit of the two contracts that carry risk, with findings and remediations
-    published. This is the gate to mainnet.
+    An independent audit including MarenVault, MarenEarn and MarenRelayHub, with findings and
+    remediations published. This is the gate to mainnet.
   </Step>
   <Step title="Then: capped mainnet">
     Mainnet launch with a hard-capped pooled vault. The cap rises only as the position proves out.
@@ -73,8 +73,8 @@ The full trajectory, with the honest state of each phase, is on the [Roadmap](/g
     `TroveManager`. Every claim carries a transaction hash.
   </Card>
   <Card title="Not yet mainnet" icon="circle-half-stroke">
-    No mainnet deployment, no paid audit, and the relayer is not hosted. Each is stated on the
-    page that depends on it, not buried.
+    No mainnet deployment or independent audit. The relayer is hosted on testnet; mainnet remains
+    gated on audit and operational readiness.
   </Card>
 </CardGroup>
 
@@ -82,19 +82,19 @@ The full trajectory, with the honest state of each phase, is on the [Roadmap](/g
 
 <AccordionGroup>
   <Accordion title="Not a claim of pent-up demand" icon="chart-line">
-    We do not argue that thousands of idle MUSD holders are waiting to borrow. Borrowing on Mezo
-    is barely used and whale-dominated. Maren is a demand-creation bet on a small, early chain,
-    and the honest evidence for it is Mezo's off-chain community, not any on-chain count.
+    We do not argue that thousands of idle MUSD holders are waiting to borrow. Borrowing on Mezo is
+    barely used and whale-dominated. Maren is a demand-creation bet on a small, early chain, and the
+    honest evidence for it is Mezo's off-chain community, not any on-chain count.
   </Accordion>
-  <Accordion title="Not zero gas, yet" icon="gas-pump">
-    The gasless path uses an ERC-2771 relayer that is built and fully tested but not hosted. Until
-    it is live, you pay BTC gas. Even once it is live, the first deposit always costs gas by
-    design. See [Gasless](/how-it-works/gasless).
+  <Accordion title="Sponsorship depends on the action" icon="gas-pump">
+    The ERC-2771 relayer is hosted on testnet and sponsors eligible calls while available. Deposits,
+    approvals when needed, and link creation still require BTC gas. See
+    [Gasless](/how-it-works/gasless).
   </Accordion>
   <Accordion title="Not a savings account" icon="piggy-bank">
-    Earn is an ERC-4626 wrapper over the MUSD Stability Pool. Its returns come from real
-    liquidation gains, which are lumpy. Maren shows trailing realised yield and never advertises a
-    forward APY, because there is no rate to guarantee.
+    Earn is an ERC-4626 wrapper over the MUSD Stability Pool. Its returns come from real liquidation
+    gains, which are lumpy. Maren shows trailing realised yield and never advertises a forward APY,
+    because there is no rate to guarantee.
   </Accordion>
 </AccordionGroup>
 

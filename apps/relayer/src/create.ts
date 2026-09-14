@@ -4,6 +4,7 @@ import { loadConfig, type Env, type RelayerConfig } from './config.js';
 import { buildApp } from './app.js';
 import { createLogger, type Logger } from './logger.js';
 import { NonceManager, TxWatcher } from './nonce.js';
+import { hasRecoveryJournal, RecoveryCoordinator } from './recovery.js';
 import { RelayerService } from './service.js';
 import { MemoryStore, RedisStore, type RelayStore } from './store.js';
 import { preflightRpcs } from './rpc.js';
@@ -203,6 +204,18 @@ export async function createRelayer(options: CreateRelayerOptions): Promise<Rela
           maxReplacements: 3,
         });
 
+  let recovery: RecoveryCoordinator | undefined;
+  if (hasRecoveryJournal(store) && chain && nonces && config.forwarder) {
+    try {
+      recovery = new RecoveryCoordinator(store, chain, config.forwarder, logger);
+      await recovery.initialize(nonces);
+    } catch (error) {
+      problems.push(
+        `durable recovery initialization failed: ${error instanceof Error ? error.message : 'unknown'}`,
+      );
+    }
+  }
+
   const service = new RelayerService({
     config,
     problems,
@@ -212,6 +225,7 @@ export async function createRelayer(options: CreateRelayerOptions): Promise<Rela
     chain,
     nonces,
     watcher,
+    ...(recovery === undefined ? {} : { recovery }),
     ...(options.now === undefined ? {} : { now: options.now }),
   });
 
@@ -219,7 +233,11 @@ export async function createRelayer(options: CreateRelayerOptions): Promise<Rela
   watcher?.setOnSettled((tx, settlement) => service.reconcile(tx, settlement));
   // Deferred refunds must drain even when no transaction is in flight: a store
   // outage can leave budget owed back with nothing pending to trigger it.
-  watcher?.setOnSweep(() => service.retryPendingRefunds().then(() => undefined));
+  watcher?.setOnSweep(async () => {
+    if (problems.length > 0) return;
+    await recovery?.sweep();
+    await service.retryPendingRefunds();
+  });
 
   const app = buildApp({
     service,

@@ -48,7 +48,7 @@ enum GasMode: Sendable {
         case .sponsored:
             return "You sign, Maren’s relayer pays the BTC gas."
         case .youPayBtc:
-            return "You pay this one; every action after is gasless."
+            return "You sign this transaction and pay its BTC gas."
         }
     }
 }
@@ -180,6 +180,19 @@ struct DemoMarenActions: MarenActions {
 // sentence the RN app uses, never a fabricated hash or receipt, and they light up the instant
 // MAREN_RELAYER_URL is set.
 
+actor WalletSubmissionGate {
+    static let shared = WalletSubmissionGate()
+    private var active: Set<String> = []
+
+    func run(wallet: String, action: @Sendable () async -> SubmitOutcome) async -> SubmitOutcome {
+        guard active.insert(wallet.lowercased()).inserted else {
+            return .declined(reason: "Another action is still being submitted from this wallet. Wait for its outcome before starting another.")
+        }
+        defer { active.remove(wallet.lowercased()) }
+        return await action()
+    }
+}
+
 struct LiveMarenActions: MarenActions {
     let network: MezoNetwork
     let loadedAddress: String
@@ -187,6 +200,12 @@ struct LiveMarenActions: MarenActions {
     var canSettle: Bool { RelayerConfig.isConfigured }
 
     func submit(_ intent: Intent) async -> SubmitOutcome {
+        await WalletSubmissionGate.shared.run(wallet: "\(MezoChain.of(network).chainId):\(loadedAddress)") {
+            await performSubmit(intent)
+        }
+    }
+
+    private func performSubmit(_ intent: Intent) async -> SubmitOutcome {
         let mezo = MezoActions(.of(network))
         switch intent.kind {
         case let .send(to, memo):

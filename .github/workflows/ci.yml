@@ -27,10 +27,9 @@
 # `CI=true` is not decoration. Without it pnpm can stop on an interactive confirmation
 # that never renders in a non-TTY, and it is indistinguishable from a network hang.
 #
-# Expected counts, so a silent skip is visible as a wrong number:
-#   forge test              236 passed, 8 skipped (the fork suite needs a matsnet RPC)
-#   pnpm test               345 passed: sdk 62, web 36, ios 33, relayer 214
-#   pnpm docs:pdf           11 documents into docs/build
+# Inspect pass/skip counts in the actual run. Dated verified counts and the
+# separate native-iOS lane are documented in docs/PRODUCTION-READINESS.md.
+# pnpm test does not run Swift tests or opt-in web integration suites by default.
 #
 # On a pull request only the areas that changed are exercised. Every push to main runs
 # everything, so main is always checked end to end regardless of what the PR touched.
@@ -112,7 +111,7 @@ jobs:
           else
             contracts=false; app=false; docs=false
             changed '^(packages/contracts/|\.gitmodules$)' && contracts=true
-            changed '^(apps/|packages/sdk/|tools/copy/)' && app=true
+            changed '^(apps/|packages/sdk/|tools/copy/|tools/release/|subgraph/|docs-site/)' && app=true
             changed '^(docs/|tools/pdf/)' && docs=true
           fi
 
@@ -218,7 +217,7 @@ jobs:
         run: forge coverage --report summary --ir-minimum
 
   app:
-    name: Web, SDK, relayer, iOS
+    name: Web, SDK, relayer, release tools
     needs: changes
     if: needs.changes.outputs.app == 'true'
     runs-on: ubuntu-latest
@@ -267,6 +266,36 @@ jobs:
 
       - name: Unit tests
         run: pnpm test
+        env:
+          MAREN_REQUIRE_CHAIN_TESTS: '1'
+
+      - name: Cross-client testnet configuration
+        run: pnpm release:attest --local
+
+      - name: Durable storage restart and alarm integration
+        run: pnpm --filter @maren/relayer test:runtime
+
+  subgraph:
+    name: Activity subgraph
+    needs: changes
+    if: needs.changes.outputs.app == 'true'
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: subgraph
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: subgraph/package-lock.json
+      - name: Install locked indexer dependencies
+        run: npm ci --ignore-scripts
+      - name: Generate event bindings
+        run: npm run codegen
+      - name: Build mappings and manifest
+        run: npm run build
 
   docs:
     name: Docs (PDF build)
@@ -313,7 +342,7 @@ jobs:
   ci:
     name: CI
     if: always()
-    needs: [changes, style, contracts, app, docs]
+    needs: [changes, style, contracts, app, subgraph, docs]
     runs-on: ubuntu-latest
     steps:
       - name: Check every job

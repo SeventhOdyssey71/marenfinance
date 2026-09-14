@@ -48,6 +48,7 @@ struct SendFlow: View {
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
         .background(Theme.Palette.canvas)
+        .interactiveDismissDisabled(stage == .submitting)
         .task {
             guard !loaded else { return }
             loaded = true
@@ -121,6 +122,9 @@ struct SendFlow: View {
             )
             .padding(.horizontal, Theme.Space.md)
             if isHandle { handlePreview.padding(.horizontal, Theme.Space.md) }
+            Text("Maren sponsors the payment gas when available. Your first payment may need a separate MUSD approval paid with BTC.")
+                .font(.text(13)).foregroundStyle(Theme.Palette.tertiary)
+                .padding(.horizontal, Theme.Space.md)
             Spacer()
             PillButton(title: "Send \(MoneyFormat.musd(amount ?? 0, unit: false)) MUSD", variant: .primary) {
                 Task { await submit() }
@@ -268,9 +272,12 @@ struct SendFlow: View {
     }
 
     private func submit() async {
-        guard let amount else { return }
+        guard stage == .recipient, canSend, amountValid, !overBalance, let amount else { return }
+        // Pin the address shown in the review, rather than resolving the handle a second time.
+        let destination = isHandle ? resolvedAddress : trimmedRecipient
+        guard let destination else { return }
         stage = .submitting
-        let intent = Intent(kind: .send(to: trimmedRecipient, memo: ""), amount: amount, unit: .musd)
+        let intent = Intent(kind: .send(to: destination, memo: ""), amount: amount, unit: .musd)
         outcome = await actions.submit(intent)
         stage = .done
     }

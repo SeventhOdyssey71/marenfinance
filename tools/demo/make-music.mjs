@@ -37,9 +37,15 @@ import { join, resolve } from 'node:path';
 import { spawnSync } from 'node:child_process';
 
 const KEY = process.env.ELEVENLABS_API_KEY;
-if (!KEY) { console.error('ELEVENLABS_API_KEY is not set'); process.exit(1); }
+if (!KEY) {
+  console.error('ELEVENLABS_API_KEY is not set');
+  process.exit(1);
+}
 
-const arg = (n, d) => { const i = process.argv.indexOf(`--${n}`); return i === -1 ? d : process.argv[i + 1]; };
+const arg = (n, d) => {
+  const i = process.argv.indexOf(`--${n}`);
+  return i === -1 ? d : process.argv[i + 1];
+};
 const SECONDS = Number(arg('seconds', 44));
 const TRIES = Number(arg('tries', 4));
 const OUT = resolve('design/launch-film/audio');
@@ -60,7 +66,11 @@ const PROMPT = [
 
 /** Share of spectral energy in the 5-9 kHz fricative band. See the header. */
 function speechiness(file) {
-  const r = spawnSync('python3', ['-c', `
+  const r = spawnSync(
+    'python3',
+    [
+      '-c',
+      `
 import subprocess, numpy as np, sys
 out = subprocess.run(['ffmpeg','-v','error','-i',sys.argv[1],'-ac','1','-ar','22050','-f','f32le','-'],
                      capture_output=True).stdout
@@ -70,7 +80,11 @@ n, hop = 1024, 256
 fr = np.lib.stride_tricks.sliding_window_view(x, n)[::hop] * np.hanning(n)
 S = np.abs(np.fft.rfft(fr, axis=1)); f = np.fft.rfftfreq(n, 1/22050)
 print(f"{(S[:, (f>=5000)&(f<=9000)].sum(axis=1) / (S.sum(axis=1)+1e-12)).mean():.4f}")
-`, file], { encoding: 'utf8' });
+`,
+      file,
+    ],
+    { encoding: 'utf8' },
+  );
   return Number((r.stdout || '0').trim());
 }
 
@@ -88,7 +102,10 @@ for (let i = 1; i <= TRIES; i += 1) {
       force_instrumental: true,
     }),
   });
-  if (!res.ok) { console.error(`take ${i}: HTTP ${res.status} ${(await res.text()).slice(0, 200)}`); continue; }
+  if (!res.ok) {
+    console.error(`take ${i}: HTTP ${res.status} ${(await res.text()).slice(0, 200)}`);
+    continue;
+  }
   const file = join(OUT, `music-take-${i}.mp3`);
   await writeFile(file, Buffer.from(await res.arrayBuffer()));
   const s = speechiness(file);
@@ -98,11 +115,19 @@ for (let i = 1; i <= TRIES; i += 1) {
   if (s < SPEECH_THRESHOLD) break;
 }
 
-if (!best) { console.error('no take produced'); process.exit(1); }
+if (!best) {
+  console.error('no take produced');
+  process.exit(1);
+}
 if (best.s >= SPEECH_THRESHOLD) {
   console.error(`\nEVERY take scored >= ${SPEECH_THRESHOLD} (best ${best.s.toFixed(3)}).`);
   console.error('Do not ship this: it will sound like a second voice under the narration.');
   process.exit(1);
 }
-await writeFile(join(OUT, 'music.mp3'), await (await import('node:fs/promises')).readFile(best.file));
-process.stdout.write(`\nkept ${best.file} (speechiness ${best.s.toFixed(3)}) -> ${join(OUT, 'music.mp3')}\n`);
+await writeFile(
+  join(OUT, 'music.mp3'),
+  await (await import('node:fs/promises')).readFile(best.file),
+);
+process.stdout.write(
+  `\nkept ${best.file} (speechiness ${best.s.toFixed(3)}) -> ${join(OUT, 'music.mp3')}\n`,
+);

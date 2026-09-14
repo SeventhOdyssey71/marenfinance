@@ -1,13 +1,13 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
 import { useQuery } from '@tanstack/react-query';
 import { usePublicClient } from 'wagmi';
-import { privateKeyToAccount } from 'viem/accounts';
 import { parseAbiItem, type Address, type Hex } from 'viem';
 import { formatMusd, getDeploymentBlock, getMarenAddresses, MEZO_MAX_LOG_RANGE } from '@maren/sdk';
 
+import { parseClaimLink, claimRecordMatches, type ParsedClaimLink } from '@/lib/chain/claim-link';
 import { marenPayAbi } from '@/lib/chain/abis';
 import { actionIsRelayable } from '@/lib/chain/relay';
 import { gasLine, gasNote, useMarenWrites, useRelayerStatus } from '@/lib/chain/write';
@@ -18,17 +18,18 @@ import { SignIn } from '@/components/app/sign-in';
 import { ConnectButton, NetworkGuard } from '@/components/app/wallet';
 import { TxSheet, useTxRunner, type TxIntent } from '@/components/app/tx';
 import { Check, LinkIcon } from '@/components/ui/icons';
+import { TESTFLIGHT_URL } from '@/lib/links';
 
 /**
  * /claim — the receiving half of a payment link.
  *
- * A link is `${origin}/claim#<secret>`, where the fragment is a one-time PRIVATE KEY. The
+ * A link is `${origin}/claim?id=N#<secret>` (legacy links omit the ID), where the fragment is a one-time PRIVATE KEY. The
  * fragment is read CLIENT-SIDE ONLY: a URL fragment is never sent to a server in the first
  * place, and nothing here logs, stores or transmits it. It lives in component state for the
  * life of the tab and is used only to sign a claim that binds the payout to the connected
  * wallet.
  *
- * WHAT THIS SCREEN READS, HONESTLY. The link URL carries no id, so the id is resolved from
+ * WHAT THIS SCREEN READS. IDs in the URL are verified against the escrow key. Legacy IDs resolve from
  * the chain: the secret fixes the link's public key, and `LinkCreated` carries that key as
  * an indexed topic, so exactly one event names it. From that id the current escrow state is
  * read from `MarenPay.links(id)`. Every state a link can be in — claimable, already claimed,
@@ -40,8 +41,6 @@ import { Check, LinkIcon } from '@/components/ui/icons';
  * and the copy says so, exactly like every other relayed action in the app — the routing
  * decision is the shared one in `lib/chain/relay.ts`, never made here.
  */
-
-const SECRET_RE = /^0x[0-9a-fA-F]{64}$/;
 
 /**
  * The `LinkCreated` event, for filtering `getLogs` by the link's indexed public key. Written
@@ -70,22 +69,15 @@ type LinkLookup =
  * invalidation in the transaction runner refetches it — a successful claim flips the card
  * to "claimed" on its own, without a reload.
  */
-function useClaimableLink(secret: Hex | null) {
+function useClaimableLink(linkKey: Address, hintedId: bigint | null) {
   const client = usePublicClient();
   const deployed = contractsDeployed(NETWORK);
-  const linkKey = useMemo<Address | null>(() => {
-    if (!secret) return null;
-    try {
-      return privateKeyToAccount(secret).address;
-    } catch {
-      return null;
-    }
-  }, [secret]);
+  const resolvedId = useRef<bigint | null>(hintedId);
 
   return useQuery<LinkLookup>({
-    queryKey: ['maren', NETWORK, 'claim-link', linkKey ?? 'none'],
+    queryKey: ['maren', NETWORK, 'claim-link', linkKey, hintedId?.toString() ?? 'legacy'],
     enabled: Boolean(client) && Boolean(linkKey) && deployed,
-    queryFn: async () => {
+    queryFn: async ({ signal }) => {
       if (!client || !linkKey) throw new Error('No RPC transport for Mezo is available.');
       const deployedAt = getDeploymentBlock(NETWORK);
       if (deployedAt === null) return { kind: 'undeployed' };
@@ -95,15 +87,16 @@ function useClaimableLink(secret: Hex | null) {
 
       // The public key sits at an indexed topic, so the node filters server-side; the scan
       // only exists to keep each request under Mezo's 10,000-block getLogs ceiling.
-      let foundId: bigint | null = null;
-      for (let from = deployedAt; from <= head && foundId === null; from += MEZO_MAX_LOG_RANGE) {
-        const to = from + MEZO_MAX_LOG_RANGE - 1n;
+      let foundId: bigint | null = resolvedId.current;
+      for (let to = head; to >= deployedAt && foundId === null; to -= MEZO_MAX_LOG_RANGE) {
+        signal.throwIfAborted();
+        const from = to - MEZO_MAX_LOG_RANGE + 1n;
         const logs = await client.getLogs({
           address: maren.marenPay,
           event: LINK_CREATED,
           args: { linkKey },
-          fromBlock: from,
-          toBlock: to > head ? head : to,
+          fromBlock: from < deployedAt ? deployedAt : from,
+          toBlock: to,
         });
         const hit = logs.find((log) => log.args.linkId !== undefined);
         if (hit && hit.args.linkId !== undefined) foundId = hit.args.linkId;
@@ -120,10 +113,11 @@ function useClaimableLink(secret: Hex | null) {
         args: [foundId],
       })) as readonly [Address, Address, bigint, bigint, boolean, boolean];
 
-      const [creator, , amountWei, expiryUnix, claimed, reclaimed] = record;
+      const [creator, recordKey, amountWei, expiryUnix, claimed, reclaimed] = record;
       // A zero creator means the record was never written — the event named a link this
       // deployment does not hold, which is not something this screen can honour.
-      if (creator === '0x0000000000000000000000000000000000000000') return { kind: 'not-found' };
+      if (!claimRecordMatches(creator, recordKey, linkKey)) return { kind: 'not-found' };
+      resolvedId.current = foundId;
 
       const latest = await client.getBlock();
       const expired = latest.timestamp > expiryUnix;
@@ -137,32 +131,29 @@ function useClaimableLink(secret: Hex | null) {
 
       return { kind: 'found', link: { linkId: foundId, amountWei, expiryUnix, state } };
     },
-    // A settled claim moves state, and the invalidation above refetches this; there is no
-    // value in a background poll on top of that.
-    refetchOnWindowFocus: false,
+    // A recipient can leave the page open across expiry or another recipient's claim.
+    // Poll only active links; reuse their verified ID instead of rescanning history.
+    refetchOnWindowFocus: true,
+    refetchInterval: (query) =>
+      query.state.data?.kind === 'found' && query.state.data.link.state === 'claimable'
+        ? 30_000
+        : false,
     retry: 1,
   });
 }
 
 export default function ClaimPage() {
-  const [secret, setSecret] = useState<Hex | null>(null);
-  const [malformed, setMalformed] = useState(false);
+  const [parsed, setParsed] = useState<ParsedClaimLink | null>(null);
 
-  // The fragment is read once, on the client, and never leaves this component. Reading it in
-  // an effect (not during render) keeps it off the server render entirely.
   useEffect(() => {
-    if (typeof window === 'undefined') return;
-    const raw = window.location.hash.replace(/^#/, '').trim();
-    if (raw === '') {
-      setMalformed(false);
-      return;
-    }
-    if (SECRET_RE.test(raw)) {
-      setSecret(raw.toLowerCase() as Hex);
-      setMalformed(false);
-    } else {
-      setMalformed(true);
-    }
+    const readLink = () => setParsed(parseClaimLink(window.location.hash, window.location.search));
+    readLink();
+    window.addEventListener('hashchange', readLink);
+    window.addEventListener('popstate', readLink);
+    return () => {
+      window.removeEventListener('hashchange', readLink);
+      window.removeEventListener('popstate', readLink);
+    };
   }, []);
 
   return (
@@ -186,21 +177,31 @@ export default function ClaimPage() {
         <ConnectButton />
       </header>
 
-      <main className="flex-1 pb-16 pt-6">
+      <main id="main" className="flex-1 pb-16 pt-6">
         <div className="mb-6">
           <span className="t-label text-text-subtle">Payment link</span>
           <h1 className="t-h2 mt-1.5">Claim your MUSD</h1>
+          <p className="text-text-muted mt-2 text-sm">
+            Mezo {NETWORK} · Pre-audit · Testnet funds only
+          </p>
         </div>
 
         <NetworkGuard />
 
         <div className="mt-4">
-          {malformed ? (
+          {parsed === null ? (
+            <Loading>Opening your link</Loading>
+          ) : parsed.kind === 'invalid' ? (
             <InvalidLink />
-          ) : secret === null ? (
+          ) : parsed.kind === 'missing' ? (
             <NoLink />
           ) : (
-            <ClaimFlow secret={secret} />
+            <ClaimFlow
+              key={`${parsed.linkKey}:${parsed.linkId}`}
+              secret={parsed.secret}
+              linkKey={parsed.linkKey}
+              hintedId={parsed.linkId}
+            />
           )}
         </div>
       </main>
@@ -208,12 +209,20 @@ export default function ClaimPage() {
   );
 }
 
-function ClaimFlow({ secret }: { secret: Hex }) {
+function ClaimFlow({
+  secret,
+  linkKey,
+  hintedId,
+}: {
+  secret: Hex;
+  linkKey: Address;
+  hintedId: bigint | null;
+}) {
   const source = useDataSource();
   const runner = useTxRunner();
   const writes = useMarenWrites({ onSimulated: runner.onSimulated });
   const relayer = useRelayerStatus();
-  const lookup = useClaimableLink(secret);
+  const lookup = useClaimableLink(linkKey, hintedId);
 
   if (!source.deployed) {
     return (
@@ -241,8 +250,13 @@ function ClaimFlow({ secret }: { secret: Hex }) {
         <div className="px-5 py-6">
           <Note tone="warning" role="alert">
             Mezo did not answer when this link was read, so its state is unknown right now. Nothing
-            has been claimed. Refresh to try again.
+            has been claimed. Try reading the link again.
           </Note>
+          <div className="mt-4">
+            <ActionButton onClick={() => void lookup.refetch()} disabled={lookup.isFetching}>
+              {lookup.isFetching ? 'Reading link…' : 'Try again'}
+            </ActionButton>
+          </div>
         </div>
       </Panel>
     );
@@ -315,12 +329,36 @@ function ClaimFlow({ secret }: { secret: Hex }) {
           </div>
 
           {link.state === 'claimable' ? (
-            <Claimable
-              account={source.account}
-              ready={writes.ready}
-              relayerLine={gasLine(actionIsRelayable('claimLink'), relayer)}
-              onClaim={() => runner.request(claimIntent())}
-            />
+            <>
+              {link.linkId > 0n && link.linkId <= 18_446_744_073_709_551_615n ? (
+                <div className="mt-5 border-b border-[var(--border-hairline)] pb-5">
+                  <a
+                    href={`maren://claim?id=${link.linkId}#${secret}`}
+                    className="bg-text text-bg inline-flex min-h-11 items-center rounded-[var(--radius-pill)] px-5 text-sm font-medium"
+                  >
+                    Open in Maren on iPhone
+                  </a>
+                  <p className="text-text-muted mt-3 text-xs leading-relaxed">
+                    Requires the latest iOS beta. Opens a review before you sign.{' '}
+                    <a
+                      href={TESTFLIGHT_URL}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="underline"
+                    >
+                      Get the beta
+                    </a>{' '}
+                    or claim with a wallet below.
+                  </p>
+                </div>
+              ) : null}
+              <Claimable
+                account={source.account}
+                ready={writes.ready}
+                relayerLine={gasLine(actionIsRelayable('claimLink'), relayer)}
+                onClaim={() => runner.request(claimIntent())}
+              />
+            </>
           ) : (
             <SettledLink state={link.state} expiryUnix={link.expiryUnix} />
           )}
@@ -347,7 +385,8 @@ function Claimable({
     <div className="mt-5">
       <p className="text-text-muted text-sm leading-relaxed">
         Whoever opens this link can claim it, so treat it like cash. The claim signs your own
-        address, which is why an observer who saw the link cannot redirect the funds to themselves.
+        address, so observers of the submitted transaction cannot redirect that claim. Anyone with
+        the original link can claim first; only share it with the intended recipient.
       </p>
 
       {account === null ? (
@@ -412,9 +451,8 @@ function NoLink() {
     <Panel title="Claimable link">
       <div className="px-5 py-6">
         <Note>
-          This page opens a Maren payment link. A link carries its claim key after a{' '}
-          <span className="num">#</span> in the address, and this address has none, so there is
-          nothing to claim.
+          Open the complete payment link sent to you to see its amount and claim it. This address
+          has no claim key. Ask the sender to share the original link again.
         </Note>
       </div>
     </Panel>

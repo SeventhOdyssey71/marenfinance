@@ -6,13 +6,10 @@ import UIKit
 // The only screen in Maren that ever shows a private key, and the last one before Home. Three
 // decisions shape it:
 //
-//   1. It is SKIPPABLE. A wallet you are locked out of is worse than one you have not written
-//      down yet, and a person who cannot get past this screen at 1am will not come back. "Back
-//      up later" sets a flag (OnboardingFlags.backupPending) that Profile can nag on for as long
-//      as it takes. Setup never blocks.
+//   1. Persistent wallets may back up later from Profile. A session-only wallet must save
+//      its key before continuing because closing the app would otherwise lose it.
 //   2. The key is behind a blur you have to hold to lift, so it cannot be shoulder-surfed by
-//      someone glancing at a screen left open, and cannot end up in a screen recording by
-//      accident.
+//      someone glancing at a screen left open. Revealing it also exposes it to screen capture.
 //   3. The warning is specific about the consequence — anyone with this key can move the money,
 //      and nobody can recover it — rather than a generic "keep it safe".
 //
@@ -25,8 +22,10 @@ struct OnboardingBackupStep: View {
     let privateKeyHex: String
     var onSaved: () -> Void
     var onLater: () -> Void
+    var allowLater: Bool = true
 
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @Environment(\.scenePhase) private var scenePhase
     @State private var held = false
     @State private var revealedForVoiceOver = false
     @State private var everRevealed = false
@@ -62,12 +61,21 @@ struct OnboardingBackupStep: View {
                 OnboardingHaptics.success()
                 onSaved()
             }
+            .disabled(!everRevealed)
             .accessibilityHint("Finishes setup and opens Maren.")
-            OnboardingTextButton(title: "Back up later") {
-                OnboardingHaptics.warning()
-                onLater()
+            if allowLater {
+                OnboardingTextButton(title: "Back up later") {
+                    OnboardingHaptics.warning()
+                    onLater()
+                }
+                .accessibilityHint("Skips the backup. You can back up later from Profile, Manage wallet.")
+            } else {
+                Text("This wallet lasts only for this session. Save your key before continuing.")
+                    .font(.text(13)).foregroundStyle(OnboardingPalette.caption)
             }
-            .accessibilityHint("Skips the backup. Maren will keep reminding you from Profile until it is done.")
+        }
+        .onChange(of: scenePhase) { _, phase in
+            if phase != .active { held = false; revealedForVoiceOver = false }
         }
     }
 
@@ -81,7 +89,8 @@ struct OnboardingBackupStep: View {
                         .font(.text(13, weight: .medium))
                         .foregroundStyle(OnboardingPalette.caption)
                     Spacer(minLength: 0)
-                    OnboardingCopyButton(value: privateKeyHex, describes: "your private key")
+                    OnboardingCopyButton(value: privateKeyHex, describes: "your private key", sensitive: true,
+                                         onCopied: markRevealed)
                 }
 
                 ZStack {

@@ -16,9 +16,8 @@ Built on [Mezo Chain](https://mezo.org).
 
 Maren is a consumer layer over Mezo's MUSD protocol, which lets Bitcoin holders borrow a
 dollar stablecoin against BTC without selling it. It does three things the underlying
-protocol does not: it pools collateral so the entry point is 0.001 BTC instead of the
-0.079 BTC a solo trove needs, it pays BTC gas on the user's behalf so nobody has to hold
-the asset they refused to sell, and it gives MUSD somewhere to be spent through payments
+protocol does not: it pools collateral so small holders can borrow below the protocol's
+minimum loan, sponsors eligible actions through a testnet relayer, and gives MUSD somewhere to be spent through payments
 addressed to a `@handle` rather than a hex address.
 
 Maren is pre-audit and deployed only to testnet. Do not use it with funds you cannot
@@ -68,17 +67,26 @@ last few hours".
 **Mainnet is not deployed.** The mainnet entries in `addresses.ts` are all zeroes and the
 deployment block is `null`, which callers must handle as unavailable rather than empty.
 
-### What is not done
+### Release status (13 September 2026)
 
-- `apps/relayer` is not deployed to any host (packaging and DEPLOY.md exist; going live
-  is one documented command plus funding the hot wallet). Until then every action in the
-  web app is paid by the user's own wallet in BTC gas, and the UI says so per action.
-- A real user borrow HAS succeeded on matsnet (25.7 MUSD through the app on 17 August,
-  after the pooled trove was topped up from its mis-sized seed to a 220%+ ICR).
-- No gasless meta-transaction has been sent through `MarenRelayHub` on chain, and no
-  code in `apps/web` posts to the relayer yet; wiring the web transaction path to it is
-  the follow-up to the deployment packaging.
-- `apps/ios-native` is the native SwiftUI app and reads live from matsnet.
+The testnet relayer is hosted on Cloudflare and `/healthz` reports accepting requests.
+Both clients have relay submission code. Deposits, token approvals when needed, and
+link creation can still require the user's BTC; sponsorship is specific to each action.
+
+The current public release is **iOS-first**. The website serves the landing page, docs,
+and `/claim`; `/app` is deliberately disabled by `MAREN_WEB_APP_ENABLED`. The native
+SwiftUI app has live chain reads and writes and a [TestFlight invite](https://testflight.apple.com/join/uhmv9YPE).
+Invite availability and a fresh installation still need device verification for each release.
+
+See [Testnet release candidate](docs/TESTNET-RELEASE.md) for the finalization work,
+validation results, rollout order, and device acceptance matrix. The broader
+[Production and grant readiness](docs/PRODUCTION-READINESS.md) plan covers grant
+evidence and mainnet gates. Run
+`pnpm release:check` for a dated, read-only HTTP check; add `--web-app` only for a
+release that intentionally enables the dashboard. Use `--require-recovery` after
+the new backend rollout and `pnpm release:attest` for contract/client alignment.
+Passing these checks does not prove
+transaction settlement or make the contracts ready for mainnet.
 
 ## Networks
 
@@ -122,17 +130,20 @@ The iOS app is native SwiftUI — build and run it from Xcode after `xcodegen ge
 ## Tests
 
 ```bash
-CI=true pnpm test                        # 345 tests across the four TypeScript workspaces
-CI=true pnpm --filter @maren/sdk test    #  62  position, borrow and format math
-CI=true pnpm --filter @maren/web test    #  36  revert decoding, preflight, em dash guard
-CI=true pnpm --filter @maren/ios test    #  33  keystore security, em dash guard
-CI=true pnpm --filter @maren/relayer test #  214 signature, policy, budget, nonce, RPC
+CI=true pnpm test                        # fresh TypeScript/metrics tests; inspect skips
+CI=true pnpm --filter @maren/sdk test    # position, borrow, ABI, and format tests
+CI=true pnpm --filter @maren/web test    # revert decoding, preflight, relay client
+CI=true pnpm --filter @maren/relayer test # signature, policy, budget, nonce, RPC
+pnpm release:test                       # read-only release check's failure behavior
 
-CI=true pnpm contracts:test              # 236 passed, 8 skipped
+CI=true pnpm contracts:test              # unit/property/invariant and optional fork suites
 node tools/copy/em-dash-scan.mjs         # no em dash in any user-visible string
 ```
 
-The 8 skipped contract tests are the fork suite in `test/fork/`. They skip rather than
+Native iOS tests run through Xcode or `.github/workflows/ios-testflight.yml`, not pnpm.
+Dated pass/skip counts are in [the readiness checklist](docs/PRODUCTION-READINESS.md).
+
+The 11 optional contract tests are the fork suite in `test/fork/`. They skip rather than
 fail when no RPC is configured, because a flaky public testnet should not be able to break
 the build. Run them deliberately, from `packages/contracts`:
 
@@ -144,9 +155,8 @@ That suite is where the assumptions a mock can get wrong are settled against dep
 bytecode: the exact borrowing fee, whether trove debt includes gas compensation, and
 whether a contract is allowed to own a trove at all.
 
-The relayer's chain tests need `anvil` on `PATH`. Without it they skip silently, and a
-silent skip reads exactly like a pass, which is why the expected count is written down
-above.
+The relayer's six chain tests need `anvil` on `PATH` and a working RPC. Set
+`MAREN_REQUIRE_CHAIN_TESTS=1` to fail instead of skipping when they cannot run.
 
 Three suites are not part of `pnpm test` because they need a running build and a live
 chain. They live in `apps/web/scripts` and are documented in
@@ -167,6 +177,8 @@ Two slower gates run nightly instead, in
 against live matsnet, so a change to Mezo's deployed bytecode surfaces as a morning
 failure rather than as a surprise during a deployment, and an 88% line-coverage floor on
 `MarenVault`.
+The same nightly workflow also records HTTP availability, relay configuration,
+and CORS for the intended iOS-first release with `pnpm release:check`.
 
 ## How this repository treats facts
 

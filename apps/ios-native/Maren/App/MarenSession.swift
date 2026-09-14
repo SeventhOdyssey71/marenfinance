@@ -168,7 +168,7 @@ final class MarenSession {
         else { UserDefaults.standard.removeObject(forKey: key) }
     }
     private nonisolated static func validAddress(_ a: String) -> String? {
-        (a.hasPrefix("0x") && a.count == 42) ? a : nil
+        PaymentLinks.isAddress(a) ? a : nil
     }
     nonisolated static func shortAddress(_ a: String) -> String {
         a.count > 10 ? "\(a.prefix(6))…\(a.suffix(4))" : a

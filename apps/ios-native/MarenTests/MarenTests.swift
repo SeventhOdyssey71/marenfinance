@@ -4,7 +4,6 @@ import BigInt
 import web3
 @testable import Maren
 
-// Empty for now — the harness exists so golden/snapshot tests can land in a later wave.
 final class MarenTests: XCTestCase {
     func testStubIsHonestlyDemo() async throws {
         // The Wave 1 stub must expose the price feed as unavailable, never a fake number.
@@ -586,5 +585,215 @@ private extension String {
     /// Left-pad with zeroes to `width`, for building 32-byte topic words in tests.
     func leftPad(to width: Int) -> String {
         count >= width ? self : String(repeating: "0", count: width - count) + self
+    }
+}
+
+final class TestnetFinalizationTests: XCTestCase {
+    private let relay = Relayer(baseURL: URL(string: "https://relay.example")!)
+    private let payer = "0x" + String(repeating: "1", count: 40)
+    private let txHash = "0x" + String(repeating: "2", count: 64)
+
+    func testRelayerURLRejectsLookalikeLoopbackAndCredentials() {
+        for url in ["http://localhost.evil.test", "http://127.0.0.1.evil.test", "http://localhost@evil.test",
+                    "https://user:password@relay.example", "https:///", "ftp://localhost", "https://relay.example?secret=x"] {
+            XCTAssertNil(RelayerConfig.normalise(url), url)
+        }
+        for url in ["https://relay.example/", "http://localhost:8787", "http://127.0.0.1:8787", "http://[::1]:8787"] {
+            XCTAssertNotNil(RelayerConfig.normalise(url), url)
+        }
+    }
+
+    func testRelayAcceptanceRequiresMatchingPayerAndHash() throws {
+        let valid: [String: Any] = ["hash": txHash, "state": "submitted", "payer": payer]
+        XCTAssertEqual(try relay.decode(status: 202, body: valid, expectedPayer: payer).get().hash, txHash)
+        for body: [String: Any] in [
+            ["hash": txHash, "state": "submitted"],
+            ["hash": txHash, "state": "submitted", "payer": "0xother"],
+            ["hash": "invented", "state": "submitted", "payer": payer]
+        ] {
+            guard case .failure(let reason) = relay.decode(status: 202, body: body, expectedPayer: payer) else {
+                return XCTFail("An unbound receipt must not report success")
+            }
+            XCTAssertTrue(reason.submissionMayExist)
+        }
+    }
+
+    func testLostRelayResponsesAndUpstreamFailuresRemainUncertain() {
+        XCTAssertTrue(Relayer.uncertainResponse.submissionMayExist)
+        XCTAssertTrue(relay.failureReason(status: 409, code: "DUPLICATE_REQUEST_IN_FLIGHT").submissionMayExist)
+        for (status, code) in [(502, "UPSTREAM_ERROR"), (503, "SUBMISSION_FAILED"), (504, "unknown")] {
+            let reason = relay.failureReason(status: status, code: code)
+            XCTAssertTrue(reason.submissionMayExist)
+            XCTAssertFalse(reason.detail.contains("Nothing was submitted"))
+        }
+    }
+
+    func testExplicitPreBroadcastRefusalsRemainDeclines() {
+        for code in ["SIMULATION_REVERTED", "INVALID_SIGNATURE", "GLOBAL_DAILY_BUDGET_EXHAUSTED"] {
+            XCTAssertFalse(relay.failureReason(status: 400, code: code).submissionMayExist)
+        }
+    }
+
+    func testPrivateKeyMustBeValidSecp256k1Scalar() {
+        XCTAssertNil(Keystore.normalise(String(repeating: "0", count: 64)))
+        XCTAssertNil(Keystore.normalise("fffffffffffffffffffffffffffffffebaaedce6af48a03bbfd25e8cd0364141"))
+        XCTAssertNil(Keystore.normalise(String(repeating: "f", count: 64)))
+        XCTAssertNotNil(Keystore.normalise(String(repeating: "0", count: 63) + "1"))
+        XCTAssertNotNil(Keystore.normalise("fffffffffffffffffffffffffffffffebaaedce6af48a03bbfd25e8cd0364140"))
+    }
+
+    private func history(head: Int = 100, errors: Bool = false, rows: [[String: Any]] = []) -> [String: Any] {
+        ["data": ["_meta": ["block": ["number": head], "hasIndexingErrors": errors], "activities": rows]]
+    }
+
+    func testStaleOrFailedIndexerCannotReportEmptyHistory() {
+        XCTAssertNil(SubgraphActivity.decode(history(head: 99), chainHead: 100))
+        XCTAssertNil(SubgraphActivity.decode(history(errors: true), chainHead: 100))
+        XCTAssertNil(SubgraphActivity.decode(["data": ["activities": []]], chainHead: 100))
+        XCTAssertNotNil(SubgraphActivity.decode(history(), chainHead: 100))
+    }
+
+    func testMalformedIndexedRowFallsBackRatherThanDroppingPayment() {
+        let row: [String: Any] = ["kind": "Paid", "amount": "100", "timestamp": "1234", "blockNumber": "100", "txHash": txHash, "outgoing": false]
+        XCTAssertEqual(SubgraphActivity.decode(history(rows: [row]), chainHead: 100)?.count, 1)
+        XCTAssertNil(SubgraphActivity.decode(history(rows: [row, ["kind": "Paid"]]), chainHead: 100))
+        var missingDirection = row
+        missingDirection.removeValue(forKey: "outgoing")
+        XCTAssertNil(SubgraphActivity.decode(history(rows: [missingDirection]), chainHead: 100))
+    }
+}
+
+
+extension TestnetFinalizationTests {
+    func testNativeClaimHandoffKeepsSecretInFragment() throws {
+        let secret = "0x" + String(repeating: "0", count: 63) + "1"
+        let native = "maren://claim?id=7#" + secret
+        XCTAssertEqual(PaymentLinks.parseClaim(native)?.linkId, 7)
+        XCTAssertEqual(PaymentLinks.parseClaim(native)?.secret, secret)
+        let publicLink = PaymentLinks.buildClaim(linkId: 7, secret: secret)
+        XCTAssertEqual(URLComponents(string: publicLink)?.host, "marenfinance.vercel.app")
+        XCTAssertEqual(URLComponents(string: publicLink)?.query, "id=7")
+        for invalid in ["maren://claim?id=7&secret=" + secret,
+                        "maren://claim?id=7&id=8#" + secret,
+                        "maren://claim?id=7#0x" + String(repeating: "0", count: 64),
+                        "https://maren.finance@evil.test/claim?id=7#" + secret,
+                        "maren://claim:123?id=7#" + secret] {
+            XCTAssertNil(PaymentLinks.parseClaim(invalid))
+        }
+        XCTAssertNotNil(PaymentLinks.parseClaim("https://maren.finance/claim?id=7#" + secret))
+    }
+
+    func testNativePaymentAmountsStayBounded() {
+        XCTAssertEqual(PaymentLinks.parsePayment("maren://pay?to=@sele&amount=1.25")?.amount, "1.25")
+        XCTAssertNil(PaymentLinks.parsePayment("maren://pay?to=@sele&to=@other"))
+        XCTAssertNil(PaymentLinks.parsePayment("maren://pay?to=@sele&amount=" + String(repeating: "9", count: 100))?.amount)
+        XCTAssertFalse(PaymentLinks.isAmount("0.0000000000000000001"))
+    }
+
+    func testConcurrentWalletActionIsRefusedWhileFirstIsInFlight() async {
+        let gate = WalletSubmissionGate()
+        let (started, start) = AsyncStream<Void>.makeStream()
+        let (release, finish) = AsyncStream<Void>.makeStream()
+        let first = Task {
+            await gate.run(wallet: "0xABC") {
+                start.yield(())
+                for await _ in release { break }
+                return .demo
+            }
+        }
+        for await _ in started { break }
+        let second = await gate.run(wallet: "0xabc") { .demo }
+        guard case .declined = second else {
+            finish.yield(())
+            return XCTFail("Two actions must not race the same wallet nonce")
+        }
+        finish.yield(())
+        _ = await first.value
+        guard case .demo = await gate.run(wallet: "0xABC", action: { .demo }) else {
+            return XCTFail("Completed actions must release the wallet")
+        }
+    }
+}
+
+extension TestnetFinalizationTests {
+    func testDurableSubmissionUncertaintyRetainsOnlyValidatedHash() {
+        let body: [String: Any] = ["error": "SUBMISSION_UNCERTAIN", "meta": ["hash": txHash, "statusUrl": "https://untrusted.example"]]
+        guard case .failure(let reason) = relay.decode(status: 503, body: body, expectedPayer: payer) else {
+            return XCTFail("Uncertain journal ACK is not acceptance")
+        }
+        XCTAssertTrue(reason.submissionMayExist)
+        XCTAssertEqual(reason.knownHash, txHash)
+        guard case .failure(let malformed) = relay.decode(status: 503,
+            body: ["error": "SUBMISSION_UNCERTAIN", "meta": ["hash": "not-a-hash"]], expectedPayer: payer) else {
+            return XCTFail("Malformed hash must remain unknown")
+        }
+        XCTAssertTrue(malformed.submissionMayExist)
+        XCTAssertNil(malformed.knownHash)
+    }
+}
+
+extension TestnetFinalizationTests {
+    private func claimDraft() throws -> PendingClaimLink {
+        let secret = "0x" + String(repeating: "0", count: 63) + "1"
+        let key = try XCTUnwrap(Keystore.normalise(secret))
+        return PendingClaimLink(owner: payer, secret: secret, linkKey: try Keystore.address(of: key),
+                                amount: "1.25", expiry: 123456, startBlock: 100)
+    }
+
+    func testClaimDraftSurvivesRestartBeforeHashWasSaved() throws {
+        let original = try claimDraft()
+        let stored = try JSONEncoder().encode(original)
+        let restarted = try JSONDecoder().decode(PendingClaimLink.self, from: stored)
+        XCTAssertEqual(restarted, original)
+        XCTAssertTrue(restarted.validated(owner: payer))
+        XCTAssertNil(restarted.txHash)
+        XCTAssertFalse(restarted.validated(owner: "0x" + String(repeating: "3", count: 40)))
+    }
+
+    func testClaimDraftKeepsBearerKeyAcrossEveryUncertainOutcome() throws {
+        for result: SubmitOutcome in [.failed(.submissionUnknown(reason: "lost response")),
+                                      .failed(.timeout(hash: txHash)),
+                                      .failed(.unreachable(hash: txHash, error: "offline"))] {
+            var draft = try claimDraft()
+            XCTAssertTrue(draft.retain(after: result))
+            let restarted = try JSONDecoder().decode(PendingClaimLink.self, from: JSONEncoder().encode(draft))
+            XCTAssertEqual(restarted.secret, draft.secret)
+            XCTAssertTrue(restarted.validated(owner: payer))
+        }
+    }
+
+    func testClaimDraftMayClearOnlyAfterDefiniteNoEscrowOutcome() throws {
+        for result: SubmitOutcome in [.declined(reason: "not signed"), .demo,
+                                      .failed(.reverted(hash: txHash, blockNumber: 100))] {
+            var draft = try claimDraft()
+            XCTAssertFalse(draft.retain(after: result))
+        }
+        var confirmed = try claimDraft()
+        XCTAssertTrue(confirmed.retain(after: .delivered(Delivered(hash: txHash, blockNumber: 100,
+            gasUsed: 100, sponsored: false, mintedId: 7))))
+        let restarted = try JSONDecoder().decode(PendingClaimLink.self, from: JSONEncoder().encode(confirmed))
+        XCTAssertEqual(restarted.linkId, 7)
+        XCTAssertEqual(restarted.txHash, txHash)
+    }
+}
+
+extension TestnetFinalizationTests {
+    func testClaimRecoverySelectsOnlyItsOwnEscrowEvent() throws {
+        let draft = try claimDraft()
+        let contract = MarenAddresses.of(.testnet).marenPay
+        let ownerTopic = "0x" + String(repeating: "0", count: 24) + payer.dropFirst(2)
+        let keyTopic = "0x" + String(repeating: "0", count: 24) + draft.linkKey.dropFirst(2).lowercased()
+        func log(owner: String, key: String, removed: Bool = false) throws -> EthereumLog {
+            let json: [String: Any] = ["address": contract, "transactionHash": txHash, "data": "0x",
+                "blockNumber": "0x64", "removed": removed,
+                "topics": [MarenEncoding.linkCreatedTopic, "0x" + String(repeating: "0", count: 63) + "7", owner, key]]
+            return try JSONDecoder().decode(EthereumLog.self, from: JSONSerialization.data(withJSONObject: json))
+        }
+        let valid = try log(owner: ownerTopic, key: keyTopic)
+        XCTAssertEqual(draft.matchingHash(in: [valid], contract: contract), txHash)
+        XCTAssertNil(draft.matchingHash(in: [try log(owner: keyTopic, key: keyTopic)], contract: contract))
+        XCTAssertNil(draft.matchingHash(in: [try log(owner: ownerTopic, key: ownerTopic)], contract: contract))
+        XCTAssertNil(draft.matchingHash(in: [try log(owner: ownerTopic, key: keyTopic, removed: true)], contract: contract))
+        XCTAssertNil(draft.matchingHash(in: [valid], contract: payer))
     }
 }

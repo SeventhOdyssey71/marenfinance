@@ -117,9 +117,8 @@ type Phase =
   | { name: 'pending'; intent: TxIntent; hash: Hash }
   | { name: 'settled'; intent: TxIntent; outcome: TxOutcome; reason: RevertReason | null }
   /**
-   * Never reached the chain. `signed` records whether the wallet was ever opened, which
-   * is the difference between "we refused this for you, at no cost" and "your wallet
-   * returned an error".
+   * No confirmed outcome. `submissionUnknown` distinguishes a lost relay response
+   * from a definite refusal; `signed` records whether the wallet was opened.
    */
   | { name: 'error'; intent: TxIntent; reason: RevertReason; signed: boolean };
 
@@ -631,7 +630,9 @@ function Failed({
 }) {
   return (
     <div role="alert">
-      <StatusLine tone="danger">Not submitted</StatusLine>
+      <StatusLine tone={reason.submissionUnknown ? 'warning' : 'danger'}>
+        {reason.submissionUnknown ? 'Submission outcome unknown' : 'Not submitted'}
+      </StatusLine>
 
       {/* The decoded human reason IS the headline. The raw contract error is secondary and
           sits at the bottom in mono, for anyone who wants to grep the Solidity. */}
@@ -642,10 +643,12 @@ function Failed({
 
       <div className="bg-surface-inset mt-5 rounded-[var(--radius-input)] border border-[var(--border-hairline)] p-4">
         <p className="text-text-muted text-sm leading-relaxed">
-          {signed
-            ? 'Your wallet was asked to sign this and it did not go through. Nothing reached the chain.'
-            : 'Maren checked this against Mezo before opening your wallet, so no signature was ' +
-              'requested and no gas was spent.'}
+          {reason.submissionUnknown
+            ? 'Do not repeat this action until its outcome is known. A missing receipt does not prove it was refused.'
+            : signed
+              ? 'Your wallet was asked to sign this and it did not go through. Nothing reached the chain.'
+              : 'Maren checked this against Mezo before opening your wallet, so no signature was ' +
+                'requested and no gas was spent.'}
         </p>
         {reason.name ? (
           <p className="num text-text-subtle mt-2.5 text-xs">Contract error: {reason.name}</p>
@@ -654,6 +657,8 @@ function Failed({
           Attempted: <span className="text-text-muted">{intent.title}</span>
         </p>
       </div>
+
+      {reason.hash ? <HashLine hash={reason.hash} /> : null}
 
       <div className="mt-6">
         <PillAction onClick={onClose} icon={<ArrowRight className="size-4" />}>

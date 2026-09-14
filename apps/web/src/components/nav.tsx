@@ -1,7 +1,8 @@
 'use client';
 
 import Link from 'next/link';
-import { useEffect, useState } from 'react';
+import { TESTFLIGHT_URL } from '@/lib/links';
+import { useEffect, useRef, useState } from 'react';
 
 /**
  * Nav — a clean, transparent bar: the Maren mark + wordmark on the left with the
@@ -20,17 +21,24 @@ const links: readonly NavLink[] = [
 export function Nav() {
   const [open, setOpen] = useState(false);
 
+  const menuButton = useRef<HTMLButtonElement>(null);
+
   useEffect(() => {
-    document.documentElement.style.overflow = open ? 'hidden' : '';
-    return () => {
-      document.documentElement.style.overflow = '';
+    const desktop = window.matchMedia('(min-width: 1024px)');
+    const closeOnDesktop = () => {
+      if (desktop.matches) setOpen(false);
     };
-  }, [open]);
+    desktop.addEventListener('change', closeOnDesktop);
+    return () => desktop.removeEventListener('change', closeOnDesktop);
+  }, []);
 
   useEffect(() => {
     if (!open) return;
     const onKey = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') setOpen(false);
+      if (e.key === 'Escape') {
+        setOpen(false);
+        menuButton.current?.focus();
+      }
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
@@ -57,11 +65,15 @@ export function Nav() {
           </div>
 
           <div className="flex items-center gap-3">
-            <a href="/docs" className="nav-cta">
-              Read docs
+            <a href="/docs" className="hidden text-sm lg:inline-flex">
+              Docs
+            </a>
+            <a href={TESTFLIGHT_URL} target="_blank" rel="noopener noreferrer" className="nav-cta">
+              Join iOS beta
             </a>
 
             <button
+              ref={menuButton}
               type="button"
               onClick={() => setOpen((v) => !v)}
               aria-expanded={open}

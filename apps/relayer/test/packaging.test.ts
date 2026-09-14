@@ -205,9 +205,10 @@ describe('DEPLOY.md', () => {
     expect(deploy).toMatch(/The Fly\.io deployment works\s*\|\s*\*\*No\.\*\*/);
   });
 
-  it('keeps the testnet-on-standalone boundary explicit and mainnet gated', async () => {
+  it('keeps supported testnet targets explicit and mainnet gated', async () => {
     const deploy = await read('../DEPLOY.md');
-    expect(deploy).toMatch(/standalone server is the only\s*\n?supported target/);
+    expect(deploy).toMatch(/standalone server and the single Durable Object deployment/);
+    expect(deploy).toMatch(/supported testnet targets/);
     expect(deploy).toMatch(/## Mainnet gates/);
     expect(deploy).toMatch(/KMS or HSM signer\. Not implemented/);
   });
