@@ -61,10 +61,13 @@ of net debt — about **$5,000 of Bitcoin** at the 250% collateral ratio Maren r
 Read on mainnet today: MUSD's system debt sits across **19 open troves**. Borrowing is
 whale-shaped because the minimum makes it whale-shaped.
 
-Maren's pooled vault lets someone borrow $25 against $79 of Bitcoin by giving them a
-proportional claim inside one conservatively managed trove that clears the protocol
-minimum on their behalf. That is the entire product thesis, and it is the part that
-required original contract work rather than integration work.
+Maren's pooled vault removes that minimum. Its own floor is `MIN_DEPOSIT = 0.001 BTC`
+— about $76 at today's price — enforced in `MarenVault._requireDepositAllowed`. There
+is no minimum *loan* at all: the only amount check on the borrow path is `amount == 0`,
+and what actually binds is the 180% collateral ratio. A depositor gets a proportional
+claim inside one conservatively managed trove that clears MUSD's 1,800 minimum on their
+behalf. That is the entire product thesis, and it is the part that required original
+contract work rather than integration work.
 
 ## Pilot metrics, read live on 16 September
 
