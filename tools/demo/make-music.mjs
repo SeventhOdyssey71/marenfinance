@@ -31,6 +31,7 @@
  *
  * Usage:
  *   ELEVENLABS_API_KEY=... node tools/demo/make-music.mjs [--seconds 44] [--tries 4]
+ *     [--out design/explainer-film/audio]
  */
 import { writeFile, mkdir } from 'node:fs/promises';
 import { join, resolve } from 'node:path';
@@ -48,7 +49,7 @@ const arg = (n, d) => {
 };
 const SECONDS = Number(arg('seconds', 44));
 const TRIES = Number(arg('tries', 4));
-const OUT = resolve('design/launch-film/audio');
+const OUT = resolve(arg('out', 'design/launch-film/audio'));
 
 /** Anything at or above this is treated as containing a voice. */
 /** Voice measures 0.16-0.19 here, piano 0.017. 0.08 sits well clear of both. */

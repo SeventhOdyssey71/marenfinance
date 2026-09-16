@@ -21,6 +21,7 @@
 import { readFile } from 'node:fs/promises';
 import { existsSync } from 'node:fs';
 import { resolve, join } from 'node:path';
+import { pathToFileURL } from 'node:url';
 import { spawn, spawnSync } from 'node:child_process';
 
 function arg(name, fallback) {
@@ -28,7 +29,7 @@ function arg(name, fallback) {
   return i === -1 ? fallback : process.argv[i + 1];
 }
 
-const AUDIO = resolve('design/launch-film/audio');
+const AUDIO = resolve(arg('audio', 'design/launch-film/audio'));
 const VIDEO = resolve(arg('video', 'design/launch-film/maren-launch-silent.mp4'));
 const OUT = resolve(arg('out', 'design/launch-film/maren-launch.mp4'));
 const MUSIC = join(AUDIO, 'music.mp3');
@@ -65,7 +66,15 @@ const CENTRE = Number(arg('centre', '1'));
 const VOICE = Number(arg('voice', '0.70'));
 /** Drop the score entirely — the one option that cannot contain a voice. */
 const NO_MUSIC = process.argv.includes('--no-music');
-const DUR = 43.2;
+
+/**
+ * `--script <module>` supplies DUR and CUES for a different film. Omitted, the launch
+ * film's numbers below are used, so the original command and its measured mix are
+ * untouched. The cue sheet is validated against the MEASURED line durations either way.
+ */
+const scriptPath = arg('script', null);
+const SCRIPT = scriptPath ? await import(pathToFileURL(resolve(scriptPath)).href) : null;
+const DUR = SCRIPT ? SCRIPT.DUR : 43.2;
 
 /**
  * id -> when the line STARTS speaking, in seconds.
@@ -73,7 +82,7 @@ const DUR = 43.2;
  * Each sits just after its beat's copy has settled, so the word and the picture
  * arrive together rather than the read pre-announcing the title.
  */
-const CUES = [
+const LAUNCH_CUES = [
   ['A1', 0.6],
   ['A2', 3.3],
   ['A3', 7.4],
@@ -91,6 +100,8 @@ const CUES = [
   // it keeps it exactly as true and lets the score carry the beat instead.
   ['C2', 38.6],
 ];
+
+const CUES = SCRIPT ? SCRIPT.CUES : LAUNCH_CUES;
 
 const vo = JSON.parse(await readFile(join(AUDIO, 'vo.json'), 'utf8'));
 const byId = Object.fromEntries(vo.map((v) => [v.id, v.seconds]));

@@ -15,9 +15,15 @@
  *
  * Usage:
  *   ELEVENLABS_API_KEY=... node tools/demo/make-vo.mjs [--voice <id>] [--out <dir>]
+ *     [--script design/explainer-film/script.mjs] [--only T2,B4]
+ *
+ * `--script` points at a module exporting `LINES` ([{id, text}]). Without it the
+ * launch film's lines below are used, so the original command is unchanged.
  */
-import { writeFile, mkdir } from 'node:fs/promises';
+import { writeFile, mkdir, readFile } from 'node:fs/promises';
+import { existsSync } from 'node:fs';
 import { join, resolve } from 'node:path';
+import { pathToFileURL } from 'node:url';
 import { spawn } from 'node:child_process';
 
 const KEY = process.env.ELEVENLABS_API_KEY;
@@ -54,7 +60,7 @@ const OUT = resolve(arg('out', 'design/launch-film/audio'));
  * only channel that can say WHY, and one that contradicts it makes the viewer
  * choose which to follow.
  */
-const LINES = [
+const LAUNCH_LINES = [
   { id: 'A1', text: 'You’ve held it for years.' },
   { id: 'A2', text: 'But to spend it, you have to sell it. And what you sell is gone.' },
   { id: 'A3', text: 'Dollars today. No Bitcoin tomorrow.' },
@@ -68,6 +74,15 @@ const LINES = [
   { id: 'C1', text: 'Non-custodial. Live on Mezo testnet. Pre-audit, not mainnet yet.' },
   { id: 'C2', text: 'Maren. Spend Bitcoin. Never sell it.' },
 ];
+
+const scriptPath = arg('script', null);
+const LINES = scriptPath
+  ? (await import(pathToFileURL(resolve(scriptPath)).href)).LINES
+  : LAUNCH_LINES;
+if (!Array.isArray(LINES) || !LINES.length) {
+  console.error(`${scriptPath} exports no LINES array`);
+  process.exit(1);
+}
 
 function ffprobe(file) {
   return new Promise((ok, fail) => {
@@ -87,10 +102,44 @@ function ffprobe(file) {
 }
 
 await mkdir(OUT, { recursive: true });
+
+/**
+ * `--only A1,T2` regenerates just those lines and MERGES them back into the existing
+ * vo.json, keeping every other measured duration byte-for-byte.
+ *
+ * This matters because TTS is not deterministic: regenerating all thirty-one lines to
+ * fix the wording of one shifts every other duration by a few hundredths, which forces
+ * a re-time of the whole film for no reason. Prosody continuity still uses the full
+ * LINES array for previous_text/next_text, so a regenerated line is read in the same
+ * context it will be heard in.
+ */
+const only = (arg('only', '') || '').split(',').filter(Boolean);
+const previous = existsSync(join(OUT, 'vo.json'))
+  ? JSON.parse(await readFile(join(OUT, 'vo.json'), 'utf8'))
+  : [];
+const priorById = Object.fromEntries(previous.map((r) => [r.id, r]));
+if (only.length) {
+  const unknown = only.filter((id) => !LINES.some((l) => l.id === id));
+  if (unknown.length) {
+    console.error(`--only names lines that are not in the script: ${unknown.join(', ')}`);
+    process.exit(1);
+  }
+  process.stderr.write(`regenerating ${only.join(', ')}; keeping ${previous.length - only.length} measured line(s)\n`);
+}
+
 const results = [];
 
 for (let i = 0; i < LINES.length; i += 1) {
   const line = LINES[i];
+  if (only.length && !only.includes(line.id)) {
+    const kept = priorById[line.id];
+    if (!kept) {
+      console.error(`--only given, but ${line.id} has no prior recording to keep`);
+      process.exit(1);
+    }
+    results.push(kept);
+    continue;
+  }
   const res = await fetch(`https://api.elevenlabs.io/v1/text-to-speech/${VOICE}`, {
     method: 'POST',
     headers: { 'xi-api-key': KEY, 'content-type': 'application/json' },
