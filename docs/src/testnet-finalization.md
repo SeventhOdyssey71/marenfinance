@@ -17,6 +17,8 @@ colophon: |
   findings, not as criticism.
 ---
 
+> **22 September follow-up:** borrowing failure diagnosis and repair evidence are maintained in [the recovery report](../releases/borrowing-recovery-2026-09-22.md). The original figures below remain the 16 September observations.
+
 ## What you can check yourself, in five minutes
 
 | | |

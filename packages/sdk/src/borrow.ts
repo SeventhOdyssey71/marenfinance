@@ -9,7 +9,6 @@ import {
   assessHealth,
   collateralRatio,
   collateralRequiredFor,
-  liquidationPrice,
   type PositionHealth,
 } from './position';
 
@@ -42,7 +41,7 @@ import {
  * — once here (as `apps/web/src/lib/vault.ts`) and once inline in the iOS vault screen,
  * where the second copy worked from `principalWei` and so ignored accrued interest. That
  * over-quoted the maximum borrow and put the slider's "180% floor" stop below the floor.
- * One implementation, imported by both apps, is the fix.
+ * Web imports these helpers; the native Swift counterpart is pinned by matching regression cases.
  */
 
 /**
@@ -63,7 +62,7 @@ export interface BorrowPosition {
   /** `MarenVault.maxBorrowable`, when the pooled route has been read from chain. */
   vaultMaxBorrowableWei?: bigint;
   /**
-   * `TroveManager.getTroveDebt()` for the trove this position draws against — the USER's
+   * Entire principal + interest, including pending redistribution, for the USER's
    * trove on the direct route, the WHOLE POOLED TROVE on the pooled route.
    *
    * This is the figure Mezo actually checks the ceiling against, and it is not
@@ -71,6 +70,12 @@ export interface BorrowPosition {
    * On the pooled route it belongs to every depositor at once, not to this user.
    */
   troveTotalDebtWei?: bigint;
+  /** Shared reserve already borrowed by the pool: this portion creates no protocol debt. */
+  reserveMusdWei?: bigint;
+  /** Collateral actually in the shared trove; idle user deposits cannot back its ICR. */
+  troveCollateralWei?: bigint;
+  /** Current protocol origination rate, WAD. Defaults to the configured testnet rate. */
+  borrowingRateWei?: bigint;
 }
 
 /**
@@ -109,86 +114,96 @@ export function collateralRequiredForTotalDebt(
  * So: work from total debt, which is what the ratio is actually computed against, and
  * gross up only the NEW draw by the origination fee.
  */
+function feeRate(position: BorrowPosition): bigint {
+  return position.borrowingRateWei ?? BORROWING_RATE;
+}
+
+/** Invert debt added, charging the fee only on the portion beyond a pooled reserve. */
+function drawForDebtBudget(position: BorrowPosition, budget: bigint): bigint {
+  if (budget <= 0n) return 0n;
+  const reserve = position.route === 'pooled' ? (position.reserveMusdWei ?? 0n) : 0n;
+  if (budget <= reserve) return budget;
+  return reserve + ((budget - reserve) * WAD) / (WAD + feeRate(position));
+}
+
 function headroomAt(position: BorrowPosition, priceWei: bigint, targetCr: bigint): bigint {
-  if (targetCr === 0n) return 0n;
+  if (targetCr <= 0n || priceWei <= 0n || feeRate(position) < 0n) return 0n;
   const debtAllowed = (position.collateralWei * priceWei) / targetCr;
-  if (debtAllowed <= position.debtWei) return 0n;
-  const room = debtAllowed - position.debtWei;
-
-  // A pooled borrow served from the vault's MUSD reserve pays no origination fee.
-  if (position.route === 'pooled') return room;
-
-  // Invert `draw + draw * rate <= room`, rounding down so the quote never overshoots.
-  return (room * WAD) / (WAD + BORROWING_RATE);
+  return drawForDebtBudget(position, debtAllowed - position.debtWei);
 }
 
 export interface BorrowCeiling {
   /** The most MUSD this user may draw right now. The slider's hard stop. */
   amountWei: bigint;
   /** Which limit produced it — the one to name in the interface. */
-  binding: 'ratio' | 'ceiling' | 'none';
+  binding: 'ratio' | 'ceiling' | 'pool' | 'unavailable' | 'none';
   /** Headroom under Maren's 180% floor alone. */
   ratioHeadroomWei: bigint;
   /** Headroom under Mezo's per-trove ceiling alone. */
   mezoHeadroomWei: bigint;
+  /** Additional draw allowed by the pooled trove’s 180% floor. */
+  poolHeadroomWei?: bigint;
 }
 
 /**
  * The hard stop for the borrow control.
  *
- * Two limits bind independently and the smaller wins: Maren's 180% floor, and Mezo's
+ * User and pooled-trove 180% floors bind independently alongside Mezo's
  * per-trove `maxBorrowingCapacity` — which is fixed at the price the trove opened at and
  * does not move when collateral is added. Quoting only the first is how a borrow ends in
  * an opaque revert.
  */
 export function borrowCeiling(position: BorrowPosition, priceWei: bigint): BorrowCeiling {
-  /**
-   * On the pooled route the contract answers this itself — `MarenVault.maxBorrowable`
-   * is the same 180% calculation done on-chain against the same ledger, so we use its
-   * number rather than a second opinion that could disagree with it by a wei.
-   */
+  const unavailable = (): BorrowCeiling => ({
+    amountWei: 0n,
+    binding: 'unavailable',
+    ratioHeadroomWei: 0n,
+    mezoHeadroomWei: 0n,
+  });
+  if (priceWei <= 0n || feeRate(position) < 0n || position.route === 'none') return unavailable();
+  const pooled = position.route === 'pooled';
+  // A user's debt is not a substitute for the debt owed by the entire pool.
+  if (
+    pooled &&
+    (position.troveTotalDebtWei === undefined ||
+      position.reserveMusdWei === undefined ||
+      position.troveCollateralWei === undefined)
+  )
+    return unavailable();
+  const reserve = pooled ? position.reserveMusdWei! : 0n;
+  const troveDebt = position.troveTotalDebtWei ?? position.debtWei;
+  if (reserve < 0n || troveDebt < 0n) return unavailable();
   const ratioHeadroomWei =
-    position.route === 'pooled'
-      ? (position.vaultMaxBorrowableWei ??
-        headroomAt(position, priceWei, MAREN_POLICY.minHealthyCr))
+    pooled && position.vaultMaxBorrowableWei !== undefined
+      ? drawForDebtBudget(position, position.vaultMaxBorrowableWei)
       : headroomAt(position, priceWei, MAREN_POLICY.minHealthyCr);
-
-  /**
-   * Mezo checks `maxBorrowingCapacity >= netDebtChange + getTroveDebt(borrower)`
-   * (BorrowerOperations `_requireHasBorrowingCapacity`), where `netDebtChange` is the draw
-   * PLUS its origination fee. So two corrections against the obvious formula:
-   *
-   * 1. Subtract the trove's TOTAL debt, not the user's drawn principal. Total debt carries
-   *    the 200 MUSD gas compensation and accrued interest, and on the pooled route it is
-   *    the whole shared trove's debt rather than this user's slice — comparing a trove-wide
-   *    ceiling against one user's balance is a category error that makes the ceiling
-   *    effectively unbounded.
-   * 2. Divide out the fee, because the protocol adds it to the draw before comparing.
-   *    Quoting a gross number means the last MUSD of the range always reverts.
-   *
-   * Measured on matsnet before this fix: `maxBorrowable()` quoted 1,556.98 MUSD for a
-   * position whose true limit simulated at 834.68 — the button labelled "Max" reverted by
-   * construction. `troveTotalDebtWei` is optional only so an unmigrated caller still
-   * compiles; when it is absent the ceiling falls back to the conservative direction by
-   * using total debt from `debtWei`, never the old under-subtraction.
-   */
-  const troveDebtWei = position.troveTotalDebtWei ?? position.debtWei;
-  const rawHeadroomWei =
-    position.maxBorrowingCapacityWei > troveDebtWei
-      ? position.maxBorrowingCapacityWei - troveDebtWei
+  const rawCapacity =
+    position.maxBorrowingCapacityWei > troveDebt
+      ? position.maxBorrowingCapacityWei - troveDebt
       : 0n;
-  // The pooled route draws through MarenVault, which pays no origination fee on the
-  // reserve-served portion; the direct route always pays it. Gross down only where charged.
-  const mezoHeadroomWei =
-    position.route === 'pooled' ? rawHeadroomWei : (rawHeadroomWei * WAD) / (WAD + BORROWING_RATE);
-
-  const amountWei = ratioHeadroomWei < mezoHeadroomWei ? ratioHeadroomWei : mezoHeadroomWei;
-
+  const mezoHeadroomWei = reserve + (rawCapacity * WAD) / (WAD + feeRate(position));
+  let amountWei = ratioHeadroomWei < mezoHeadroomWei ? ratioHeadroomWei : mezoHeadroomWei;
+  let binding: BorrowCeiling['binding'] =
+    amountWei === 0n ? 'none' : ratioHeadroomWei <= mezoHeadroomWei ? 'ratio' : 'ceiling';
+  let poolHeadroomWei: bigint | undefined;
+  if (pooled) {
+    const poolDebtAllowed = (position.troveCollateralWei! * priceWei) / MAREN_POLICY.minHealthyCr;
+    // The contract checks pooled ICR even when all funds come out of the existing reserve.
+    poolHeadroomWei =
+      poolDebtAllowed < troveDebt
+        ? 0n
+        : reserve + ((poolDebtAllowed - troveDebt) * WAD) / (WAD + feeRate(position));
+    if (poolHeadroomWei < amountWei || poolDebtAllowed < troveDebt) {
+      amountWei = poolHeadroomWei;
+      binding = 'pool';
+    }
+  }
   return {
     amountWei,
-    binding: amountWei === 0n ? 'none' : ratioHeadroomWei <= mezoHeadroomWei ? 'ratio' : 'ceiling',
+    binding,
     ratioHeadroomWei,
     mezoHeadroomWei,
+    ...(poolHeadroomWei === undefined ? {} : { poolHeadroomWei }),
   };
 }
 
@@ -225,14 +240,32 @@ export function previewBorrow(
   priceWei: bigint,
   amountWei: bigint,
 ): BorrowPreview {
-  const originationFeeWei = position.route === 'pooled' ? 0n : (amountWei * BORROWING_RATE) / WAD;
+  const reserve = position.route === 'pooled' ? (position.reserveMusdWei ?? 0n) : 0n;
+  const freshDraw = amountWei > reserve ? amountWei - reserve : 0n;
+  const originationFeeWei = (freshDraw * feeRate(position)) / WAD;
   const debtWei = position.debtWei + amountWei + originationFeeWei;
+  const health = assessHealth(position.collateralWei, debtWei, priceWei);
+  if (position.route === 'pooled') {
+    health.liquidationPrice =
+      position.collateralWei > 0n
+        ? (debtWei * MAREN_POLICY.vaultLiquidationCr + position.collateralWei - 1n) /
+          position.collateralWei
+        : 0n;
+    health.priceDropToLiquidationBps =
+      debtWei === 0n
+        ? 10_000
+        : priceWei <= health.liquidationPrice
+          ? 0
+          : Number(((priceWei - health.liquidationPrice) * 10_000n) / priceWei);
+    if (debtWei > 0n && health.collateralRatio < MAREN_POLICY.vaultLiquidationCr)
+      health.status = 'liquidatable';
+  }
 
   return {
     debtWei,
     collateralRatio: collateralRatio(position.collateralWei, debtWei, priceWei),
-    liquidationPriceWei: liquidationPrice(position.collateralWei, debtWei),
-    health: assessHealth(position.collateralWei, debtWei, priceWei),
+    liquidationPriceWei: health.liquidationPrice,
+    health,
     originationFeeWei,
   };
 }

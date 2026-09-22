@@ -11,7 +11,7 @@ export function Hero() {
   return (
     <section id="top" className="u-wrap hero">
       <Reveal className="flex justify-center">
-        <span className="hero-eyebrow">iOS beta · Mezo testnet</span>
+        <span className="hero-eyebrow">Web + iOS beta · Mezo testnet</span>
       </Reveal>
 
       <Reveal as="h1" delay={60} className="hero-title">
@@ -41,10 +41,8 @@ export function Hero() {
           </svg>
           Join the iOS beta
         </a>
-        {/* Secondary CTA. The web app is off in production while the launch is
-            mobile-first, so this points at the docs rather than a route that 404s. */}
-        <a href="/docs" className="hero-btn hero-btn-ghost">
-          Read docs
+        <a href="/app" className="hero-btn hero-btn-ghost">
+          Open web app
         </a>
       </Reveal>
 

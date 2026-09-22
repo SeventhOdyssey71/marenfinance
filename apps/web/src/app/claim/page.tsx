@@ -5,7 +5,13 @@ import Link from 'next/link';
 import { useQuery } from '@tanstack/react-query';
 import { usePublicClient } from 'wagmi';
 import { parseAbiItem, type Address, type Hex } from 'viem';
-import { formatMusd, getDeploymentBlock, getMarenAddresses, MEZO_MAX_LOG_RANGE } from '@maren/sdk';
+import {
+  formatMusd,
+  getChain,
+  getDeploymentBlock,
+  getMarenAddresses,
+  MEZO_MAX_LOG_RANGE,
+} from '@maren/sdk';
 
 import { parseClaimLink, claimRecordMatches, type ParsedClaimLink } from '@/lib/chain/claim-link';
 import { marenPayAbi } from '@/lib/chain/abis';
@@ -70,7 +76,7 @@ type LinkLookup =
  * to "claimed" on its own, without a reload.
  */
 function useClaimableLink(linkKey: Address, hintedId: bigint | null) {
-  const client = usePublicClient();
+  const client = usePublicClient({ chainId: getChain(NETWORK).id });
   const deployed = contractsDeployed(NETWORK);
   const resolvedId = useRef<bigint | null>(hintedId);
 

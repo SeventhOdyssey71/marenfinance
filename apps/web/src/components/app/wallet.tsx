@@ -113,7 +113,7 @@ function AccountMenu({
 /** The wallet-only flow: pick a wagmi connector from a menu. Unchanged behaviour. */
 function WagmiConnectButton() {
   const { address, isConnected } = useAccount();
-  const { connectors, connect, isPending } = useConnect();
+  const { connectors, connect, isPending, error } = useConnect();
   const { disconnect } = useDisconnect();
   const [open, setOpen] = useState(false);
   const ref = useDismiss(open, () => setOpen(false));
@@ -148,6 +148,14 @@ function WagmiConnectButton() {
           </svg>
         </span>
       </button>
+
+      {error ? (
+        <p role="alert" className="text-danger mt-2 max-w-64 text-xs">
+          {error.name === 'UserRejectedRequestError'
+            ? 'Connection was cancelled. Choose a wallet to try again.'
+            : 'The wallet could not connect. Unlock it and try again, or choose another wallet.'}
+        </p>
+      ) : null}
 
       {open ? (
         <div

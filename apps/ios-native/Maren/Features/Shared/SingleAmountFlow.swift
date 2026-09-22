@@ -16,6 +16,7 @@ struct AmountFlowConfig {
     /// The spendable/available ceiling and its label, when there is one to enforce.
     var available: Decimal? = nil
     var availableLabel: String? = nil
+    var requiresAvailable: Bool = false
     let gas: GasMode
     var gasDetail: String? = nil
     let submitTitle: String
@@ -47,7 +48,7 @@ struct SingleAmountFlow: View {
     private var unitLabel: String { isMusd ? "MUSD" : "BTC" }
     private var amount: Decimal? { Decimal(string: raw.isEmpty ? "0" : raw) }
     private var overMax: Bool { if let a = amount, let m = config.available { return a > m }; return false }
-    private var amountValid: Bool { (amount ?? 0) > 0 && !overMax }
+    private var amountValid: Bool { (amount ?? 0) > 0 && !overMax && (!config.requiresAvailable || config.available != nil) }
 
     var body: some View {
         VStack(spacing: 0) {
@@ -101,6 +102,11 @@ struct SingleAmountFlow: View {
                     .transition(.opacity)
             }
 
+            if let explainer = config.explainer {
+                Text(explainer).font(.text(13)).foregroundStyle(Theme.Palette.muted)
+                    .padding(.horizontal, Theme.Space.md)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
             if let available = config.available, let label = config.availableLabel {
                 availableCard(available, label)
             }

@@ -333,7 +333,7 @@ export interface MarenWriteOptions {
 export function useMarenWrites(options: MarenWriteOptions = {}): MarenWrites {
   const { address, isConnected } = useAccount();
   const chainId = useChainId();
-  const client = usePublicClient();
+  const client = usePublicClient({ chainId: targetChain.id });
   const { writeContractAsync } = useWriteContract();
   const { signTypedDataAsync } = useSignTypedData();
   const relayer = useRelayerStatus();

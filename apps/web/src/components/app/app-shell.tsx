@@ -79,13 +79,13 @@ function Disclosure({ className = '' }: { className?: string }) {
   return (
     <div className={`text-text-subtle flex flex-col gap-3 text-xs leading-relaxed ${className}`}>
       <p className="max-w-[60ch]">
-        Pre-audit: MarenVault and MarenPay hold user funds and have not been audited. Pooled
-        collateral is segregated in accounting, not custody.
+        Testnet funds only. Maren’s contracts are pre-audit. Pooled collateral is segregated in
+        accounting, not custody.
       </p>
       <div className="flex flex-wrap items-center gap-x-5 gap-y-2">
         <VaultProvenance />
         <a
-          href="https://github.com/SeventhOdyssey71/marenfinance/tree/main/docs"
+          href="/docs"
           target="_blank"
           rel="noreferrer noopener"
           className="text-text-muted hover:text-text transition-colors duration-[120ms] ease-out"

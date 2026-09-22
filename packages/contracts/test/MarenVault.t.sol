@@ -2,6 +2,7 @@
 pragma solidity ^0.8.28;
 
 import {MarenVault} from "../src/MarenVault.sol";
+import {ITroveManager} from "../src/interfaces/ITroveManager.sol";
 import {VaultTestBase} from "./helpers/VaultTestBase.sol";
 import {MockMusdProtocol} from "./mocks/MockMusdProtocol.sol";
 import {IAccessControl} from "@openzeppelin/contracts/access/IAccessControl.sol";
@@ -10,6 +11,42 @@ contract MarenVaultTest is VaultTestBase {
     function setUp() public {
         _deployVault();
         _openPooledTrove();
+    }
+
+    function test_pendingRedistributionsAreAlreadyIncludedInEntireTotals() public {
+        vm.mockCall(
+            address(protocol),
+            abi.encodeCall(ITroveManager.getEntireDebtAndColl, (address(vault))),
+            abi.encode(1.1 ether, 2401.8e18, 10e18, 0.1 ether, 400e18, 7e18)
+        );
+        (uint256 coll, uint256 netDebt,) = vault.troveStatus();
+        assertEq(coll, 1.1 ether, "pending collateral must not be added twice");
+        assertEq(netDebt, 2211.8e18, "pending principal/interest must not be added twice");
+        assertEq(vault.outstandingDebt(), 411.8e18, "reserve deducted from inclusive totals once");
+    }
+
+    function test_applyingPendingRedistributionDoesNotChangeShareholderDebtAgain() public {
+        _deposit(alice, 0.01 ether);
+        _borrow(alice, 200e18);
+        bytes memory callData = abi.encodeCall(ITroveManager.getEntireDebtAndColl, (address(vault)));
+        vm.mockCall(
+            address(protocol), callData, abi.encode(1.11 ether, 2401.8e18, 10e18, 0.1 ether, 400e18, 7e18)
+        );
+        vault.syncTrove();
+        uint256 beforeDebt = vault.debtOf(alice);
+        uint256 beforeOutstanding = vault.outstandingDebt();
+        assertEq(beforeOutstanding, 611.8e18);
+        // Materializing the redistribution changes the subset fields, not the totals.
+        vm.mockCall(
+            address(protocol),
+            callData,
+            abi.encode(1.11 ether, 2401.8e18, 10e18, uint256(0), uint256(0), uint256(0))
+        );
+        vault.syncTrove();
+        assertEq(vault.outstandingDebt(), beforeOutstanding);
+        assertEq(
+            vault.debtOf(alice), beforeDebt, "applying already-accounted rewards cannot change user debt"
+        );
     }
 
     // ------------------------------------------------------------------ //

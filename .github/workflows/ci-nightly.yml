@@ -87,8 +87,8 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 22
-      - name: Check the intended iOS-first release
-        run: node tools/release/check.mjs --out release-evidence.json
+      - name: Check the web and iOS testnet release
+        run: node tools/release/check.mjs --web-app --require-recovery --out release-evidence.json
       - name: Retain dated observations, including failures
         if: always()
         uses: actions/upload-artifact@v4

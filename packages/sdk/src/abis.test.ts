@@ -1,7 +1,18 @@
 import { describe, expect, it } from 'vitest';
-import { toEventSelector, type AbiEvent } from 'viem';
+import { decodeFunctionResult, encodeFunctionData, toEventSelector, type AbiEvent } from 'viem';
 
-import { MAREN_EARN_EVENTS, MAREN_PAY_EVENTS, MAREN_VAULT_EVENTS } from './abis';
+import { marenVaultAbi, MAREN_EARN_EVENTS, MAREN_PAY_EVENTS, MAREN_VAULT_EVENTS } from './abis';
+
+it('reads the accounted reserve independently of the vault token balance', () => {
+  expect(encodeFunctionData({ abi: marenVaultAbi, functionName: 'reserveMUSD' })).toHaveLength(10);
+  expect(
+    decodeFunctionResult({
+      abi: marenVaultAbi,
+      functionName: 'reserveMUSD',
+      data: `0x${'0'.repeat(62)}64`,
+    }),
+  ).toBe(100n);
+});
 
 /**
  * Event topics, pinned to the hashes the DEPLOYED contracts actually emit.

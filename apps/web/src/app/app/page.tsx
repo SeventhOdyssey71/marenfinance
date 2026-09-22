@@ -4,8 +4,7 @@ import type { ReactNode } from 'react';
 import Link from 'next/link';
 import {
   MAREN_POLICY,
-  assessHealth,
-  borrowCeiling,
+  previewBorrow,
   collateralValue,
   formatBtc,
   formatMusd,
@@ -57,8 +56,10 @@ import {
   usePosition,
   usePrice,
   usePrimaryHandle,
+  useProtocolStats,
 } from '@/lib/data/source';
 import type { ActivityItem } from '@/lib/data/types';
+import { preflightBorrow } from '@/lib/chain/preflight';
 
 /**
  * Home — the position at a glance.
@@ -88,6 +89,7 @@ export default function PortfolioPage() {
   const positionQ = usePosition();
   const balancesQ = useBalances();
   const earnQ = useEarn();
+  const { data: stats } = useProtocolStats();
   const { data: handle } = usePrimaryHandle();
 
   const position = positionQ.data;
@@ -123,7 +125,7 @@ export default function PortfolioPage() {
 
   const health =
     position && livePrice && !empty && !debtFree
-      ? assessHealth(position.collateralWei, position.debtWei, livePrice)
+      ? previewBorrow(position, livePrice, 0n).health
       : null;
 
   const collateralUsd =
@@ -179,7 +181,9 @@ export default function PortfolioPage() {
           balances={balances}
           earn={earn}
           collateralUsd={collateralUsd}
-          livePrice={livePrice}
+          available={
+            stats ? preflightBorrow({ position, balances, price, stats }, 0n).maxWei : null
+          }
         />
       ) : (
         <Panel title="Your position" labelledBy="position-health">
@@ -314,17 +318,15 @@ function PositionCard({
   balances,
   earn,
   collateralUsd,
-  livePrice,
+  available,
 }: {
   position: NonNullable<ReturnType<typeof usePosition>['data']>;
-  health: NonNullable<ReturnType<typeof assessHealth>>;
+  health: ReturnType<typeof previewBorrow>['health'];
   balances: ReturnType<typeof useBalances>['data'];
   earn: ReturnType<typeof useEarn>['data'];
   collateralUsd: bigint | null;
-  livePrice: bigint;
+  available: bigint | null;
 }) {
-  const limits = borrowCeiling(position, livePrice);
-  const available = limits?.amountWei ?? null;
   const ceiling = position.maxBorrowingCapacityWei;
   const pooled = position.route === 'pooled';
 
@@ -397,7 +399,11 @@ function PositionCard({
                     debtWei={position.debtWei}
                     size="sm"
                   />
-                  <span className="text-text-subtle"> · protocol liquidates at 110%</span>
+                  <span className="text-text-subtle">
+                    {position.route === 'pooled'
+                      ? ' · pooled positions liquidate at 140%'
+                      : ' · protocol liquidates at 110%'}
+                  </span>
                 </DetailRow>
                 <DetailRow label="Interest owed">
                   <Musd wei={position.interestWei} size="sm" />

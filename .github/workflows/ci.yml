@@ -13,7 +13,7 @@
 #   forge fmt --check
 #   forge build --sizes
 #   FOUNDRY_PROFILE=ci forge test
-#   forge snapshot --check --tolerance 5 --no-match-contract "MarenVaultInvariantTest|MarenVaultForkTest"
+#   forge snapshot --check --tolerance 5 --no-match-contract "MarenVaultInvariantTest|MarenVaultForkTest|DeployedBorrowRepairForkTest"
 #   forge coverage --report summary --ir-minimum
 #   cd ../..
 #
@@ -208,7 +208,7 @@ jobs:
       - name: Gas snapshot
         run: >-
           forge snapshot --check --tolerance 5
-          --no-match-contract "MarenVaultInvariantTest|MarenVaultForkTest"
+          --no-match-contract "MarenVaultInvariantTest|MarenVaultForkTest|DeployedBorrowRepairForkTest"
 
       # Not `|| true`. Coverage compiles via-IR with the optimizer off, which is a
       # genuinely different pipeline from `forge test`, and it has already caught two
@@ -271,6 +271,9 @@ jobs:
 
       - name: Cross-client testnet configuration
         run: pnpm release:attest --local
+
+      - name: Keeper repair safety regressions
+        run: node --test tools/ops/refinance-trove.test.mjs
 
       - name: Durable storage restart and alarm integration
         run: pnpm --filter @maren/relayer test:runtime

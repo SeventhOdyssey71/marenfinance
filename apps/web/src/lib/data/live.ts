@@ -4,6 +4,7 @@ import {
   MEZO_PRICE_ORACLE_PRECOMPILE,
   getMarenAddresses,
   getMusdAddresses,
+  borrowerOperationsAbi,
   type MezoNetwork,
 } from '@maren/sdk';
 import { erc20Abi, type Address, type PublicClient } from 'viem';
@@ -169,20 +170,22 @@ export async function readPosition(ctx: LiveContext): Promise<Position> {
       .catch(() => null),
   ]);
 
-  const [coll, principal, interest, pendingColl, pendingPrincipal, pendingInterest] = trove;
+  // Mezo's first three values already include pending redistributions. The trailing
+  // values are explanatory components, not deltas to add a second time.
+  const [coll, principal, interest] = trove;
 
-  if (coll + pendingColl > 0n) {
+  if (coll > 0n) {
     if (directCapacity === null) {
       throw new Error('Mezo did not report this trove’s borrowing capacity.');
     }
 
     // `principal` from Mezo's TroveManager already includes the 200 MUSD gas
     // compensation, so it is not added again here.
-    const totalPrincipal = principal + pendingPrincipal;
-    const totalInterest = interest + pendingInterest;
+    const totalPrincipal = principal;
+    const totalInterest = interest;
 
     return {
-      collateralWei: coll + pendingColl,
+      collateralWei: coll,
       debtWei: totalPrincipal + totalInterest,
       principalWei:
         totalPrincipal > MUSD_GAS_COMPENSATION ? totalPrincipal - MUSD_GAS_COMPENSATION : 0n,
@@ -444,6 +447,8 @@ export async function readProtocolStats(ctx: LiveContext): Promise<ProtocolStats
     troveOpen,
     depositCap,
     idleCollateral,
+    borrowingRate,
+    entireTrove,
   ] = await Promise.all([
     ctx.client.readContract({
       address: maren.marenVault,
@@ -461,10 +466,9 @@ export async function readProtocolStats(ctx: LiveContext): Promise<ProtocolStats
       functionName: 'troveMaxBorrowingCapacity',
     }),
     ctx.client.readContract({
-      address: musd.musd,
-      abi: erc20Abi,
-      functionName: 'balanceOf',
-      args: [maren.marenVault],
+      address: maren.marenVault,
+      abi: marenVaultAbi,
+      functionName: 'reserveMUSD',
     }),
     ctx.client.readContract({
       address: maren.marenVault,
@@ -491,9 +495,26 @@ export async function readProtocolStats(ctx: LiveContext): Promise<ProtocolStats
       abi: marenVaultAbi,
       functionName: 'idleCollateral',
     }),
+    ctx.client
+      .readContract({
+        address: musd.borrowerOperations,
+        abi: borrowerOperationsAbi,
+        functionName: 'borrowingRate',
+      })
+      .catch(() => null),
+    ctx.client.readContract({
+      address: musd.troveManager,
+      abi: troveManagerAbi,
+      functionName: 'getEntireDebtAndColl',
+      args: [maren.marenVault],
+    }),
   ]);
 
-  const [coll, netDebt, icr] = status;
+  const [, , icr] = status;
+  const [coll, principal, interest] = entireTrove;
+  const compositeDebt = principal + interest;
+  const netDebt =
+    compositeDebt > MUSD_GAS_COMPENSATION ? compositeDebt - MUSD_GAS_COMPENSATION : 0n;
   const system = await readSystemMode(ctx);
 
   return {
@@ -503,6 +524,7 @@ export async function readProtocolStats(ctx: LiveContext): Promise<ProtocolStats
     troveNetDebtWei: netDebt,
     troveIcrWei: icr,
     reserveMusdWei: reserve,
+    borrowingRateWei: borrowingRate,
     troveMaxBorrowingCapacityWei: capacity,
     troveOpen,
     depositCapWei: depositCap,

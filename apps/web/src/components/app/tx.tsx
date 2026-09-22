@@ -138,7 +138,7 @@ export interface TxRunner {
 
 export function useTxRunner(): TxRunner {
   const [phase, setPhase] = useState<Phase>({ name: 'idle' });
-  const client = usePublicClient();
+  const client = usePublicClient({ chainId: getChain(NETWORK).id });
   const queryClient = useQueryClient();
 
   /**

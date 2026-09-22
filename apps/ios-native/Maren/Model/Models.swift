@@ -120,7 +120,17 @@ struct Position: Sendable, Equatable, Codable {
     let bitcoinLocked: Decimal        // BTC, from the vault, no oracle needed
     let borrowed: Decimal             // MUSD, from the vault, no oracle needed
     /// MUSD headroom under the 180% floor. Price-derived: nil when the oracle price is stale.
-    let leftToBorrow: Decimal?
+    var leftToBorrow: Decimal?
+    var borrowUnavailableReason: String? = nil
+    var borrowReserveMusd: Decimal? = nil
+    var borrowFeeRate: Decimal? = nil
+    var liquidationThresholdPercent: Decimal? = nil
+    var usesPooledVault: Bool? = nil
+
+    func debtAfterBorrow(_ amount: Decimal) -> Decimal {
+        let freshDraw = max(0, amount - (borrowReserveMusd ?? 0))
+        return borrowed + amount + freshDraw * (borrowFeeRate ?? 0)
+    }
     let collateralRatioPercent: Decimal?
     let dropToLiquidationPercent: Decimal?   // how far BTC can fall before liquidation
     /// Derived from the collateral ratio, so it is absent whenever the ratio is. `.none` means

@@ -135,6 +135,13 @@ export const marenVaultAbi = [
   },
   {
     type: 'function',
+    name: 'reserveMUSD',
+    stateMutability: 'view',
+    inputs: [],
+    outputs: [{ type: 'uint256' }],
+  },
+  {
+    type: 'function',
     name: 'troveStatus',
     stateMutability: 'view',
     inputs: [],

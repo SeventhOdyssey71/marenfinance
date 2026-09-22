@@ -17,6 +17,7 @@ const columns: readonly FooterColumn[] = [
     links: [
       { label: 'What you can do', href: '#product' },
       { label: 'How it works', href: '#how' },
+      { label: 'Open web app', href: '/app' },
       { label: 'Join the iOS beta', href: TESTFLIGHT_URL, external: true },
     ],
   },
@@ -78,7 +79,7 @@ export function Footer() {
             Maren
           </span>
           <p className="mt-3 max-w-[34ch] text-[14px] font-medium leading-[1.55] text-[color:var(--muted)]">
-            Bitcoin-backed borrowing and payments. Built for iPhone, on Mezo testnet.
+            Bitcoin-backed borrowing and payments. Available on the web and iPhone, on Mezo testnet.
           </p>
           <ul className="mt-5 flex items-center gap-2.5">
             {socials.map(({ label, href, Icon }) => (

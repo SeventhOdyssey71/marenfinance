@@ -1,0 +1,78 @@
+{
+  "observedAt": "2026-09-21T23:50:51.609Z",
+  "chainId": 31611,
+  "identity": "0x07e4C7F23b74761FF59294a6770f53Fb1D7abd3A",
+  "identityBalanceWei": "0",
+  "action": "marenRegistry.commit(random opaque commitment), no handle registered",
+  "httpStatus": 202,
+  "cors": "https://www.marenfinance.xyz",
+  "response": {
+    "hash": "0x85694af9be88852057aa7f30be78aaa92804e44e838badcf4227faf470f86266",
+    "state": "submitted",
+    "success": false,
+    "payer": "0x07e4C7F23b74761FF59294a6770f53Fb1D7abd3A",
+    "nonce": 33,
+    "sponsorship": "free-tier",
+    "freeActionsRemaining": 24,
+    "function": "marenRegistry.commit",
+    "statusUrl": "/status/0x85694af9be88852057aa7f30be78aaa92804e44e838badcf4227faf470f86266"
+  },
+  "settlement": {
+    "hash": "0x85694af9be88852057aa7f30be78aaa92804e44e838badcf4227faf470f86266",
+    "state": "confirmed",
+    "success": true,
+    "blockNumber": "15688497",
+    "gasUsed": "87333",
+    "effectiveGasPrice": "146",
+    "gasCostWei": "12750618",
+    "from": "0xd90245ee16B2f58eD8654961BBf2fa835046df89"
+  },
+  "commitmentTimestamp": "1790034650",
+  "recovery": {
+    "ok": true,
+    "accepting": true,
+    "relayer": "0xd90245ee16B2f58eD8654961BBf2fa835046df89",
+    "chainId": 31611,
+    "network": "testnet",
+    "keySource": "env",
+    "singleInstance": true,
+    "recovery": {
+      "durable": true,
+      "blocked": false,
+      "pending": 0,
+      "pendingRefunds": 0,
+      "oldestPendingAt": null,
+      "replacementPolicy": "rebroadcast-identical"
+    },
+    "nonce": {
+      "next": 34,
+      "inFlight": 0,
+      "queued": 0,
+      "resyncs": 0
+    },
+    "lastSubmitted": {
+      "hash": "0x85694af9be88852057aa7f30be78aaa92804e44e838badcf4227faf470f86266",
+      "nonce": 33,
+      "at": "2026-09-21T23:50:51.923Z"
+    },
+    "lastSubmittedBlock": null,
+    "budget": {
+      "day": "2026-09-21",
+      "limitWei": "10000000000000000",
+      "committedWei": "12750618",
+      "reservedWei": "12750618",
+      "inFlightWei": "0",
+      "remainingWei": "9999999987249382",
+      "committedPct": 0,
+      "reservedPct": 0,
+      "halted": false,
+      "pendingRefunds": 0
+    },
+    "store": "durable",
+    "watching": 0,
+    "warnings": [
+      "RELAYER_PRIVATE_KEY puts the raw hot key in the process environment. This is a DEVELOPMENT-ONLY mode: use RELAYER_KEYSTORE_PATH + RELAYER_KEYSTORE_PASSWORD_FILE for anything holding real BTC"
+    ],
+    "problems": []
+  }
+}

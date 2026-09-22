@@ -118,19 +118,21 @@ describe('borrowCeiling', () => {
     expect(naive - correct.mezoHeadroomWei).toBeGreaterThan(MUSD_GAS_COMPENSATION);
   });
 
-  it('does not gross down the fee on the pooled route, which does not pay one', () => {
+  it('charges the fee on a pooled draw once the reserve is empty', () => {
     const base = directPosition();
     const pooled = borrowCeiling(
       {
         ...base,
         route: 'pooled' as const,
+        reserveMusdWei: 0n,
+        troveCollateralWei: base.collateralWei,
         maxBorrowingCapacityWei: base.debtWei + 100n * WAD,
         troveTotalDebtWei: base.debtWei,
         vaultMaxBorrowableWei: 10_000n * WAD,
       },
       PRICE,
     );
-    expect(pooled.mezoHeadroomWei).toBe(100n * WAD);
+    expect(pooled.mezoHeadroomWei).toBe((100n * WAD * WAD) / (WAD + BORROWING_RATE));
   });
 
   it('reports no headroom rather than a negative one', () => {
@@ -146,6 +148,9 @@ describe('borrowCeiling', () => {
       ...directPosition(),
       route: 'pooled',
       vaultMaxBorrowableWei: 42n * WAD,
+      reserveMusdWei: 100n * WAD,
+      troveCollateralWei: WAD,
+      troveTotalDebtWei: directPosition().debtWei,
     };
 
     expect(borrowCeiling(position, PRICE).ratioHeadroomWei).toBe(42n * WAD);
@@ -191,7 +196,11 @@ describe('previewBorrow', () => {
   });
 
   it('charges no origination fee on a pooled draw from the reserve', () => {
-    const position: BorrowPosition = { ...directPosition(), route: 'pooled' };
+    const position: BorrowPosition = {
+      ...directPosition(),
+      route: 'pooled',
+      reserveMusdWei: 1_000n * WAD,
+    };
     const preview = previewBorrow(position, PRICE, 1_000n * WAD);
 
     expect(preview.originationFeeWei).toBe(0n);
@@ -227,5 +236,91 @@ describe('directTroveThreshold', () => {
     // 0.0785 – 0.0795 BTC at this price. The headline number in the thesis.
     expect(required).toBeGreaterThan((785n * WAD) / 10_000n);
     expect(required).toBeLessThan((795n * WAD) / 10_000n);
+  });
+});
+
+describe('pooled reserve and global collateral limits', () => {
+  const pool = (): BorrowPosition => ({
+    collateralWei: WAD,
+    debtWei: 0n,
+    principalWei: 0n,
+    route: 'pooled',
+    maxBorrowingCapacityWei: 2_000n * WAD,
+    troveTotalDebtWei: 2_000n * WAD,
+    reserveMusdWei: 100n * WAD,
+    troveCollateralWei: WAD / 10n,
+  });
+
+  it('can use existing reserve even when protocol borrowing capacity is exhausted', () => {
+    expect(borrowCeiling(pool(), PRICE).amountWei).toBe(100n * WAD);
+    expect(previewBorrow(pool(), PRICE, 100n * WAD).originationFeeWei).toBe(0n);
+  });
+
+  it('charges only the non-reserve portion and keeps the per-user ratio above the floor', () => {
+    const position = {
+      ...pool(),
+      maxBorrowingCapacityWei: 20_000n * WAD,
+      troveCollateralWei: WAD,
+      vaultMaxBorrowableWei: 200n * WAD,
+    };
+    const max = borrowCeiling(position, PRICE).amountWei;
+    expect(max).toBe(100n * WAD + (100n * WAD * WAD) / (WAD + BORROWING_RATE));
+    expect(previewBorrow(position, PRICE, max).debtWei).toBeLessThanOrEqual(200n * WAD);
+    expect(previewBorrow(position, PRICE, max).originationFeeWei).toBeGreaterThan(0n);
+  });
+
+  it('does not let idle user collateral bypass the global pool ratio', () => {
+    const position = {
+      ...pool(),
+      maxBorrowingCapacityWei: 20_000n * WAD,
+      troveCollateralWei: (3n * WAD) / 50n,
+    };
+    const ceiling = borrowCeiling(position, PRICE);
+    expect(ceiling.binding).toBe('pool');
+    const fresh = ceiling.amountWei - 100n * WAD;
+    const poolDebtAfter = 2_000n * WAD + fresh + (fresh * BORROWING_RATE) / WAD;
+    expect(
+      collateralRatio(position.troveCollateralWei, poolDebtAfter, PRICE),
+    ).toBeGreaterThanOrEqual(MAREN_POLICY.minHealthyCr);
+  });
+
+  it('blocks even reserve-only borrowing when the pool is already below 180%', () => {
+    const ceiling = borrowCeiling({ ...pool(), troveCollateralWei: WAD / 100n }, PRICE);
+    expect(ceiling.amountWei).toBe(0n);
+    expect(ceiling.binding).toBe('pool');
+  });
+
+  it('never replaces unreadable shared debt with one user’s debt', () => {
+    for (const missing of ['troveTotalDebtWei', 'troveCollateralWei', 'reserveMusdWei'] as const) {
+      const ceiling = borrowCeiling({ ...pool(), [missing]: undefined }, PRICE);
+      expect(ceiling.binding).toBe('unavailable');
+      expect(ceiling.amountWei).toBe(0n);
+    }
+  });
+
+  it('uses the current rate instead of silently assuming the configured origination fee', () => {
+    const position = {
+      ...pool(),
+      reserveMusdWei: 0n,
+      maxBorrowingCapacityWei: 2_100n * WAD,
+      borrowingRateWei: WAD / 100n,
+    };
+    expect(borrowCeiling(position, PRICE).amountWei).toBe((100n * WAD * WAD) / (WAD + WAD / 100n));
+  });
+});
+
+describe('pooled liquidation previews', () => {
+  it('uses the vault 140% threshold rather than the direct-trove 110% threshold', () => {
+    const position: BorrowPosition = {
+      collateralWei: WAD,
+      debtWei: 20_000n * WAD,
+      principalWei: 20_000n * WAD,
+      route: 'pooled',
+      maxBorrowingCapacityWei: 50_000n * WAD,
+    };
+    const preview = previewBorrow(position, 60_000n * WAD, 0n);
+    expect(preview.liquidationPriceWei).toBe(28_000n * WAD);
+    expect(preview.health.priceDropToLiquidationBps).toBe(5333);
+    expect(previewBorrow(position, 26_000n * WAD, 0n).health.status).toBe('liquidatable');
   });
 });

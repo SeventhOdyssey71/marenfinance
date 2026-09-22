@@ -57,6 +57,7 @@ import {
   type VaultState,
 } from '@/lib/chain/preflight';
 import { actionIsRelayable } from '@/lib/chain/relay';
+import { borrowPosition } from '@/lib/chain/borrow-position';
 import {
   gasLine,
   gasNote,
@@ -213,6 +214,20 @@ export default function VaultPage() {
     );
   }
 
+  if (position?.route === 'direct') {
+    return (
+      <div className="flex flex-col gap-4">
+        <Header refreshing={refreshing} />
+        <PositionStrip livePrice={livePrice} />
+        <Note>
+          This wallet has a direct Mezo trove. Manage it through Mezo’s direct-trove interface.
+          Maren’s deposit, borrow, repay and withdrawal controls act on its shared vault and cannot
+          change this separate position.
+        </Note>
+      </div>
+    );
+  }
+
   const empty = position !== undefined && position.collateralWei === 0n && position.debtWei === 0n;
 
   /**
@@ -345,7 +360,11 @@ function BorrowPanel({
   chain: VaultState;
   onDeposit: () => void;
 }) {
-  const { position, price, stats } = chain;
+  const { position: accountPosition, price, stats } = chain;
+  const position = useMemo(
+    () => (accountPosition ? borrowPosition(accountPosition, stats) : undefined),
+    [accountPosition, stats],
+  );
   const writes = useMarenWrites({ onSimulated: runner.onSimulated });
   const relayer = useRelayerStatus();
   const livePrice = price.state === 'live' ? price.priceWei : null;
@@ -403,7 +422,7 @@ function BorrowPanel({
     details: [
       { label: 'You receive', value: <Musd wei={value} /> },
       {
-        label: 'Origination fee (0.1%)',
+        label: 'Origination fee on new pool debt',
         value: preview ? <Musd wei={preview.originationFeeWei} /> : <Dash />,
       },
       {
@@ -589,9 +608,11 @@ function BorrowPanel({
 
         {ceiling && ceiling.amountWei > 0n && !range.rangeDead ? (
           <p className="text-text-subtle mt-3 text-xs leading-relaxed">
-            {ceiling.binding === 'ceiling'
-              ? `Capped by Mezo’s per-trove ceiling. Your ratio would allow ${formatMusd(ceiling.ratioHeadroomWei)}.`
-              : `Capped by Maren’s ${policyRatio(MAREN_POLICY.minHealthyCr)} floor. Mezo’s ceiling would allow ${formatMusd(ceiling.mezoHeadroomWei)}.`}
+            {ceiling.binding === 'pool'
+              ? 'Capped by the shared trove’s collateral buffer, including the fee on any new debt.'
+              : ceiling.binding === 'ceiling'
+                ? `Capped by Mezo’s per-trove ceiling. Your ratio would allow ${formatMusd(ceiling.ratioHeadroomWei)}.`
+                : `Capped by Maren’s ${policyRatio(MAREN_POLICY.minHealthyCr)} floor. Mezo’s ceiling would allow ${formatMusd(ceiling.mezoHeadroomWei)}.`}
           </p>
         ) : null}
       </div>
@@ -658,7 +679,7 @@ function BorrowPanel({
                     size="lg"
                   />
                 }
-                caption="protocol liquidates at 110%"
+                caption="pooled positions liquidate at 140%"
               />
               <Metric
                 className="px-5 py-4"
@@ -679,7 +700,7 @@ function BorrowPanel({
             <PanelBody>
               <StatRow
                 label="Origination fee"
-                hint="0.1%"
+                hint="applies only above the pool’s existing MUSD reserve"
                 value={<Musd wei={preview.originationFeeWei} />}
               />
               <StatRow

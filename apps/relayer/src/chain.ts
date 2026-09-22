@@ -1,5 +1,6 @@
 import {
   BaseError,
+  ExecutionRevertedError,
   createPublicClient,
   createWalletClient,
   encodeFunctionData,
@@ -56,6 +57,21 @@ function revertDetail(error: unknown): string {
   }
   if (error instanceof Error) return error.message;
   return 'unknown revert';
+}
+
+function simulationFailure(error: unknown, stage: 'simulation' | 'gas estimation'): RelayError {
+  // A failed RPC request is not evidence that the user's contract call reverted.
+  // viem wraps both transport failures and EVM reverts in execution errors, so
+  // inspect the cause chain instead of the outer CallExecutionError name.
+  const revert =
+    error instanceof BaseError
+      ? error.walk((cause) => cause instanceof ExecutionRevertedError)
+      : null;
+  if (revert instanceof ExecutionRevertedError) {
+    return new RelayError('SIMULATION_REVERTED', 422, `${stage} reverted: ${revert.shortMessage}`);
+  }
+  // Do not return provider messages: they can include URLs or signed calldata.
+  return upstream(`could not complete ${stage}; no transaction was submitted`);
 }
 
 /**
@@ -177,11 +193,7 @@ export function createViemAdapter(deps: ViemAdapterDeps): ChainAdapter {
       try {
         await publicClient.call({ account: account.address, to: forwarder, data, value: 0n });
       } catch (error) {
-        throw new RelayError(
-          'SIMULATION_REVERTED',
-          422,
-          `the forwarded call reverts in simulation: ${revertDetail(error)}`,
-        );
+        throw simulationFailure(error, 'simulation');
       }
       // 2. eth_estimateGas — the limit to submit with.
       let estimate: bigint;
@@ -193,11 +205,7 @@ export function createViemAdapter(deps: ViemAdapterDeps): ChainAdapter {
           value: 0n,
         });
       } catch (error) {
-        throw new RelayError(
-          'SIMULATION_REVERTED',
-          422,
-          `gas estimation failed: ${revertDetail(error)}`,
-        );
+        throw simulationFailure(error, 'gas estimation');
       }
       // OpenZeppelin's forwarder checks 63/64ths of remaining gas against
       // `request.gas`, so submitting exactly the estimate can revert at the

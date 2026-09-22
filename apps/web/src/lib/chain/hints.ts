@@ -126,17 +126,16 @@ export async function readTrovePosition(
   network: MezoNetwork,
 ): Promise<TrovePosition> {
   const vault = getMarenAddresses(network).marenVault;
-  const [coll, principal, interest, pendingColl, pendingPrincipal, pendingInterest] =
-    await client.readContract({
-      address: getMusdAddresses(network).troveManager,
-      abi: troveManagerAbi,
-      functionName: 'getEntireDebtAndColl',
-      args: [vault],
-    });
+  const [coll, principal, interest] = await client.readContract({
+    address: getMusdAddresses(network).troveManager,
+    abi: troveManagerAbi,
+    functionName: 'getEntireDebtAndColl',
+    args: [vault],
+  });
 
   return {
-    collWei: coll + pendingColl,
-    debtWei: principal + interest + pendingPrincipal + pendingInterest,
+    collWei: coll,
+    debtWei: principal + interest,
   };
 }
 

@@ -49,9 +49,9 @@ interface ITroveManager {
     /**
      * @notice Liquity v1 returns 4 values here; Mezo returns 6 because debt is split into
      *         principal and interest.
-     * @return coll               collateral recorded on the trove
-     * @return principal          principal debt (includes the 200e18 gas compensation)
-     * @return interest           accrued interest, 1% APR simple, fixed at open
+     * @return coll               total collateral, INCLUDING pending collateral
+     * @return principal          total principal, INCLUDING pending principal and gas compensation
+     * @return interest           total accrued interest, INCLUDING pending interest
      * @return pendingCollateral  collateral owed from redistributions, not yet applied
      * @return pendingPrincipal   principal owed from redistributions, not yet applied
      * @return pendingInterest    interest owed from redistributions, not yet applied

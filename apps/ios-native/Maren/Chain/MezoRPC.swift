@@ -201,10 +201,14 @@ struct MezoRPC: Sendable {
         let enc = ABIFunctionEncoder("getEntireDebtAndColl")
         try enc.encode(EthereumAddress(account))
         let out = try await call(to: MusdAddresses.of(chain.network).troveManager, data: try enc.encoded())
-        let coll = Self.word(out, 0) + Self.word(out, 3)
-        let principal = Self.word(out, 1) + Self.word(out, 4)
-        let interest = Self.word(out, 2) + Self.word(out, 5)
-        return TroveRead(collWei: coll, principalWei: principal, interestWei: interest)
+        return try Self.decodeEntireTrove(out)
+    }
+
+    /// Mezo includes pending redistribution in words 0–2 already. Words 3–5 only
+    /// describe that included portion; adding them again doubles redistributed debt.
+    static func decodeEntireTrove(_ out: Data) throws -> TroveRead {
+        guard out.count >= 192 else { throw MezoRPCError.decode("getEntireDebtAndColl returned a short result") }
+        return TroveRead(collWei: word(out, 0), principalWei: word(out, 1), interestWei: word(out, 2))
     }
 
     /// A pooled position in `MarenVault`, keyed by the user's EOA. Most Maren loans live here,
@@ -521,6 +525,13 @@ struct MezoSnapshot: Sendable {
     /// Both are trove-wide, not per user: the ceiling is shared by every depositor.
     var troveCapacityWei: BigUInt?
     var troveTotalDebtWei: BigUInt?
+    var troveCollateralWei: BigUInt?
+    var reserveMusdWei: BigUInt?
+    var vaultMaxBorrowableWei: BigUInt?
+    var borrowingRateWei: BigUInt?
+    var borrowingPaused: Bool?
+    var troveOpen: Bool?
+    var troveStatus: BigUInt?
 }
 
 extension MezoRPC {
@@ -561,6 +572,13 @@ extension MezoRPC {
             // is how a tester was shown 1,319 MUSD against a real limit of 84.
             .init(to: musd.troveManager, data: try encAddr("getTroveMaxBorrowingCapacity", maren.marenVault)),
             .init(to: musd.troveManager, data: try encAddr("getTroveDebt", maren.marenVault)),
+            .init(to: musd.troveManager, data: try encAddr("getEntireDebtAndColl", maren.marenVault)),
+            .init(to: maren.marenVault, data: try enc("reserveMUSD")),
+            .init(to: maren.marenVault, data: try encAddr("maxBorrowable", account)),
+            .init(to: maren.marenVault, data: try enc("borrowingPaused")),
+            .init(to: maren.marenVault, data: try enc("troveOpen")),
+            .init(to: musd.troveManager, data: try encAddr("getTroveStatus", maren.marenVault)),
+            .init(to: musd.borrowerOperations, data: try enc("borrowingRate")),
         ]
 
         let r = try await multicall(calls)
@@ -577,9 +595,7 @@ extension MezoRPC {
         if let c = r[2] { snap.vaultCollWei = Self.word(c, 0) }
         if let d = r[3] { snap.vaultDebtWei = Self.word(d, 0) }
         if let t = r[4] {
-            snap.trove = TroveRead(collWei: Self.word(t, 0) + Self.word(t, 3),
-                                   principalWei: Self.word(t, 1) + Self.word(t, 4),
-                                   interestWei: Self.word(t, 2) + Self.word(t, 5))
+            snap.trove = try? Self.decodeEntireTrove(t)
         }
         if let m = r[5] { snap.musdWei = Self.word(m, 0) }
         if let b = r[6] { snap.btcWei = Self.word(b, 0) }
@@ -593,7 +609,17 @@ extension MezoRPC {
         }
         if let s = r[9] { snap.earnStalePrice = Self.word(s, 0) == 1 }
         if let c = r[10] { snap.troveCapacityWei = Self.word(c, 0) }
-        if let d = r[11] { snap.troveTotalDebtWei = Self.word(d, 0) }
+        // The entire tuple includes pending redistribution, unlike the old stored-debt read.
+        if let d = r[12], let pooled = try? Self.decodeEntireTrove(d) {
+            snap.troveTotalDebtWei = pooled.principalWei + pooled.interestWei
+            snap.troveCollateralWei = pooled.collWei
+        }
+        if let d = r[13], d.count >= 32 { snap.reserveMusdWei = Self.word(d, 0) }
+        if let d = r[14], d.count >= 32 { snap.vaultMaxBorrowableWei = Self.word(d, 0) }
+        if let d = r[15], d.count >= 32 { snap.borrowingPaused = Self.word(d, 0) != 0 }
+        if let d = r[16], d.count >= 32 { snap.troveOpen = Self.word(d, 0) != 0 }
+        if let d = r[17], d.count >= 32 { snap.troveStatus = Self.word(d, 0) }
+        if let d = r[18], d.count >= 32 { snap.borrowingRateWei = Self.word(d, 0) }
         return snap
     }
 }

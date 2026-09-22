@@ -47,6 +47,10 @@ export interface Position {
    * compares its per-trove ceiling against, and it is not the user's drawn principal.
    */
   troveTotalDebtWei?: bigint;
+  /** The pooled borrowing quote must include shared reserve, collateral and current fee. */
+  troveCollateralWei?: bigint;
+  reserveMusdWei?: bigint;
+  borrowingRateWei?: bigint;
   /** 'direct' = the user's own trove. 'pooled' = a share of MarenVault's trove. */
   route: 'direct' | 'pooled' | 'none';
   /** Unix seconds the position was opened, for the interest narrative. */
@@ -227,6 +231,8 @@ export interface ProtocolStats {
   troveIcrWei: bigint;
   /** MUSD sitting in the vault's reserve, available to serve borrows without new debt. */
   reserveMusdWei: bigint;
+  /** Current BorrowerOperations fee rate, WAD; null if the rate could not be read. */
+  borrowingRateWei: bigint | null;
   /** The trove's Mezo-fixed borrowing ceiling. */
   troveMaxBorrowingCapacityWei: bigint;
   /**

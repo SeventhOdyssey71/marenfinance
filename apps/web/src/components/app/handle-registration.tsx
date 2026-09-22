@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { useAccount, usePublicClient } from 'wagmi';
 import type { Hex } from 'viem';
+import { getChain } from '@maren/sdk';
 
 import { ActionButton, Info, Note, Panel } from '@/components/app/primitives';
 import { ArrowRight } from '@/components/ui/icons';
@@ -40,7 +41,7 @@ import { NETWORK, useDataSource, useHandleAvailable, usePrimaryHandle } from '@/
 export function HandleRegistration({ runner }: { runner: TxRunner }) {
   const source = useDataSource();
   const { address } = useAccount();
-  const client = usePublicClient();
+  const client = usePublicClient({ chainId: getChain(NETWORK).id });
   const writes = useMarenWrites({ onSimulated: runner.onSimulated });
   const relayer = useRelayerStatus();
   const queryClient = useQueryClient();

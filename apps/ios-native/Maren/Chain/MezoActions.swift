@@ -113,13 +113,44 @@ struct MezoActions {
     }
 
     /// A relayed (gasless) MarenVault write — `function` is "borrow" | "repay" | "withdraw".
+    static func vaultWriteUnavailableReason(_ snap: MezoSnapshot) -> String? {
+        guard let collateral = snap.vaultCollWei, let debt = snap.vaultDebtWei else {
+            return "Your pooled vault position could not be verified. Refresh before continuing."
+        }
+        guard collateral > 0 || debt > 0 else {
+            return "There is no Maren pooled position to manage. Direct Mezo loans must be repaid or withdrawn in Mezo."
+        }
+        return nil
+    }
+
     func vaultWrite(_ function: String, loadedAddress: String, amountWei: BigUInt) async -> ActionResult {
+        do {
+            // Validate the route again before every vault signature, including repay/withdraw.
+            let snap = try await rpc.fetchSnapshot(loadedAddress)
+            if let reason = Self.vaultWriteUnavailableReason(snap) {
+                return .declined(reason: reason)
+            }
+            if function == "borrow" {
+                let fresh = snap.priceUpdatedAt.map { MezoMarenClient.isFresh(updatedAt: $0) } ?? false
+                let available = MezoMarenClient.pooledBorrowAvailability(snap, priceIsFresh: fresh)
+                guard let max = available.amountWei, amountWei > 0, amountWei <= max else {
+                    return .declined(reason: available.reason ?? "That amount exceeds the current borrowing limit. Refresh the vault and choose a smaller amount.")
+                }
+            }
+        } catch {
+            return .declined(reason: "The current vault position could not be verified, so nothing was submitted. Refresh the vault and try again.")
+        }
         let key: Data
         switch await accessKey(loadedAddress) {
         case .ok(let k): key = k
         case .fail(let reason): return .declined(reason: reason)
         }
         let data: Data
+        if function == "repay",
+           let reason = await ensureMusdAllowance(privateKey: key, loadedAddress: loadedAddress,
+               spender: MarenAddresses.of(chain.network).marenVault, needed: amountWei) {
+            return .declined(reason: reason)
+        }
         do { data = try MarenEncoding.vaultWriteCalldata(function: function, amount: amountWei) }
         catch { return .declined(reason: prepFailed) }
         return await relayCall(privateKey: key, loadedAddress: loadedAddress,

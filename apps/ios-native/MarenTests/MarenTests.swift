@@ -505,11 +505,123 @@ final class MarenTests: XCTestCase {
         XCTAssertLessThan(left, 3_400)
     }
 
-    func testMissingCeilingLeavesTheRatioHeadroomUnchanged() throws {
-        // An unreadable ceiling must not silently zero the borrow control.
+    func testRatioMetricsHelperWithoutPoolInputs() throws {
+        // The metrics helper is not the actionable pool quote; position(from:) applies required shared reads.
         let p = position(priceIsFresh: true)
         XCTAssertNotNil(p.leftToBorrow)
         XCTAssertGreaterThan(try XCTUnwrap(p.leftToBorrow), 0)
+    }
+
+    private func pooledSnapshot() -> MezoSnapshot {
+        let wad = BigUInt(10).power(18)
+        var snap = MezoSnapshot()
+        snap.priceWei = 60_000 * wad
+        snap.priceUpdatedAt = BigUInt(Date().timeIntervalSince1970)
+        snap.vaultCollWei = wad
+        snap.vaultDebtWei = 0
+        snap.vaultMaxBorrowableWei = 30_000 * wad
+        snap.troveCapacityWei = 2_000 * wad
+        snap.troveTotalDebtWei = 2_000 * wad
+        snap.troveCollateralWei = wad / 10
+        snap.reserveMusdWei = 100 * wad
+        snap.borrowingRateWei = wad / 1_000
+        snap.borrowingPaused = false
+        snap.troveOpen = true
+        snap.troveStatus = 1
+        return snap
+    }
+
+    func testEntireTroveDoesNotDoubleCountPendingRedistribution() throws {
+        let words: [BigUInt] = [100, 200, 30, 10, 20, 3]
+        let data = words.reduce(into: Data()) { result, value in
+            let bytes = value.serialize()
+            result.append(Data(repeating: 0, count: 32 - bytes.count)); result.append(bytes)
+        }
+        let trove = try MezoRPC.decodeEntireTrove(data)
+        XCTAssertEqual(trove.collWei, 100)
+        XCTAssertEqual(trove.principalWei, 200)
+        XCTAssertEqual(trove.interestWei, 30)
+        XCTAssertThrowsError(try MezoRPC.decodeEntireTrove(data.prefix(160)))
+    }
+
+    func testDebtFreeUserIsStillBoundBySharedCapacityButCanUseReserve() throws {
+        let result = try MezoMarenClient.position(from: pooledSnapshot())
+        XCTAssertEqual(result.leftToBorrow, 100)
+        XCTAssertEqual(result.borrowed, 0)
+        XCTAssertNil(result.collateralRatioPercent)
+        XCTAssertTrue(result.borrowUnavailableReason?.contains("refinance") == true)
+    }
+
+    func testPooledBorrowChargesOnlyNewProtocolDraw() throws {
+        var snap = pooledSnapshot()
+        let wad = BigUInt(10).power(18)
+        snap.troveCapacityWei = 20_000 * wad
+        snap.troveCollateralWei = wad
+        snap.vaultMaxBorrowableWei = 200 * wad
+        let available = MezoMarenClient.pooledBorrowAvailability(snap, priceIsFresh: true)
+        XCTAssertEqual(available.amountWei, 100 * wad + 100 * wad * wad / (wad + wad / 1_000))
+        let result = try MezoMarenClient.position(from: snap)
+        XCTAssertEqual(result.debtAfterBorrow(150), Decimal(string: "150.05"))
+    }
+
+    func testPooledGlobalRatioCanBlockEvenReserveDraws() {
+        var snap = pooledSnapshot()
+        snap.troveCollateralWei = BigUInt(10).power(18) / 100
+        let available = MezoMarenClient.pooledBorrowAvailability(snap, priceIsFresh: true)
+        XCTAssertEqual(available.amountWei, 0)
+        XCTAssertTrue(available.reason?.contains("180%") == true)
+    }
+
+    func testUnreadablePoolStateWithholdsBorrowLimit() throws {
+        var snap = pooledSnapshot()
+        snap.troveTotalDebtWei = nil
+        XCTAssertNil(try MezoMarenClient.position(from: snap).leftToBorrow)
+        snap = pooledSnapshot(); snap.borrowingRateWei = nil
+        XCTAssertNil(try MezoMarenClient.position(from: snap).leftToBorrow)
+        snap = pooledSnapshot(); snap.reserveMusdWei = nil
+        XCTAssertNil(try MezoMarenClient.position(from: snap).leftToBorrow)
+        snap = pooledSnapshot(); snap.vaultDebtWei = nil
+        XCTAssertThrowsError(try MezoMarenClient.position(from: snap))
+    }
+
+    func testPausedAndInactivePoolsDoNotOfferBorrowing() {
+        var snap = pooledSnapshot(); snap.borrowingPaused = true
+        XCTAssertEqual(MezoMarenClient.pooledBorrowAvailability(snap, priceIsFresh: true).amountWei, 0)
+        snap = pooledSnapshot(); snap.troveStatus = 3
+        XCTAssertEqual(MezoMarenClient.pooledBorrowAvailability(snap, priceIsFresh: true).amountWei, 0)
+        XCTAssertNil(MezoMarenClient.pooledBorrowAvailability(pooledSnapshot(), priceIsFresh: false).amountWei)
+    }
+
+    func testDirectLoanDoesNotOfferPooledBorrowWrites() throws {
+        var snap = pooledSnapshot()
+        snap.vaultCollWei = 0; snap.vaultDebtWei = 0
+        snap.trove = .init(collWei: BigUInt(10).power(18), principalWei: 2_200 * BigUInt(10).power(18), interestWei: 0)
+        let result = try MezoMarenClient.position(from: snap)
+        XCTAssertNil(result.leftToBorrow)
+        XCTAssertTrue(result.borrowUnavailableReason?.contains("direct Mezo") == true)
+        XCTAssertEqual(result.usesPooledVault, false)
+        XCTAssertTrue(MezoActions.vaultWriteUnavailableReason(snap)?.contains("in Mezo") == true)
+    }
+
+    func testAllVaultWritesRequireVerifiedPooledPositionBeforeSigning() throws {
+        let pooled = pooledSnapshot()
+        XCTAssertNil(MezoActions.vaultWriteUnavailableReason(pooled))
+        XCTAssertEqual(try MezoMarenClient.position(from: pooled).usesPooledVault, true)
+        var missing = pooled; missing.vaultDebtWei = nil
+        XCTAssertNotNil(MezoActions.vaultWriteUnavailableReason(missing))
+        var empty = pooled; empty.vaultCollWei = 0; empty.vaultDebtWei = 0
+        XCTAssertNotNil(MezoActions.vaultWriteUnavailableReason(empty))
+    }
+
+    func testPooledLiquidationDistanceUsesInternal140PercentThreshold() throws {
+        var snap = pooledSnapshot()
+        snap.vaultDebtWei = 20_000 * BigUInt(10).power(18)
+        let result = try MezoMarenClient.position(from: snap)
+        XCTAssertEqual(result.liquidationThresholdPercent, 140)
+        XCTAssertEqual(result.dropToLiquidationPercent, 53)
+        let risk = try XCTUnwrap(LiquidationRisk.of(collateralBtc: 1, debtMusd: 20_000,
+            priceUsd: 60_000, liquidationPercent: 140))
+        XCTAssertEqual(risk.price, 28_000)
     }
 
     func testStalePriceWithholdsEveryPriceDerivedFigure() {

@@ -10,6 +10,7 @@ import { Note } from '@/components/app/primitives';
 import { PillAction } from '@/components/ui/pill-button';
 import { ArrowRight, ArrowUpRight, Check } from '@/components/ui/icons';
 import { parseUnitsSafe, utf8Length } from '@/lib/copy';
+import { parsePaymentRequest } from '@/lib/payment-request';
 import { preflightMusdSpend } from '@/lib/chain/preflight';
 import { actionIsRelayable } from '@/lib/chain/relay';
 import {
@@ -67,6 +68,14 @@ export function SendFlow({ runner }: { runner: TxRunner }) {
   const [amount, setAmount] = useState('');
   const [to, setTo] = useState('');
   const [memo, setMemo] = useState('');
+
+  useEffect(() => {
+    const request = parsePaymentRequest(new URLSearchParams(window.location.search));
+    if (!request) return;
+    setTo(request.to);
+    if (request.amount !== undefined) setAmount(request.amount);
+    // Stay on the amount step. Shared URLs never open signing or submit automatically.
+  }, []);
 
   const trimmed = to.trim();
   const isAddress = ADDRESS_RE.test(trimmed);

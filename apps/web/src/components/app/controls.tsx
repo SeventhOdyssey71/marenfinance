@@ -189,7 +189,8 @@ export function AmountSlider({
   describedBy?: string;
   endLabels?: { start: string; end: string };
 }) {
-  const ticks = max > 0n ? Number((value * TICKS) / max) : 0;
+  const displayedValue = value < 0n ? 0n : value > max ? max : value;
+  const ticks = max > 0n ? Number((displayedValue * TICKS) / max) : 0;
   const markerPercent = marker && max > 0n ? Number((marker.at * 1000n) / max) / 10 : null;
   const fillPercent = ticks / 10;
 
