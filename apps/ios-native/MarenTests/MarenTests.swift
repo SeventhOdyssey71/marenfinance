@@ -130,9 +130,13 @@ final class MarenTests: XCTestCase {
     // isolated; the test hops onto the main actor to call it under Swift 6 strict concurrency.
     @MainActor
     func testMoneyGreysDecimals() {
-        let (head, tail) = MoneyText.split("1,240.50 MUSD")
-        XCTAssertEqual(head, "1,240")
-        XCTAssertEqual(tail, ".50 MUSD")
+        let (head, tail) = MoneyText.split(MoneyFormat.musd(Decimal(string: "1240.509999999999999999")!))
+        XCTAssertEqual(head, "$1,240")
+        XCTAssertEqual(tail, ".50")
+        // Formatting must never round a spendable value up or put a currency mark in input data.
+        XCTAssertEqual(MoneyFormat.musd(Decimal(string: "1732.019999999999999999")!, unit: false), "1,732.01")
+        XCTAssertEqual(MoneyFormat.musd(0), "$0.00")
+        XCTAssertEqual(MoneyFormat.musd(Decimal(string: "-1.009999999999999999")!), "-$1.00")
     }
 
     // MARK: - Realised-yield annualisation
@@ -907,5 +911,99 @@ extension TestnetFinalizationTests {
         XCTAssertNil(draft.matchingHash(in: [try log(owner: ownerTopic, key: ownerTopic)], contract: contract))
         XCTAssertNil(draft.matchingHash(in: [try log(owner: ownerTopic, key: keyTopic, removed: true)], contract: contract))
         XCTAssertNil(draft.matchingHash(in: [valid], contract: payer))
+    }
+}
+
+final class VaultTransactionPreparationTests: XCTestCase {
+    let upper = "0x57a270C711Ccea7AFCB5361d214eAef149C5fA9B"
+    let lower = "0x306919805Eed1aD4772d92e18d00A1c132b07C19"
+
+    func testVaultEncodersPreserveLiveNeighbours() throws {
+        let hints = MarenEncoding.TroveHints(upper: upper, lower: lower)
+        let words = "00000000000000000000000057a270c711ccea7afcb5361d214eaef149c5fa9b" +
+                    "000000000000000000000000306919805eed1ad4772d92e18d00a1c132b07c19"
+        // Independently generated with cast calldata borrow(uint256,address,address), 10e18.
+        let borrow = try MarenEncoding.vaultWriteCalldata(function: "borrow",
+            amount: BigUInt(10).power(19), hints: hints)
+        XCTAssertEqual(borrow.web3.hexString, "0xd5164184" +
+            "0000000000000000000000000000000000000000000000008ac7230489e80000" + words)
+        for function in ["repay", "withdraw"] {
+            let data = try MarenEncoding.vaultWriteCalldata(function: function, amount: 1, hints: hints)
+            XCTAssertEqual(String(data.web3.hexString.suffix(128)), words)
+        }
+        XCTAssertEqual(try MarenEncoding.depositCalldata(hints: hints).web3.hexString,
+                       "0xf9609f08" + words)
+    }
+
+    func testTroveHintDecoderRejectsMissingAndMalformedReplies() throws {
+        XCTAssertThrowsError(try MezoRPC.decodeTroveHint(Data()))
+        XCTAssertThrowsError(try MezoRPC.decodeTroveHint(Data(repeating: 0, count: 31)))
+        XCTAssertThrowsError(try MezoRPC.decodeTroveHint(Data(repeating: 1, count: 32)))
+        let encoded = try XCTUnwrap(Data(hex: "0x000000000000000000000000" + upper.dropFirst(2)))
+        XCTAssertEqual(try MezoRPC.decodeTroveHint(encoded), upper.lowercased())
+        // A true list boundary is different from a missing reply.
+        XCTAssertEqual(try MezoRPC.decodeTroveHint(Data(repeating: 0, count: 32)),
+                       MarenEncoding.TroveHints.none.upper)
+    }
+
+    func testVaultGasKeepsMarginAndNeverClampsAnOversizedEstimate() {
+        // Historical public testnet proof: hinted borrow costs 476,464; fallback 660k
+        // cannot execute the old zero-hint 1,158,787-gas operation.
+        XCTAssertEqual(MezoActions.vaultRelayGasLimit(directEstimate: 476_464), BigUInt(774_696))
+        XCTAssertNil(MezoActions.vaultRelayGasLimit(directEstimate: 1_158_787))
+        XCTAssertNil(MezoActions.vaultRelayGasLimit(directEstimate: 0))
+        XCTAssertEqual(MezoActions.vaultRelayGasLimit(directEstimate: 960_000), BigUInt(MAX_RELAY_GAS))
+        XCTAssertNil(MezoActions.vaultRelayGasLimit(directEstimate: 960_001))
+    }
+}
+
+extension VaultTransactionPreparationTests {
+    private var rpcURL: URL { URL(string: "https://rpc.test.example")! }
+
+    func testSponsoredEstimateActuallySendsZeroGasPriceOverRPC() throws {
+        let request = try MezoRPC.gasEstimateRequest(url: rpcURL, from: upper, to: lower,
+                                                     data: Data([0xab, 0xcd]))
+        XCTAssertEqual(request.httpMethod, "POST")
+        let body = try XCTUnwrap(JSONSerialization.jsonObject(with: XCTUnwrap(request.httpBody)) as? [String: Any])
+        XCTAssertEqual(body["method"] as? String, "eth_estimateGas")
+        XCTAssertEqual(body["id"] as? Int, 1)
+        let parameters = try XCTUnwrap(body["params"] as? [[String: String]])
+        XCTAssertEqual(parameters, [["from": upper, "to": lower, "data": "0xabcd", "value": "0x0", "gasPrice": "0x0"]])
+    }
+
+    func testSelfPaidDepositEstimatePreservesValueWithoutZeroFeeOverride() throws {
+        let request = try MezoRPC.gasEstimateRequest(url: rpcURL, from: upper, to: lower,
+                                                     data: Data([0xab]), value: 2_000, sponsored: false)
+        let body = try XCTUnwrap(JSONSerialization.jsonObject(with: XCTUnwrap(request.httpBody)) as? [String: Any])
+        let parameters = try XCTUnwrap(body["params"] as? [[String: String]])
+        XCTAssertEqual(parameters[0]["value"], "0x7d0")
+        XCTAssertNil(parameters[0]["gasPrice"])
+    }
+
+    func testEstimateRejectsHTTPAndRPCFailuresBeforeUsingResult() throws {
+        func response(_ status: Int) -> HTTPURLResponse {
+            HTTPURLResponse(url: rpcURL, statusCode: status, httpVersion: nil, headerFields: nil)!
+        }
+        let valid = Data(#"{"jsonrpc":"2.0","id":1,"result":"0x74530"}"#.utf8)
+        XCTAssertEqual(try MezoRPC.decodeGasEstimate(data: valid, response: response(200)), BigUInt(476_464))
+        XCTAssertThrowsError(try MezoRPC.decodeGasEstimate(data: valid, response: response(503)))
+        let failed = Data(#"{"jsonrpc":"2.0","id":1,"result":"0x74530","error":{"code":-32000,"message":"reverted"}}"#.utf8)
+        XCTAssertThrowsError(try MezoRPC.decodeGasEstimate(data: failed, response: response(200)))
+    }
+
+    func testMalformedEstimateCannotBecomeGuessedVaultGas() throws {
+        let response = HTTPURLResponse(url: rpcURL, statusCode: 200, httpVersion: nil, headerFields: nil)!
+        for result in ["0x0", "0x00", "0x01", "123", "invalid", "0x-1", "0x1g"] {
+            let body = try JSONSerialization.data(withJSONObject: ["jsonrpc": "2.0", "id": 1, "result": result])
+            XCTAssertThrowsError(try MezoRPC.decodeGasEstimate(data: body, response: response))
+        }
+        for body in ["{}", "not JSON", #"{"jsonrpc":"2.0","id":2,"result":"0x1"}"#] {
+            XCTAssertThrowsError(try MezoRPC.decodeGasEstimate(data: Data(body.utf8), response: response))
+        }
+    }
+
+    func testDepositKeepsItsExistingFloorForCaughtInnerCallFailure() {
+        XCTAssertEqual(MezoActions.depositGasLimit(directEstimate: 100_000), BigUInt(500_000))
+        XCTAssertEqual(MezoActions.depositGasLimit(directEstimate: 600_000), BigUInt(780_000))
     }
 }

@@ -1,5 +1,19 @@
 # Borrowing recovery — 22 September 2026
 
+## Follow-up: native borrowing preparation
+
+The user reported another native “Nothing was submitted” refusal after the pool repair. The relayer health check showed approximately **0.01999999 BTC**, accepting requests, with no in-flight work. A gas-wallet top-up was not needed. Its public address is `0xd90245ee16B2f58eD8654961BBf2fa835046df89` on Mezo testnet (31611).
+
+A read-only replay at block **15,695,455** exposed a separate native-client defect: borrowing 10 MUSD with zero sorted-trove hints required **1,158,787 gas**, whereas the native fallback after an estimation error signed only **660,000**. Supplying the pooled trove's actual neighbours reduced the estimate to **476,464**. The earlier public proof used neighbours and a larger gas allowance, so it did not cover this native fallback. The user's exact failing request remains unconfirmed without their wallet, amount and build number.
+
+The native fix reads and validates the pooled trove's neighbours for borrowing, repayment, withdrawal and deposit. Sponsored estimates use zero simulation gas price so an empty user BTC balance does not prevent estimation. Vault requests require a successful estimate and retain the full 50% plus 60,000 gas margin within the relayer's cap; failed estimates no longer become guessed vault requests. Deposits now estimate their actual value-bearing call instead of relying on a fixed gas limit.
+
+The corrected signed-forwarder call succeeded in the historical replay with **774,696 gas**. No public transaction was sent by this follow-up probe. [Results](borrow-gas-probe-2026-09-22.json) and the [read-only reproduction script](probe-borrow-gas-2026-09-22.mjs) preserve the comparison. Native RPC estimation also explicitly serializes `gasPrice: "0x0"` for sponsored calls: the pinned web3.swift estimate wrapper omits the field even when supplied on its transaction object.
+
+The same native update adds the requested subtle lavender/cream home gradient and dollar-formatted stablecoin figures with quieter cents. MUSD identity remains visible; amount parsing and on-chain token units are unchanged. A Debug simulator capture verified the layout using demo data. These changes require a new native distribution; build 9 does not contain them.
+
+Final local native regression suite: **94 passed, zero failures**, including exact RPC request serialization, invalid HTTP/RPC responses, hint encoding/decoding and gas-cap boundaries. The Release simulator build passed and its binary contains none of the checked Debug stub, demo transaction or screenshot-hook markers. Independent code review found no remaining material blocker. These checks establish the repaired preparation path; they do not establish success on an unobserved user's device.
+
 ## Incident and diagnosis
 
 The deployed Mezo testnet pool could not draw new MUSD because accrued debt exceeded its fixed borrowing ceiling. At the incident snapshot, debt was approximately 2,749.55 MUSD, the ceiling was 2,749.20 MUSD, and `reserveMUSD()` was zero. Adding collateral alone does not reset that ceiling. The relayer correctly refused to sponsor the reverting borrow.

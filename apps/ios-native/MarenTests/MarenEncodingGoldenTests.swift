@@ -184,13 +184,13 @@ final class MarenEncodingGoldenTests: XCTestCase {
             "0000000000000000000000000000000000000000000000000000000000000000" +
             "0000000000000000000000000000000000000000000000000000000000000000"
         for (fn, selector) in expected {
-            let data = try MarenEncoding.vaultWriteCalldata(function: fn, amount: amount)
+            let data = try MarenEncoding.vaultWriteCalldata(function: fn, amount: amount, hints: .none)
             XCTAssertEqual(data.web3.hexString, selector + tail, "\(fn) calldata must match cast")
         }
     }
 
     func testDepositCalldataMatchesCast() throws {
-        let data = try MarenEncoding.depositCalldata()
+        let data = try MarenEncoding.depositCalldata(hints: .none)
         let expected = "0xf9609f08" +
             "0000000000000000000000000000000000000000000000000000000000000000" +
             "0000000000000000000000000000000000000000000000000000000000000000"

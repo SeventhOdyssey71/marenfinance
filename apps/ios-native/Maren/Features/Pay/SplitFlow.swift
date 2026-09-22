@@ -72,6 +72,7 @@ struct SplitFlow: View {
                         .accessibilityLabel("Recipient")
                     Divider().overlay(Theme.Palette.ink.opacity(0.07))
                     HStack {
+                        Text("$").font(.figure(20, weight: .semibold)).foregroundStyle(Theme.Palette.ink)
                         TextField("0", text: $leg.amount)
                             .font(.figure(20, weight: .semibold))
                             .foregroundStyle(Theme.Palette.ink)

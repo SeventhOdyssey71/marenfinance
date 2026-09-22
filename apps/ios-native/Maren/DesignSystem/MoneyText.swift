@@ -2,9 +2,9 @@ import SwiftUI
 
 // MARK: - Money formatting
 //
-// Mirrors the web SDK's display rules: BTC trims trailing zeros to at most 6 dp, MUSD
-// and USD carry exactly 2 dp with grouped thousands. Formatting is pure and integer-
-// stable via Decimal; unit suffixes are optional so a value can carry its own label.
+// BTC trims trailing zeros to at most 6 dp. Stablecoin money figures use a dollar
+// prefix and exactly 2 dp with grouped thousands. Decimal keeps values precise;
+// unit:false stays numeric for amount inputs, payment links and MAX controls.
 
 enum MoneyFormat {
     static func btc(_ value: Decimal, unit: Bool = true) -> String {
@@ -14,11 +14,11 @@ enum MoneyFormat {
 
     static func musd(_ value: Decimal, unit: Bool = true) -> String {
         let s = fixed(value, fractionDigits: 2)
-        return unit ? "\(s) MUSD" : s
+        return unit ? (s.hasPrefix("-") ? "-$" + String(s.dropFirst()) : "$" + s) : s
     }
 
     static func usd(_ value: Decimal) -> String {
-        "$" + fixed(value, fractionDigits: 2)
+        musd(value)
     }
 
     /// A collateral ratio, rounded DOWN to one decimal — a position at 179.9% must never
@@ -38,18 +38,23 @@ enum MoneyFormat {
     // MARK: private
 
     private static func fixed(_ value: Decimal, fractionDigits: Int) -> String {
+        var source = value
+        var rounded = Decimal()
+        NSDecimalRound(&rounded, &source, fractionDigits, value < 0 ? .up : .down)
         let fmt = NumberFormatter()
+        fmt.locale = Locale(identifier: "en_US_POSIX")
         fmt.numberStyle = .decimal
         fmt.groupingSeparator = ","
         fmt.usesGroupingSeparator = true
         fmt.minimumFractionDigits = fractionDigits
         fmt.maximumFractionDigits = fractionDigits
         fmt.roundingMode = .down
-        return fmt.string(from: value as NSDecimalNumber) ?? "0"
+        return fmt.string(from: rounded as NSDecimalNumber) ?? "0"
     }
 
     private static func trimmed(_ value: Decimal, maxFractionDigits: Int) -> String {
         let fmt = NumberFormatter()
+        fmt.locale = Locale(identifier: "en_US_POSIX")
         fmt.numberStyle = .decimal
         fmt.groupingSeparator = ","
         fmt.usesGroupingSeparator = true

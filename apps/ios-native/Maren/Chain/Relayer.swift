@@ -165,7 +165,7 @@ struct Relayer {
             return "This trove is at the borrowing ceiling Mezo fixed when it opened. That ceiling does not rise when collateral is added — only a refinance moves it — so a smaller amount may go through even though your collateral ratio looks healthy."
         }
         if d.contains("net debt must be greater than minimum") {
-            return "MUSD requires every loan to stay above its 1,800 MUSD minimum. Repaying this much would leave the position below it, so either repay less or repay all of it."
+            return "MUSD requires every loan to stay above its $1,800 minimum. Repaying this much would leave the position below it, so either repay less or repay all of it."
         }
         if d.contains("amount repaid must not be larger") {
             return "That is more than the position currently owes. Interest accrues every block, so the figure moves — reopen the screen for the current amount."

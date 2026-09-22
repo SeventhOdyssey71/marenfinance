@@ -25,7 +25,6 @@ struct HomeView: View {
         ScrollView {
             VStack(alignment: .leading, spacing: Theme.Space.lg) {
                 header
-                DottedDivider()
                 balanceHero
                 actionPills
                 DottedDivider()
@@ -37,7 +36,16 @@ struct HomeView: View {
             .padding(.top, Theme.Space.sm)
             .padding(.bottom, 120)   // clear the floating glass tab bar
         }
-        .background(Theme.Palette.canvas)
+        .background {
+            Theme.Palette.canvas
+                .overlay(alignment: .top) {
+                    BalanceGlow()
+                        .frame(height: 440)
+                        .allowsHitTesting(false)
+                        .accessibilityHidden(true)
+                }
+                .ignoresSafeArea(edges: .top)
+        }
         .task { await model.load(using: client, address: session.address) }
         .refreshOnSettle { await model.load(using: client, address: session.address) }
         .fullScreenCover(item: $fullFlow) { $0.view }
@@ -73,30 +81,31 @@ struct HomeView: View {
         .animation(.easeInOut(duration: 0.2), value: model.refreshing)
     }
 
-    // MARK: balance hero — one big number, in MUSD, centered
-    //
-    // MUSD IS SHOWN AS MUSD, NEVER AS DOLLARS. This figure is the raw MUSD balance read from
-    // the token contract. Rendering it as "$1,240.50" asserted a 1.00 peg that no oracle read
-    // backs, in an app that elsewhere refuses to convert BTC to USD without a live price. The
-    // coin mark and the unit under the figure say what the number actually is; a dollar figure
-    // would need a live price read and the same 60s staleness discipline as everything else.
+    // MARK: balance hero — dollar notation, with the stablecoin identified underneath
 
     private var balanceHero: some View {
-        VStack(spacing: Theme.Space.xs) {
-            Text("Balance").labelStyle()
+        VStack(spacing: Theme.Space.sm) {
+            Text("Available balance")
+                .font(.text(13, weight: .medium))
+                .foregroundStyle(Theme.Palette.muted)
             if let musd = model.displayBalances?.musd {
-                HStack(spacing: Theme.Space.xs) {
-                    MusdCoin(size: 30)
-                    MoneyText(text: MoneyFormat.musd(musd, unit: false), size: 38, weight: .bold, tracking: -2)
-                }
+                MoneyText(text: MoneyFormat.musd(musd), size: 46, weight: .bold, tracking: -1.8)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.55)
+                    .accessibilityLabel("Available balance, \(MoneyFormat.musd(musd)), MUSD stablecoin")
             } else {
                 Unavailable(label: "Balance unavailable")
             }
-            Text("MUSD · Mezo")
-                .font(.text(13))
-                .foregroundStyle(Theme.Palette.tertiary)
+            HStack(spacing: Theme.Space.xs) {
+                MusdCoin(size: 16)
+                Text("MUSD · Mezo")
+                    .font(.text(12, weight: .medium))
+                    .foregroundStyle(Theme.Palette.muted)
+            }
         }
         .frame(maxWidth: .infinity)
+        .padding(.top, Theme.Space.lg)
+        .padding(.bottom, Theme.Space.md)
         .skeleton(model.isFirstLoad)
     }
 
@@ -226,6 +235,34 @@ struct HomeView: View {
                 Rectangle().fill(Theme.Palette.ink.opacity(0.07)).frame(height: 1)
             }
         }
+    }
+}
+
+/// A quiet wash behind the balance, fading into the white content surface.
+private struct BalanceGlow: View {
+    @Environment(\.accessibilityReduceTransparency) private var reduceTransparency
+
+    var body: some View {
+        ZStack {
+            LinearGradient(
+                stops: [
+                    .init(color: Theme.Palette.balanceLavender, location: 0),
+                    .init(color: Theme.Palette.balancePearl, location: 0.48),
+                    .init(color: Theme.Palette.canvas, location: 1)
+                ],
+                startPoint: .topTrailing,
+                endPoint: .bottomLeading
+            )
+            if !reduceTransparency {
+                RadialGradient(
+                    colors: [Theme.Palette.balanceWarmth.opacity(0.8), .clear],
+                    center: UnitPoint(x: 0, y: 0.12),
+                    startRadius: 0,
+                    endRadius: 320
+                )
+            }
+        }
+        .mask(LinearGradient(colors: [.white, .white, .clear], startPoint: .top, endPoint: .bottom))
     }
 }
 

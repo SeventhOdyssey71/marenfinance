@@ -85,7 +85,7 @@ struct SingleAmountFlow: View {
             header(config.navTitle)
             Spacer(minLength: 0)
             AmountReadout(raw: raw, unitLabel: unitLabel,
-                          prefix: isMusd ? "$" : "", showToggle: isMusd)
+                          prefix: isMusd ? "$" : "")
             if overMax {
                 Text(isMusd ? "More than your available MUSD" : "More than you can use")
                     .font(.text(13, weight: .medium)).foregroundStyle(Theme.Palette.warning)

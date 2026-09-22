@@ -10,9 +10,8 @@ import web3
 //   2. Submit, yielding a hash — relayed as a signed ForwardRequest, or self-submitted.
 //   3. `Receipt.confirm` — the single R15 checkpoint. A hash is not a success.
 //
-// The live path is GATED on a configured relayer URL. None is set in this repo, so
-// `submit` returns `.declined` with the same honest sentence the RN app uses, rather than
-// producing a receipt and a hash that do not exist on chain.
+// The live path requires a configured relayer URL. A missing configuration declines before
+// signing; acceptance still requires an on-chain receipt before the UI reports success.
 
 enum ActionResult: Sendable {
     case ok(Delivered)
@@ -90,6 +89,20 @@ struct MezoActions {
         return padded > cap ? cap : padded
     }
 
+    /// Vault calls must retain the full estimate margin within sponsorship policy.
+    /// Silently clamping or guessing after a failed estimate can sign an unusable request.
+    static func vaultRelayGasLimit(directEstimate: BigUInt) -> BigUInt? {
+        guard directEstimate > 0 else { return nil }
+        let padded = directEstimate + directEstimate / 2 + 60_000
+        return padded <= BigUInt(MAX_RELAY_GAS) ? padded : nil
+    }
+
+    static func depositGasLimit(directEstimate: BigUInt) -> BigUInt {
+        // Deposits catch an unsuccessful collateral push and may leave BTC idle. Preserve
+        // the existing 500k floor so an estimate of that cheaper branch cannot lower it.
+        max(BigUInt(500_000), directEstimate + directEstimate / 4 + 30_000)
+    }
+
     /// Submit a sponsored `pay` to `to`. Face ID → build calldata → sign ForwardRequest →
     /// POST to the relayer → confirm the receipt. Declines honestly when no relayer is set or
     /// the Keychain key does not derive `loadedAddress`.
@@ -151,8 +164,12 @@ struct MezoActions {
                spender: MarenAddresses.of(chain.network).marenVault, needed: amountWei) {
             return .declined(reason: reason)
         }
-        do { data = try MarenEncoding.vaultWriteCalldata(function: function, amount: amountWei) }
-        catch { return .declined(reason: prepFailed) }
+        do {
+            let hints = try await rpc.pooledTroveHints()
+            data = try MarenEncoding.vaultWriteCalldata(function: function, amount: amountWei, hints: hints)
+        } catch {
+            return .declined(reason: "The pooled vault's transaction hints could not be read. The vault transaction was not submitted. Refresh and try again.")
+        }
         return await relayCall(privateKey: key, loadedAddress: loadedAddress,
                                to: MarenAddresses.of(chain.network).marenVault, data: data)
     }
@@ -166,10 +183,17 @@ struct MezoActions {
         case .fail(let reason): return .declined(reason: reason)
         }
         do {
-            let data = try MarenEncoding.depositCalldata()
+            let hints = try await rpc.pooledTroveHints()
+            let data = try MarenEncoding.depositCalldata(hints: hints)
+            let estimate = try await rpc.estimateGas(from: loadedAddress,
+                to: MarenAddresses.of(chain.network).marenVault, data: data,
+                value: valueWei, sponsored: false)
+            guard let gasLimit = Int(exactly: Self.depositGasLimit(directEstimate: estimate)) else {
+                return .declined(reason: prepFailed)
+            }
             let hash = try await sendSelfPaid(privateKey: key, loadedAddress: loadedAddress,
                                               to: MarenAddresses.of(chain.network).marenVault,
-                                              value: valueWei, data: data, gasLimit: 500_000)
+                                              value: valueWei, data: data, gasLimit: gasLimit)
             let client = EthereumHttpClient(url: chain.rpcURLs[0], network: .custom(String(chain.chainId)))
             let outcome = await Receipt.confirm(client: client, hash: hash, sponsored: false)
             await MezoSnapshotStore.shared.invalidate()  // cached reads are stale now
@@ -519,12 +543,27 @@ struct MezoActions {
         }
         let maren = MarenAddresses.of(chain.network)
         do {
-            let estimate = (try? await rpc.estimateGas(from: loadedAddress, to: to, data: data)) ?? BigUInt(400_000)
+            let gasLimit: BigUInt
+            if to.lowercased() == maren.marenVault.lowercased() {
+                let estimate: BigUInt
+                do {
+                    estimate = try await rpc.estimateGas(from: loadedAddress, to: to, data: data)
+                } catch {
+                    return .declined(reason: "Mezo could not estimate this vault transaction. The vault limits or RPC may have changed. The vault transaction was not submitted. Refresh and try again.")
+                }
+                guard let padded = Self.vaultRelayGasLimit(directEstimate: estimate) else {
+                    return .declined(reason: "This vault transaction needs more gas than sponsorship currently allows. The vault transaction was not submitted.")
+                }
+                gasLimit = padded
+            } else {
+                let estimate = (try? await rpc.estimateGas(from: loadedAddress, to: to, data: data)) ?? BigUInt(400_000)
+                gasLimit = Self.relayGasLimit(directEstimate: estimate)
+            }
             let nonce = try await rpc.forwarderNonce(hub: maren.marenForwarder, owner: loadedAddress)
             let deadline = UInt64(Date().timeIntervalSince1970) + RELAY_DEADLINE_SECONDS
             let request = MarenEncoding.ForwardRequest(
                 from: loadedAddress, to: to, value: 0,
-                gas: Self.relayGasLimit(directEstimate: estimate), nonce: nonce,
+                gas: gasLimit, nonce: nonce,
                 deadline: deadline, data: data
             )
             let signature = try Self.signForwardRequest(

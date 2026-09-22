@@ -75,21 +75,89 @@ struct MezoRPC: Sendable {
         return Self.word(out, 0)
     }
 
-    /// A direct-call gas estimate, with failover. Used to size the relayed gas cap.
-    func estimateGas(from: String, to: String, data: Data) async throws -> BigUInt {
+    /// A direct-call simulation, with failover. Sponsored simulations explicitly use zero
+    /// gas price so a user holding no BTC can still estimate; this never sets a broadcast fee.
+    func estimateGas(from: String, to: String, data: Data, value: BigUInt = 0,
+                     sponsored: Bool = true) async throws -> BigUInt {
         var lastError = "no endpoints configured"
         for url in chain.rpcURLs {
             do {
-                let tx = EthereumTransaction(from: EthereumAddress(from), to: EthereumAddress(to),
-                                             value: 0, data: data, nonce: nil, gasPrice: nil, gasLimit: nil,
-                                             chainId: chain.chainId)
-                return try await makeClient(url).eth_estimateGas(tx)
+                return try await Self.estimateGas(using: URLSession.shared, url: url,
+                    from: from, to: to, data: data, value: value, sponsored: sponsored)
             } catch {
                 lastError = String(describing: error)
                 continue
             }
         }
         throw MezoRPCError.allEndpointsFailed(lastError)
+    }
+
+    /// Build the exact JSON-RPC body. web3.swift's convenience wrapper omits gasPrice,
+    /// so sponsored estimates use this explicit request instead.
+    static func gasEstimateRequest(url: URL, from: String, to: String, data: Data,
+                                   value: BigUInt = 0, sponsored: Bool = true) throws -> URLRequest {
+        var transaction = ["from": from, "to": to, "data": data.web3.hexString,
+                           "value": "0x" + String(value, radix: 16)]
+        if sponsored { transaction["gasPrice"] = "0x0" }
+        var request = URLRequest(url: url, timeoutInterval: 20)
+        request.httpMethod = "POST"
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        request.httpBody = try JSONSerialization.data(withJSONObject: [
+            "jsonrpc": "2.0", "id": 1, "method": "eth_estimateGas", "params": [transaction]
+        ])
+        return request
+    }
+
+    static func decodeGasEstimate(data: Data, response: URLResponse) throws -> BigUInt {
+        guard let http = response as? HTTPURLResponse, (200...299).contains(http.statusCode) else {
+            throw MezoRPCError.decode("gas estimation HTTP request failed")
+        }
+        guard let payload = try JSONSerialization.jsonObject(with: data) as? [String: Any],
+              payload["jsonrpc"] as? String == "2.0", payload["id"] as? Int == 1,
+              !payload.keys.contains("error"), let hex = payload["result"] as? String,
+              hex.range(of: "^0x[1-9a-fA-F][0-9a-fA-F]*$", options: .regularExpression) != nil,
+              let estimate = BigUInt(String(hex.dropFirst(2)), radix: 16) else {
+            throw MezoRPCError.decode("invalid gas estimate or RPC simulation failure")
+        }
+        return estimate
+    }
+
+    static func estimateGas(using session: URLSession, url: URL, from: String, to: String,
+                            data: Data, value: BigUInt = 0, sponsored: Bool = true) async throws -> BigUInt {
+        let request = try gasEstimateRequest(url: url, from: from, to: to, data: data,
+                                            value: value, sponsored: sponsored)
+        let (body, response) = try await session.data(for: request)
+        return try decodeGasEstimate(data: body, response: response)
+    }
+
+    /// Zero neighbours are valid at a list boundary, but a missing/truncated RPC response
+    /// must never silently become a zero hint. The contract validates hints again at execution.
+    static func decodeTroveHint(_ data: Data) throws -> String {
+        guard data.count == 32, data.prefix(12).allSatisfy({ $0 == 0 }) else {
+            throw MezoRPCError.decode("invalid trove hint address")
+        }
+        return address(data, 0)
+    }
+
+    func pooledTroveHints() async throws -> MarenEncoding.TroveHints {
+        let vault = MarenAddresses.of(chain.network).marenVault
+        let sorted = MusdAddresses.of(chain.network).sortedTroves
+        let contains = ABIFunctionEncoder("contains")
+        try contains.encode(EthereumAddress(vault))
+        let membership = try await call(to: sorted, data: try contains.encoded())
+        guard membership.count == 32, Self.word(membership, 0) <= 1 else {
+            throw MezoRPCError.decode("invalid sorted trove membership")
+        }
+        // A deposit into an unopened pooled trove is held idle and needs no insertion hints.
+        if Self.word(membership, 0) == 0 { return .none }
+        func neighbour(_ function: String) async throws -> String {
+            let enc = ABIFunctionEncoder(function)
+            try enc.encode(EthereumAddress(vault))
+            return try Self.decodeTroveHint(await call(to: sorted, data: enc.encoded()))
+        }
+        async let upper = neighbour("getPrev")
+        async let lower = neighbour("getNext")
+        return try await MarenEncoding.TroveHints(upper: upper, lower: lower)
     }
 
     // MARK: typed reads

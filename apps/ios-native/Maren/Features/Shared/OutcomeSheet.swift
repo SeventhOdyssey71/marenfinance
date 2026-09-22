@@ -68,6 +68,6 @@ struct OutcomeRow: Identifiable {
 /// redesigned badge, message and Done button.
 struct OutcomeDetail {
     var caption: String? = nil   // "You sent"
-    var hero: String? = nil      // "1.40 MUSD"
+    var hero: String? = nil      // "$1.40"
     var rows: [OutcomeRow] = []  // e.g. To · @sele
 }

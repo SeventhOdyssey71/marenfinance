@@ -604,7 +604,7 @@ struct MezoMarenClient: MarenClient {
     static func activityItem(from r: SubgraphActivity.Row) -> ActivityItem? {
         let amount = Wei.toDecimal(r.amountWei) ?? 0
         let id = "\(r.txHash)-\(r.blockNumber)-\(r.kind)-\(r.outgoing ? "out" : "in")"
-        func musd(_ sign: String) -> String { "\(sign)\(MoneyFormat.musd(amount, unit: false)) MUSD" }
+        func musd(_ sign: String) -> String { "\(sign)\(MoneyFormat.musd(amount))" }
         func btc(_ sign: String) -> String { "\(sign)\(MoneyFormat.btc(amount, unit: false)) BTC" }
         func row(_ kind: ActivityItem.Kind, _ title: String, _ subtitle: String, _ text: String) -> ActivityItem {
             ActivityItem(id: id, kind: kind, title: title, subtitle: subtitle, amount: text,
@@ -673,7 +673,7 @@ struct MezoMarenClient: MarenClient {
         let date = times[log.block]
         let id = (log.txHash ?? UUID().uuidString) + "-" + String(log.logIndex)
 
-        func musd(_ sign: String) -> String { "\(sign)\(MoneyFormat.musd(amount, unit: false)) MUSD" }
+        func musd(_ sign: String) -> String { "\(sign)\(MoneyFormat.musd(amount))" }
         func btc(_ sign: String) -> String { "\(sign)\(MoneyFormat.btc(amount, unit: false)) BTC" }
         func row(_ kind: ActivityItem.Kind, _ title: String, _ subtitle: String, _ amountText: String) -> ActivityItem {
             ActivityItem(id: id, kind: kind, title: title, subtitle: subtitle, amount: amountText, date: date)

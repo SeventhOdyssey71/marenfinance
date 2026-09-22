@@ -60,6 +60,9 @@ struct AmountField: View {
                 Text("Amount")
                     .labelStyle()
                 HStack(alignment: .firstTextBaseline, spacing: 8) {
+                    if unit == "MUSD" {
+                        Text("$").font(.figure(32, weight: .bold)).foregroundStyle(Theme.Palette.ink)
+                    }
                     TextField("0", text: $text)
                         .font(.figure(40, weight: .bold))
                         .foregroundStyle(Theme.Palette.ink)

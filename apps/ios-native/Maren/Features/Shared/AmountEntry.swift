@@ -14,8 +14,8 @@ struct AmountReadout: View {
     let unitLabel: String            // "MUSD" or "BTC"
     /// The big-figure prefix — "$" for MUSD, empty for BTC.
     var prefix: String = "$"
-    /// Whether to show the fiat/crypto toggle affordance (MUSD only; it's 1:1 so cosmetic).
-    var showToggle: Bool = true
+    /// Only show a toggle when the caller provides a real conversion action.
+    var showToggle: Bool = false
     var onToggle: () -> Void = {}
 
     private var isZero: Bool { raw.isEmpty || Decimal(string: raw) == 0 }
@@ -37,7 +37,7 @@ struct AmountReadout: View {
 
             Button(action: onToggle) {
                 HStack(spacing: 6) {
-                    Text("\(shown) \(unitLabel)").font(.text(15, weight: .medium))
+                    Text(unitLabel).font(.text(15, weight: .medium))
                     if showToggle {
                         Image(systemName: "arrow.up.arrow.down").font(.system(size: 13, weight: .semibold))
                     }
