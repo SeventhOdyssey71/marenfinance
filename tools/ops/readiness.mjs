@@ -151,6 +151,36 @@ threshold('collateral in the trove', 100 - idlePct, {
   detail: idlePct > 20 ? 'keeper can push idle collateral in to raise capacity' : '',
 });
 
+/**
+ * REDEMPTION DETECTOR. Redemption on Mezo is permissionless, and the deployed vault
+ * predates its own reconciliation (`reconcileRedemption`, `settleRedemption`,
+ * `collateralOf` are all absent from its dispatch table). If a redeemer reaches the
+ * pooled trove, the trove's debt and collateral fall but no user ledger moves — early
+ * withdrawers would take their full pre-redemption entitlement and later ones would hit a
+ * reverting withdraw. Nothing anywhere watches for this.
+ *
+ * It is cheap to detect because the vault's own accounting implies an exact identity:
+ * `outstandingDebt()` == trove principal + interest − 200 MUSD gas compensation − reserve.
+ * That holds to the wei today. A redemption breaks it, and nothing else does.
+ */
+try {
+  const outstanding = BigInt(read(VAULT, 'outstandingDebt()(uint256)'));
+  const GAS_COMPENSATION = 200n * WAD;
+  const implied =
+    troveDebt > GAS_COMPENSATION + reserve ? troveDebt - GAS_COMPENSATION - reserve : 0n;
+  const drift = implied > outstanding ? implied - outstanding : outstanding - implied;
+  check({
+    name: 'redemption ledger',
+    status: drift > WAD ? 'fail' : 'pass',
+    detail:
+      drift > WAD
+        ? `trove and vault accounting disagree by ${num(drift)} MUSD — a redemption has hit the pooled trove and the deployed vault cannot reconcile it. Stop withdrawals.`
+        : `intact (trove and vault agree to ${num(drift, 6)} MUSD)`,
+  });
+} catch (e) {
+  check({ name: 'redemption ledger', status: 'warn', detail: `could not verify: ${e.message}` });
+}
+
 check({
   name: 'vault switches',
   status: depositsPaused || borrowingPaused ? 'fail' : 'pass',
