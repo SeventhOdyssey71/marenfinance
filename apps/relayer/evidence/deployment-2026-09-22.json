@@ -1,0 +1,133 @@
+{
+  "recordedAt": "2026-09-22T01:38:47.119Z",
+  "sourceRevision": "ebd7aac7e9272e4f828c048de4cb05431bcd553a",
+  "previousVersion": "52bce9af-73f4-4d20-b613-c9cd9355a162",
+  "finalVersion": "aaa0afa9-1585-4119-a2c5-2bfac983f0f5",
+  "finalVersionTag": "testnet-ebd7aac",
+  "finalVersionCreatedAt": "2026-09-22T01:38:02.369748Z",
+  "namespaceId": "7f85151a72eb4690b8abf783d18cded1",
+  "migrationTag": "v1",
+  "configurationDelta": null,
+  "preserved": [
+    "Durable Object namespace and singleton",
+    "signer and RELAYER_PRIVATE_KEY secret binding",
+    "RPC URLs, testnet chain, forwarder and target allowlist",
+    "sponsorship cap and allowed browser origins"
+  ],
+  "checks": {
+    "health": {
+      "ok": true,
+      "accepting": true,
+      "relayer": "0xd90245ee16B2f58eD8654961BBf2fa835046df89",
+      "balanceWei": "19999998587059528",
+      "balanceBtc": "0.01999999",
+      "nonce": 34,
+      "chainId": 31611,
+      "network": "testnet",
+      "forwarder": "0x22cC1Adfb0C91D9359746dE3F7E8cB7F2B8eA98C",
+      "rpcs": ["https://rpc.test.mezo.org", "https://mezo-testnet.drpc.org"],
+      "targets": [
+        "marenPay:0xe475Ff919D54E055809f516E3bed8a5c7a101836",
+        "marenRegistry:0x9e123Cdd0CD524812CF9F552d3FAB13d8143b77E",
+        "marenVault:0x46252B00AB59384518d9dB6D1f210ffF1221645b"
+      ],
+      "store": "durable",
+      "inFlight": 0,
+      "watching": 0,
+      "spentTodayWei": "0",
+      "committedTodayWei": "0",
+      "pendingRefunds": 0,
+      "dailyBudgetWei": "10000000000000000",
+      "problems": []
+    },
+    "deepHealth": {
+      "ok": true,
+      "accepting": true,
+      "relayer": "0xd90245ee16B2f58eD8654961BBf2fa835046df89",
+      "chainId": 31611,
+      "network": "testnet",
+      "keySource": "env",
+      "singleInstance": true,
+      "recovery": {
+        "durable": true,
+        "blocked": false,
+        "pending": 0,
+        "pendingRefunds": 0,
+        "oldestPendingAt": null,
+        "replacementPolicy": "rebroadcast-identical"
+      },
+      "nonce": {
+        "next": null,
+        "inFlight": 0,
+        "queued": 0,
+        "resyncs": 0
+      },
+      "lastSubmitted": null,
+      "lastSubmittedBlock": null,
+      "budget": {
+        "day": "2026-09-22",
+        "limitWei": "10000000000000000",
+        "committedWei": "0",
+        "reservedWei": "0",
+        "inFlightWei": "0",
+        "remainingWei": "10000000000000000",
+        "committedPct": 0,
+        "reservedPct": 0,
+        "halted": false,
+        "pendingRefunds": 0
+      },
+      "store": "durable",
+      "watching": 0,
+      "warnings": [
+        "RELAYER_PRIVATE_KEY puts the raw hot key in the process environment. This is a DEVELOPMENT-ONLY mode: use RELAYER_KEYSTORE_PATH + RELAYER_KEYSTORE_PASSWORD_FILE for anything holding real BTC"
+      ],
+      "problems": []
+    },
+    "cors": [
+      {
+        "origin": "https://marenfinance.vercel.app",
+        "status": 204,
+        "allowOrigin": "https://marenfinance.vercel.app"
+      },
+      {
+        "origin": "https://www.marenfinance.xyz",
+        "status": 204,
+        "allowOrigin": "https://www.marenfinance.xyz"
+      },
+      {
+        "origin": "http://localhost:3000",
+        "status": 204,
+        "allowOrigin": "http://localhost:3000"
+      },
+      {
+        "origin": "https://untrusted.example",
+        "status": 204,
+        "allowOrigin": null
+      }
+    ],
+    "signerNonces": [
+      {
+        "rpc": "https://rpc.test.mezo.org",
+        "latest": 34,
+        "pending": 34
+      },
+      {
+        "rpc": "https://mezo-testnet.drpc.org",
+        "latest": 34,
+        "pending": 34
+      }
+    ]
+  },
+  "validation": {
+    "relayerTests": 335,
+    "localWorkerdRecoveryChecks": 6,
+    "sourceAndWorkerTypecheck": "passed",
+    "workerBundleDryRun": "passed"
+  },
+  "publicTransactionsDuringDeployment": 0,
+  "scope": "RPC transport/internal failures now return UPSTREAM_ERROR rather than falsely reporting SIMULATION_REVERTED. Genuine contract reverts remain rejected before broadcast.",
+  "limitations": [
+    "No public keeper refinance executed; pool borrowing ceiling remediation is separate.",
+    "This deployment does not establish native App Store/TestFlight or confirmed borrowing acceptance."
+  ]
+}

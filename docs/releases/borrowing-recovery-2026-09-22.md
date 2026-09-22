@@ -8,7 +8,7 @@ The existing vault exposes `refinancePooledTrove`. Simulation with its current s
 
 This is a diagnosis and tested repair procedure, **not evidence that public borrowing has recovered**. The keeper transaction has not been signed. Public borrower receipts are still required afterward.
 
-## Changes prepared
+## Changes
 
 - Reopen the web app and browser launch links; support native `/pay` links as unsigned browser payment drafts.
 - Read borrowing capacity from total pool debt, actual MUSD reserve, live origination fee and pool collateral. Apply user and pool collateral limits before signing. Reserve-served borrowing adds no protocol debt or origination fee; fresh draws do.
@@ -50,4 +50,13 @@ After the receipt succeeds, verify fresh capacity, a confirmed public borrow, re
 
 ## Deployment observations
 
-Pending publication and verification of this candidate. Native changes require a new TestFlight build; source/simulator checks do not update the installed beta.
+Source revision: `ebd7aac7e9272e4f828c048de4cb05431bcd553a`, pushed to `release/borrowing-recovery-2026-09-22` in the existing private repository.
+
+- Web deployed to **https://www.marenfinance.xyz/app**. Vercel deployment `dpl_2TcFTQRN1D3fNtaGZsMe34Sqmrm9` is Ready with www, apex and canonical Vercel aliases. Eight public HTTP/CORS/recovery checks passed.
+- Fresh Chrome against the public deployment: six routes passed on desktop/mobile, no client exceptions or horizontal overflow; onboarding, wallet menu and payment draft redirect verified. Live pool figures rendered. A browser-origin request to the relayer returned accepting=true on chain 31611 with zero pending transactions and refunds.
+- Worker deployed as version `aaa0afa9-1585-4119-a2c5-2bfac983f0f5`, tag `testnet-ebd7aac`. Health, CORS, nonce and durable settlement state verified; signer, namespace and secrets preserved.
+- Live contract/client configuration attestation passed. Runtime hashes are observations, not proof that deployed Solidity matches the current source.
+- Native Release simulator build passed. **No new TestFlight build uploaded**: automatic approval review blocked signed distribution pending explicit approval for this build and existing TestFlight destination. The approval request is pending; GitHub billing was not retested because no workflow was dispatched.
+- **No public keeper refinance submitted.** The existing keeper keystore needs local unlocking. The deployed contract accounting fixes still need a separate migration.
+
+Machine-readable observations: [deployment](deployment-2026-09-22.json), [public HTTP](http-2026-09-22.json), [browser](browser-2026-09-22.json), [contract configuration](testnet-configuration-2026-09-22.json), and [Worker rollout](../../apps/relayer/evidence/deployment-2026-09-22.json).

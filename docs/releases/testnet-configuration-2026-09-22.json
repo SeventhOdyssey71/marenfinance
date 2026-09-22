@@ -1,0 +1,260 @@
+{
+  "checkedAt": "2026-09-22T01:40:57.240Z",
+  "scope": "Read-only testnet deployment and client configuration checks. Runtime code hashes are observations, not a proof that deployed code equals local source. No transaction signing or submission.",
+  "localCommit": "ebd7aac7e9272e4f828c048de4cb05431bcd553a",
+  "localChanges": true,
+  "passed": true,
+  "configuration": [
+    {
+      "name": "iOS marenVault",
+      "status": "pass",
+      "detail": "expected SDK testnet 0x46252B00AB59384518d9dB6D1f210ffF1221645b"
+    },
+    {
+      "name": "iOS marenPay",
+      "status": "pass",
+      "detail": "expected SDK testnet 0xe475Ff919D54E055809f516E3bed8a5c7a101836"
+    },
+    {
+      "name": "iOS marenForwarder",
+      "status": "pass",
+      "detail": "expected SDK testnet 0x22cC1Adfb0C91D9359746dE3F7E8cB7F2B8eA98C"
+    },
+    {
+      "name": "iOS marenRegistry",
+      "status": "pass",
+      "detail": "expected SDK testnet 0x9e123Cdd0CD524812CF9F552d3FAB13d8143b77E"
+    },
+    {
+      "name": "iOS marenEarn",
+      "status": "pass",
+      "detail": "expected SDK testnet 0xE3B02b215085B99Ce61E0F5ea9763Ac637aa7826"
+    },
+    {
+      "name": "iOS musd",
+      "status": "pass",
+      "detail": "expected SDK testnet 0x118917a40FAF1CD7a13dB0Ef56C86De7973Ac503"
+    },
+    {
+      "name": "iOS troveManager",
+      "status": "pass",
+      "detail": "expected SDK testnet 0xE47c80e8c23f6B4A1aE41c34837a0599D5D16bb0"
+    },
+    {
+      "name": "iOS sortedTroves",
+      "status": "pass",
+      "detail": "expected SDK testnet 0x722E4D24FD6Ff8b0AC679450F3D91294607268fA"
+    },
+    {
+      "name": "iOS hintHelpers",
+      "status": "pass",
+      "detail": "expected SDK testnet 0x4e4cBA3779d56386ED43631b4dCD6d8EacEcBCF6"
+    },
+    {
+      "name": "iOS priceFeed",
+      "status": "pass",
+      "detail": "expected SDK testnet 0x86bCF0841622a5dAC14A313a15f96A95421b9366"
+    },
+    {
+      "name": "iOS chain ID",
+      "status": "pass",
+      "detail": "expected 31611"
+    },
+    {
+      "name": "iOS relayer URL",
+      "status": "pass",
+      "detail": "must match the endpoint being checked"
+    },
+    {
+      "name": "Worker network",
+      "status": "pass",
+      "detail": "expected testnet"
+    },
+    {
+      "name": "Worker forwarder",
+      "status": "pass",
+      "detail": "expected 0x22cC1Adfb0C91D9359746dE3F7E8cB7F2B8eA98C"
+    },
+    {
+      "name": "Worker targets",
+      "status": "pass",
+      "detail": "must match the testnet SDK and enabled relay target set"
+    }
+  ],
+  "chain": {
+    "passed": true,
+    "blockNumber": "15690123",
+    "observations": [
+      {
+        "name": "allowed marenPay.cancelRequest",
+        "status": "pass",
+        "detail": "0x3015394c"
+      },
+      {
+        "name": "allowed marenPay.claimLink",
+        "status": "pass",
+        "detail": "0xaf4be47b"
+      },
+      {
+        "name": "allowed marenPay.createRequest",
+        "status": "pass",
+        "detail": "0xba9a7a9e"
+      },
+      {
+        "name": "allowed marenPay.fulfillRequest",
+        "status": "pass",
+        "detail": "0x9a91eb0d"
+      },
+      {
+        "name": "allowed marenPay.fulfillRequestWithPermit",
+        "status": "pass",
+        "detail": "0xd2fdcbfa"
+      },
+      {
+        "name": "allowed marenPay.pay",
+        "status": "pass",
+        "detail": "0x4a4bdb30"
+      },
+      {
+        "name": "allowed marenPay.payToHandle",
+        "status": "pass",
+        "detail": "0x806311fd"
+      },
+      {
+        "name": "allowed marenPay.payWithPermit",
+        "status": "pass",
+        "detail": "0xbfefcfd1"
+      },
+      {
+        "name": "allowed marenPay.payWithPermit2",
+        "status": "pass",
+        "detail": "0xdf926b11"
+      },
+      {
+        "name": "allowed marenPay.split",
+        "status": "pass",
+        "detail": "0xad0ffab1"
+      },
+      {
+        "name": "allowed marenRegistry.commit",
+        "status": "pass",
+        "detail": "0xf14fcbc8"
+      },
+      {
+        "name": "allowed marenRegistry.register",
+        "status": "pass",
+        "detail": "0x656afdee"
+      },
+      {
+        "name": "allowed marenRegistry.setPrimaryHandle",
+        "status": "pass",
+        "detail": "0xf288d63f"
+      },
+      {
+        "name": "allowed marenRegistry.transferHandle",
+        "status": "pass",
+        "detail": "0xc8a0f3ae"
+      },
+      {
+        "name": "allowed marenVault.borrow",
+        "status": "pass",
+        "detail": "0xd5164184"
+      },
+      {
+        "name": "allowed marenVault.closePosition",
+        "status": "pass",
+        "detail": "0xbf42841c"
+      },
+      {
+        "name": "allowed marenVault.repay",
+        "status": "pass",
+        "detail": "0xc883b2e5"
+      },
+      {
+        "name": "allowed marenVault.withdraw",
+        "status": "pass",
+        "detail": "0xb460af94"
+      },
+      {
+        "name": "chain identity",
+        "status": "pass",
+        "detail": "Mezo testnet at block 15690123"
+      },
+      {
+        "name": "forwarder EIP-712 domain",
+        "status": "pass",
+        "detail": "Maren Forwarder / 1 / 31611 / configured hub; no salt or extensions"
+      },
+      {
+        "name": "marenEarn runtime code",
+        "status": "pass",
+        "detail": "11396 bytes; keccak256 0xca33f98d7e0e5f4236ee70e6e95b6270a83ed20366443d6051b39bdee211a84a"
+      },
+      {
+        "name": "marenEarn trusted forwarder",
+        "status": "pass",
+        "detail": "0x22cC1Adfb0C91D9359746dE3F7E8cB7F2B8eA98C"
+      },
+      {
+        "name": "marenForwarder runtime code",
+        "status": "pass",
+        "detail": "7934 bytes; keccak256 0xa95d480a083daadf30059d3c5c61f33d6267d7bef2b8775b2b9434157f050d11"
+      },
+      {
+        "name": "marenPay runtime code",
+        "status": "pass",
+        "detail": "9264 bytes; keccak256 0x0e62133182340e0a198143bed665c4e99be7660ff0dc3c93dfebeee27d6e9cfd"
+      },
+      {
+        "name": "marenPay trusted forwarder",
+        "status": "pass",
+        "detail": "0x22cC1Adfb0C91D9359746dE3F7E8cB7F2B8eA98C"
+      },
+      {
+        "name": "marenRegistry runtime code",
+        "status": "pass",
+        "detail": "4742 bytes; keccak256 0x3b43da0a81f3b24a89065eb4d8e121a957695ac7f9070e668b51cba5670fca5f"
+      },
+      {
+        "name": "marenRegistry trusted forwarder",
+        "status": "pass",
+        "detail": "0x22cC1Adfb0C91D9359746dE3F7E8cB7F2B8eA98C"
+      },
+      {
+        "name": "marenVault runtime code",
+        "status": "pass",
+        "detail": "14508 bytes; keccak256 0xf932355953047e0188b075abf1f246d81e1aa3da51097125fd8137a2e773854a"
+      },
+      {
+        "name": "marenVault trusted forwarder",
+        "status": "pass",
+        "detail": "0x22cC1Adfb0C91D9359746dE3F7E8cB7F2B8eA98C"
+      },
+      {
+        "name": "MUSD decimals",
+        "status": "pass",
+        "detail": "18"
+      },
+      {
+        "name": "musd runtime code",
+        "status": "pass",
+        "detail": "6437 bytes; keccak256 0xc0d0630dacd16463b0390f3914920cb4cbbe3586e7a51ef0d71930249756f474"
+      },
+      {
+        "name": "not sponsored createLink(address,uint256,uint64,string)",
+        "status": "pass",
+        "detail": "disabled"
+      },
+      {
+        "name": "not sponsored deposit(address,address)",
+        "status": "pass",
+        "detail": "disabled"
+      }
+    ]
+  },
+  "health": {
+    "name": "deployed relayer configuration and RPC health",
+    "status": "pass",
+    "detail": "accepting on testnet with expected forwarder/targets and readable signer balance/nonce"
+  }
+}
