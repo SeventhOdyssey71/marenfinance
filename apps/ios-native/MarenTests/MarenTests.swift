@@ -1007,3 +1007,106 @@ extension VaultTransactionPreparationTests {
         XCTAssertEqual(MezoActions.depositGasLimit(directEstimate: 600_000), BigUInt(780_000))
     }
 }
+
+extension VaultTransactionPreparationTests {
+    private var wad: BigUInt { BigUInt(10).power(18) }
+
+    private func hintState(principal: BigUInt = 2_750, interest: BigUInt = 7,
+                           reserve: BigUInt = 0, idle: BigUInt = 3,
+                           userDebt: BigUInt = 500, rate: BigUInt? = nil) -> MezoRPC.VaultHintState {
+        MezoRPC.VaultHintState(trove: .init(collWei: 100 * wad, principalWei: principal * wad,
+            interestWei: interest * wad), reserveWei: reserve * wad, idleWei: idle * wad,
+            userDebtWei: userDebt * wad, borrowingRateWei: rate ?? wad / 1_000,
+            minimumNetDebtWei: 1_800 * wad, gasCompensationWei: 200 * wad)
+    }
+
+    func testBorrowTargetsPostOperationPrincipalWithFeeAndReserve() throws {
+        let allDrawn = try MezoRPC.projectedTrove(operation: .borrow, amount: 500 * wad, state: hintState())
+        XCTAssertEqual(allDrawn.principalWei, 3_250 * wad + wad / 2)
+        XCTAssertEqual(allDrawn.interestWei, 7 * wad) // excluded from the NICR denominator
+        XCTAssertEqual(allDrawn.collWei, 100 * wad)
+        let partlyReserved = try MezoRPC.projectedTrove(operation: .borrow, amount: 500 * wad,
+                                                       state: hintState(reserve: 100))
+        XCTAssertEqual(partlyReserved.principalWei, 3_150 * wad + 4 * wad / 10)
+        let fullyReserved = try MezoRPC.projectedTrove(operation: .borrow, amount: 500 * wad,
+                                                       state: hintState(reserve: 600))
+        XCTAssertEqual(fullyReserved.principalWei, 2_750 * wad)
+        let exempt = try MezoRPC.projectedTrove(operation: .borrow, amount: 500 * wad,
+                                                state: hintState(rate: 0))
+        XCTAssertEqual(exempt.principalWei, 3_250 * wad)
+    }
+
+    func testRepaymentUsesInterestFirstAndIncludesExistingReserve() throws {
+        let result = try MezoRPC.projectedTrove(operation: .repay, amount: 100 * wad,
+                                                state: hintState(reserve: 20))
+        XCTAssertEqual(result.principalWei, 2_637 * wad) // 120 pushed: 7 interest + 113 principal
+        XCTAssertEqual(result.interestWei, 0)
+        let interestOnly = try MezoRPC.projectedTrove(operation: .repay, amount: 5 * wad, state: hintState())
+        XCTAssertEqual(interestOnly.principalWei, 2_750 * wad)
+        XCTAssertEqual(interestOnly.interestWei, 2 * wad)
+    }
+
+    func testRepaymentClampsToUserDebtAndPreservesProtocolDebtFloor() throws {
+        let clamped = try MezoRPC.projectedTrove(operation: .repay, amount: 1_000 * wad,
+                                                 state: hintState(userDebt: 10))
+        XCTAssertEqual(clamped.principalWei, 2_747 * wad)
+        let floor = try MezoRPC.projectedTrove(operation: .repay, amount: 500 * wad,
+                                               state: hintState(principal: 2_050, interest: 10))
+        XCTAssertEqual(floor.principalWei, 2_000 * wad)
+        XCTAssertEqual(floor.interestWei, 0)
+        let atFloor = try MezoRPC.projectedTrove(operation: .repay, amount: 100 * wad,
+                                                 state: hintState(principal: 2_000, interest: 0))
+        XCTAssertEqual(atFloor.principalWei, 2_000 * wad)
+    }
+
+    func testWithdrawalConsumesIdleFirstAndDepositPushesOnlyNewValue() throws {
+        let withdrawal = try MezoRPC.projectedTrove(operation: .withdraw, amount: 10 * wad, state: hintState())
+        XCTAssertEqual(withdrawal.collWei, 93 * wad)
+        let idleOnly = try MezoRPC.projectedTrove(operation: .withdraw, amount: 2 * wad, state: hintState())
+        XCTAssertEqual(idleOnly.collWei, 100 * wad)
+        let deposit = try MezoRPC.projectedTrove(operation: .deposit, amount: 10 * wad, state: hintState())
+        XCTAssertEqual(deposit.collWei, 110 * wad)
+        XCTAssertEqual(deposit.principalWei, 2_750 * wad)
+        XCTAssertThrowsError(try MezoRPC.projectedTrove(operation: .withdraw, amount: 104 * wad, state: hintState()))
+    }
+
+    func testInsertionHintNormalizationExcludesVaultBeforeReinsert() throws {
+        let vault = MarenAddresses.of(.testnet).marenVault
+        let current = MarenEncoding.TroveHints(upper: upper, lower: lower)
+        func pair(_ first: String, _ second: String) throws -> Data {
+            try XCTUnwrap(Data(hex: "0x" + String(repeating: "0", count: 24) + first.dropFirst(2) +
+                String(repeating: "0", count: 24) + second.dropFirst(2)))
+        }
+        let below = try MezoRPC.insertionHints(pair(vault, lower), vault: vault, current: current)
+        XCTAssertEqual(below.upper, upper)
+        XCTAssertEqual(below.lower, lower.lowercased())
+        let above = try MezoRPC.insertionHints(pair(upper, vault), vault: vault, current: current)
+        XCTAssertEqual(above.upper, upper.lowercased())
+        XCTAssertEqual(above.lower, lower)
+        let boundary = MarenEncoding.TroveHints.none
+        let onlyTrove = try MezoRPC.insertionHints(pair(vault, boundary.lower), vault: vault, current: boundary)
+        XCTAssertEqual(onlyTrove.upper, boundary.upper)
+        XCTAssertEqual(onlyTrove.lower, boundary.lower)
+        XCTAssertThrowsError(try MezoRPC.insertionHints(Data(), vault: vault, current: current))
+        XCTAssertThrowsError(try MezoRPC.insertionHints(pair(upper, upper), vault: vault, current: current))
+    }
+
+    func testReportedFiveHundredBorrowKeepsFullMeasuredGasMargin() {
+        XCTAssertEqual(MezoActions.vaultRelayGasLimit(directEstimate: 486_088), BigUInt(789_132))
+        XCTAssertNil(MezoActions.vaultRelayGasLimit(directEstimate: 1_257_780)) // current neighbours
+        XCTAssertNil(MezoActions.vaultRelayGasLimit(directEstimate: 1_952_877)) // zero hints
+    }
+}
+
+
+extension VaultTransactionPreparationTests {
+    func testUnopenedPoolStillAllowsIdleCollateralExitAndReserveRepayment() throws {
+        for operation: MezoRPC.VaultHintOperation in [.deposit, .repay, .withdraw] {
+            let hints = try MezoRPC.inactiveTroveHints(operation: operation, amount: 3, idleWei: 3)
+            XCTAssertEqual(hints.upper, MarenEncoding.TroveHints.none.upper)
+            XCTAssertEqual(hints.lower, MarenEncoding.TroveHints.none.lower)
+        }
+        XCTAssertThrowsError(try MezoRPC.inactiveTroveHints(operation: .withdraw, amount: 4, idleWei: 3))
+        XCTAssertThrowsError(try MezoRPC.inactiveTroveHints(operation: .borrow, amount: 1, idleWei: 3))
+    }
+}

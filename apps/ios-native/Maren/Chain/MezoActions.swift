@@ -165,7 +165,11 @@ struct MezoActions {
             return .declined(reason: reason)
         }
         do {
-            let hints = try await rpc.pooledTroveHints()
+            guard let operation = MezoRPC.VaultHintOperation(rawValue: function) else {
+                return .declined(reason: prepFailed)
+            }
+            let hints = try await rpc.pooledTroveHints(operation: operation, amount: amountWei,
+                                                      owner: loadedAddress)
             data = try MarenEncoding.vaultWriteCalldata(function: function, amount: amountWei, hints: hints)
         } catch {
             return .declined(reason: "The pooled vault's transaction hints could not be read. The vault transaction was not submitted. Refresh and try again.")
@@ -183,7 +187,7 @@ struct MezoActions {
         case .fail(let reason): return .declined(reason: reason)
         }
         do {
-            let hints = try await rpc.pooledTroveHints()
+            let hints = try await rpc.pooledTroveHints(operation: .deposit, amount: valueWei, owner: loadedAddress)
             let data = try MarenEncoding.depositCalldata(hints: hints)
             let estimate = try await rpc.estimateGas(from: loadedAddress,
                 to: MarenAddresses.of(chain.network).marenVault, data: data,
