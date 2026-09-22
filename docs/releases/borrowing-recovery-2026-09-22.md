@@ -26,6 +26,10 @@ The [exact-wallet read-only probe](user-borrow-probe-2026-09-22.json) confirms p
 
 Final native validation: **101 tests passed with zero failures**; the Release simulator build passed and its binary contains none of the checked Debug stub, demo transaction or screenshot-hook markers. Independent review found no remaining material blocker in the projected-position calculations or inactive-pool handling.
 
+The pinned deployed-bytecode fork then completed the reported lifecycle with Forge 1.4.3: borrow 500 MUSD at a 789,132 gas allowance, repay 500.5 MUSD at 498,598 gas with the full amount pushed and no reserve retained, and withdraw 0.001 BTC at 225,079 gas using idle collateral first. One test passed with zero failures or skips; no public transaction was sent. [Fork evidence](native-hints-fork-2026-09-22.json).
+
+Apple accepted **TestFlight build 77** from final commit `214ea7b` at 10:19:56 UTC. The signed workflow's hosted tests, Release build, production-binary marker check, archive and export all passed. Delivery UUID: `f188b363-b75b-48d3-8a86-989a7064c106`. Apple processing completion and tester availability remain unverified. [Upload evidence](testflight-native-fix-2026-09-22.json).
+
 ## Incident and diagnosis
 
 The deployed Mezo testnet pool could not draw new MUSD because accrued debt exceeded its fixed borrowing ceiling. At the incident snapshot, debt was approximately 2,749.55 MUSD, the ceiling was 2,749.20 MUSD, and `reserveMUSD()` was zero. Adding collateral alone does not reset that ceiling. The relayer correctly refused to sponsor the reverting borrow.
