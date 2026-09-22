@@ -30,6 +30,16 @@ The pinned deployed-bytecode fork then completed the reported lifecycle with For
 
 Apple accepted **TestFlight build 77** from final commit `214ea7b` at 10:19:56 UTC. The signed workflow's hosted tests, Release build, production-binary marker check, archive and export all passed. Delivery UUID: `f188b363-b75b-48d3-8a86-989a7064c106`. Apple processing completion and tester availability remain unverified. [Upload evidence](testflight-native-fix-2026-09-22.json).
 
+### Activity performance and Home visual follow-up
+
+Transaction history now persists its covered chain range per account, shares simultaneous Home and Activity requests, and re-reads only the latest 100 blocks on a warm refresh for reorg safety. A normal revisit therefore makes three log requests instead of twelve, while the initial cold scan is bounded to exactly four 10,000-block windows across the three Maren contracts. Activity also paints the last confirmed Home rows immediately while the incremental refresh runs. Confirmed writes invalidate any in-flight history result so an older scan cannot overwrite the post-transaction refresh.
+
+The Home wash is now one pale lavender vertical gradient confined to the top 330 points and fading into the white canvas. The previous warm radial and pearl layers were removed.
+
+Local validation for `0ef2769`: **103 native tests passed with zero failures**, including incremental coverage and reorg-window replacement; the Release simulator build passed; and a simulator capture verified the top-only lavender treatment.
+
+Apple accepted **TestFlight build 79** from commit `0ef2769` at 11:07:27 UTC. The signed workflow's hosted tests, Release build, production-binary marker check, archive and export all passed. Delivery UUID: `fef324d5-9689-4e27-bd4e-7b3c5cc93d8a`. Apple processing completion and tester availability remain unverified. [Upload evidence](testflight-activity-performance-2026-09-22.json).
+
 ## Incident and diagnosis
 
 The deployed Mezo testnet pool could not draw new MUSD because accrued debt exceeded its fixed borrowing ceiling. At the incident snapshot, debt was approximately 2,749.55 MUSD, the ceiling was 2,749.20 MUSD, and `reserveMUSD()` was zero. Adding collateral alone does not reset that ceiling. The relayer correctly refused to sponsor the reverting borrow.
