@@ -1008,6 +1008,58 @@ extension VaultTransactionPreparationTests {
     }
 }
 
+final class ActivityHistoryCacheTests: XCTestCase {
+    private let account = "0x4b0b25687fee0eb9d90617d656490dfd2964c0ef"
+    private let contracts = ["0x1111111111111111111111111111111111111111"]
+
+    private func item(_ id: String, block: Int, seconds: TimeInterval) -> ActivityItem {
+        ActivityItem(id: id, kind: .borrow, title: "Borrowed", subtitle: "Maren Credit",
+                     amount: "+$500.00", date: Date(timeIntervalSince1970: seconds),
+                     blockNumber: block)
+    }
+
+    func testActivityPlanResumesFromReorgWindow() {
+        let cached = ActivityHistoryStore.Entry(
+            version: ActivityHistoryStore.version, chainId: 31611, account: account,
+            contracts: contracts, fromBlock: 1_000, toBlock: 5_000, items: []
+        )
+
+        let warm = ActivityHistoryStore.plan(cached: cached, coldFloor: 1_000, head: 5_100)
+        XCTAssertEqual(warm.fromBlock, 4_901)
+        XCTAssertNotNil(warm.reuse)
+
+        let cold = ActivityHistoryStore.plan(cached: nil, coldFloor: 1_000, head: 5_100)
+        XCTAssertEqual(cold.fromBlock, 1_000)
+        XCTAssertNil(cold.reuse)
+
+        let expired = ActivityHistoryStore.plan(cached: cached, coldFloor: 5_002, head: 45_001)
+        XCTAssertEqual(expired.fromBlock, 5_002)
+        XCTAssertNil(expired.reuse)
+    }
+
+    func testActivityMergeReplacesReorgWindowAndKeepsOlderRows() {
+        let cached = ActivityHistoryStore.Entry(
+            version: ActivityHistoryStore.version, chainId: 31611, account: account,
+            contracts: contracts, fromBlock: 100, toBlock: 190,
+            items: [item("old", block: 100, seconds: 100),
+                    item("replaced", block: 190, seconds: 190)]
+        )
+        let merged = ActivityHistoryStore.merged(
+            reuse: cached,
+            freshItems: [item("replacement", block: 190, seconds: 191),
+                         item("new", block: 200, seconds: 200)],
+            fromBlock: 180, toBlock: 200, chainId: 31611,
+            account: account.uppercased(), contracts: contracts
+        )
+
+        XCTAssertEqual(merged.fromBlock, 100)
+        XCTAssertEqual(merged.toBlock, 200)
+        XCTAssertEqual(merged.account, account)
+        XCTAssertEqual(merged.items.map(\.id), ["new", "replacement", "old"])
+        XCTAssertFalse(merged.items.contains(where: { $0.id == "replaced" }))
+    }
+}
+
 extension VaultTransactionPreparationTests {
     private var wad: BigUInt { BigUInt(10).power(18) }
 

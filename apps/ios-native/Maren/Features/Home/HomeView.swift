@@ -40,7 +40,7 @@ struct HomeView: View {
             Theme.Palette.canvas
                 .overlay(alignment: .top) {
                     BalanceGlow()
-                        .frame(height: 440)
+                        .frame(height: 330)
                         .allowsHitTesting(false)
                         .accessibilityHidden(true)
                 }
@@ -240,29 +240,16 @@ struct HomeView: View {
 
 /// A quiet wash behind the balance, fading into the white content surface.
 private struct BalanceGlow: View {
-    @Environment(\.accessibilityReduceTransparency) private var reduceTransparency
-
     var body: some View {
-        ZStack {
-            LinearGradient(
-                stops: [
-                    .init(color: Theme.Palette.balanceLavender, location: 0),
-                    .init(color: Theme.Palette.balancePearl, location: 0.48),
-                    .init(color: Theme.Palette.canvas, location: 1)
-                ],
-                startPoint: .topTrailing,
-                endPoint: .bottomLeading
-            )
-            if !reduceTransparency {
-                RadialGradient(
-                    colors: [Theme.Palette.balanceWarmth.opacity(0.8), .clear],
-                    center: UnitPoint(x: 0, y: 0.12),
-                    startRadius: 0,
-                    endRadius: 320
-                )
-            }
-        }
-        .mask(LinearGradient(colors: [.white, .white, .clear], startPoint: .top, endPoint: .bottom))
+        LinearGradient(
+            stops: [
+                .init(color: Theme.Palette.balanceLavender, location: 0),
+                .init(color: Theme.Palette.balanceLavender.opacity(0.72), location: 0.46),
+                .init(color: Theme.Palette.canvas.opacity(0), location: 1)
+            ],
+            startPoint: .top,
+            endPoint: .bottom
+        )
     }
 }
 

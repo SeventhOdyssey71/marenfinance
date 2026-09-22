@@ -295,6 +295,9 @@ struct ActivityItem: Sendable, Equatable, Identifiable, Codable {
     /// "January 1" header dated 1970. Nil is the honest answer, and the UI groups and labels it
     /// as "Time unknown".
     let date: Date?
+    /// The mined block, used to resume Activity scans without re-reading old immutable logs.
+    /// Optional so locally-created/demo rows and older on-disk snapshots remain decodable.
+    var blockNumber: Int? = nil
 
     // Optional receipt detail. Defaulted so the Chain client (which does not populate them yet)
     // keeps compiling; a nil field renders as an honest gap in the receipt, never a fake value.

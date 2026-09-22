@@ -29,10 +29,8 @@ enum Theme {
         static let accentText = Color(hex: 0x4A2BE0)   // text-safe deep violet for small brand text on white
         static let accentWash = Color(hex: 0xEDEAFF)   // faint violet wash for chips/haloes
 
-        // Home balance wash: soft lavender and warm pearl, fading into the canvas.
-        static let balanceLavender = Color(hex: 0xE8E2F8)
-        static let balancePearl = Color(hex: 0xF8F5F8)
-        static let balanceWarmth = Color(hex: 0xF8EBDC)
+        // Home header wash: one restrained lavender, fading into the white canvas.
+        static let balanceLavender = Color(hex: 0xEEEAFE)
 
         // Accent family (used sparingly, for meaning or category)
         static let lime = Color(hex: 0xADFF02)

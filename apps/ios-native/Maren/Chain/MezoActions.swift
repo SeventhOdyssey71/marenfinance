@@ -201,6 +201,7 @@ struct MezoActions {
             let client = EthereumHttpClient(url: chain.rpcURLs[0], network: .custom(String(chain.chainId)))
             let outcome = await Receipt.confirm(client: client, hash: hash, sponsored: false)
             await MezoSnapshotStore.shared.invalidate()  // cached reads are stale now
+            await ActivityHistoryStore.shared.invalidate()
             if case .delivered(let d) = outcome { return .ok(d) }
             return .failed(outcome)
         } catch {
@@ -489,6 +490,7 @@ struct MezoActions {
         // after a deposit could be served the PRE-transaction balance — the exact "it went
         // through but nothing moved" that the receipt-gating elsewhere exists to prevent.
         await MezoSnapshotStore.shared.invalidate()
+        await ActivityHistoryStore.shared.invalidate()
         if case .delivered(let d) = outcome { return .ok(d) }
         return .failed(outcome)
     }
@@ -585,6 +587,7 @@ struct MezoActions {
             let outcome = await Receipt.confirm(client: client, hash: accepted.hash, sponsored: true,
                                                 mintedIdFrom: mintedIdFrom)
             await MezoSnapshotStore.shared.invalidate()  // cached reads are stale now
+            await ActivityHistoryStore.shared.invalidate()
             if case .delivered(let d) = outcome { return .ok(d) }
             return .failed(outcome)
         } catch let refused as RelayRefused {
@@ -594,6 +597,7 @@ struct MezoActions {
                     let outcome = await Receipt.confirm(client: client, hash: hash, sponsored: true,
                                                         mintedIdFrom: mintedIdFrom)
                     await MezoSnapshotStore.shared.invalidate()
+                    await ActivityHistoryStore.shared.invalidate()
                     if case .delivered(let delivered) = outcome { return .ok(delivered) }
                     return .failed(outcome)
                 }

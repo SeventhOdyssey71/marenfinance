@@ -2,6 +2,138 @@ import Foundation
 import BigInt
 import web3
 
+// MARK: - Activity scan cache
+//
+// Mezo caps eth_getLogs at 10,000 blocks. A cold Activity load therefore reads four windows
+// across three contracts. Mined logs do not change, so repeating that entire crawl on every
+// tab visit only makes the UI slow. This store persists the covered range and re-reads the
+// latest 100 blocks for ordinary reorgs; concurrent Home/Activity loads share one task.
+
+actor ActivityHistoryStore {
+    static let shared = ActivityHistoryStore()
+    static let version = 1
+    static let reorgDepth = 100
+    static let maxRows = 50
+
+    struct Entry: Codable, Sendable {
+        let version: Int
+        let chainId: Int
+        let account: String
+        let contracts: [String]
+        let fromBlock: Int
+        let toBlock: Int
+        let items: [ActivityItem]
+    }
+
+    struct Plan: Sendable {
+        let fromBlock: Int
+        let reuse: Entry?
+    }
+
+    private struct Running {
+        let generation: Int
+        let task: Task<Entry, Error>
+    }
+
+    private var generation = 0
+    private var inFlight: [String: Running] = [:]
+
+    private static var directory: URL {
+        FileManager.default.urls(for: .cachesDirectory, in: .userDomainMask)[0]
+            .appendingPathComponent("maren-activity", isDirectory: true)
+    }
+
+    private static func key(chainId: Int, account: String) -> String {
+        "\(chainId)-\(account.lowercased())"
+    }
+
+    private static func fileURL(key: String) -> URL {
+        directory.appendingPathComponent("activity-\(key).json")
+    }
+
+    private static func read(key: String, chainId: Int, account: String,
+                             contracts: [String]) -> Entry? {
+        guard let data = try? Data(contentsOf: fileURL(key: key)),
+              let entry = try? JSONDecoder().decode(Entry.self, from: data),
+              entry.version == version, entry.chainId == chainId,
+              entry.account == account.lowercased(),
+              entry.contracts == contracts.map({ $0.lowercased() }),
+              entry.fromBlock >= 0, entry.toBlock >= entry.fromBlock
+        else { return nil }
+        return entry
+    }
+
+    private static func write(_ entry: Entry, key: String) {
+        try? FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        guard let data = try? JSONEncoder().encode(entry) else { return }
+        try? data.write(to: fileURL(key: key), options: .atomic)
+    }
+
+    func activity(chainId: Int, account: String, contracts: [String],
+                  fetch: @escaping @Sendable (Entry?) async throws -> Entry) async throws -> [ActivityItem] {
+        let cacheKey = Self.key(chainId: chainId, account: account)
+        if let running = inFlight[cacheKey], running.generation == generation {
+            return try await running.task.value.items
+        }
+
+        let cached = Self.read(key: cacheKey, chainId: chainId, account: account, contracts: contracts)
+        let startedAt = generation
+        let task = Task { try await fetch(cached) }
+        inFlight[cacheKey] = Running(generation: startedAt, task: task)
+        do {
+            let entry = try await task.value
+            if generation == startedAt {
+                Self.write(entry, key: cacheKey)
+                inFlight[cacheKey] = nil
+                return entry.items
+            }
+            // A transaction settled while this crawl was running. Do not let its older result
+            // repaint either Home or Activity; join the fresh incremental scan instead.
+            return try await activity(chainId: chainId, account: account,
+                                      contracts: contracts, fetch: fetch)
+        } catch {
+            if generation == startedAt { inFlight[cacheKey] = nil }
+            throw error
+        }
+    }
+
+    /// A confirmed write makes a scan already in flight stale. Keep its on-disk coverage as
+    /// the resume point, but prevent that task from being shared or overwriting the next scan.
+    func invalidate() {
+        generation += 1
+        inFlight.removeAll()
+    }
+
+    static func plan(cached: Entry?, coldFloor: Int, head: Int) -> Plan {
+        guard let cached,
+              cached.fromBlock <= coldFloor,
+              cached.toBlock <= head,
+              cached.toBlock + 1 >= coldFloor
+        else { return Plan(fromBlock: coldFloor, reuse: nil) }
+        return Plan(fromBlock: max(coldFloor, cached.toBlock - reorgDepth + 1), reuse: cached)
+    }
+
+    static func merged(reuse: Entry?, freshItems: [ActivityItem], fromBlock: Int,
+                       toBlock: Int, chainId: Int, account: String,
+                       contracts: [String]) -> Entry {
+        let kept = reuse?.items.filter { ($0.blockNumber ?? Int.max) < fromBlock } ?? []
+        let ordered = (kept + freshItems).sorted {
+            let left = $0.blockNumber ?? Int.min
+            let right = $1.blockNumber ?? Int.min
+            if left != right { return left > right }
+            return ($0.date ?? .distantPast) > ($1.date ?? .distantPast)
+        }
+        var seen = Set<String>()
+        let items = ordered.filter { seen.insert($0.id).inserted }.prefix(maxRows)
+        return Entry(
+            version: version, chainId: chainId, account: account.lowercased(),
+            contracts: contracts.map({ $0.lowercased() }),
+            fromBlock: min(reuse?.fromBlock ?? fromBlock, fromBlock), toBlock: toBlock,
+            items: Array(items)
+        )
+    }
+}
+
 // MARK: - MezoMarenClient
 //
 // The real Mezo implementation of `MarenClient`. Reads run against the public testnet RPC
@@ -498,19 +630,30 @@ struct MezoMarenClient: MarenClient {
             let items = rows.compactMap { Self.activityItem(from: $0) }
             if items.count == rows.count { return items }
         }
+        let contracts = [maren.marenVault, maren.marenPay, maren.marenEarn]
+        return try await ActivityHistoryStore.shared.activity(
+            chainId: chain.chainId, account: accountAddress, contracts: contracts
+        ) { cached in
+            try await scanActivity(contracts: contracts, cached: cached)
+        }
+    }
+
+    private func scanActivity(contracts: [String], cached: ActivityHistoryStore.Entry?) async throws -> ActivityHistoryStore.Entry {
         let acct = "0x" + String(accountAddress.dropFirst(2)).lowercased().leftPadded(to: 64)
         let names = Self.eventNamesByTopic
-        let contracts = [maren.marenVault, maren.marenPay, maren.marenEarn]
         let chainId = chain.chainId
 
         var lastError = "no endpoints"
         for url in chain.rpcURLs {
             do {
                 let head = try await EthereumHttpClient(url: url, network: .custom(String(chainId))).eth_blockNumber()
-                let floor = max(0, head - MEZO_MAX_LOG_RANGE * 4)
+                // Inclusive endpoints: +1 keeps this to exactly four 10k windows, rather
+                // than four windows plus a fifth one-block request.
+                let coldFloor = max(0, head - MEZO_MAX_LOG_RANGE * 4 + 1)
+                let plan = ActivityHistoryStore.plan(cached: cached, coldFloor: coldFloor, head: head)
 
                 var windows: [(Int, Int)] = []
-                var from = floor
+                var from = plan.fromBlock
                 while from <= head {
                     let to = min(head, from + MEZO_MAX_LOG_RANGE - 1)
                     windows.append((from, to))
@@ -540,7 +683,12 @@ struct MezoMarenClient: MarenClient {
 
                 let times = await Self.blockTimestamps(url: url, chainId: chainId,
                                                        blocks: Array(Set(mine.map { $0.block })))
-                return mine.compactMap { decodeActivity($0, account: acct, names: names, times: times) }
+                let fresh = mine.compactMap { decodeActivity($0, account: acct, names: names, times: times) }
+                return ActivityHistoryStore.merged(
+                    reuse: plan.reuse, freshItems: fresh, fromBlock: plan.fromBlock,
+                    toBlock: head, chainId: chainId, account: accountAddress,
+                    contracts: contracts
+                )
             } catch {
                 lastError = String(describing: error)
                 continue
@@ -608,7 +756,8 @@ struct MezoMarenClient: MarenClient {
         func btc(_ sign: String) -> String { "\(sign)\(MoneyFormat.btc(amount, unit: false)) BTC" }
         func row(_ kind: ActivityItem.Kind, _ title: String, _ subtitle: String, _ text: String) -> ActivityItem {
             ActivityItem(id: id, kind: kind, title: title, subtitle: subtitle, amount: text,
-                         date: r.timestamp, hash: r.txHash, memo: r.memo, counterparty: r.counterparty)
+                         date: r.timestamp, blockNumber: r.blockNumber, hash: r.txHash,
+                         memo: r.memo, counterparty: r.counterparty)
         }
         switch r.kind {
         case "Deposited":   return row(.deposit, "Deposited Bitcoin", "Vault collateral", btc("+"))
@@ -676,7 +825,8 @@ struct MezoMarenClient: MarenClient {
         func musd(_ sign: String) -> String { "\(sign)\(MoneyFormat.musd(amount))" }
         func btc(_ sign: String) -> String { "\(sign)\(MoneyFormat.btc(amount, unit: false)) BTC" }
         func row(_ kind: ActivityItem.Kind, _ title: String, _ subtitle: String, _ amountText: String) -> ActivityItem {
-            ActivityItem(id: id, kind: kind, title: title, subtitle: subtitle, amount: amountText, date: date)
+            ActivityItem(id: id, kind: kind, title: title, subtitle: subtitle,
+                         amount: amountText, date: date, blockNumber: log.block)
         }
 
         switch name {

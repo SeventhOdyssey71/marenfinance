@@ -11,6 +11,7 @@ struct ActivityView: View {
     @Environment(\.marenClient) private var client
     @Environment(\.marenActions) private var actions
     @Environment(\.isDemoData) private var isDemoData
+    @Environment(MarenSession.self) private var session
 
     private enum Phase: Equatable { case loading, loaded, failed(String) }
     @State private var phase: Phase = .loading
@@ -29,7 +30,16 @@ struct ActivityView: View {
                 if items.isEmpty { emptyState } else { list }
             }
         }
-        .task { await load() }
+        .task {
+            // Home persists the last confirmed rows. Reuse them for the first Activity paint
+            // instead of showing a skeleton while the incremental chain refresh runs.
+            if items.isEmpty, let address = session.address,
+               let cached = HomeCache.load(address: address), !cached.activity.isEmpty {
+                items = cached.activity
+                phase = .loaded
+            }
+            await load()
+        }
         .refreshOnSettle { await load() }
         .sheet(item: $selected) { ReceiptDetail(item: $0) }
     }
