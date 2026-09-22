@@ -1,15 +1,17 @@
 # Production and grant readiness
 
-Latest hosted status: [14 September deployment report](TESTNET-DEPLOYMENT-2026-09-14.md).
-Web/backend changes have been deployed; the new TestFlight upload is blocked by
-GitHub billing. The analysis below includes the prior candidate assessment.
+Latest status: [22 September borrowing recovery](releases/borrowing-recovery-2026-09-22.md).
+The web app and relayer updates are deployed. The keeper refinance is confirmed in
+block 15,695,381, followed by a confirmed public sponsored borrow, full repayment
+and withdrawal. Apple accepted native build 9; processing and tester availability still need confirmation. The earlier GitHub billing block did not prevent this
+new workflow from starting. Contract source accounting fixes still require migration.
 
 Reviewed 13 September 2026 against local source at `d349a22` plus the uncommitted
 hardening changes described below. The current release checklist and rollout order
 are in [TESTNET-RELEASE.md](TESTNET-RELEASE.md). This is the broader execution checklist;
 older dated product plans and internal assessments are historical context.
 
-**The next release is a dependable iOS testnet pilot. Mainnet remains gated on an
+**The next release is a dependable web and iOS testnet pilot. Mainnet remains gated on an
 independent audit and operational readiness.** Mezo's developer FAQ describes a
 live testnet MVP as the starting point for its Founder Program. Application
 eligibility and safe custody of mainnet funds are separate gates.
@@ -21,14 +23,14 @@ eligibility and safe custody of mainnet funds are separate gates.
 | ----------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | Contracts   | Five matsnet addresses in `packages/sdk/src/addresses.ts`; mainnet Maren addresses are zero. Local source contains changes beyond the original deployment, so source tests do not prove deployed bytecode parity.                                                    |
 | iOS         | Native SwiftUI, live reads/writes, links, requests, handle registration, Keychain signing, and encoding golden tests. Public TestFlight invite is configured. Fresh installation, restoration, and the current distributed binary still require device verification. |
-| Web         | Public `/`, `/docs`, and `/claim` respond. `/app` and its children intentionally return 404 unless `MAREN_WEB_APP_ENABLED=true`. Do not advertise the dashboard as the current public product.                                                                       |
+| Web         | Public `/`, `/docs`, `/claim`, `/app` and finance/payment routes are active. Public browser checks, live pool reads and relayer-origin access passed on 22 September.                                                                                                |
 | Relayer     | Cloudflare testnet `/healthz` reports accepting, chain 31611, durable quota store, one instance, and no boot problems. This endpoint reads process/quota state; it does not demonstrate a recent successful chain transaction.                                       |
 | Sponsorship | Both clients have relay submission paths. Deposits, approvals when required, and link creation can require user-paid BTC. Do not describe every action as gasless.                                                                                                   |
 | Earn        | Stability Pool wrapper, exposure and trailing-yield code exist. Mainnet deposit access, exit behavior, and real swap-router integration need verification before choosing the mainnet backend.                                                                       |
 | Activity    | Goldsky subgraph source exists, but `MAREN_SUBGRAPH_URL` is empty in the iOS plist. The RPC log fallback remains active. The subgraph remains outside the pnpm workspace; a separate CI job now generates and builds it.                                             |
 | Metrics     | Existing aggregation measures funded positions and whether borrowers subsequently pay. The 7 September figures in the public roadmap are a tiny test cohort, including team accounts; they are not independent demand evidence.                                      |
 
-## Changes and verification
+## Historical candidate verification — 13 September
 
 The finalization pass added durable relay intent and quota recovery, safe client
 handling for uncertain submissions, stricter wallet/claim/deep-link recovery,
@@ -49,13 +51,13 @@ to an account billing/spending-limit failure, confirmed through their annotation
 
 ## M0: finish the pilot release
 
-1. Complete the release candidate's local gates in TESTNET-RELEASE.md, including
+1. Local gates and hosted web/backend rollout completed on 22 September; retain
    durable recovery and cross-client claim handling. Keep one coordination object
    per relay signer. The durable path resends identical signed bytes and retains
    unresolved reservations; it deliberately does not replace pending transactions.
-2. Roll out the verified candidate in the documented order. Drain the old relay's
-   in-memory transactions/refunds first: a new journal cannot reconstruct them.
-   Observe actual Cloudflare alarm/restart recovery before opening the pilot.
+2. Keep the deployed durable journal and signer together during subsequent rollouts.
+   Zero pending transactions/refunds and preserved namespace were verified on 22 September.
+   Retain the runtime restart/alarm regressions and observe live settlement after changes.
 3. Exercise the distributed TestFlight build on physical devices using two
    independent wallets. Record build number and public transaction receipts for
    deposit, borrow, pay, claim, request, repay, withdrawal, and Earn exit. Include

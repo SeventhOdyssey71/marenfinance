@@ -1,5 +1,10 @@
 # Testnet release candidate
 
+Current release: [22 September borrowing recovery](releases/borrowing-recovery-2026-09-22.md).
+The web app is active, relayer updates are deployed, and the keeper refinance is
+confirmed. The sections below preserve the older candidate plan and its historical
+results; use the linked recovery report for current transaction and distribution evidence.
+
 Date: 13 September 2026. Baseline `d349a22` plus local uncommitted changes.
 
 Deployment update, 14 September: the web and backend rollout is recorded in

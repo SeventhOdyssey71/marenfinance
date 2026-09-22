@@ -71,8 +71,8 @@ deployment block is `null`, which callers must handle as unavailable rather than
 
 The browser and borrowing recovery candidate is documented in the
 [22 September recovery report](docs/releases/borrowing-recovery-2026-09-22.md).
-Live borrowing still requires a keeper refinance and a confirmed public borrower transaction.
-Native fixes need a new TestFlight upload; simulator validation does not update the beta.
+Keeper refinance and a public sponsored borrow, full repayment and collateral withdrawal are confirmed.
+Apple accepted native build 9 on 22 September; processing and tester availability still need confirmation.
 The [14 September deployment report](docs/TESTNET-DEPLOYMENT-2026-09-14.md)
 records the previous deployment and its then-observed GitHub billing block.
 

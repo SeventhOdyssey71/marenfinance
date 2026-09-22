@@ -1,0 +1,192 @@
+{
+  "app": "Maren",
+  "bundleId": "finance.maren.app",
+  "approvedNativeCommit": "ebd7aac7e9272e4f828c048de4cb05431bcd553a",
+  "dispatchedRef": "release/borrowing-recovery-2026-09-22",
+  "dispatchedSha": "a3ad572cb1fa686098f50595deb2f4dfe9ad969b",
+  "nativeAndWorkflowIdenticalToApprovedCommit": true,
+  "workflow": "ios-testflight.yml",
+  "uploadRequested": true,
+  "whatToTest": "Corrected testnet borrowing limits, direct-position guards and repayment allowance handling.",
+  "runId": 35700326753,
+  "runNumber": 9,
+  "runUrl": "https://github.com/SeventhOdyssey71/marenfinance/actions/runs/35700326753",
+  "createdAt": "2026-09-22T07:35:00Z",
+  "status": "completed",
+  "appStoreUploadAccepted": true,
+  "processingVerified": false,
+  "testFlightAvailabilityVerified": false,
+  "notes": [
+    "Apple altool accepted build 9; no second upload was dispatched.",
+    "Apple processing completion, TestFlight tester availability, and What to Test metadata publication were not verified.",
+    "The supplied What to Test note is recorded in the workflow summary; this workflow does not publish that note to App Store Connect.",
+    "Workflow-only commit 29f1e7bb38706b2359c56a3b8b41187b461eb19a prepares future build-number selection from App Store Connect; it was not needed for this successful upload."
+  ],
+  "conclusion": "success",
+  "updatedAt": "2026-09-22T07:52:11Z",
+  "buildNumber": "9",
+  "uploadAcceptedAt": "2026-09-22T07:52:04Z",
+  "deliveryUuid": "7149c0f9-55e4-4541-981d-336a44829106",
+  "acceptanceEvidence": [
+    "2026-09-22T07:52:04.3407210Z No errors uploading archive at '/Users/runner/work/_temp/export/Maren.ipa'.",
+    "2026-09-22T07:52:04.3504590Z UPLOAD SUCCEEDED with no errors",
+    "2026-09-22T07:52:04.3606210Z Delivery UUID: 7149c0f9-55e4-4541-981d-336a44829106"
+  ],
+  "jobs": [
+    {
+      "name": "Test (simulator)",
+      "id": 106656551526,
+      "status": "completed",
+      "conclusion": "success",
+      "startedAt": "2026-09-22T07:35:08Z",
+      "completedAt": "2026-09-22T07:43:55Z",
+      "steps": [
+        {
+          "name": "Set up job",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "Run actions/checkout@v4",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "Show toolchain",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "Install XcodeGen",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "Generate project",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "Resolve a simulator",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "Test",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "Release build (simulator, unsigned)",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "Assert no fabricated data in the Release binary",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "Post Run actions/checkout@v4",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "Complete job",
+          "status": "completed",
+          "conclusion": "success"
+        }
+      ]
+    },
+    {
+      "name": "Archive and upload",
+      "id": 106658991758,
+      "status": "completed",
+      "conclusion": "success",
+      "startedAt": "2026-09-22T07:44:04Z",
+      "completedAt": "2026-09-22T07:52:10Z",
+      "steps": [
+        {
+          "name": "Set up job",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "Run actions/checkout@v4",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "Require the iOS 26 SDK or later",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "Install XcodeGen",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "Generate project",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "Import signing certificate",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "Install provisioning profile",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "Write App Store Connect API key",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "Archive",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "Export ipa",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "Upload the .ipa as a workflow artifact",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "Upload to TestFlight",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "Summary",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "Clean up secrets on the runner",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "Post Run actions/checkout@v4",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "Complete job",
+          "status": "completed",
+          "conclusion": "success"
+        }
+      ]
+    }
+  ]
+}
