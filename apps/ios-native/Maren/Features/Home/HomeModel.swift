@@ -60,7 +60,13 @@ final class HomeModel {
         // The four screen-critical reads all draw from ONE batched multicall, so awaiting
         // them costs a single round trip between them.
         if let value = try? await account { self.account = value }
-        if let value = try? await position { self.position = value }
+        // Track the position read specifically. Keeping the last good value on failure is
+        // right, but with nothing cached there IS no last good value, and the screen then sat
+        // on "Loading your position…" forever with no error and no retry — the codebase
+        // already documents Mezo's public RPCs as transiently flaky, so this is a normal
+        // first-run outcome, not an exotic one. Activity got this right; Home did not.
+        var positionUnavailable = false
+        if let value = try? await position { self.position = value } else { positionUnavailable = true }
         if let value = try? await balances { self.balances = value }
         if let value = try? await price { self.priceFeed = value }
 
@@ -69,7 +75,11 @@ final class HomeModel {
         // gate `.loaded`, so the balance sat behind a history scan it does not depend on. The
         // crawl is already in flight from the `async let` above; it lands a moment later and
         // fills the list in place.
-        phase = .loaded
+        // Only a failed read with nothing to fall back on is a failure. A failed refresh over
+        // cached data stays `.loaded` and keeps showing the stale figures, which is the point.
+        phase = positionUnavailable && self.position == nil
+            ? .failed("Mezo did not answer. Your funds are safe on-chain — this is only the read.")
+            : .loaded
 
         if let value = try? await activity { self.activity = value }
 

@@ -220,6 +220,8 @@ private struct VaultSection: View {
                 gas: .youPayBtc,
                 submitTitle: "Deposit Bitcoin",
                 makeIntent: { Intent(kind: .deposit, amount: $0, unit: .btc) },
+                fundingPrompt: "A deposit moves your own Bitcoin, so you send it and pay the "
+                    + "network fee yourself. Maren cannot sponsor a transaction that carries value.",
                 reviewRows: { amt in
                     var rows = [ReviewRow(label: "Bitcoin deposited", value: MoneyFormat.btc(amt))]
                     if let locked = p?.bitcoinLocked {

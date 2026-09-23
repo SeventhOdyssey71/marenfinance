@@ -30,6 +30,11 @@ struct AmountFlowConfig {
     /// consequence used to appear for the first time on the review screen — after the number
     /// had already been chosen.
     var liveRisk: ((Decimal) -> LiquidationRisk?)? = nil
+    /// Set on flows whose balance can only be topped up from outside the app — today that
+    /// means BTC. When the available balance is zero this replaces the keypad with a funding
+    /// path, because no amount would have been valid anyway. The string says why THIS flow
+    /// needs it; flows funded from inside Maren (MUSD from a borrow) leave it nil.
+    var fundingPrompt: String? = nil
     /// The review rows to state back before submitting.
     let reviewRows: (Decimal) -> [ReviewRow]
 }
@@ -37,6 +42,7 @@ struct AmountFlowConfig {
 struct SingleAmountFlow: View {
     let config: AmountFlowConfig
     @Environment(\.marenActions) private var actions
+    @Environment(MarenSession.self) private var session
     @Environment(\.dismiss) private var dismiss
 
     private enum Stage { case amount, review, submitting, done }
@@ -48,6 +54,10 @@ struct SingleAmountFlow: View {
     private var unitLabel: String { isMusd ? "MUSD" : "BTC" }
     private var amount: Decimal? { Decimal(string: raw.isEmpty ? "0" : raw) }
     private var overMax: Bool { if let a = amount, let m = config.available { return a > m }; return false }
+    /// Nothing to spend and no way to get any from inside this screen. Entering an amount is
+    /// pointless here — every value is over the maximum — so the screen offers funding instead
+    /// of a keypad wired to a permanently disabled Review.
+    private var needsFunding: Bool { config.fundingPrompt != nil && (config.available ?? 0) <= 0 }
     private var amountValid: Bool { (amount ?? 0) > 0 && !overMax && (!config.requiresAvailable || config.available != nil) }
 
     var body: some View {
@@ -83,6 +93,20 @@ struct SingleAmountFlow: View {
     private var amountStage: some View {
         VStack(spacing: Theme.Space.md) {
             header(config.navTitle)
+            if needsFunding, let why = config.fundingPrompt {
+                ScrollView {
+                    FundingNeeded(address: session.address, because: why)
+                        .padding(.horizontal, Theme.Space.md)
+                        .padding(.top, Theme.Space.md)
+                }
+            } else {
+                amountEntry
+            }
+        }
+    }
+
+    private var amountEntry: some View {
+        VStack(spacing: Theme.Space.md) {
             Spacer(minLength: 0)
             AmountReadout(raw: raw, unitLabel: unitLabel,
                           prefix: isMusd ? "$" : "")
