@@ -97,10 +97,30 @@ struct MezoActions {
         return padded <= BigUInt(MAX_RELAY_GAS) ? padded : nil
     }
 
+    /// THE ESTIMATE FOR `deposit` IS STRUCTURALLY UNTRUSTWORTHY. `MarenVault.deposit` wraps
+    /// `addColl` in `_tryPushCollateral`, whose catch leaves the BTC idle instead of
+    /// reverting. So the cheap fallback always succeeds, `eth_estimateGas` prices THAT, and
+    /// a limit derived from it guarantees the push fails. The estimator returns ~294k against
+    /// the live chain; the push needs far more. This is a fixed point that resolves to the
+    /// wrong branch every time, and it is silent — the deposit still returns success.
+    ///
+    /// It ran for five weeks. Trove collateral was 0.069061 BTC on 18 August and still
+    /// 0.069061 BTC on 22 September while idle grew to 0.212 BTC, which left the pooled
+    /// trove at 183% ICR against its own 180% borrow floor and capped pool-wide borrowing at
+    /// ~159 MUSD. Every collateral figure looked healthy throughout.
+    ///
+    /// The floor therefore has to be sized from the PUSH path, independently of the estimate.
+    /// Measured against the live 233-trove sorted list, `topUpCollateral` — which is
+    /// `_syncState` + `_price` + `addColl` plus overhead, i.e. the same work — costs 716,827
+    /// gas for a small amount and 983,223 for a large one. A deposit adds share minting on
+    /// top, and EIP-150 forwards only 63/64 of what remains to the inner call. 1.2M clears
+    /// all of that with room for the list to grow.
+    ///
+    /// Over-provisioning is close to free: gas is refunded if unused, and at Mezo's observed
+    /// 146 wei the whole limit is ~0.00000018 BTC. Under-provisioning costs a silent failure
+    /// nobody notices for a month, so the asymmetry is not close.
     static func depositGasLimit(directEstimate: BigUInt) -> BigUInt {
-        // Deposits catch an unsuccessful collateral push and may leave BTC idle. Preserve
-        // the existing 500k floor so an estimate of that cheaper branch cannot lower it.
-        max(BigUInt(500_000), directEstimate + directEstimate / 4 + 30_000)
+        max(BigUInt(1_200_000), directEstimate + directEstimate / 4 + 30_000)
     }
 
     /// Submit a sponsored `pay` to `to`. Face ID → build calldata → sign ForwardRequest →
@@ -204,6 +224,8 @@ struct MezoActions {
             await ActivityHistoryStore.shared.invalidate()
             if case .delivered(let d) = outcome { return .ok(d) }
             return .failed(outcome)
+        } catch let rejection as SelfPaidRejected {
+            return .declined(reason: rejection.readable)
         } catch {
             return .declined(reason: prepFailed)
         }
@@ -266,6 +288,8 @@ struct MezoActions {
             }
             let data = try MarenEncoding.claimLinkCalldata(linkId: BigUInt(linkId), recipient: loadedAddress, signature: sigData)
             return await relayCall(privateKey: key, loadedAddress: loadedAddress, to: maren.marenPay, data: data)
+        } catch let rejection as SelfPaidRejected {
+            return .declined(reason: rejection.readable)
         } catch {
             return .declined(reason: prepFailed)
         }
@@ -535,6 +559,12 @@ struct MezoActions {
             let client = EthereumHttpClient(url: chain.rpcURLs[0], network: .custom(String(chain.chainId)))
             if case .delivered = await Receipt.confirm(client: client, hash: hash, sponsored: false) { return nil }
             return "The one-time MUSD approval has not confirmed. It may still settle and spend BTC gas. The payment has not been submitted. Check the approval on the explorer before retrying: \(hash)"
+        } catch let rejection as SelfPaidRejected {
+            // The most common first-run failure in the whole app: this approve is self-paid
+            // and runs before every "gasless" payment, so a wallet with no BTC lands here.
+            // Give it the node's actual reason rather than the generic line, and never the
+            // explorer link above — that hash was never broadcast.
+            return rejection.readable
         } catch {
             return "The one-time MUSD approval could not be submitted, so nothing was sent."
         }
@@ -604,6 +634,8 @@ struct MezoActions {
                 return .failed(.submissionUnknown(reason: refused.reason.detail))
             }
             return .declined(reason: refused.reason.detail)
+        } catch let rejection as SelfPaidRejected {
+            return .declined(reason: rejection.readable)
         } catch {
             return .declined(reason: prepFailed)
         }
@@ -625,8 +657,53 @@ struct MezoActions {
         // Establish the identity BEFORE external submission. Even a lost RPC response leaves
         // a real hash to reconcile; never misclassify an attempted broadcast as a decline.
         let hash = raw.web3.keccak256.web3.hexString
-        _ = try? await client.networkProvider.send(method: "eth_sendRawTransaction",
-                                                   params: [raw.web3.hexString], receive: String.self)
+        do {
+            _ = try await client.networkProvider.send(method: "eth_sendRawTransaction",
+                                                      params: [raw.web3.hexString], receive: String.self)
+        } catch JSONRPCError.executionError(let result) {
+            // A NODE REJECTION IS A FACT, NOT AN AMBIGUITY. This used to be `try?`, which
+            // reconciled a lost response and a definitive refusal into the same silence: the
+            // locally-derived hash was returned either way, `Receipt.confirm` then polled a
+            // transaction that had never been broadcast for the full 60 seconds, and the user
+            // was told it "may still land" and handed an explorer link to nothing.
+            //
+            // That is the first thing a new tester meets, because the one-time MUSD approve
+            // runs self-paid before every "gasless" payment — so an empty BTC balance, the
+            // expected state of a fresh wallet, produced a minute of spinner and a fabricated
+            // hash instead of "you need testnet BTC for gas". Web already got this right.
+            //
+            // `executionError` is the node answering; anything else below is the network
+            // failing to deliver an answer, where the old reconciliation logic is still right.
+            throw SelfPaidRejected(detail: result.error.message)
+        }
         return hash
+    }
+}
+
+/// A self-paid broadcast the node refused outright. Nothing was sent and no gas was spent,
+/// so the caller can decline plainly instead of reporting an uncertain outcome.
+struct SelfPaidRejected: Error {
+    let detail: String
+
+    /// The rejections a tester actually provokes, in their words rather than the node's.
+    /// Anything unrecognised keeps the node's own message, which is still more use than
+    /// "the transaction could not be prepared".
+    var readable: String {
+        let d = detail.lowercased()
+        if d.contains("insufficient funds") {
+            return "This wallet does not hold enough BTC to pay the gas for this. "
+                 + "Deposits, approvals and Earn are paid by you, not sponsored."
+        }
+        if d.contains("nonce too low") || d.contains("already known") || d.contains("replacement") {
+            return "A transaction from this wallet is already in flight. "
+                 + "Wait for it to confirm before trying again."
+        }
+        if d.contains("underpriced") || d.contains("fee too low") {
+            return "The network raised its fee while this was being prepared. Try again."
+        }
+        if d.contains("intrinsic gas") || d.contains("exceeds block gas limit") {
+            return "This transaction is too large for the network to accept."
+        }
+        return detail
     }
 }

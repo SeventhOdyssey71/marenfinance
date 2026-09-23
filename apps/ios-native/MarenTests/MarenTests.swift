@@ -744,6 +744,48 @@ final class TestnetFinalizationTests: XCTestCase {
         }
     }
 
+    func testUpstreamErrorIsOnlyCertainWhenTheRelayerSaysNothingWasSubmitted() {
+        // The relayer raises UPSTREAM_ERROR both from `simulationFailure` (nothing sent) and
+        // from a failed receipt read (already broadcast). Only its own wording separates them,
+        // so the status code alone must never be enough to tell someone to retry a payment.
+        let certain = relay.failureReason(status: 502, code: "UPSTREAM_ERROR",
+                                          detail: "could not complete simulation; no transaction was submitted")
+        XCTAssertFalse(certain.submissionMayExist)
+        XCTAssertTrue(certain.detail.contains("never submitted"))
+
+        let ambiguous = relay.failureReason(status: 502, code: "UPSTREAM_ERROR",
+                                            detail: "could not read the transaction receipt")
+        XCTAssertTrue(ambiguous.submissionMayExist)
+    }
+
+    func testGasCapIsReportedAsSizeNotAsUnsupported() {
+        let reason = relay.failureReason(status: 403, code: "GAS_LIMIT_TOO_HIGH")
+        XCTAssertFalse(reason.submissionMayExist)
+        XCTAssertTrue(reason.title.contains("too large"))
+        XCTAssertFalse(reason.detail.contains("not one of them"))
+    }
+
+    func testNodeRejectionsAreTranslatedRatherThanSwallowed() {
+        // The first thing a fresh wallet hits: the self-paid MUSD approve with no BTC.
+        let broke = SelfPaidRejected(detail: "insufficient funds for gas * price + value")
+        XCTAssertTrue(broke.readable.contains("does not hold enough BTC"))
+        XCTAssertTrue(SelfPaidRejected(detail: "nonce too low").readable.contains("already in flight"))
+        XCTAssertTrue(SelfPaidRejected(detail: "transaction underpriced").readable.contains("raised its fee"))
+        // Anything unrecognised keeps the node's own words rather than a generic line.
+        XCTAssertEqual(SelfPaidRejected(detail: "some novel refusal").readable, "some novel refusal")
+    }
+
+    func testMusdShortfallMatchDoesNotClaimEveryInsufficientRevert() {
+        // "insufficient allowance" is not a MUSD balance problem; the old broad match caught
+        // it and told the user they were short of MUSD. Checked through the public surface.
+        let allowance = relay.failureReason(status: 422, code: "SIMULATION_REVERTED",
+                                            detail: "ERC20: insufficient allowance")
+        XCTAssertFalse(allowance.detail.contains("not enough MUSD"))
+        let shortfall = relay.failureReason(status: 422, code: "SIMULATION_REVERTED",
+                                            detail: "MarenPay: doesnt have enough musd")
+        XCTAssertTrue(shortfall.detail.contains("not enough MUSD"))
+    }
+
     func testExplicitPreBroadcastRefusalsRemainDeclines() {
         for code in ["SIMULATION_REVERTED", "INVALID_SIGNATURE", "GLOBAL_DAILY_BUDGET_EXHAUSTED"] {
             XCTAssertFalse(relay.failureReason(status: 400, code: code).submissionMayExist)
@@ -1003,8 +1045,12 @@ extension VaultTransactionPreparationTests {
     }
 
     func testDepositKeepsItsExistingFloorForCaughtInnerCallFailure() {
-        XCTAssertEqual(MezoActions.depositGasLimit(directEstimate: 100_000), BigUInt(500_000))
-        XCTAssertEqual(MezoActions.depositGasLimit(directEstimate: 600_000), BigUInt(780_000))
+        // The floor must dominate the estimate: `eth_estimateGas` prices the idle fallback
+        // (~294k live), and anything derived from it silently skips the collateral push.
+        XCTAssertEqual(MezoActions.depositGasLimit(directEstimate: 100_000), BigUInt(1_200_000))
+        XCTAssertEqual(MezoActions.depositGasLimit(directEstimate: 294_000), BigUInt(1_200_000))
+        // Above the floor the estimate still wins, so a genuinely expensive push is funded.
+        XCTAssertEqual(MezoActions.depositGasLimit(directEstimate: 1_200_000), BigUInt(1_530_000))
     }
 }
 

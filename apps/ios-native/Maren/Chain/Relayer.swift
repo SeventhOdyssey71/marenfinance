@@ -182,7 +182,8 @@ struct Relayer {
         if d.contains("oracle is stale") || d.contains("pricefeed") {
             return "Mezo's price feed is older than the 60 seconds the protocol accepts, so it refused the call. Try again shortly."
         }
-        if d.contains("doesnt have enough musd") || d.contains("insufficient") {
+        if d.contains("doesnt have enough musd") || d.contains("insufficient musd")
+            || d.contains("musd balance") {
             return "There is not enough MUSD in the account to cover this."
         }
         return nil
@@ -214,8 +215,14 @@ struct Relayer {
         case "INVALID_SIGNATURE", "SIGNER_MISMATCH":
             return RelayReason(name: code, title: "The relayer would not accept that signature",
                 detail: "What arrived did not match what your wallet signed, so it was refused. \(ns)")
+        case "GAS_LIMIT_TOO_HIGH", "CALLDATA_TOO_LARGE":
+            // Distinct from the allowlist below: this call IS sponsored, it is simply larger
+            // than the relayer will pay for. Telling someone their supported action is not
+            // supported sends them looking for the wrong thing.
+            return RelayReason(name: code, title: "This action is too large to sponsor",
+                detail: "Maren sponsors this kind of action, but this one needs more gas than the relayer will pay for. \(ns) A smaller amount usually fits, or you can send it yourself.")
         case "TARGET_NOT_ALLOWED", "SELECTOR_NOT_ALLOWED", "CALLDATA_UNDECODABLE", "VALUE_NOT_PERMITTED",
-             "GAS_LIMIT_TOO_HIGH", "CALLDATA_TOO_LARGE", "MALFORMED_REQUEST", "UNSUPPORTED_CHAIN":
+             "MALFORMED_REQUEST", "UNSUPPORTED_CHAIN":
             return RelayReason(name: code, title: "Maren does not sponsor this action",
                 detail: "The relayer only forwards a fixed set of calls to Maren's own contracts, and this is not one of them. \(ns) You can send it yourself.")
         case "SIMULATION_REVERTED":
@@ -226,6 +233,15 @@ struct Relayer {
             }
             return RelayReason(name: code, title: "This would have failed on-chain",
                 detail: "The relayer ran the call against Mezo before paying for it and it reverted, so it was never broadcast. \(ns)")
+        case "UPSTREAM_ERROR" where (detail ?? "").contains("no transaction was submitted"):
+            // 502 ALONE IS NOT ENOUGH, which is why this matches on the detail. The relayer
+            // raises UPSTREAM_ERROR from two places: `simulationFailure`, which cannot have
+            // submitted anything, and a failure to read a receipt, which happens AFTER
+            // broadcast. Treating every 502 as safe-to-retry would tell someone to re-send a
+            // payment that is already on chain, so only the relayer's own "no transaction was
+            // submitted" wording earns the definite answer. Everything else stays uncertain.
+            return RelayReason(name: code, title: "Mezo could not be reached",
+                detail: "The relayer could not reach the network to check this, so it was never submitted. \(ns) Try again.")
         case "SUBMISSION_FAILED", "SUBMISSION_UNCERTAIN", "SUBMISSION_UNKNOWN":
             return Self.uncertainResponse
         default:
