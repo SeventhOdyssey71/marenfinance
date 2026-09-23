@@ -48,11 +48,11 @@ pnpm install
     testnet.
 
     <Note>
-      `/app` is served in **local development only**. It is switched off on
-      `marenfinance.vercel.app`, where `/app/*` returns 404 by design while the launch is
-      mobile-first — the iOS TestFlight beta is the shipping client. The documentation site is the
-      public surface today. The dev script also pins port 3000; pass `--port` to `next dev`
-      directly if that port is taken.
+      `/app` is served in production too, not only locally:
+      [www.marenfinance.xyz/app](https://www.marenfinance.xyz/app) returns HTTP 200 and the web app
+      is live and functional against matsnet (checked 2026-09-23). The iOS TestFlight beta is the
+      other shipping client, not a replacement for it. The dev script pins port 3000; pass `--port`
+      to `next dev` directly if that port is taken.
     </Note>
   </Tab>
   <Tab title="Contracts">

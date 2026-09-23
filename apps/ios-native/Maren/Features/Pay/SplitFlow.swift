@@ -108,6 +108,14 @@ struct SplitFlow: View {
             ReviewRow(label: shortRecipient($0.recipient), value: MoneyFormat.musd($0.amount))
         })
         GasNote(mode: .sponsored)
+        // Split runs `ensureMusdAllowance` like Send and repay do, so a first-time splitter
+        // pays a self-paid approval before the sponsored split — which the Gasless note alone
+        // implies they will not. Send discloses it; this screen did not.
+        Text("Your first payment needs a one-time, uncapped MUSD approval that you pay in BTC.")
+            .font(.text(12))
+            .foregroundStyle(Theme.Palette.tertiary)
+            .padding(.horizontal, Theme.Space.md)
+            .fixedSize(horizontal: false, vertical: true)
         SubmitBar(title: "Send to \(validLegs.count)", submitting: stage == .submitting) {
             Task { await submit() }
         }

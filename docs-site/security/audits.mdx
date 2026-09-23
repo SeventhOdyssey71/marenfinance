@@ -17,8 +17,18 @@ is private during the grant review and opens with the paid audit.
   **The fixes below are fixed in source, not on chain.** The contract deployed to matsnet
   (`0x46252B00…645b`) predates the redemption splitter: `reconcileRedemption`, `settleRedemption`,
   `collateralOf` and `redemptionShortfall` are all absent from its dispatch table, verifiable with
-  `cast code`. Until that build is replaced, a redemption against the pooled trove would go
+  `cast code` (re-checked against `0x46252B00…645b` on 2026-09-23: all six splitter selectors
+  absent). Until that build is replaced, a redemption against the pooled trove would go
   unreconciled. Only testnet BTC is exposed. Redeploying is a prerequisite for any mainnet claim.
+
+  **The pending-redistribution fix is also source-only.** Mezo's `getEntireDebtAndColl` already
+  includes pending redistributions in its first three return values; the final three describe that
+  same subset rather than additional balances. Counting both double-counts a redistribution. This is
+  corrected in `MarenVault._troveCollAndNetDebt` in source and in the web and native readers, but
+  the **deployed vault still runs the previous accounting code**. Pending redistribution values were
+  zero when this was found, so nothing was actually mis-stated on matsnet, and the vault is
+  immutable by design, so the fix ships only with a redeployment and a migration plan for existing
+  positions.
 </Warning>
 
 ## The three audits

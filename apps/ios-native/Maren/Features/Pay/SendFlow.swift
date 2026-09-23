@@ -122,7 +122,10 @@ struct SendFlow: View {
             )
             .padding(.horizontal, Theme.Space.md)
             if isHandle { handlePreview.padding(.horizontal, Theme.Space.md) }
-            Text("Maren sponsors the payment gas when available. Your first payment may need a separate MUSD approval paid with BTC.")
+            // The approval is `type(uint256).max` (MezoActions.approveCalldata). Saying only
+            // "an approval" while granting an unlimited allowance is the kind of omission this
+            // app does not make elsewhere, so the copy names it.
+            Text("Payments are sponsored. The first one needs a one-time MUSD approval that you pay in BTC. It is uncapped, which is what keeps every payment after it gasless.")
                 .font(.text(13)).foregroundStyle(Theme.Palette.tertiary)
                 .padding(.horizontal, Theme.Space.md)
             Spacer()

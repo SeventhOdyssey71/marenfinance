@@ -262,7 +262,7 @@ private struct VaultSection: View {
             return AmountFlowConfig(
                 navTitle: "Repay MUSD",
                 unit: .musd,
-                explainer: p?.usesPooledVault == true ? "Reduces your debt and raises your collateral ratio. The first repayment may need a token approval paid with a small amount of Bitcoin; the repayment itself is sponsored." : "Repayment here is for Maren pooled loans. Manage direct Mezo loans in Mezo; refresh if your pooled position is unavailable.",
+                explainer: p?.usesPooledVault == true ? "Reduces your debt and raises your collateral ratio. The repayment is sponsored; the first one needs a one-time, uncapped MUSD approval that you pay in BTC." : "Repayment here is for Maren pooled loans. Manage direct Mezo loans in Mezo; refresh if your pooled position is unavailable.",
                 presets: [500, 1_000],
                 available: p?.usesPooledVault == true ? model.balances?.musd : nil,
                 availableLabel: "Your MUSD balance",

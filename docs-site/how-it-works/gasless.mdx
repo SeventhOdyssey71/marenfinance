@@ -61,6 +61,11 @@ the same frame, bubbling any inner revert, so fee and work settle together or ne
   carries BTC as `msg.value`, which this relay path cannot carry. Every BTC deposit needs user-paid
   gas. Other actions are sponsored only if their selector is allowed and the relayer is available;
   link creation and approvals can require user-paid gas too.
+
+**Earn is not sponsored either.** `MarenEarn` is not an allowlisted relay target: the relayer's
+`/health` reports exactly three — `marenPay`, `marenRegistry` and `marenVault`. Both
+`MarenEarn.deposit()` and `MarenEarn.withdraw()` are therefore user-paid, in BTC, every time.
+
 </Warning>
 
 The relayer's guarantees are narrow and worth stating precisely. It relays only to Maren

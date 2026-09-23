@@ -54,26 +54,6 @@
           }
         ]
       }
-    ],
-    "global": {
-      "anchors": [
-        {
-          "anchor": "GitHub",
-          "href": "https://github.com/SeventhOdyssey71/marenfinance",
-          "icon": "github"
-        }
-      ]
-    }
-  },
-  "navbar": {
-    "primary": {
-      "type": "github",
-      "href": "https://github.com/SeventhOdyssey71/marenfinance"
-    }
-  },
-  "footer": {
-    "socials": {
-      "github": "https://github.com/SeventhOdyssey71/marenfinance"
-    }
+    ]
   }
 }

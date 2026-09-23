@@ -6,16 +6,23 @@ description: "Deposit, borrow, repay, and withdraw against Bitcoin, with health 
 Borrowing is the core mechanic underneath the money app: deposit BTC, draw MUSD against it, and
 get all your Bitcoin back when you repay. Health is shown as a plain number with a plain meaning.
 
-<Warning>
-  **Known gap, pre-audit, and it is the one place an offered action can still revert.** The borrow
-  ceiling is derived from the right getter with the wrong subtrahend: it subtracts the user's own
-  drawn principal, where Mezo checks `maxBorrowingCapacity >= netDebtChange + getTroveDebt(trove)` —
-  a figure that includes the 200 MUSD gas compensation and accrued interest, and on the pooled route
-  belongs to the whole shared trove rather than to one user. The 0.1% origination fee gross-up is
-  missing too. Measured on matsnet on 2026-09-07: `maxBorrowable()` quoted **1,556.98 MUSD** for a
-  position whose true limit simulated at **834.68 MUSD**. The fix is to carry `getTroveDebt()`
-  through and gross up for the fee. Until it lands, an amount near the top of the slider can revert.
-</Warning>
+<Note>
+  **The raw getter and the slider disagree on purpose, and the slider is the binding one.** The
+  clients no longer quote `maxBorrowable()` as a borrow ceiling. `borrowCeiling()` in
+  `packages/sdk/src/borrow.ts` takes the smallest of three bounds: the user's own ratio headroom;
+  Mezo's `maxBorrowingCapacity` less the **whole shared trove's** debt — the figure that includes
+  the 200 MUSD gas compensation and accrued interest — grossed up for the 0.1% origination fee; and
+  the pooled trove's own headroom against the 180% floor. The web and iOS apps both clamp the
+  slider to that number and name which bound is binding. The earlier defect, where a quoted maximum
+  could exceed the true limit and revert, is closed.
+
+  `MarenVault.maxBorrowable()` itself is **still pool-blind, by design**, and its own docstring says
+  so (`MarenVault.sol:1106-1116`): it answers only how much more MUSD this user could owe before
+  their own share hits the 180% floor, and it deliberately ignores both the trove-level ICR check
+  and Mezo's per-trove `maxBorrowingCapacity`, either of which may bind first. A reviewer calling
+  that getter directly will therefore read a higher number than any client will ever offer. That is
+  the getter being narrow, not the app being wrong.
+</Note>
 
 
 ## The four actions

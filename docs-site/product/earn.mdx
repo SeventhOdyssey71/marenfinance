@@ -28,6 +28,13 @@ schedule, so there is no rate to promise.
   piggy bank, so nothing on the screen contradicts the disclosure.
 </Note>
 
+<Warning>
+  **Earn costs you BTC gas, both ways.** Neither the deposit nor the withdrawal is sponsored:
+  `MarenEarn` is not on the relay hub's allowlist, and the relayer's `/health` reports only
+  `marenPay`, `marenRegistry` and `marenVault` as sponsored targets. Keep a small testnet BTC
+  balance before using Earn. See [Gasless](/how-it-works/gasless).
+</Warning>
+
 ## The full cycle, proven on-chain
 
 The Earn path is the whole product in three transactions, and all three are on matsnet:

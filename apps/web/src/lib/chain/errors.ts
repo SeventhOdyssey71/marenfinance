@@ -753,7 +753,13 @@ function describeErrorString(message: string): RevertReason {
   );
 }
 
-function describeMusdRequire(message: string): RevertReason | null {
+/**
+ * Exported so relayed refusals can reach it too. The relayer returns MUSD's own require
+ * string in `detail` on a 422, and the web client used to throw that away and print a
+ * static "This would have failed on-chain" — which meant every SPONSORED action, i.e.
+ * everything a zero-BTC tester does, lost the explanation that self-paid actions got.
+ */
+export function describeMusdRequire(message: string): RevertReason | null {
   const has = (needle: string) => message.includes(needle);
 
   if (has('Collateral withdrawal not permitted Recovery Mode')) {

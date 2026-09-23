@@ -1,6 +1,5 @@
 import Link from 'next/link';
 import { TESTFLIGHT_URL } from '@/lib/links';
-import { XLogo } from './ui/icons';
 import { Reveal } from './ui/reveal';
 
 /**
@@ -37,8 +36,6 @@ const columns: readonly FooterColumn[] = [
     ],
   },
 ];
-
-const socials = [{ label: 'Maren on X', href: 'https://x.com/marenfinance', Icon: XLogo }] as const;
 
 export function Footer() {
   return (
@@ -81,21 +78,6 @@ export function Footer() {
           <p className="mt-3 max-w-[34ch] text-[14px] font-medium leading-[1.55] text-[color:var(--muted)]">
             Bitcoin-backed borrowing and payments. Available on the web and iPhone, on Mezo testnet.
           </p>
-          <ul className="mt-5 flex items-center gap-2.5">
-            {socials.map(({ label, href, Icon }) => (
-              <li key={label}>
-                <a
-                  href={href}
-                  target="_blank"
-                  rel="noreferrer noopener"
-                  aria-label={label}
-                  className="u-chip size-10 transition-colors duration-[120ms] ease-out hover:bg-[color:var(--lime)]"
-                >
-                  <Icon className="size-4" />
-                </a>
-              </li>
-            ))}
-          </ul>
         </div>
 
         {columns.map((col) => (
