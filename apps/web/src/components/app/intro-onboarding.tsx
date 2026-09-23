@@ -108,7 +108,11 @@ export function IntroOnboarding({ onComplete }: { onComplete: () => void }) {
           </span>
         </div>
       ) : current ? (
-        <div className="intro-fade relative flex flex-1 flex-col">
+        // The flow is phone-shaped by design, and on a laptop it stretched to the full
+        // viewport — a "Continue" button 1280px wide with the copy stranded in the middle.
+        // A centred column keeps one layout for both rather than a second desktop design;
+        // the text inside already caps itself at 18ch/34ch.
+        <div className="intro-fade relative mx-auto flex w-full max-w-[460px] flex-1 flex-col">
           {/* Top bar — Skip, hidden on the final screen where there is nothing left to skip. */}
           <div className="flex h-14 items-center justify-end px-3 pt-[max(0.5rem,env(safe-area-inset-top))]">
             {!isLast ? (
