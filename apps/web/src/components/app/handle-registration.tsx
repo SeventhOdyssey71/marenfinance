@@ -268,7 +268,7 @@ export function HandleRegistration({ runner }: { runner: TxRunner }) {
               autoComplete="off"
               spellCheck={false}
               aria-describedby="handle-status"
-              className="num text-text placeholder:text-text-subtle/60 min-w-0 flex-1 bg-transparent text-lg outline-none"
+              className="num text-text placeholder:text-text-subtle/60 min-w-0 flex-1 bg-transparent text-lg"
             />
           </div>
           <p id="handle-status" className="mt-3 min-h-[1.25rem] text-sm" role="status">

@@ -44,8 +44,7 @@ export function Footer() {
       <Reveal>
         <div className="rounded-[36px] bg-[color:var(--ink)] p-10 text-center sm:p-16">
           <h2
-            className="u-display mx-auto max-w-[16ch] text-[clamp(30px,5vw,58px)]"
-            style={{ color: '#fff' }}
+            className="u-display mx-auto max-w-[16ch] text-[clamp(30px,5vw,58px)] text-white"
           >
             Spend Bitcoin. Never sell it.
           </h2>

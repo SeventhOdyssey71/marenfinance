@@ -245,7 +245,7 @@ function RequestPanel({ runner }: { runner: TxRunner }) {
             placeholder="@handle"
             autoComplete="off"
             spellCheck={false}
-            className="num text-text placeholder:text-text-subtle/60 mt-3 w-full border-b border-[var(--border-hairline)] bg-transparent pb-3 text-lg outline-none focus:border-[var(--border-strong)]"
+            className="num text-text placeholder:text-text-subtle/60 mt-3 w-full border-b border-[var(--border-hairline)] bg-transparent pb-3 text-lg focus:border-[var(--border-strong)]"
           />
           <p className="mt-3 min-h-[1.25rem] text-sm" role="status">
             {isHandle && resolved ? (
@@ -270,7 +270,7 @@ function RequestPanel({ runner }: { runner: TxRunner }) {
             value={memo}
             onChange={(event) => setMemo(event.target.value)}
             placeholder="Invoice 0044"
-            className="text-text placeholder:text-text-subtle/60 mt-3 w-full border-b border-[var(--border-hairline)] bg-transparent pb-3 text-[0.9375rem] outline-none focus:border-[var(--border-strong)]"
+            className="text-text placeholder:text-text-subtle/60 mt-3 w-full border-b border-[var(--border-hairline)] bg-transparent pb-3 text-[0.9375rem] focus:border-[var(--border-strong)]"
           />
         </div>
 
@@ -458,7 +458,7 @@ function FulfilPanel({ runner }: { runner: TxRunner }) {
             placeholder="e.g. 42"
             autoComplete="off"
             spellCheck={false}
-            className="num text-text placeholder:text-text-subtle/60 mt-3 w-full border-b border-[var(--border-hairline)] bg-transparent pb-3 text-lg outline-none focus:border-[var(--border-strong)]"
+            className="num text-text placeholder:text-text-subtle/60 mt-3 w-full border-b border-[var(--border-hairline)] bg-transparent pb-3 text-lg focus:border-[var(--border-strong)]"
           />
           <p className="text-text-subtle mt-3 text-xs">
             The number the requester shared, or the id shown on their request in Activity.
@@ -757,7 +757,7 @@ function LinkPanel({ runner }: { runner: TxRunner }) {
                 value={days}
                 onChange={(event) => setDays(event.target.value)}
                 inputMode="numeric"
-                className="num text-text min-w-0 flex-1 bg-transparent text-3xl outline-none"
+                className="num text-text min-w-0 flex-1 bg-transparent text-3xl"
               />
               <span className="t-h3 text-text-muted shrink-0">days</span>
             </div>
@@ -774,7 +774,7 @@ function LinkPanel({ runner }: { runner: TxRunner }) {
             value={memo}
             onChange={(event) => setMemo(event.target.value)}
             placeholder="Coffee fund"
-            className="text-text placeholder:text-text-subtle/60 mt-3 w-full border-b border-[var(--border-hairline)] bg-transparent pb-3 text-[0.9375rem] outline-none focus:border-[var(--border-strong)]"
+            className="text-text placeholder:text-text-subtle/60 mt-3 w-full border-b border-[var(--border-hairline)] bg-transparent pb-3 text-[0.9375rem] focus:border-[var(--border-strong)]"
           />
         </div>
 
@@ -1160,7 +1160,7 @@ function SplitPanel({ runner }: { runner: TxRunner }) {
             placeholder="Dinner, three ways"
             autoComplete="off"
             aria-describedby="split-memo-count"
-            className="text-text placeholder:text-text-subtle/60 mt-3 w-full border-b border-[var(--border-hairline)] bg-transparent pb-3 text-[0.9375rem] outline-none focus:border-[var(--border-strong)]"
+            className="text-text placeholder:text-text-subtle/60 mt-3 w-full border-b border-[var(--border-hairline)] bg-transparent pb-3 text-[0.9375rem] focus:border-[var(--border-strong)]"
           />
           <p id="split-memo-count" className="text-text-subtle mt-2 text-xs">
             <span className="num">{memoBytes}</span>/80 bytes · one memo, written on-chain for every
@@ -1307,7 +1307,7 @@ function SplitRecipientRow({
             spellCheck={false}
             inputMode="text"
             aria-describedby={statusId}
-            className="num text-text placeholder:text-text-subtle/60 w-full border-b border-[var(--border-hairline)] bg-transparent pb-3 text-lg outline-none focus:border-[var(--border-strong)]"
+            className="num text-text placeholder:text-text-subtle/60 w-full border-b border-[var(--border-hairline)] bg-transparent pb-3 text-lg focus:border-[var(--border-strong)]"
           />
         </div>
 
@@ -1324,7 +1324,7 @@ function SplitRecipientRow({
               autoComplete="off"
               spellCheck={false}
               placeholder="0.00"
-              className="num text-text placeholder:text-text-subtle/60 w-28 bg-transparent text-right text-lg outline-none"
+              className="num text-text placeholder:text-text-subtle/60 w-28 bg-transparent text-right text-lg"
             />
             <span className="t-label text-text-muted shrink-0">MUSD</span>
           </div>

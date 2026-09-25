@@ -357,6 +357,11 @@ function AmountStep({
           accessible, keyboard-reachable control (never hidden behind aria-hidden). The
           display span is a decorative duplicate that carries the greyed-decimal treatment. */}
       <div
+        /* The real input is text-transparent — a decorative span draws the styled digits —
+           and it used to suppress its own outline, so tabbing into the first field on the
+           Pay tab showed nothing at all. Letting the global :focus-visible ring through is
+           the whole fix; it lands on the input, which sits inset-0 over the digits. A
+           second ring on this wrapper would draw a different rect at a different radius. */
         className="flex w-full cursor-text flex-col items-center py-6"
         onMouseDown={(e) => {
           if (e.target !== inputRef.current) {
@@ -388,7 +393,7 @@ function AmountStep({
               spellCheck={false}
               aria-label="Amount to send, in MUSD"
               aria-invalid={over ? true : undefined}
-              className={`${BIG_NUMBER} absolute inset-0 w-full bg-transparent text-transparent caret-violet-500 outline-none`}
+              className={`${BIG_NUMBER} absolute inset-0 w-full bg-transparent text-transparent caret-violet-500`}
             />
           </div>
           <span className="t-h3 text-text-muted shrink-0">MUSD</span>
@@ -494,7 +499,7 @@ function RecipientStep({
         autoComplete="off"
         spellCheck={false}
         aria-describedby="send-to-status"
-        className="num text-text placeholder:text-text-subtle/60 mt-3 w-full border-b border-[var(--border-hairline)] bg-transparent pb-3 text-lg outline-none focus:border-[var(--border-strong)]"
+        className="num text-text placeholder:text-text-subtle/60 mt-3 w-full border-b border-[var(--border-hairline)] bg-transparent pb-3 text-lg focus:border-[var(--border-strong)]"
       />
 
       {/* The resolved address, always, before anything is signed. */}
@@ -536,7 +541,7 @@ function RecipientStep({
           onChange={(e) => onMemo(e.target.value)}
           placeholder="What is this for?"
           aria-describedby="send-memo-count"
-          className="text-text placeholder:text-text-subtle/60 mt-3 w-full border-b border-[var(--border-hairline)] bg-transparent pb-3 text-[0.9375rem] outline-none focus:border-[var(--border-strong)]"
+          className="text-text placeholder:text-text-subtle/60 mt-3 w-full border-b border-[var(--border-hairline)] bg-transparent pb-3 text-[0.9375rem] focus:border-[var(--border-strong)]"
         />
         <p id="send-memo-count" className="text-text-subtle mt-2 text-xs">
           <span className="num">{memoBytes}</span>/80 bytes · public on-chain

@@ -133,6 +133,14 @@ export function AppShell({ children }: { children: ReactNode }) {
     <div className="min-h-screen">
       {/* The phone column — one centered narrow frame at every width. */}
       <div className="mx-auto flex min-h-screen w-full max-w-[30rem] flex-col px-5">
+        {/* First focusable element in the shell, visible only once focused. */}
+        <a
+          href="#app-content"
+          className="sr-only focus:not-sr-only focus:absolute focus:left-4 focus:top-4 focus:z-50 focus:rounded-[var(--radius-pill)] focus:bg-[var(--color-ink)] focus:px-4 focus:py-2 focus:text-sm focus:text-white"
+        >
+          Skip to content
+        </a>
+
         {/* Top bar — transparent, scrolls with the page. */}
         <header className="flex items-center justify-between pb-2 pt-5">
           <Wordmark />

@@ -37,7 +37,7 @@ export function Segmented<T extends string>({
             role="tab"
             aria-selected={active}
             onClick={() => onChange(option.key)}
-            className={`h-10 flex-1 rounded-[var(--radius-pill)] px-4 text-sm transition-colors duration-[120ms] ease-out ${
+            className={`h-11 flex-1 rounded-[var(--radius-pill)] px-4 text-sm transition-colors duration-[120ms] ease-out ${
               active
                 ? 'bg-surface-raised text-text font-medium shadow-[0_1px_2px_rgba(16,16,19,0.06),0_4px_10px_-6px_rgba(16,16,19,0.18)]'
                 : 'text-text-muted hover:text-text'
@@ -99,7 +99,7 @@ export function AmountField({
           placeholder="0.00"
           aria-describedby={error ? `${id}-error` : undefined}
           aria-invalid={error ? true : undefined}
-          className="num text-text placeholder:text-text-subtle/60 min-w-0 flex-1 bg-transparent text-3xl outline-none"
+          className="num text-text placeholder:text-text-subtle/60 min-w-0 flex-1 bg-transparent text-3xl"
         />
         <span className="t-h3 text-text-muted shrink-0">{unit}</span>
       </div>
@@ -111,7 +111,12 @@ export function AmountField({
             <button
               type="button"
               onClick={onMax}
-              className="text-text-muted hover:text-text rounded-[var(--radius-pill)] transition-colors duration-[120ms] ease-out"
+              /* The visible label is the balance itself, which on its own announces as
+                 "0.05 BTC" with no hint that pressing it fills the field. */
+              aria-label={`Use the full ${maxLabel ?? 'available'} balance, ${max}`}
+              /* The glyph alone was about 18px of tap target. The negative margin keeps
+                 the row looking identical while giving it a real one. */
+              className="text-text-muted hover:text-text -my-2 min-h-[44px] rounded-[var(--radius-pill)] px-1.5 py-2 transition-colors duration-[120ms] ease-out"
             >
               {max}
             </button>
