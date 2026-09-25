@@ -124,11 +124,26 @@ threshold('pool borrow capacity', Number(capacity) / 1e18, {
   fmt: (v) => `${v.toFixed(2)} MUSD`,
   detail: `limited by ${binding}`,
 });
+/**
+ * BOTH HALVES OF THIS LINE INVERT ONCE THE RATIO CROSSES THE FLOOR, which is exactly
+ * when someone is reading it. It used to print "-1.3 points above the 180% floor" —
+ * a negative distance above something — next to "a -0.7% BTC fall blocks new
+ * borrowing", when in fact no further fall is needed because borrowing is already
+ * refused. Below the floor the useful number is the opposite one: how far BTC has to
+ * RISE to restore borrowing, and that the keeper can restore it now without waiting
+ * for the price at all.
+ */
+const belowFloor = icrPct < floorPct;
 threshold('trove ratio margin', icrPct - floorPct, {
   warn: 20,
   fail: 6,
-  fmt: (v) => `${v.toFixed(1)} points above the ${floorPct.toFixed(0)}% floor (ICR ${icrPct.toFixed(1)}%)`,
-  detail: `a ${(100 - (floorPct / icrPct) * 100).toFixed(1)}% BTC fall blocks new borrowing`,
+  fmt: (v) =>
+    belowFloor
+      ? `${Math.abs(v).toFixed(1)} points BELOW the ${floorPct.toFixed(0)}% floor (ICR ${icrPct.toFixed(1)}%)`
+      : `${v.toFixed(1)} points above the ${floorPct.toFixed(0)}% floor (ICR ${icrPct.toFixed(1)}%)`,
+  detail: belowFloor
+    ? `new borrowing is already refused — needs a ${((floorPct / icrPct - 1) * 100).toFixed(1)}% BTC rise, or a keeper top-up now`
+    : `a ${(100 - (floorPct / icrPct) * 100).toFixed(1)}% BTC fall blocks new borrowing`,
 });
 threshold('ceiling headroom', Number(ceilingHeadroom) / 1e18, {
   warn: 400,

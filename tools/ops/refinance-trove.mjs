@@ -60,23 +60,40 @@ const SORTED_TROVES = '0x722E4D24FD6Ff8b0AC679450F3D91294607268fA';
 const KEEPER = '0x54196397D6f01b48739dB3957257cB33cD341885';
 const ZERO = '0x0000000000000000000000000000000000000000';
 
-function cast(args, { allowFail = false } = {}) {
-  const r = spawnSync('cast', args, { encoding: 'utf8', timeout: 30_000 });
-  if (r.error) {
-    const detail =
-      r.error.code === 'ENOENT'
-        ? 'cast not found on PATH — install Foundry'
-        : 'cast command timed out or could not start';
-    if (allowFail) return { error: detail };
-    throw new Error(detail);
+/**
+ * A TRANSPORT BLIP IS NOT AN ANSWER. Mezo's public RPC drops requests under the rapid
+ * sequence of calls this tool makes — "error sending request for url" — while
+ * `cast block-number` succeeds either side. Aborting a keeper repair because one read
+ * out of a dozen was dropped is not usable, so transport failures retry with backoff.
+ *
+ * Only transport failures. A revert, a bad status, a missing selector and a refused
+ * keystore are the node or Foundry ANSWERING; retrying those asks the same question
+ * until the wording changes. The `cast send` below deliberately does not go through
+ * this helper, because a resubmission could double up.
+ */
+const TRANSIENT = /error sending request|connection (closed|reset)|timed out|timeout|EOF|503|502|504/i;
+
+function cast(args, { allowFail = false, retries = 4 } = {}) {
+  let lastDetail = '';
+  for (let attempt = 0; attempt <= retries; attempt += 1) {
+    const r = spawnSync('cast', args, { encoding: 'utf8', timeout: 30_000 });
+    if (r.error) {
+      lastDetail =
+        r.error.code === 'ENOENT'
+          ? 'cast not found on PATH — install Foundry'
+          : 'cast command timed out or could not start';
+      if (r.error.code === 'ENOENT') break;
+    } else if (r.status === 0) {
+      return { value: (r.stdout || '').trim() };
+    } else {
+      lastDetail = (r.stderr || r.stdout || '').trim().split('\n')[0];
+      if (!TRANSIENT.test(lastDetail)) break;
+    }
+    if (attempt < retries) spawnSync('sleep', [String(0.4 * (attempt + 1))]);
   }
-  if (r.status !== 0) {
-    const detail = (r.stderr || r.stdout || '').trim().split('\n')[0];
-    if (allowFail) return { error: detail };
-    if (args[0] === 'wallet') throw new Error('Could not unlock the configured keeper keystore.');
-    throw new Error(`cast ${args.slice(0, 2).join(' ')} failed: ${detail}`);
-  }
-  return { value: (r.stdout || '').trim() };
+  if (allowFail) return { error: lastDetail };
+  if (args[0] === 'wallet') throw new Error('Could not unlock the configured keeper keystore.');
+  throw new Error(`cast ${args.slice(0, 2).join(' ')} failed: ${lastDetail}`);
 }
 
 /** One read. `sig` is a full signature, so cast computes the selector — we never type one. */
