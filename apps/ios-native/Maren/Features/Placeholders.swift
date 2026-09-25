@@ -53,7 +53,7 @@ struct ComingSoon: View {
             HStack(spacing: Theme.Space.sm) {
                 Image(systemName: "hammer")
                     .font(.system(size: 15, weight: .semibold))
-                    .foregroundStyle(Theme.Palette.tertiary)
+                    .foregroundStyle(Theme.Palette.muted)
                     .accessibilityHidden(true)
                 Text(text)
                     .font(.system(size: 15))

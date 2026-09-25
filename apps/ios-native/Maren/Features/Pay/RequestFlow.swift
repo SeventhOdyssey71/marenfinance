@@ -101,7 +101,7 @@ private struct AskSection: View {
                 Text("Or just share a pay link").labelStyle()
                 QRCode(string: link, size: 180).frame(maxWidth: .infinity)
                 Text("This link opens Send addressed to you. It records nothing on-chain.")
-                    .font(.system(size: 13)).foregroundStyle(Theme.Palette.tertiary)
+                    .font(.system(size: 13)).foregroundStyle(Theme.Palette.muted)
                     .fixedSize(horizontal: false, vertical: true)
                 ShareLink(item: link) { Text("Share pay link").pillLabel() }
                     .accessibilityLabel("Share a pay link addressed to you")
@@ -272,7 +272,7 @@ private struct SettleSection: View {
                     .fixedSize(horizontal: false, vertical: true)
             }
             if stage != .submitting {
-                PillButton(title: "Another id", variant: .quiet) {
+                PillButton(title: "Try another id", variant: .quiet) {
                     record = nil
                     idText = ""
                     stage = .entry

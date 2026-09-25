@@ -31,7 +31,7 @@ enum OnboardingPalette {
     /// Footnotes and field labels. 4.9:1 on white.
     static let caption = Color(hex: 0x6E6E7A)
     /// Placeholder text only — never used for content.
-    static let placeholder = Theme.Palette.tertiary // #9A9AA2
+    static let placeholder = Theme.Palette.muted // #9A9AA2
     /// The one thing you are meant to touch.
     static let accent = Theme.Palette.accent        // #5B3DF5
     /// Brand violet as small text, darkened to hold AA on the violet wash chips.

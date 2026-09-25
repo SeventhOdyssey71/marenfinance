@@ -39,7 +39,7 @@ struct ProfileView: View {
             howItWorksCard
             if !actions.canSettle {
                 Text("Reads run live against Mezo testnet. Deposit, Earn and creating a claimable link are self-paid: you sign, pay a little BTC gas, and they settle on-chain now. Sending, borrowing, repaying, splitting, claiming a link, payment requests and claiming a name go through a relayer, which isn’t configured in this build, so those decline honestly rather than pretend to settle.")
-                    .font(.text(13)).foregroundStyle(Theme.Palette.tertiary)
+                    .font(.text(13)).foregroundStyle(Theme.Palette.muted)
                     .fixedSize(horizontal: false, vertical: true)
             }
         }
@@ -79,7 +79,7 @@ struct ProfileView: View {
                 if let caption = displayAccount?.titleCaption {
                     Text(caption)
                         .font(.text(13))
-                        .foregroundStyle(Theme.Palette.tertiary)
+                        .foregroundStyle(Theme.Palette.muted)
                         .fixedSize(horizontal: false, vertical: true)
                 }
                 HStack(spacing: Theme.Space.sm) {
@@ -150,7 +150,7 @@ struct ProfileView: View {
         switch protection {
         case .keychainBiometric: return Theme.Palette.success
         case .sessionOnly: return Theme.Palette.warning
-        case .none: return Theme.Palette.tertiary
+        case .none: return Theme.Palette.muted
         }
     }
     private var keyTitle: String {
@@ -321,7 +321,7 @@ private struct HandleCard: View {
             Spacer(minLength: 0)
         }
         Text(phaseDetail)
-            .font(.text(13)).foregroundStyle(Theme.Palette.tertiary)
+            .font(.text(13)).foregroundStyle(Theme.Palette.muted)
             .fixedSize(horizontal: false, vertical: true)
 
         switch phase {
@@ -357,7 +357,7 @@ private struct HandleCard: View {
         case .revealable: return Theme.Palette.success
         case .waiting: return Theme.Palette.warning
         case .expired: return Theme.Palette.danger
-        case .notCommitted, .unknown, .none: return Theme.Palette.tertiary
+        case .notCommitted, .unknown, .none: return Theme.Palette.muted
         }
     }
 

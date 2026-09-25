@@ -22,7 +22,16 @@ enum Theme {
         // Ink / text
         static let ink = Color(hex: 0x101013)         // primary text
         static let muted = Color(hex: 0x6E6E6E)        // secondary (AA on white)
-        static let tertiary = Color(hex: 0x9A9AA2)     // tertiary / greyed decimals
+        /// DECORATIVE ONLY — 2.79:1 on white, which fails AA for normal text (4.5:1) and
+        /// even the large-text floor (3:1). It was reading as a third text grey and had
+        /// spread to greetings, empty states, timestamps, transaction subtitles and a full
+        /// explanatory paragraph. On white there is no third grey that is both AA and
+        /// visibly distinct from `muted` — an accessible version lands around #767676,
+        /// which is `muted` again. So the palette has two text greys, and this is not one
+        /// of them. Its remaining use is the greyed decimal tail in `MoneyText`, which sits
+        /// beside a full-contrast head and is incidental in the WCAG sense.
+        /// For quiet text, use `muted`.
+        static let tertiary = Color(hex: 0x9A9AA2)
 
         // Brand — Maren violet, taken from the logo mark (a violet gradient swoosh).
         static let accent = Color(hex: 0x5B3DF5)       // primary violet: fills, dots, the CTA

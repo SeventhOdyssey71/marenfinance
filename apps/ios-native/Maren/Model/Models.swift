@@ -94,7 +94,7 @@ enum HealthStatus: String, Sendable, CaseIterable, Codable {
 
     var tone: Color {
         switch self {
-        case .none: return Theme.Palette.tertiary
+        case .none: return Theme.Palette.muted
         case .healthy: return Theme.Palette.success
         case .caution, .warning: return Theme.Palette.warning
         case .danger, .liquidatable: return Theme.Palette.danger

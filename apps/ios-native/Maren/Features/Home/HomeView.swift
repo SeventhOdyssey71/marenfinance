@@ -68,7 +68,7 @@ struct HomeView: View {
             VStack(alignment: .leading, spacing: 1) {
                 Text(greeting)
                     .font(.text(12))
-                    .foregroundStyle(Theme.Palette.tertiary)
+                    .foregroundStyle(Theme.Palette.muted)
                 Text(session.greetingName)
                     .font(.display(18, weight: .medium))
                     .foregroundStyle(Theme.Palette.ink)
@@ -235,7 +235,7 @@ struct HomeView: View {
         } else {
             Text("Loading your position…")
                 .font(.text(16, weight: .medium))
-                .foregroundStyle(Theme.Palette.tertiary)
+                .foregroundStyle(Theme.Palette.muted)
         }
     }
 
@@ -253,12 +253,13 @@ struct HomeView: View {
                 } label: {
                     Image(systemName: "arrow.clockwise")
                         .font(.system(size: 11, weight: .semibold))
-                        .foregroundStyle(Theme.Palette.tertiary)
+                        .foregroundStyle(Theme.Palette.muted)
                         .rotationEffect(.degrees(model.refreshing ? 360 : 0))
                         .animation(model.refreshing && !reduceMotion
                                    ? .linear(duration: 0.8).repeatForever(autoreverses: false) : .snappy,
                                    value: model.refreshing)
-                        .frame(width: 28, height: 28)
+                        // 44 to match the scan button above it; the glyph stays 11pt.
+                        .frame(width: 44, height: 44)
                 }
                 .buttonStyle(.plain)
                 .accessibilityLabel("Refresh")
@@ -276,7 +277,7 @@ struct HomeView: View {
                 if model.displayActivity.isEmpty {
                     Text("No transactions yet.")
                         .font(.text(15))
-                        .foregroundStyle(Theme.Palette.tertiary)
+                        .foregroundStyle(Theme.Palette.muted)
                         .frame(maxWidth: .infinity, alignment: .leading)
                 } else {
                     VStack(spacing: 0) {
@@ -301,7 +302,7 @@ struct HomeView: View {
                         .foregroundStyle(Theme.Palette.ink)
                     Text(item.subtitle)
                         .font(.text(13))
-                        .foregroundStyle(Theme.Palette.tertiary)
+                        .foregroundStyle(Theme.Palette.muted)
                 }
                 Spacer(minLength: Theme.Space.sm)
                 Text(item.amount)

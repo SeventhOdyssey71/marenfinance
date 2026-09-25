@@ -146,7 +146,7 @@ struct SingleAmountFlow: View {
         HStack(spacing: Theme.Space.sm) {
             TokenCoin(isBtc: !isMusd, size: 34)
             VStack(alignment: .leading, spacing: 1) {
-                Text(label).font(.text(13)).foregroundStyle(Theme.Palette.tertiary)
+                Text(label).font(.text(13)).foregroundStyle(Theme.Palette.muted)
                 Text(figure(available) + " " + unitLabel)
                     .font(.figure(15, weight: .medium)).foregroundStyle(Theme.Palette.ink)
             }

@@ -78,7 +78,7 @@ struct ClaimableLinkFlow: View {
             ])
             Text("MarenPay holds this MUSD against a link id until it is claimed. If nobody claims it, you can take it back after the date above and not before, which is what stops a creator front-running a real claim.")
                 .font(.system(size: 13))
-                .foregroundStyle(Theme.Palette.tertiary)
+                .foregroundStyle(Theme.Palette.muted)
                 .fixedSize(horizontal: false, vertical: true)
             GasNote(mode: .youPayBtc, detail: "You pay BTC gas to create the escrow. Maren sponsors claiming when sponsorship is available.")
             SubmitBar(title: "Create link", submitting: stage == .submitting) {
@@ -259,7 +259,7 @@ struct ClaimableLinkFlow: View {
                         .fixedSize(horizontal: false, vertical: true)
                     Text("Anyone with this link can claim the funds. A recovery copy stays in this device’s biometric Keychain until you confirm that you saved it. Reopen Claimable link to find it.")
                         .font(.system(size: 13))
-                        .foregroundStyle(Theme.Palette.tertiary)
+                        .foregroundStyle(Theme.Palette.muted)
                         .fixedSize(horizontal: false, vertical: true)
                 }
             }
@@ -318,7 +318,7 @@ struct ClaimableLinkFlow: View {
                 detail: OutcomeDetail(caption: "No link was created", rows: [])
             ) { dismiss() }
             Text("A claimable link only exists once MarenPay has escrowed the MUSD and reported the link's id. Nothing was escrowed here, so there is no link to show.")
-                .font(.system(size: 13)).foregroundStyle(Theme.Palette.tertiary)
+                .font(.system(size: 13)).foregroundStyle(Theme.Palette.muted)
                 .fixedSize(horizontal: false, vertical: true)
         }
     }

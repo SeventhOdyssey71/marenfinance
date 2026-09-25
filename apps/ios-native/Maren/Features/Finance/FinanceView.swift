@@ -106,7 +106,7 @@ private struct VaultSection: View {
         if let ratio = model.displayPosition?.collateralRatioPercent {
             MoneyText(text: MoneyFormat.ratio(ratio), size: 17, weight: .semibold)
         } else if model.displayPosition?.borrowed == 0 {
-            Text("No debt").font(.figure(15, weight: .medium)).foregroundStyle(Theme.Palette.tertiary)
+            Text("No debt").font(.figure(15, weight: .medium)).foregroundStyle(Theme.Palette.muted)
         } else {
             Unavailable()
         }
@@ -116,7 +116,7 @@ private struct VaultSection: View {
         if let drop = model.displayPosition?.dropToLiquidationPercent, (model.displayPosition?.borrowed ?? 0) > 0 {
             MoneyText(text: MoneyFormat.percent(drop), size: 17, weight: .semibold)
         } else if model.displayPosition?.borrowed == 0 {
-            Text("—").font(.figure(15, weight: .medium)).foregroundStyle(Theme.Palette.tertiary)
+            Text("—").font(.figure(15, weight: .medium)).foregroundStyle(Theme.Palette.muted)
         } else {
             Unavailable()
         }
@@ -338,7 +338,7 @@ private struct EarnSection: View {
                 if let balance = model.displayEarnBalance {
                     MoneyText(text: MoneyFormat.musd(balance), size: 34, weight: .bold)
                     Text("Supplied to the Stability Pool")
-                        .font(.text(13)).foregroundStyle(Theme.Palette.tertiary)
+                        .font(.text(13)).foregroundStyle(Theme.Palette.muted)
                 } else {
                     Unavailable(label: "Couldn’t read your pool balance")
                 }
@@ -402,7 +402,7 @@ private struct EarnSection: View {
             MoneyText(text: MoneyFormat.btc(y.btcRealised), size: 28, weight: .bold)
         }
         Text("Realised over the last \(y.windowDays) \(y.windowDays == 1 ? "day" : "days")")
-            .font(.text(13)).foregroundStyle(Theme.Palette.tertiary)
+            .font(.text(13)).foregroundStyle(Theme.Palette.muted)
 
         Text(seizedSummary(y))
             .font(.text(13)).foregroundStyle(Theme.Palette.muted)
@@ -417,7 +417,7 @@ private struct EarnSection: View {
                     .foregroundStyle(Theme.Palette.ink)
                 Text("realised · trailing · not a forecast")
                     .font(.text(12, weight: .medium))
-                    .foregroundStyle(Theme.Palette.tertiary)
+                    .foregroundStyle(Theme.Palette.muted)
             }
         } else {
             Text(withheldPercentReason(y))
@@ -458,7 +458,7 @@ private struct EarnSection: View {
             .foregroundStyle(Theme.Palette.ink)
         if y.windowDays > 0 {
             Text("No liquidation gains in the last \(y.windowDays) \(y.windowDays == 1 ? "day" : "days").")
-                .font(.text(13)).foregroundStyle(Theme.Palette.tertiary)
+                .font(.text(13)).foregroundStyle(Theme.Palette.muted)
                 .fixedSize(horizontal: false, vertical: true)
         }
     }
@@ -473,7 +473,7 @@ private struct EarnSection: View {
                 if let exposure = model.displayEarnExposure {
                     MoneyText(text: MoneyFormat.musd(exposure.musdBacking), size: 28, weight: .bold)
                     Text("MUSD backing the Stability Pool")
-                        .font(.text(13)).foregroundStyle(Theme.Palette.tertiary)
+                        .font(.text(13)).foregroundStyle(Theme.Palette.muted)
                     if exposure.btcSeized > 0 {
                         Divider().overlay(Theme.Palette.ink.opacity(0.07))
                         seizedLine(exposure)

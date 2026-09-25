@@ -70,7 +70,7 @@ struct FundingNeeded: View {
 
                 Text("Paste your address into the faucet and choose BTC. It arrives in a moment.")
                     .font(.text(12))
-                    .foregroundStyle(Theme.Palette.tertiary)
+                    .foregroundStyle(Theme.Palette.muted)
                     .fixedSize(horizontal: false, vertical: true)
             }
         }

@@ -126,7 +126,7 @@ struct SendFlow: View {
             // "an approval" while granting an unlimited allowance is the kind of omission this
             // app does not make elsewhere, so the copy names it.
             Text("Payments are sponsored. The first one needs a one-time MUSD approval that you pay in BTC. It is uncapped, which is what keeps every payment after it gasless.")
-                .font(.text(13)).foregroundStyle(Theme.Palette.tertiary)
+                .font(.text(13)).foregroundStyle(Theme.Palette.muted)
                 .padding(.horizontal, Theme.Space.md)
             Spacer()
             PillButton(title: "Send \(MoneyFormat.musd(amount ?? 0))", variant: .primary) {
@@ -157,7 +157,7 @@ struct SendFlow: View {
             if resolving {
                 ProgressView().controlSize(.small)
                 Text("Resolving \(trimmedRecipient)…")
-                    .font(.text(13)).foregroundStyle(Theme.Palette.tertiary)
+                    .font(.text(13)).foregroundStyle(Theme.Palette.muted)
             } else if let resolvedAddress {
                 Image(systemName: "checkmark.circle.fill")
                     .font(.system(size: 12)).foregroundStyle(Theme.Palette.success)
@@ -169,7 +169,7 @@ struct SendFlow: View {
                     .truncationMode(.middle)
             } else {
                 Text("\(trimmedRecipient) isn’t registered yet.")
-                    .font(.text(13)).foregroundStyle(Theme.Palette.tertiary)
+                    .font(.text(13)).foregroundStyle(Theme.Palette.muted)
             }
             Spacer(minLength: 0)
         }
@@ -204,7 +204,7 @@ struct SendFlow: View {
                 Text("MUSD").font(.text(15, weight: .medium)).foregroundStyle(Theme.Palette.ink)
                 Text(balance.map { "\(MoneyFormat.musd($0)) available" }
                      ?? (balanceLoaded ? "Balance unavailable" : "$0,000.00 available"))
-                    .font(.text(13)).foregroundStyle(Theme.Palette.tertiary)
+                    .font(.text(13)).foregroundStyle(Theme.Palette.muted)
                     .skeleton(!balanceLoaded && balance == nil)
             }
             Spacer()
@@ -231,7 +231,7 @@ struct SendFlow: View {
                 Text("Sending \(MoneyFormat.musd(amount ?? 0))")
                     .font(.display(20, weight: .semibold)).foregroundStyle(Theme.Palette.ink)
                 Text("to \(shortRecipient)")
-                    .font(.text(14)).foregroundStyle(Theme.Palette.tertiary)
+                    .font(.text(14)).foregroundStyle(Theme.Palette.muted)
             }
             Spacer()
         }

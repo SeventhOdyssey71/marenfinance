@@ -58,7 +58,7 @@ struct SplitFlow: View {
                             } label: {
                                 Image(systemName: "minus.circle")
                                     .font(.system(size: 16, weight: .semibold))
-                                    .foregroundStyle(Theme.Palette.tertiary)
+                                    .foregroundStyle(Theme.Palette.muted)
                                     .frame(width: 44, height: 44, alignment: .trailing)
                             }
                             .accessibilityLabel("Remove this recipient")
@@ -78,7 +78,7 @@ struct SplitFlow: View {
                             .foregroundStyle(Theme.Palette.ink)
                             .keyboardType(.decimalPad)
                             .accessibilityLabel("Amount in MUSD")
-                        Text("MUSD").font(.figure(15, weight: .semibold)).foregroundStyle(Theme.Palette.tertiary)
+                        Text("MUSD").font(.figure(15, weight: .semibold)).foregroundStyle(Theme.Palette.muted)
                     }
                 }
             }
@@ -113,7 +113,7 @@ struct SplitFlow: View {
         // implies they will not. Send discloses it; this screen did not.
         Text("Your first payment needs a one-time, uncapped MUSD approval that you pay in BTC.")
             .font(.text(12))
-            .foregroundStyle(Theme.Palette.tertiary)
+            .foregroundStyle(Theme.Palette.muted)
             .padding(.horizontal, Theme.Space.md)
             .fixedSize(horizontal: false, vertical: true)
         SubmitBar(title: "Send to \(validLegs.count)", submitting: stage == .submitting) {
