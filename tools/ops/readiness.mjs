@@ -250,9 +250,12 @@ if (health) {
       warn: 100,
       fail: 30,
       fmt: (v) => `${v} for the lifetime of the deployment`,
+      // Was hardcoded to "action 26", which was right only while the cap was 25. The cap
+      // is now 250 and the line still said 26, which is exactly the kind of stale number
+      // this tool exists to catch in everyone else's output.
       detail: q.feeAfterFreeTierMusdWei
         ? 'a paid tier takes over afterwards'
-        : 'no paid tier configured — action 26 is refused outright',
+        : `no paid tier configured — action ${(q.freeActionsPerAddress ?? 0) + 1} is refused outright`,
     });
   } catch {
     check({ name: 'free actions per tester', status: 'warn', detail: 'quota endpoint unreadable' });
