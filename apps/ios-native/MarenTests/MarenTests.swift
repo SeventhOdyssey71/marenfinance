@@ -1,10 +1,44 @@
 import XCTest
 import SwiftUI
+import CryptoKit
 import BigInt
 import web3
 @testable import Maren
 
 final class MarenTests: XCTestCase {
+    func testAppReviewCredentialsRestoreOnlyConfiguredWallet() throws {
+        let email = "review-fixture@maren.finance"
+        let code = "fixture-access-code-with-high-entropy-2026"
+        var material = Data("maren-app-review-v1".utf8)
+        material.append(0)
+        material.append(contentsOf: email.utf8)
+        material.append(0)
+        material.append(contentsOf: code.utf8)
+        let key = Data(SHA256.hash(data: material))
+        let expectedAddress = try Keystore.address(of: key)
+
+        let result = AppReviewAccess.unlock(
+            email: "  REVIEW-FIXTURE@MAREN.FINANCE ", accessCode: "  \(code)  ",
+            expectedEmail: email, expectedAddress: expectedAddress
+        )
+        guard case .success(let wallet) = result else {
+            return XCTFail("Correct review credentials must restore the configured wallet")
+        }
+        XCTAssertEqual(wallet.privateKey, key)
+        XCTAssertEqual(wallet.address.lowercased(), expectedAddress.lowercased())
+
+        XCTAssertEqual(
+            AppReviewAccess.unlock(email: email, accessCode: code + "x",
+                                   expectedEmail: email, expectedAddress: expectedAddress),
+            .failure(.refused)
+        )
+        XCTAssertEqual(
+            AppReviewAccess.unlock(email: "", accessCode: "",
+                                   expectedEmail: email, expectedAddress: expectedAddress),
+            .failure(.incomplete)
+        )
+    }
+
     func testStubIsHonestlyDemo() async throws {
         // The Wave 1 stub must expose the price feed as unavailable, never a fake number.
         let client = StubMarenClient()

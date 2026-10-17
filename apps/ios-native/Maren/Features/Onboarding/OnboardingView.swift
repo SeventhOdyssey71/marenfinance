@@ -37,6 +37,7 @@ struct OnboardingView: View {
     private enum Step: Hashable {
         case welcome
         case restore     // sign in: paste or scan an existing key
+        case review      // App Review: email + high-entropy testnet access code
         case name        // "What should we call you?"
         case generate    // the key-generation moment, resolving into the address reveal
         case protect     // Face ID enrollment (or the honest session-only state)
@@ -49,6 +50,8 @@ struct OnboardingView: View {
     @State private var protection: KeyProtection?
     /// Restore skips the backup step: you are already holding the key you just pasted.
     @State private var isRestoring = false
+    /// Review access skips both the private-key field and display-name step.
+    @State private var isReviewAccess = false
 
     /// Screenshot/testing hook. `MAREN_SCREEN` can open the flow directly on one step so each
     /// screen can be captured. Absent in normal use, so it changes nothing for a real user.
@@ -68,10 +71,23 @@ struct OnboardingView: View {
                         onKey: { key, address in
                             pending = PendingWallet(key: key, address: address)
                             isRestoring = true
+                            isReviewAccess = false
                             // A restored key is by definition already in its owner's hands, so
                             // there is nothing for the app to nag about later.
                             OnboardingFlags.markBackedUp()
                             go(to: .name)
+                        }
+                    )
+                case .review:
+                    OnboardingReviewAccessStep(
+                        onBack: { go(to: .welcome) },
+                        onWallet: { key, address in
+                            pending = PendingWallet(key: key, address: address)
+                            name = "App Review"
+                            isRestoring = true
+                            isReviewAccess = true
+                            OnboardingFlags.markBackedUp()
+                            go(to: .protect)
                         }
                     )
                 case .name:
@@ -95,7 +111,7 @@ struct OnboardingView: View {
                 case .protect:
                     OnboardingProtectionStep(
                         stepCount: stepCount,
-                        stepIndex: 2,
+                        stepIndex: isReviewAccess ? 1 : 2,
                         protection: $protection,
                         onEnable: storeKey,
                         onContinue: { isRestoring ? finish() : go(to: .backup) },
@@ -150,15 +166,24 @@ struct OnboardingView: View {
             OnboardingCTA(title: "Create a new wallet", icon: "plus") {
                 OnboardingHaptics.tap()
                 isRestoring = false
+                isReviewAccess = false
                 go(to: .name)
             }
             .accessibilityHint("Generates a new key on this device and takes you through setup.")
             OnboardingGhostButton(title: "I already have a wallet", icon: "arrow.down.doc") {
                 OnboardingHaptics.tap()
                 isRestoring = true
+                isReviewAccess = false
                 go(to: .restore)
             }
             .accessibilityHint("Restore a wallet from a private key you already hold.")
+            OnboardingTextButton(title: "App Review access") {
+                OnboardingHaptics.tap()
+                isRestoring = true
+                isReviewAccess = true
+                go(to: .review)
+            }
+            .accessibilityHint("Opens the testnet review account sign-in supplied to Apple.")
             Text("Nothing is sent to a server. There is no password to reset, so keep your key safe.")
                 .font(.text(13, weight: .medium))
                 .foregroundStyle(OnboardingPalette.caption)
@@ -173,7 +198,7 @@ struct OnboardingView: View {
 
     /// Four steps when creating (name, wallet, protection, backup), three when restoring
     /// (key, name, protection).
-    private var stepCount: Int { isRestoring ? 3 : 4 }
+    private var stepCount: Int { isReviewAccess ? 2 : (isRestoring ? 3 : 4) }
 
     private var pendingKeyHex: String {
         guard let pending else { return "" }
@@ -235,6 +260,7 @@ struct OnboardingView: View {
         switch launchScreen {
         case "welcome", "onboarding": step = .welcome
         case "signin", "restore": isRestoring = true; step = .restore
+        case "review": isRestoring = true; isReviewAccess = true; step = .review
         case "name": step = .name
         // "generation" holds the forming beat for capture; "reveal" lets it resolve into the
         // address so both halves of the moment can be photographed.

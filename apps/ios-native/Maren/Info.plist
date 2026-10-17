@@ -26,6 +26,12 @@
     <string></string>
     <key>MAREN_RELAYER_URL</key>
     <string>https://maren-relayer.rolandojude18.workers.dev</string>
+    <!-- Public identity of the testnet-only App Review wallet. The access code and derived
+         private key are supplied privately in App Store Connect and never ship in the app. -->
+    <key>MAREN_REVIEW_EMAIL</key>
+    <string>appreview@maren.finance</string>
+    <key>MAREN_REVIEW_ADDRESS</key>
+    <string>0xE86De53Ff4c3C223F7D1cF2F4ed23D50899dD3CC</string>
     <!--
       Export-compliance declaration. Maren only uses standard, exempt cryptography: HTTPS/TLS
       for network calls, Apple's Keychain/Secure Enclave and secp256k1 signing for the wallet.

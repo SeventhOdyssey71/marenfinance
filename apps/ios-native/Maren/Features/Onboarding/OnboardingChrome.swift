@@ -469,6 +469,8 @@ struct OnboardingField: View {
     var mono: Bool = false
     var axis: Axis = .horizontal
     var autocapitalization: TextInputAutocapitalization = .never
+    var keyboardType: UIKeyboardType = .default
+    var secure: Bool = false
     var submitLabel: SubmitLabel = .continue
     var showsPaste: Bool = false
     var onSubmit: () -> Void = {}
@@ -497,12 +499,20 @@ struct OnboardingField: View {
                         .accessibilityLabel("Paste from the clipboard")
                     }
                 }
-                TextField("", text: $text, axis: axis)
+                Group {
+                    if secure {
+                        SecureField("", text: $text)
+                            .privacySensitive()
+                    } else {
+                        TextField("", text: $text, axis: axis)
+                    }
+                }
                     .placeholderOverlay(placeholder, mono: mono, visible: text.isEmpty)
                     .font(mono ? .figure(17, weight: .medium) : .text(22, weight: .medium))
                     .foregroundStyle(OnboardingPalette.heading)
                     .tint(OnboardingPalette.accent)
                     .textInputAutocapitalization(autocapitalization)
+                    .keyboardType(keyboardType)
                     .autocorrectionDisabled()
                     .submitLabel(submitLabel)
                     .focused($focused)
