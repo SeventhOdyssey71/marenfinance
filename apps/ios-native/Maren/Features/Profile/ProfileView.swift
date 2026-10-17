@@ -15,6 +15,7 @@ struct ProfileView: View {
     @State private var account: Account?
     @State private var showSetup = false
     @State private var showReviewAccess = false
+    @State private var confirmReviewAccess = false
     @State private var protection: KeyProtection?
     @State private var loadingAccount = true
     @AppStorage("finance.maren.swift.backupPending") private var backupPending = false
@@ -60,6 +61,16 @@ struct ProfileView: View {
                 onBack: { showReviewAccess = false },
                 onWallet: installReviewWallet
             )
+        }
+        .confirmationDialog(
+            "Switch to the App Review wallet?",
+            isPresented: $confirmReviewAccess,
+            titleVisibility: .visible
+        ) {
+            Button("Continue to App Review access") { showReviewAccess = true }
+            Button("Cancel", role: .cancel) {}
+        } message: {
+            Text("This replaces the signing key currently stored on this device. Save that wallet's private key first if you need it again.")
         }
         .onAppear(perform: refreshProtection)
     }
@@ -133,7 +144,7 @@ struct ProfileView: View {
                 }
                 if !AppReviewAccess.configuredEmail.isEmpty {
                     PillButton(title: "App Review access", icon: "checkmark.seal", variant: .quiet) {
-                        showReviewAccess = true
+                        confirmReviewAccess = true
                     }
                     .accessibilityHint("Switches to the testnet review wallet using the credentials supplied to Apple.")
                 }
