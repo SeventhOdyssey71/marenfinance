@@ -14,6 +14,7 @@ struct ProfileView: View {
     @Environment(MarenSession.self) private var session
     @State private var account: Account?
     @State private var showSetup = false
+    @State private var showReviewAccess = false
     @State private var protection: KeyProtection?
     @State private var loadingAccount = true
     @AppStorage("finance.maren.swift.backupPending") private var backupPending = false
@@ -43,7 +44,7 @@ struct ProfileView: View {
                     .fixedSize(horizontal: false, vertical: true)
             }
         }
-        .task {
+        .task(id: session.address) {
             loadingAccount = true
             account = try? await client.account()
             loadingAccount = false
@@ -53,6 +54,12 @@ struct ProfileView: View {
                 protection = newProtection
                 if newProtection == nil { session.signOut() }
             }
+        }
+        .fullScreenCover(isPresented: $showReviewAccess) {
+            OnboardingReviewAccessStep(
+                onBack: { showReviewAccess = false },
+                onWallet: installReviewWallet
+            )
         }
         .onAppear(perform: refreshProtection)
     }
@@ -124,6 +131,32 @@ struct ProfileView: View {
                 PillButton(title: protection == nil ? "Restore wallet" : (backupPending ? "Back up wallet" : "Manage wallet"), variant: .quiet) {
                     showSetup = true
                 }
+                if !AppReviewAccess.configuredEmail.isEmpty {
+                    PillButton(title: "App Review access", icon: "checkmark.seal", variant: .quiet) {
+                        showReviewAccess = true
+                    }
+                    .accessibilityHint("Switches to the testnet review wallet using the credentials supplied to Apple.")
+                }
+            }
+        }
+    }
+
+    private func installReviewWallet(_ key: Data, address: String) {
+        Task {
+            guard let derived = try? Keystore.address(of: key),
+                  derived.lowercased() == address.lowercased(),
+                  address.lowercased() == AppReviewAccess.configuredAddress.lowercased() else { return }
+            do {
+                protection = try await Keystore.shared.store(privateKey: key)
+                OnboardingFlags.markBackedUp()
+                backupPending = false
+                session.adopt(address: address, name: "App Review")
+                account = nil
+                loadingAccount = true
+                showReviewAccess = false
+            } catch {
+                // The credentials screen remains open, so no public wallet state changes if
+                // Keychain refuses the already-validated key.
             }
         }
     }
