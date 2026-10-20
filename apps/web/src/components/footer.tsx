@@ -43,9 +43,7 @@ export function Footer() {
       {/* Closing CTA — clean dark panel */}
       <Reveal>
         <div className="rounded-[36px] bg-[color:var(--ink)] p-10 text-center sm:p-16">
-          <h2
-            className="u-display mx-auto max-w-[16ch] text-[clamp(30px,5vw,58px)] text-white"
-          >
+          <h2 className="u-display mx-auto max-w-[16ch] text-[clamp(30px,5vw,58px)] text-white">
             Spend Bitcoin. Never sell it.
           </h2>
           <p className="mx-auto mt-4 max-w-[46ch] text-[15px] font-normal leading-[1.5] text-white/65 sm:text-[17px]">

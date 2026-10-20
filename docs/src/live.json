@@ -23,22 +23,10 @@
     "oracleUpdatedAt": "2026-09-16T12:44:33.000Z"
   },
   "quotedIn": {
-    "mainnet.troveCount": [
-      "docs/src/01-thesis.md",
-      "docs/ARCHITECTURE.md"
-    ],
-    "mainnet.btcPriceUsd": [
-      "docs/src/01-thesis.md",
-      "docs/ARCHITECTURE.md"
-    ],
-    "matsnet.collateralBtc": [
-      "docs/src/progress.md"
-    ],
-    "matsnet.debtMusd": [
-      "docs/src/progress.md"
-    ],
-    "matsnet.icrPercent": [
-      "docs/src/progress.md"
-    ]
+    "mainnet.troveCount": ["docs/src/01-thesis.md", "docs/ARCHITECTURE.md"],
+    "mainnet.btcPriceUsd": ["docs/src/01-thesis.md", "docs/ARCHITECTURE.md"],
+    "matsnet.collateralBtc": ["docs/src/progress.md"],
+    "matsnet.debtMusd": ["docs/src/progress.md"],
+    "matsnet.icrPercent": ["docs/src/progress.md"]
   }
 }

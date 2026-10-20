@@ -32,10 +32,7 @@ function arg(name, fallback) {
 const input = resolve(arg('input', 'design/explainer-film/maren-explainer.html'));
 const step = Number(arg('step', 0.04));
 const outDir = resolve(arg('out', '/tmp/maren-probe'));
-const stills = (arg('stills', '') || '')
-  .split(',')
-  .filter(Boolean)
-  .map(Number);
+const stills = (arg('stills', '') || '').split(',').filter(Boolean).map(Number);
 
 if (!existsSync(input)) {
   console.error(`no such film: ${input}`);
@@ -63,11 +60,14 @@ try {
     /* eslint-disable no-undef */
     playing = false;
     window.requestAnimationFrame = () => 0;
-    for (const id of ['ui', 'hint']) document.getElementById(id)?.style.setProperty('display', 'none');
+    for (const id of ['ui', 'hint'])
+      document.getElementById(id)?.style.setProperty('display', 'none');
 
     // Every element the film animates, plus the headline subset used for collisions.
     const nodes = [...document.querySelectorAll('.anim, .copy > *, .w')];
-    const heads = [...document.querySelectorAll('.copy > .h2, .hero, .big, .mid, .turn-h, .copy .num')];
+    const heads = [
+      ...document.querySelectorAll('.copy > .h2, .hero, .big, .mid, .turn-h, .copy .num'),
+    ];
     const alphaOf = (el) => {
       // Effective alpha: an element inside a hidden wrapper is not on screen no matter
       // what its own opacity says. Walk up to #camera multiplying as we go.
@@ -147,7 +147,11 @@ try {
     }
     if (emptyRun) empties.push(emptyRun);
 
-    const beats = BEATS.map((b) => ({ id: b.id, name: b.name, len: Number((b.t1 - b.t0).toFixed(2)) }));
+    const beats = BEATS.map((b) => ({
+      id: b.id,
+      name: b.name,
+      len: Number((b.t1 - b.t0).toFixed(2)),
+    }));
     return { DUR, empties, collisions, jumps, beats };
     /* eslint-enable no-undef */
   }, step);
@@ -174,7 +178,9 @@ try {
   }
   if (run) runs.push(run);
   for (const r of runs) {
-    console.log(`  ${r.from.toFixed(2)}-${r.to.toFixed(2)}s  ${(r.to - r.from).toFixed(2)}s  ${r.what.join('  |  ')}`);
+    console.log(
+      `  ${r.from.toFixed(2)}-${r.to.toFixed(2)}s  ${(r.to - r.from).toFixed(2)}s  ${r.what.join('  |  ')}`,
+    );
   }
 
   console.log(`\nHARD CUTS (alpha jump > 0.30 in one ${step}s step)  ${report.jumps.length}`);

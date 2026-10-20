@@ -21,21 +21,21 @@ colophon: |
 
 ## What you can check yourself, in five minutes
 
-| | |
-| --- | --- |
-| Site | `https://marenfinance.xyz` |
-| Docs | `https://marenfinance.xyz/docs` |
-| iOS beta | `https://testflight.apple.com/join/uhmv9YPE` |
+|                |                                                           |
+| -------------- | --------------------------------------------------------- |
+| Site           | `https://marenfinance.xyz`                                |
+| Docs           | `https://marenfinance.xyz/docs`                           |
+| iOS beta       | `https://testflight.apple.com/join/uhmv9YPE`              |
 | Relayer health | `https://maren-relayer.rolandojude18.workers.dev/healthz` |
-| Chain | Mezo **matsnet**, chain ID 31611 |
+| Chain          | Mezo **matsnet**, chain ID 31611                          |
 
 Five contracts, all source-verified on Blockscout:
 
-| Contract | Address |
-| --- | --- |
-| MarenVault | `0x46252B00AB59384518d9dB6D1f210ffF1221645b` |
-| MarenPay | `0xe475Ff919D54E055809f516E3bed8a5c7a101836` |
-| MarenEarn | `0xE3B02b215085B99Ce61E0F5ea9763Ac637aa7826` |
+| Contract      | Address                                      |
+| ------------- | -------------------------------------------- |
+| MarenVault    | `0x46252B00AB59384518d9dB6D1f210ffF1221645b` |
+| MarenPay      | `0xe475Ff919D54E055809f516E3bed8a5c7a101836` |
+| MarenEarn     | `0xE3B02b215085B99Ce61E0F5ea9763Ac637aa7826` |
 | MarenRegistry | `0x9e123Cdd0CD524812CF9F552d3FAB13d8143b77E` |
 | MarenRelayHub | `0x22cC1Adfb0C91D9359746dE3F7E8cB7F2B8eA98C` |
 
@@ -65,7 +65,7 @@ whale-shaped because the minimum makes it whale-shaped.
 
 Maren's pooled vault removes that minimum. Its own floor is `MIN_DEPOSIT = 0.001 BTC`
 — about $76 at today's price — enforced in `MarenVault._requireDepositAllowed`. There
-is no minimum *loan* at all: the only amount check on the borrow path is `amount == 0`,
+is no minimum _loan_ at all: the only amount check on the borrow path is `amount == 0`,
 and what actually binds is the 180% collateral ratio. A depositor gets a proportional
 claim inside one conservatively managed trove that clears MUSD's 1,800 minimum on their
 behalf. That is the entire product thesis, and it is the part that required original
@@ -77,18 +77,18 @@ Regenerate every figure below with `pnpm --filter @maren/metrics start`. It read
 Maren contract from the deployment block — 14,911,471, located by bisecting
 `eth_getCode` — through to chain head.
 
-| | |
-| --- | --- |
-| Funded positions | **6** |
-| MUSD borrowed through Maren | **2,944.72** gross, all time |
-| Payments settled | **17**, totalling 82.70 MUSD |
-| Earn TVL | **54.00 MUSD** across 4 depositors |
-| Handles registered | 2 |
-| Money links created / claimed | 1 / 0 |
-| **Spend ratio** | **80.0%** — 4 of the 5 borrowers went on to send a payment |
+|                               |                                                            |
+| ----------------------------- | ---------------------------------------------------------- |
+| Funded positions              | **6**                                                      |
+| MUSD borrowed through Maren   | **2,944.72** gross, all time                               |
+| Payments settled              | **17**, totalling 82.70 MUSD                               |
+| Earn TVL                      | **54.00 MUSD** across 4 depositors                         |
+| Handles registered            | 2                                                          |
+| Money links created / claimed | 1 / 0                                                      |
+| **Spend ratio**               | **80.0%** — 4 of the 5 borrowers went on to send a payment |
 
 **The spend ratio is the number that matters.** Maren's thesis is that Bitcoin-backed
-credit creates *spending*, not merely borrowing. Four of the five addresses that borrowed
+credit creates _spending_, not merely borrowing. Four of the five addresses that borrowed
 then paid someone.
 
 **These are testnet figures from a handful of accounts, most of them ours or our two beta
@@ -111,7 +111,7 @@ from chain logs.
 sequencing and per-user quota. It is fail-closed: it simulates every call before paying,
 and declines rather than burning gas on something that would revert.
 
-*Proof, not a claim:* a real ERC-2771 sponsored transaction settled in **block
+_Proof, not a claim:_ a real ERC-2771 sponsored transaction settled in **block
 15368268** — gas paid by `0xd902…df89` on behalf of a signer holding **zero BTC**.
 
 **A TypeScript SDK** over viem, shared by the web client and the metrics tool, plus a
@@ -164,8 +164,8 @@ One example of what that caught. Our borrow screen computed the maximum borrow f
 Maren's own 180% collateral floor and ignored Mezo's per-trove `maxBorrowingCapacity`,
 which is fixed at the price the trove opened at. Measured against the live trove, the app
 offered **1,319.10 MUSD** where the real limit was **84.52**. Confirmed by simulation: 84
-clears, 90 reverts with *"BorrowerOps: An operation that exceeds maxBorrowingCapacity is
-not permitted."* A beta tester hit exactly this. It is fixed on both clients, with three
+clears, 90 reverts with _"BorrowerOps: An operation that exceeds maxBorrowingCapacity is
+not permitted."_ A beta tester hit exactly this. It is fixed on both clients, with three
 regression tests pinned to the measured figures.
 
 ### Honest data, enforced rather than intended
@@ -204,36 +204,36 @@ These are in our tracker and on the public risk page. None is hidden.
 MUSD against 2,749.13 of debt — **0.07 MUSD of headroom**. Borrowing is effectively
 blocked until the trove is refinanced. The trove itself is healthy at a 190.6% collateral
 ratio on 0.069061 BTC; it is the capacity cap that binds, not risk. The app reports this
-honestly rather than offering an amount that would revert. *Open, operational.*
+honestly rather than offering an amount that would revert. _Open, operational._
 
 **`getEntireDebtAndColl` pending values are double-counted** in four places. Mezo's
 TroveManager folds `pending*` into its first three return values before returning them;
 we then add them again. On the first liquidation the Stability Pool cannot absorb, every
 pooled user would be charged twice the redistributed debt. Mezo's DefaultPool is 0/0
-today, so this is armed and not firing. *Open, critical.*
+today, so this is armed and not firing. _Open, critical._
 
 **The deployed vault predates its own redemption reconciliation.** `reconcileRedemption`,
 `settleRedemption`, `collateralOf` and `redemptionShortfall` are absent from the deployed
 dispatch table — confirmed again today. The mechanism exists in source and in the test
-suite; it is not on chain. *Open, needs redeploy.*
+suite; it is not on chain. _Open, needs redeploy._
 
 **A liquidation of the pooled trove freezes every exit**, including idle BTC that never
 entered the trove, with no admin recovery path. Disclosed on the risk page as R-10.
-*Open, by design pending a wind-down mechanism.*
+_Open, by design pending a wind-down mechanism._
 
 **Earn can lose principal.** Cantina's mUSD audit §3.4.7 established that Stability Pool
 liquidations can be unprofitable; Thesis agreed and marked it **Acknowledged, not fixed**.
 Maren is structurally the passive depositor in that scenario. Disclosed as R-11.
-*Disclosed, not mitigable by us.*
+_Disclosed, not mitigable by us._
 
 **One EOA holds every privileged role** on matsnet — admin, keeper and guardian. A Safe
-with a timelock is a hard mainnet gate. Disclosed as R-13. *Open.*
+with a timelock is a hard mainnet gate. Disclosed as R-13. _Open._
 
 **The keeper is not built.** Liquidation functions are deployed and `KEEPER_ROLE`-gated,
-but no automated process calls them. *Open.*
+but no automated process calls them. _Open._
 
 **The repository is private** during grant review. Access can be granted immediately on
-request. *Open.*
+request. _Open._
 
 ## Infrastructure, briefly
 

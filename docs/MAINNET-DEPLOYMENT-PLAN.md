@@ -10,25 +10,25 @@ denominated in it.
 
 Mezo mainnet is live and the protocol Maren depends on is fully deployed there.
 
-| | mainnet (31612) | matsnet (31611) |
-| --- | --- | --- |
-| chain | block 12,505,025 | block 16,152,947 |
-| MUSD | `0xdD468A1D…F9F186`, 6,436 B | `0x118917a4…3Ac503` |
-| BorrowerOperations | `0x44b1bac6…1dEe031`, 1,159 B | `0xCdF7028c…994beE5` |
-| TroveManager | `0x94AfB503…B93c193`, 1,159 B | `0xE47c80e8…D16bb0` |
-| PriceFeed | `0xc5aC5A88…3fFcA88`, 1,159 B | `0x86bCF084…1b9366` |
-| **Maren's own contracts** | **not deployed — all zero** | deployed 2026-08-15 |
+|                           | mainnet (31612)               | matsnet (31611)      |
+| ------------------------- | ----------------------------- | -------------------- |
+| chain                     | block 12,505,025              | block 16,152,947     |
+| MUSD                      | `0xdD468A1D…F9F186`, 6,436 B  | `0x118917a4…3Ac503`  |
+| BorrowerOperations        | `0x44b1bac6…1dEe031`, 1,159 B | `0xCdF7028c…994beE5` |
+| TroveManager              | `0x94AfB503…B93c193`, 1,159 B | `0xE47c80e8…D16bb0`  |
+| PriceFeed                 | `0xc5aC5A88…3fFcA88`, 1,159 B | `0x86bCF084…1b9366`  |
+| **Maren's own contracts** | **not deployed — all zero**   | deployed 2026-08-15  |
 
 The 1,159-byte contracts are proxies, which is expected.
 
 **The protocol parameters are identical on both chains**, verified today:
 
-| | mainnet | matsnet |
-| --- | --- | --- |
-| MCR (liquidation) | 110% | 110% |
-| CCR (recovery mode) | 150% | 150% |
-| minimum net debt | 1,800 MUSD | 1,800 MUSD |
-| interest rate | 1% | 1% |
+|                     | mainnet    | matsnet    |
+| ------------------- | ---------- | ---------- |
+| MCR (liquidation)   | 110%       | 110%       |
+| CCR (recovery mode) | 150%       | 150%       |
+| minimum net debt    | 1,800 MUSD | 1,800 MUSD |
+| interest rate       | 1%         | 1%         |
 
 This is the single most useful finding for planning: nothing in the product's design has to
 change for mainnet. The floors, the minimum trove size and the liquidation maths all carry
@@ -58,7 +58,7 @@ Three options, each coherent:
 3. **Deploy a limited mainnet** — contracts live, caps set so that total exposure is bounded
    to an amount you would accept losing — and keep the audit gate for lifting the caps. This
    is the only option that gets something real on mainnet soon without contradicting the page,
-   because the page gates *reaching* mainnet, which option 3 does breach. Read it carefully
+   because the page gates _reaching_ mainnet, which option 3 does breach. Read it carefully
    before choosing this; it may require the same amendment as option 2.
 
 Everything below is independent of which you pick.
@@ -139,12 +139,12 @@ the local build, and the deployment block for each contract.
 The smallest legal trove carries **2,000 MUSD** of debt (1,800 minimum net debt + 200 gas
 compensation). At $83,333/BTC:
 
-| target ratio | BTC | USD | meaning |
-| --- | --- | --- | --- |
-| 110% | 0.0264 | $2,200 | liquidation — never seed here |
-| 180% | 0.0432 | $3,600 | Maren's borrow floor, zero headroom |
-| **250%** | **0.0600** | **$5,000** | recommended |
-| 370% | 0.0888 | $7,400 | where matsnet lands after the pending top-up |
+| target ratio | BTC        | USD        | meaning                                      |
+| ------------ | ---------- | ---------- | -------------------------------------------- |
+| 110%         | 0.0264     | $2,200     | liquidation — never seed here                |
+| 180%         | 0.0432     | $3,600     | Maren's borrow floor, zero headroom          |
+| **250%**     | **0.0600** | **$5,000** | recommended                                  |
+| 370%         | 0.0888     | $7,400     | where matsnet lands after the pending top-up |
 
 At a 250% seed, BTC can fall **28%** before borrowing stops, **40%** before recovery mode,
 and **56%** before liquidation. At a 180% seed the first of those is zero — which is exactly
@@ -164,16 +164,16 @@ A separate Worker and a separate signer. Do not reuse the matsnet relayer.
 
 `apps/relayer/wrangler.jsonc` needs every one of these changed:
 
-| var | matsnet | mainnet |
-| --- | --- | --- |
-| `RELAYER_NETWORK` | `testnet` | `mainnet` |
-| `RELAYER_RPC_URLS` | `rpc.test.mezo.org,…` | `jsonrpc-mezo.boar.network` |
-| `RELAYER_FORWARDER_ADDRESS` | `0x22cC1Adf…` | new RelayHub |
-| `RELAYER_ALLOWED_TARGETS` | matsnet trio | new Pay/Registry/Vault |
-| `RELAYER_MAX_DAILY_SPONSORED_BTC` | `0.01` | **see below** |
-| `RELAYER_FREE_ACTIONS_PER_ADDRESS` | `250` | **see below** |
-| `RELAYER_IP_SALT` | `…testnet…v1` | a new salt |
-| `RELAYER_ALLOWED_ORIGINS` | current | mainnet origins only |
+| var                                | matsnet               | mainnet                     |
+| ---------------------------------- | --------------------- | --------------------------- |
+| `RELAYER_NETWORK`                  | `testnet`             | `mainnet`                   |
+| `RELAYER_RPC_URLS`                 | `rpc.test.mezo.org,…` | `jsonrpc-mezo.boar.network` |
+| `RELAYER_FORWARDER_ADDRESS`        | `0x22cC1Adf…`         | new RelayHub                |
+| `RELAYER_ALLOWED_TARGETS`          | matsnet trio          | new Pay/Registry/Vault      |
+| `RELAYER_MAX_DAILY_SPONSORED_BTC`  | `0.01`                | **see below**               |
+| `RELAYER_FREE_ACTIONS_PER_ADDRESS` | `250`                 | **see below**               |
+| `RELAYER_IP_SALT`                  | `…testnet…v1`         | a new salt                  |
+| `RELAYER_ALLOWED_ORIGINS`          | current               | mainnet origins only        |
 
 **The caps must come down before mainnet, not after.** Mainnet gas is 1,462,500 wei against
 matsnet's 146 — **10,017×**. The same `0.01 BTC/day` ceiling that authorised about 8 cents a
@@ -194,15 +194,15 @@ back to self-paid, it stops.
 
 ## Phase 4 — clients
 
-| file | change |
-| --- | --- |
-| `packages/sdk/src/addresses.ts` | `MAREN_ADDRESSES.mainnet` — five `ZERO`s become real |
-| `packages/sdk/src/addresses.ts` | `MAREN_DEPLOYMENT_BLOCK.mainnet` — `null` becomes the earliest deploy block |
-| `packages/sdk/src/chains.ts` | mainnet RPC and explorer wiring |
-| `apps/web` | `NEXT_PUBLIC_MEZO_NETWORK`, relayer URL, Privy chain config |
-| `apps/ios-native` | network constant, relayer URL, explorer base |
-| `docs-site/reference/contracts.mdx` | the Mainnet (31612) tab is currently empty |
-| `docs-site/reference/networks.mdx` | same |
+| file                                | change                                                                      |
+| ----------------------------------- | --------------------------------------------------------------------------- |
+| `packages/sdk/src/addresses.ts`     | `MAREN_ADDRESSES.mainnet` — five `ZERO`s become real                        |
+| `packages/sdk/src/addresses.ts`     | `MAREN_DEPLOYMENT_BLOCK.mainnet` — `null` becomes the earliest deploy block |
+| `packages/sdk/src/chains.ts`        | mainnet RPC and explorer wiring                                             |
+| `apps/web`                          | `NEXT_PUBLIC_MEZO_NETWORK`, relayer URL, Privy chain config                 |
+| `apps/ios-native`                   | network constant, relayer URL, explorer base                                |
+| `docs-site/reference/contracts.mdx` | the Mainnet (31612) tab is currently empty                                  |
+| `docs-site/reference/networks.mdx`  | same                                                                        |
 
 `MAREN_DEPLOYMENT_BLOCK.mainnet` is `null` deliberately — the comment says `null` means
 "there is no history to read", which callers handle as unavailable rather than empty. Set it
@@ -230,12 +230,12 @@ submission is a false statement to Apple.
 
 ## Costs
 
-| | BTC | USD |
-| --- | --- | --- |
-| Contract deployment, 11 txs, 11,688,063 gas | 0.0000171 | **$1.42** |
-| Seed trove at 250% | 0.0600 | **$5,000** |
-| Relayer float, initial | your call | — |
-| Audit | — | **five figures, and the long pole** |
+|                                             | BTC       | USD                                 |
+| ------------------------------------------- | --------- | ----------------------------------- |
+| Contract deployment, 11 txs, 11,688,063 gas | 0.0000171 | **$1.42**                           |
+| Seed trove at 250%                          | 0.0600    | **$5,000**                          |
+| Relayer float, initial                      | your call | —                                   |
+| Audit                                       | —         | **five figures, and the long pole** |
 
 Gas is not the constraint and never will be on this chain. The seed and the audit are the
 real numbers.

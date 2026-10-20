@@ -124,7 +124,9 @@ if (only.length) {
     console.error(`--only names lines that are not in the script: ${unknown.join(', ')}`);
     process.exit(1);
   }
-  process.stderr.write(`regenerating ${only.join(', ')}; keeping ${previous.length - only.length} measured line(s)\n`);
+  process.stderr.write(
+    `regenerating ${only.join(', ')}; keeping ${previous.length - only.length} measured line(s)\n`,
+  );
 }
 
 const results = [];

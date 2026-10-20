@@ -49,11 +49,14 @@ const num = (wei, dp = 2) => (Number(wei) / 1e18).toFixed(dp);
 function cast(args) {
   const r = spawnSync('cast', args, { encoding: 'utf8', timeout: 30_000 });
   if (r.error || r.status !== 0) {
-    throw new Error((r.stderr || r.stdout || r.error?.message || 'cast failed').trim().split('\n')[0]);
+    throw new Error(
+      (r.stderr || r.stdout || r.error?.message || 'cast failed').trim().split('\n')[0],
+    );
   }
   return r.stdout.trim().split(/\s+/)[0];
 }
-const read = (to, sig, ...a) => cast(['call', to, sig, ...a, '--rpc-url', opt.rpc, '--block', block]);
+const read = (to, sig, ...a) =>
+  cast(['call', to, sig, ...a, '--rpc-url', opt.rpc, '--block', block]);
 
 function check({ name, status, detail, value }) {
   results.push({ name, status, detail, value });
@@ -83,7 +86,11 @@ check({ name: 'chain', status: 'pass', detail: `Mezo testnet 31611 at block ${bl
 let price = 0n;
 try {
   price = BigInt(read(PRICE_FEED, 'fetchPrice()(uint256)'));
-  check({ name: 'oracle', status: 'pass', detail: `$${num(price)} / BTC, fresh enough to transact` });
+  check({
+    name: 'oracle',
+    status: 'pass',
+    detail: `$${num(price)} / BTC, fresh enough to transact`,
+  });
 } catch (e) {
   check({
     name: 'oracle',
@@ -95,7 +102,9 @@ try {
 // --- the pooled trove: the thing that ran out last time ---------------------
 const troveColl = BigInt(read(TROVE_MANAGER, 'getTroveColl(address)(uint256)', VAULT));
 const troveDebt = BigInt(read(TROVE_MANAGER, 'getTroveDebt(address)(uint256)', VAULT));
-const ceiling = BigInt(read(TROVE_MANAGER, 'getTroveMaxBorrowingCapacity(address)(uint256)', VAULT));
+const ceiling = BigInt(
+  read(TROVE_MANAGER, 'getTroveMaxBorrowingCapacity(address)(uint256)', VAULT),
+);
 const minTroveCr = BigInt(read(VAULT, 'MIN_TROVE_CR()(uint256)'));
 const reserve = BigInt(read(VAULT, 'reserveMUSD()(uint256)'));
 const idle = BigInt(read(VAULT, 'idleCollateral()(uint256)'));
@@ -300,8 +309,10 @@ if (opt.json || opt.out) {
     process.stdout.write(`${mark[r.status]} ${r.name.padEnd(24)} ${r.detail}\n`);
   }
   process.stdout.write(`\n${verdict}`);
-  if (fails.length) process.stdout.write(` — ${fails.length} blocking: ${fails.map((f) => f.name).join(', ')}`);
-  else if (warns.length) process.stdout.write(` — ${warns.length} degrading: ${warns.map((w) => w.name).join(', ')}`);
+  if (fails.length)
+    process.stdout.write(` — ${fails.length} blocking: ${fails.map((f) => f.name).join(', ')}`);
+  else if (warns.length)
+    process.stdout.write(` — ${warns.length} degrading: ${warns.map((w) => w.name).join(', ')}`);
   process.stdout.write('\n\n');
 }
 process.exit(fails.length ? 2 : warns.length ? 1 : 0);

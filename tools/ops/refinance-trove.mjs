@@ -71,7 +71,8 @@ const ZERO = '0x0000000000000000000000000000000000000000';
  * until the wording changes. The `cast send` below deliberately does not go through
  * this helper, because a resubmission could double up.
  */
-const TRANSIENT = /error sending request|connection (closed|reset)|timed out|timeout|EOF|503|502|504/i;
+const TRANSIENT =
+  /error sending request|connection (closed|reset)|timed out|timeout|EOF|503|502|504/i;
 
 function cast(args, { allowFail = false, retries = 4 } = {}) {
   let lastDetail = '';

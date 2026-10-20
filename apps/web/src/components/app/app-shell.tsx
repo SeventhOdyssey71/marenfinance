@@ -77,7 +77,7 @@ function AppNav({ pathname }: { pathname: string }) {
                 aria-current={active ? 'page' : undefined}
                 className={`flex min-h-[44px] min-w-[4.25rem] flex-col items-center justify-center gap-1 rounded-[var(--radius-pill)] px-3 py-2 text-[0.6875rem] transition-colors duration-[120ms] ease-out md:min-w-0 md:flex-row md:gap-2 md:px-4 md:text-sm ${
                   active
-                    ? 'bg-surface-inset text-text font-medium md:bg-surface md:shadow-[0_1px_2px_rgba(16,16,19,0.06)]'
+                    ? 'bg-surface-inset text-text md:bg-surface font-medium md:shadow-[0_1px_2px_rgba(16,16,19,0.06)]'
                     : 'text-text-muted'
                 }`}
               >

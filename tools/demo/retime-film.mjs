@@ -33,8 +33,8 @@ function arg(name, fallback) {
 
 const AUDIO = resolve(arg('audio', 'design/explainer-film/audio'));
 const LEAD = 0.55; // beat t0 -> line starts speaking
-const TAIL = 0.40; // line ends -> next beat t0 (== the beat overlap)
-const OVERLAP = 0.40;
+const TAIL = 0.4; // line ends -> next beat t0 (== the beat overlap)
+const OVERLAP = 0.4;
 
 /**
  * id, human name, and the minimum the PICTURE needs, independent of the words.
@@ -85,7 +85,16 @@ for (const [id, name, floor, lead] of PLAN) {
   if (dur === undefined) throw new Error(`no measured audio for ${id}`);
   const need = dur + (lead ?? LEAD) + TAIL;
   const len = Math.max(floor, Math.ceil(need * 20) / 20); // round up to 0.05
-  beats.push({ id, name, t0, t1: t0 + len, len, dur, cue: t0 + (lead ?? LEAD), bound: need > floor });
+  beats.push({
+    id,
+    name,
+    t0,
+    t1: t0 + len,
+    len,
+    dur,
+    cue: t0 + (lead ?? LEAD),
+    bound: need > floor,
+  });
   t0 = t0 + len - OVERLAP;
 }
 
@@ -97,15 +106,28 @@ for (const [id, name, floor, lead] of PLAN) {
    nothing. 1.30s is the launch film's spacing, and it is enough for the POP to settle. */
 const T2 = beats.find((b) => b.id === 'T2');
 const P1 = beats.find((b) => b.id === 'P1');
-const T1 = { id: 'T1', name: 'Turn · the mark', t0: Number((T2.t0 - 1.3).toFixed(2)), t1: Number((P1.t0 - 0.4).toFixed(2)) };
+const T1 = {
+  id: 'T1',
+  name: 'Turn · the mark',
+  t0: Number((T2.t0 - 1.3).toFixed(2)),
+  t1: Number((P1.t0 - 0.4).toFixed(2)),
+};
 
 const DUR = beats[beats.length - 1].t1;
 const out = [...beats];
-out.splice(out.findIndex((b) => b.id === 'T2'), 0, T1);
+out.splice(
+  out.findIndex((b) => b.id === 'T2'),
+  0,
+  T1,
+);
 
 const f = (v) => v.toFixed(2).padStart(6);
-console.log(`\nDUR = ${DUR.toFixed(2)}  (${Math.floor(DUR / 60)}:${String(Math.round(DUR % 60)).padStart(2, '0')})`);
-console.log(`${beats.filter((b) => b.bound).length} of ${beats.length} beats are held open by their line, not by the floor\n`);
+console.log(
+  `\nDUR = ${DUR.toFixed(2)}  (${Math.floor(DUR / 60)}:${String(Math.round(DUR % 60)).padStart(2, '0')})`,
+);
+console.log(
+  `${beats.filter((b) => b.bound).length} of ${beats.length} beats are held open by their line, not by the floor\n`,
+);
 
 console.log('var BEATS = [');
 for (const b of out) {

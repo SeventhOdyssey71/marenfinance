@@ -70,7 +70,8 @@ const WAD = 10n ** 18n;
  * asking the same question until the wording changes. `send` is never retried here
  * either: it is called once, from the execute path, where a resubmission could double up.
  */
-const TRANSIENT = /error sending request|connection (closed|reset)|timed out|timeout|EOF|503|502|504/i;
+const TRANSIENT =
+  /error sending request|connection (closed|reset)|timed out|timeout|EOF|503|502|504/i;
 
 function cast(args, { allowFail = false, retries = 4 } = {}) {
   let lastDetail = '';
@@ -120,7 +121,9 @@ assertKeeperRole();
 const idle = BigInt(read(VAULT, 'idleCollateral()(uint256)'));
 const troveColl = BigInt(read(TROVE_MANAGER, 'getTroveColl(address)(uint256)', VAULT));
 const troveDebt = BigInt(read(TROVE_MANAGER, 'getTroveDebt(address)(uint256)', VAULT));
-const ceiling = BigInt(read(TROVE_MANAGER, 'getTroveMaxBorrowingCapacity(address)(uint256)', VAULT));
+const ceiling = BigInt(
+  read(TROVE_MANAGER, 'getTroveMaxBorrowingCapacity(address)(uint256)', VAULT),
+);
 const minTroveCr = BigInt(read(VAULT, 'MIN_TROVE_CR()(uint256)'));
 const reserve = BigInt(read(VAULT, 'reserveMUSD()(uint256)'));
 const price = BigInt(read(PRICE_FEED, 'fetchPrice()(uint256)'));
@@ -139,9 +142,18 @@ const drawNow = reserve + (ceilingHeadroom < ratioHeadroom ? ceilingHeadroom : r
 process.stdout.write('\nPooled collateral, read live\n');
 line('snapshot block', snapshotBlock);
 line('in the trove', `${btc(troveColl)} BTC`);
-line('idle in the vault', `${btc(idle)} BTC  (${Number((idle * 100n) / (idle + troveColl))}% of the pool)`);
-line('trove ICR', `${(Number(icr) / 1e16).toFixed(1)}%  against a ${Number(minTroveCr) / 1e16}% floor`);
-line('borrow capacity now', `${musd(drawNow)} MUSD  (limited by ${ceilingHeadroom < ratioHeadroom ? 'the ceiling' : 'the trove ratio'})`);
+line(
+  'idle in the vault',
+  `${btc(idle)} BTC  (${Number((idle * 100n) / (idle + troveColl))}% of the pool)`,
+);
+line(
+  'trove ICR',
+  `${(Number(icr) / 1e16).toFixed(1)}%  against a ${Number(minTroveCr) / 1e16}% floor`,
+);
+line(
+  'borrow capacity now',
+  `${musd(drawNow)} MUSD  (limited by ${ceilingHeadroom < ratioHeadroom ? 'the ceiling' : 'the trove ratio'})`,
+);
 
 // --- how much to move ------------------------------------------------------
 /**
@@ -161,7 +173,8 @@ if (options.amount) {
   const parsed = cast(['to-wei', options.amount, 'ether'], { allowFail: true });
   if (parsed.error) throw new Error(`Refusing: --amount is not a number (${parsed.error}).`);
   push = BigInt(parsed.value);
-  if (push > idle) throw new Error(`Refusing: --amount exceeds idle collateral (${btc(idle)} BTC).`);
+  if (push > idle)
+    throw new Error(`Refusing: --amount exceeds idle collateral (${btc(idle)} BTC).`);
 }
 
 process.stdout.write('\nProposed push\n');
@@ -173,17 +186,31 @@ if (push === 0n) {
 const afterColl = troveColl + push;
 const afterIcr = troveDebt > 0n ? (afterColl * price) / troveDebt : 0n;
 const afterRatioHeadroom = capacityNow((afterColl * price) / minTroveCr);
-const afterDraw = reserve + (ceilingHeadroom < afterRatioHeadroom ? ceilingHeadroom : afterRatioHeadroom);
+const afterDraw =
+  reserve + (ceilingHeadroom < afterRatioHeadroom ? ceilingHeadroom : afterRatioHeadroom);
 line('amount', `${btc(push)} BTC of ${btc(idle)} idle`);
 line('left idle for withdrawals', `${btc(idle - push)} BTC`);
-line('trove ICR after', `${(Number(icr) / 1e16).toFixed(0)}% -> ${(Number(afterIcr) / 1e16).toFixed(0)}%`);
+line(
+  'trove ICR after',
+  `${(Number(icr) / 1e16).toFixed(0)}% -> ${(Number(afterIcr) / 1e16).toFixed(0)}%`,
+);
 line('borrow capacity after', `${musd(drawNow)} -> ${musd(afterDraw)} MUSD`);
 
 // --- simulate --------------------------------------------------------------
 const estimate = () => {
   const r = cast(
-    ['estimate', VAULT, 'topUpCollateral(uint256,address,address)', String(push), prev, next,
-     '--from', KEEPER, '--rpc-url', RPC],
+    [
+      'estimate',
+      VAULT,
+      'topUpCollateral(uint256,address,address)',
+      String(push),
+      prev,
+      next,
+      '--from',
+      KEEPER,
+      '--rpc-url',
+      RPC,
+    ],
     { allowFail: true },
   );
   if (r.error) return { error: r.error };
@@ -195,7 +222,7 @@ process.stdout.write('\nSimulated against chain head\n');
 line('gas', sim.error ? `FAILED — ${sim.error}` : sim.gas.toLocaleString());
 if (sim.error) {
   console.error('\nRefusing: the simulation did not succeed, so nothing was submitted.');
-  console.error("Check oracle freshness (Mezo reverts past 60s) and Recovery Mode.\n");
+  console.error('Check oracle freshness (Mezo reverts past 60s) and Recovery Mode.\n');
   process.exit(1);
 }
 let gasLimit = Math.ceil(sim.gas * 1.5);
@@ -211,7 +238,14 @@ if (!EXECUTE) {
 
 // --- send ------------------------------------------------------------------
 if (PASSWORD_FILE) {
-  const signer = cast(['wallet', 'address', '--account', ACCOUNT, '--password-file', PASSWORD_FILE]).value;
+  const signer = cast([
+    'wallet',
+    'address',
+    '--account',
+    ACCOUNT,
+    '--password-file',
+    PASSWORD_FILE,
+  ]).value;
   if (signer.toLowerCase() !== KEEPER.toLowerCase())
     throw new Error('Refusing: keystore is not the expected testnet keeper.');
 }
@@ -229,14 +263,29 @@ gasLimit = Math.ceil(finalSim.gas * 1.5);
 process.stdout.write('\nSending once through the Foundry keystore\n\n');
 const sent = spawnSync(
   'cast',
-  ['send', VAULT, 'topUpCollateral(uint256,address,address)', String(push), prev, next,
-   '--account', ACCOUNT, '--from', KEEPER,
-   ...(PASSWORD_FILE ? ['--password-file', PASSWORD_FILE] : []),
-   '--rpc-url', RPC, '--gas-limit', String(gasLimit)],
+  [
+    'send',
+    VAULT,
+    'topUpCollateral(uint256,address,address)',
+    String(push),
+    prev,
+    next,
+    '--account',
+    ACCOUNT,
+    '--from',
+    KEEPER,
+    ...(PASSWORD_FILE ? ['--password-file', PASSWORD_FILE] : []),
+    '--rpc-url',
+    RPC,
+    '--gas-limit',
+    String(gasLimit),
+  ],
   { stdio: 'inherit' },
 );
 if (sent.status !== 0) {
-  console.error('\ncast send did not return success. Submission may still have occurred; check the keeper nonce and a receipt before retrying.');
+  console.error(
+    '\ncast send did not return success. Submission may still have occurred; check the keeper nonce and a receipt before retrying.',
+  );
   process.exit(sent.status ?? 1);
 }
 
@@ -252,4 +301,6 @@ if (newTroveColl <= troveColl) {
   console.error('\nTrove collateral did not rise. Check the CollateralPushedToTrove event.\n');
   process.exit(1);
 }
-process.stdout.write('\nRun tools/ops/readiness.mjs to confirm the borrowing limits moved with it.\n\n');
+process.stdout.write(
+  '\nRun tools/ops/readiness.mjs to confirm the borrowing limits moved with it.\n\n',
+);
