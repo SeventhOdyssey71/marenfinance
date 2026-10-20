@@ -53,6 +53,45 @@ function isActive(pathname: string, href: string): boolean {
   return pathname === href || pathname.startsWith(href + '/');
 }
 
+/**
+ * ONE nav element that changes position, not two that duplicate each other.
+ *
+ * Below `md` it stays the thumb-reachable bar pinned to the bottom, icon over label.
+ * At `md` and up it becomes a pill sitting in the header, icon beside label. Rendering
+ * a separate desktop copy would double the landmark, double the tab stops, and read the
+ * four destinations twice to a screen reader — so the same list simply moves.
+ */
+function AppNav({ pathname }: { pathname: string }) {
+  return (
+    <nav
+      aria-label="App sections"
+      className="fixed inset-x-0 bottom-0 z-40 flex justify-center px-4 pb-[max(1rem,env(safe-area-inset-bottom))] md:static md:z-auto md:px-0 md:pb-0"
+    >
+      <ul className="bg-surface-raised/90 flex items-center gap-1 rounded-[var(--radius-pill)] p-1.5 shadow-[0_1px_2px_rgba(16,16,19,0.05),0_12px_32px_-12px_rgba(16,16,19,0.28)] backdrop-blur-xl md:gap-0.5 md:shadow-[0_1px_2px_rgba(16,16,19,0.04),0_8px_24px_-14px_rgba(16,16,19,0.2)]">
+        {NAV.map(({ href, label, Icon }) => {
+          const active = isActive(pathname, href);
+          return (
+            <li key={href}>
+              <Link
+                href={href}
+                aria-current={active ? 'page' : undefined}
+                className={`flex min-h-[44px] min-w-[4.25rem] flex-col items-center justify-center gap-1 rounded-[var(--radius-pill)] px-3 py-2 text-[0.6875rem] transition-colors duration-[120ms] ease-out md:min-w-0 md:flex-row md:gap-2 md:px-4 md:text-sm ${
+                  active
+                    ? 'bg-surface-inset text-text font-medium md:bg-surface md:shadow-[0_1px_2px_rgba(16,16,19,0.06)]'
+                    : 'text-text-muted'
+                }`}
+              >
+                <Icon className={`size-[20px] ${active ? 'text-violet-500' : ''}`} aria-hidden />
+                {label}
+              </Link>
+            </li>
+          );
+        })}
+      </ul>
+    </nav>
+  );
+}
+
 /** The wordmark — SF Pro Rounded, the app's friendly display face, sentence case. */
 function Wordmark() {
   return (
@@ -130,24 +169,36 @@ export function AppShell({ children }: { children: ReactNode }) {
   }
 
   return (
-    <div className="min-h-screen">
-      {/* The phone column — one centered narrow frame at every width. */}
-      <div className="mx-auto flex min-h-screen w-full max-w-[30rem] flex-col px-5">
-        {/* First focusable element in the shell, visible only once focused. */}
-        <a
-          href="#app-content"
-          className="sr-only focus:not-sr-only focus:absolute focus:left-4 focus:top-4 focus:z-50 focus:rounded-[var(--radius-pill)] focus:bg-[var(--color-ink)] focus:px-4 focus:py-2 focus:text-sm focus:text-white"
-        >
-          Skip to content
-        </a>
+    <div className="flex min-h-screen flex-col">
+      {/* First focusable element in the shell, visible only once focused. */}
+      <a
+        href="#app-content"
+        className="sr-only focus:not-sr-only focus:absolute focus:left-4 focus:top-4 focus:z-50 focus:rounded-[var(--radius-pill)] focus:bg-[var(--color-ink)] focus:px-4 focus:py-2 focus:text-sm focus:text-white"
+      >
+        Skip to content
+      </a>
 
-        {/* Top bar — transparent, scrolls with the page. */}
-        <header className="flex items-center justify-between pb-2 pt-5">
+      {/* The header spans the viewport while the CONTENT stays a column. Keeping the two
+          widths independent is what stops a laptop reading as a phone screenshot: the
+          chrome breathes to the edges, the reading measure does not. */}
+      <header className="mx-auto flex w-full max-w-[76rem] items-center gap-4 px-5 pb-2 pt-5 md:px-8 md:pt-7">
+        {/* The two outer cells carry equal flex basis so the nav sits on the VIEWPORT's
+            centre line rather than on whatever is left between a short wordmark and a
+            wide button — which is what made it read as slightly adrift. */}
+        <div className="flex flex-1 justify-start">
           <Wordmark />
+        </div>
+        <AppNav pathname={pathname} />
+        <div className="flex flex-1 justify-end">
           <ConnectButton />
-        </header>
+        </div>
+      </header>
 
-        <main id="app-content" className="flex-1 pb-28 pt-3">
+      {/* The content column. A phone frame below md, a reading column above it — still far
+          short of full width, because a ledger read edge-to-edge on a 1440px display is
+          harder to scan, not easier. */}
+      <div className="mx-auto flex w-full max-w-[30rem] flex-1 flex-col px-5 md:max-w-[40rem]">
+        <main id="app-content" className="flex-1 pb-28 pt-3 md:pb-16">
           <div className="flex flex-col gap-4">
             <NetworkGuard />
             <ChainStatus />
@@ -159,33 +210,6 @@ export function AppShell({ children }: { children: ReactNode }) {
           </div>
         </main>
       </div>
-
-      {/* Bottom nav — a floating glass pill, on every screen size. */}
-      <nav
-        aria-label="App sections"
-        className="fixed inset-x-0 bottom-0 z-40 flex justify-center px-4 pb-[max(1rem,env(safe-area-inset-bottom))]"
-      >
-        <ul className="bg-surface-raised/90 flex items-center gap-1 rounded-[var(--radius-pill)] p-1.5 shadow-[0_1px_2px_rgba(16,16,19,0.05),0_12px_32px_-12px_rgba(16,16,19,0.28)] backdrop-blur-xl">
-          {NAV.map(({ href, label, Icon }) => {
-            const active = isActive(pathname, href);
-            return (
-              <li key={href}>
-                <Link
-                  href={href}
-                  aria-label={label}
-                  aria-current={active ? 'page' : undefined}
-                  className={`flex min-w-[4.25rem] flex-col items-center gap-1 rounded-[var(--radius-pill)] px-3 py-2 text-[0.6875rem] transition-colors duration-[120ms] ease-out ${
-                    active ? 'bg-surface-inset text-text font-medium' : 'text-text-muted'
-                  }`}
-                >
-                  <Icon className={`size-[20px] ${active ? 'text-violet-500' : ''}`} />
-                  {label}
-                </Link>
-              </li>
-            );
-          })}
-        </ul>
-      </nav>
 
       {/* First-run intro, above the bottom nav (z-40). Opaque, so it fully covers the app
           it is handing off to. */}
