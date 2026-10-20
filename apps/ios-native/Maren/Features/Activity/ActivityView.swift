@@ -11,6 +11,7 @@ struct ActivityView: View {
     @Environment(\.marenClient) private var client
     @Environment(\.marenActions) private var actions
     @Environment(\.isDemoData) private var isDemoData
+    @Environment(MarenSession.self) private var session
 
     private enum Phase: Equatable { case loading, loaded, failed(String) }
     @State private var phase: Phase = .loading
@@ -29,7 +30,16 @@ struct ActivityView: View {
                 if items.isEmpty { emptyState } else { list }
             }
         }
-        .task { await load() }
+        .task {
+            // Home persists the last confirmed rows. Reuse them for the first Activity paint
+            // instead of showing a skeleton while the incremental chain refresh runs.
+            if items.isEmpty, let address = session.address,
+               let cached = HomeCache.load(address: address), !cached.activity.isEmpty {
+                items = cached.activity
+                phase = .loaded
+            }
+            await load()
+        }
         .refreshOnSettle { await load() }
         .sheet(item: $selected) { ReceiptDetail(item: $0) }
     }
@@ -107,7 +117,7 @@ struct ActivityView: View {
                 VStack(alignment: .leading, spacing: Theme.Space.sm) {
                     Text(group.label)
                         .font(.text(13, weight: .medium))
-                        .foregroundStyle(Theme.Palette.tertiary)
+                        .foregroundStyle(Theme.Palette.muted)
                         .padding(.horizontal, Theme.Space.xs)
                     MCard(padding: Theme.Space.md) {
                         VStack(spacing: 0) {
@@ -123,7 +133,7 @@ struct ActivityView: View {
                     if group.day == nil {
                         Text("These transactions are real and confirmed, but Mezo did not return a timestamp for their blocks, so when they happened is not known.")
                             .font(.text(13))
-                            .foregroundStyle(Theme.Palette.tertiary)
+                            .foregroundStyle(Theme.Palette.muted)
                             .fixedSize(horizontal: false, vertical: true)
                             .padding(.horizontal, Theme.Space.xs)
                     }
@@ -184,15 +194,17 @@ private struct ActivityRow: View {
                                 .foregroundStyle(item.status.tone)
                             Text(item.status.label).font(.system(size: 13)).foregroundStyle(item.status.tone)
                         } else {
-                            Text(item.subtitle).font(.system(size: 13)).foregroundStyle(Theme.Palette.tertiary)
+                            Text(item.subtitle).font(.system(size: 13)).foregroundStyle(Theme.Palette.muted)
                         }
                     }
                 }
                 Spacer(minLength: Theme.Space.sm)
                 VStack(alignment: .trailing, spacing: 2) {
                     Text(item.amount)
-                        .font(.text(15, weight: .medium))
-                        .foregroundStyle(item.status == .failed ? Theme.Palette.tertiary : item.amountColor)
+                        // .figure, like every other money figure in the app, so the amount
+                        // column lines up on a decimal grid down the ledger.
+                        .font(.figure(15, weight: .medium))
+                        .foregroundStyle(item.status == .failed ? Theme.Palette.muted : item.amountColor)
                         .strikethrough(item.status == .failed)
                         .lineLimit(1)
                         .fixedSize(horizontal: true, vertical: false)
@@ -201,11 +213,11 @@ private struct ActivityRow: View {
                     if let date = item.date {
                         Text(date, style: .time)
                             .font(.text(11))
-                            .foregroundStyle(Theme.Palette.tertiary)
+                            .foregroundStyle(Theme.Palette.muted)
                     } else {
                         Text("—")
                             .font(.text(11))
-                            .foregroundStyle(Theme.Palette.tertiary)
+                            .foregroundStyle(Theme.Palette.muted)
                             .accessibilityLabel("Time unknown")
                     }
                 }

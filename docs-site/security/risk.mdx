@@ -41,7 +41,7 @@ Ordered by expected harm, not by likelihood.
 | R-1 | Pooled vault socialises a loss in a fast BTC drawdown | Pooled users | Critical | Partly mitigated; reconciliation not yet deployed; paid audit pending |
 | R-2 | MUSD proxy upgrade changes behaviour underneath us | All users | Critical | Disclosed, not mitigable |
 | R-3 | Oracle failure or manipulation | All users | High | Partially mitigated |
-| R-4 | Keeper fails to act in time | Pooled users | High | Not mitigated — keeper not yet built |
+| R-4 | Keeper fails to act in time | Pooled users | High | Not mitigated — keeper actions run by hand; automation not built |
 | R-5 | Relayer key compromise | Maren treasury | Medium | Mitigated by design |
 | R-6 | Contract bug in Pay / Registry / Earn | Individual users | Medium | Own tests only; no third-party audit |
 | R-7 | Sponsorship abuse drains the gas budget | Maren treasury | Low | Mitigated |
@@ -51,6 +51,7 @@ Ordered by expected harm, not by likelihood.
 | R-11 | Earn can lose principal, and its withdrawable figure is optimistic | Earn depositors | High | Disclosed, not mitigated |
 | R-12 | Earn withdrawals blocked by a trove nobody in the vault owns | Earn depositors | Medium | Disclosed, not yet decoded |
 | R-13 | Admin keys: one EOA holds every privileged role | All users | High | Disclosed; multisig is a mainnet gate |
+| R-14 | The pooled trove exhausts its fixed `maxBorrowingCapacity` and borrowing stops for every user at once | Pooled borrowers | High | Occurred 22 Sep 2026, cleared manually; detection and automation not built |
 
 ## R-1: The pooled vault
 
@@ -144,7 +145,7 @@ Chainlink and not Pyth.
 Maren's keeper treats an oracle revert as a **halt condition**, not an error to retry through: it
 stops opening new debt and continues to permit withdrawals.
 
-## R-4 to R-9: Controls
+## R-4 to R-14: Controls
 
 <AccordionGroup>
   <Accordion title="R-4 Keeper" icon="robot">
@@ -152,8 +153,11 @@ stops opening new debt and continues to permit withdrawals.
     `onlyRole(KEEPER_ROLE)` by design: an open liquidation market pays the liquidator to push users
     over the line, so Maren runs it at cost and the 5% penalty goes to the insurance buffer rather
     than to the caller. The consequence is that if the keeper does not act, nobody else can. The
-    keeper process is **not yet built**, and on matsnet `KEEPER_ROLE` is held by a single operator
-    key. Exits stay open regardless — `withdraw`, `repay` and `closePosition` carry no pause
+    keeper process is **still not built as automation**, and on matsnet `KEEPER_ROLE` is held by a
+    single operator key. Keeper actions have now been run **by hand in production**: the trove
+    refinance of 22 September 2026 in the incident log below was executed by an operator with
+    `tools/ops/refinance-trove.mjs`. A human with a keystore is not a keeper; nothing watches the
+    trove between those runs. Exits stay open regardless — `withdraw`, `repay` and `closePosition` carry no pause
     modifier — so a dead keeper cannot trap collateral outside the frozen state described in R-1. If the keeper halts, borrowing
     stops; withdrawals do not.
   </Accordion>
@@ -189,12 +193,14 @@ stops opening new debt and continues to permit withdrawals.
     **Not yet implemented:** a strict Content-Security-Policy and subresource integrity.
     `next.config.ts` sets no security headers today. Both are mainnet gates, not shipped controls.
 
-    **Known defect, disclosed rather than held back.** The borrow slider's upper bound subtracts
-    only drawn principal from Mezo's per-trove `maxBorrowingCapacity`, where the protocol checks
-    against total trove debt — which includes the 200 MUSD gas compensation and accrued interest —
-    and it omits the 0.1% origination fee gross-up. Measured on matsnet on 2026-09-07,
-    `maxBorrowable()` quoted 1,556.98 MUSD for a position whose true limit simulated at 834.68
-    MUSD. Pressing a button the app itself labelled "Max" can therefore revert and cost gas.
+    **The borrow-ceiling defect recorded here is fixed in the shipped clients.** `borrowCeiling()`
+    in `packages/sdk/src/borrow.ts` now subtracts the whole trove's debt — gas compensation and
+    accrued interest included — from Mezo's `maxBorrowingCapacity`, grosses the result up for the
+    0.1% origination fee, and additionally clamps to the pooled trove's headroom against the 180%
+    floor. Both apps bound the slider by that figure, so "Max" no longer quotes an amount the
+    protocol will refuse. The on-chain `maxBorrowable()` getter is unchanged and remains pool-blind
+    by design — see [Borrow](/product/borrow) for why a reviewer calling it directly still sees a
+    higher number.
   </Accordion>
   <Accordion title="R-10 A pooled-trove liquidation freezes every exit" icon="lock">
     A liquidation of the pooled trove is **not** only a pro-rata loss. When the trove leaves Mezo's
@@ -252,7 +258,50 @@ stops opening new debt and continues to permit withdrawals.
     timelock, no separation of duties. Only testnet funds are exposed. Splitting the roles across a
     Safe with a timelock is a hard mainnet gate.
   </Accordion>
+  <Accordion title="R-14 The pooled trove runs out of borrowing ceiling" icon="gauge-high">
+    On Mezo a trove's `maxBorrowingCapacity` is **frozen at the BTC price the trove was opened at**.
+    Adding collateral does not raise it; `refinance()` is the only thing that does. A pooled trove
+    held across a BTC rally therefore walks into a ceiling that has nothing to do with how well
+    collateralised it is, and when the trove's debt reaches it **every borrow reverts for every
+    pooled user at once**, however healthy their own position.
+
+    This is not hypothetical: it happened on 22 September 2026, and the incident log below gives the
+    timeline. Nothing detects or clears it automatically today. `MarenVault.refinancePooledTrove` is
+    deployed and works, but calling it is a manual keeper step, so the failure recurs the next time
+    BTC moves far enough. Deposits, repayments and withdrawals are unaffected when it happens, which
+    is the same direction as R-4: borrowing pauses, exits do not.
+  </Accordion>
 </AccordionGroup>
+
+## Incident log
+
+Incidents are recorded here with a timeline, including the ones caught before any user was harmed.
+
+### 22 September 2026 — the pooled trove hit its borrowing ceiling and all borrowing stopped
+
+**Impact.** Every borrow through the pooled vault was refused, for every user, for as long as the
+condition lasted. No funds were lost, no position was liquidated, and deposits, repayments and
+withdrawals kept working throughout. Only testnet funds were exposed.
+
+**Cause.** The pooled trove's `maxBorrowingCapacity` is fixed at the price the trove opened at, and
+its debt had caught up with it. Read from the deployed `TroveManager` at block 15,695,380 — the
+block before the fix — the ceiling was **2,749.20 MUSD** against a trove debt of **2,749.57 MUSD**
+(2,747.27 principal plus 2.30 accrued interest): about 0.37 MUSD over. Mezo checks
+`maxBorrowingCapacity >= netDebtChange + getTroveDebt(trove)`, so no borrow of any size could pass.
+The trove itself was healthy; this was a ceiling, not a collateral shortfall. From inside the app it
+looked like a broken relayer, because the fail-closed relayer correctly declined to sponsor a call
+it had simulated as reverting.
+
+**Fix.** An operator holding `KEEPER_ROLE` called `MarenVault.refinancePooledTrove` by hand using
+`tools/ops/refinance-trove.mjs`. Confirmed in block **15,695,381**, 07:36:12 UTC on 22 September
+2026, transaction
+[`0x163e5f3d…86c7`](https://explorer.test.mezo.org/tx/0x163e5f3d662c4e5af12432923437502e38e498ea7dbc6e1fa10ee29f964986c7).
+The ceiling moved from **2,749.20 MUSD to 5,348.05 MUSD** and borrowing resumed. Every figure here
+was re-read from matsnet at those two blocks on 2026-09-23.
+
+**Still open.** Nothing watches for this condition and nothing clears it automatically.
+`refinancePooledTrove` had been deployed since day one and had never been called outside unit tests
+before this. It is tracked as R-14 above, and it stays open until a keeper process exists.
 
 ## Rules inherited from a real audit
 

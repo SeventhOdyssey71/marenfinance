@@ -71,6 +71,13 @@ struct RootView: View {
         .environment(\.marenActions, SettleBroadcaster(base: session.actions))
         .environment(\.isDemoData, session.isDemo)
         .tint(Theme.Palette.accent)
+        // Onboarding pins this on all three of its screens; the main app tree never did, so a
+        // device set to Dark Mode painted the system label colour (white) onto surfaces this
+        // app forces white — FlowScreen sets .toolbarBackground(card) with no matching
+        // .toolbarColorScheme, so the navigation titles on Scan, Request, Split, Receipt,
+        // Claim and Wallet setup went white-on-white. The palette has no dark variant by
+        // design, so the fix is to be light everywhere rather than half-adopt a scheme.
+        .preferredColorScheme(.light)
         .background(PrivacyShield())
         .onOpenURL { url in
             guard let parsed = PaymentLinks.parse(url.absoluteString) else { return }

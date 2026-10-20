@@ -14,6 +14,7 @@ import {
   vaultShareTenths,
 } from '@maren/sdk';
 
+import { ArrowDown } from '@/components/ui/icons';
 import { HealthChip, HealthScale } from '@/components/app/health';
 import { Btc, Dash, Musd, Num } from '@/components/app/money';
 import { Info, Metric, MetricStrip, Note, Panel } from '@/components/app/primitives';
@@ -154,76 +155,94 @@ export function SocialVaultPanel({
     >
       <div className="px-5 py-5">{health}</div>
 
-      <div className="border-t border-[var(--border-hairline)]">
-        <MetricStrip>
-          <Metric
-            className="px-5 py-4"
-            label="Vault collateral"
-            value={<Btc wei={stats.troveCollateralWei} size="lg" />}
-            caption={collateralUsd !== null ? formatUsd(collateralUsd) : 'needs a live price'}
+      {/* EVERYTHING BELOW IS ABOUT THE PROTOCOL, NOT ABOUT YOU.
+          It used to be the screen's subject — vault collateral, vault debt, capacity used,
+          a fill bar, your share of the pool, then two paragraphs — so someone opening
+          Finance to check their own money met twelve figures about a shared trove first.
+          It is all still here and still one click away, because the pooling is the part
+          that can cost someone money and hiding it would be worse. It is just no longer
+          what the screen opens with. The health figure above stays visible: that one is
+          worth interrupting for. */}
+      <details className="group border-t border-[var(--border-hairline)]">
+        <summary className="text-text-muted hover:text-text flex min-h-[44px] cursor-pointer list-none items-center justify-between px-5 py-3 text-sm transition-colors duration-[120ms] ease-out [&::-webkit-details-marker]:hidden">
+          <span>How the shared vault works</span>
+          <ArrowDown
+            className="size-4 transition-transform duration-200 ease-out group-open:rotate-180 motion-reduce:transition-none"
+            aria-hidden
           />
-          <Metric
-            className="px-5 py-4"
-            label="Vault debt"
-            value={<Musd wei={stats.troveNetDebtWei} size="lg" />}
-            caption="drawn by everyone in it"
-          />
-          <Metric
-            className="px-5 py-4"
-            label="Capacity used"
-            value={<Num size="lg">{formatPercentTenths(capacity.filledTenths)}</Num>}
-            caption={`of a ${formatBtc(capacity.capWei)} cap`}
-          />
-        </MetricStrip>
-      </div>
+        </summary>
 
-      <div className="border-t border-[var(--border-hairline)] px-5 py-4">
-        <CapacityBar
-          filledTenths={capacity.filledTenths}
-          usedWei={capacity.usedWei}
-          capWei={capacity.capWei}
-          headroomWei={capacity.headroomWei}
-        />
-        {capacity.full ? (
-          <div className="mt-4">
-            <Note tone="warning" role="status">
-              The vault is at its cap. Deposits reopen when the cap is raised or someone withdraws.
-              Repaying and withdrawing are unaffected.
-            </Note>
-          </div>
-        ) : null}
-      </div>
-
-      {inVault && position ? (
         <div className="border-t border-[var(--border-hairline)]">
           <MetricStrip>
             <Metric
               className="px-5 py-4"
-              label="Your collateral in it"
-              value={<Btc wei={position.collateralWei} size="lg" />}
-              caption={`${formatPercentTenths(shareTenths)} of the vault`}
+              label="Vault collateral"
+              value={<Btc wei={stats.troveCollateralWei} size="lg" />}
+              caption={collateralUsd !== null ? formatUsd(collateralUsd) : 'needs a live price'}
             />
             <Metric
               className="px-5 py-4"
-              label="Your debt in it"
-              value={<Musd wei={position.debtWei} size="lg" />}
-              caption="yours alone, not the vault's"
+              label="Vault debt"
+              value={<Musd wei={stats.troveNetDebtWei} size="lg" />}
+              caption="drawn by everyone in it"
+            />
+            <Metric
+              className="px-5 py-4"
+              label="Capacity used"
+              value={<Num size="lg">{formatPercentTenths(capacity.filledTenths)}</Num>}
+              caption={`of a ${formatBtc(capacity.capWei)} cap`}
             />
           </MetricStrip>
         </div>
-      ) : null}
 
-      <div className="border-t border-[var(--border-hairline)] px-5 py-4">
-        <SharedMeaning />
-        <Info summary="How Maren limits that risk">
-          Maren liquidates a pooled position internally at{' '}
-          {policyRatio(MAREN_POLICY.vaultLiquidationCr)}, far above the protocol’s 110%, and backs
-          that with a {formatBtc(MAREN_VAULT.minDeposit)} floor, per-block keeper checks and an
-          insurance buffer funded from vault fees. These are mitigations, not a guarantee. Nobody
-          can borrow at all while the vault sits under {policyRatio(MAREN_VAULT.minTroveCr)}, which
-          is checked on every borrow whether or not it adds any trove debt.
-        </Info>
-      </div>
+        <div className="border-t border-[var(--border-hairline)] px-5 py-4">
+          <CapacityBar
+            filledTenths={capacity.filledTenths}
+            usedWei={capacity.usedWei}
+            capWei={capacity.capWei}
+            headroomWei={capacity.headroomWei}
+          />
+          {capacity.full ? (
+            <div className="mt-4">
+              <Note tone="warning" role="status">
+                The vault is at its cap. Deposits reopen when the cap is raised or someone
+                withdraws. Repaying and withdrawing are unaffected.
+              </Note>
+            </div>
+          ) : null}
+        </div>
+
+        {inVault && position ? (
+          <div className="border-t border-[var(--border-hairline)]">
+            <MetricStrip>
+              <Metric
+                className="px-5 py-4"
+                label="Your collateral in it"
+                value={<Btc wei={position.collateralWei} size="lg" />}
+                caption={`${formatPercentTenths(shareTenths)} of the vault`}
+              />
+              <Metric
+                className="px-5 py-4"
+                label="Your debt in it"
+                value={<Musd wei={position.debtWei} size="lg" />}
+                caption="yours alone, not the vault's"
+              />
+            </MetricStrip>
+          </div>
+        ) : null}
+
+        <div className="border-t border-[var(--border-hairline)] px-5 py-4">
+          <SharedMeaning />
+          <Info summary="How Maren limits that risk">
+            Maren liquidates a pooled position internally at{' '}
+            {policyRatio(MAREN_POLICY.vaultLiquidationCr)}, far above the protocol’s 110%, and backs
+            that with a {formatBtc(MAREN_VAULT.minDeposit)} floor, per-block keeper checks and an
+            insurance buffer funded from vault fees. These are mitigations, not a guarantee. Nobody
+            can borrow at all while the vault sits under {policyRatio(MAREN_VAULT.minTroveCr)},
+            which is checked on every borrow whether or not it adds any trove debt.
+          </Info>
+        </div>
+      </details>
     </Panel>
   );
 }

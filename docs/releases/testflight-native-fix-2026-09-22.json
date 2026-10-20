@@ -1,0 +1,31 @@
+{
+  "app": "Maren",
+  "bundleId": "finance.maren.app",
+  "sourceCommit": "214ea7b6c7da0600cd261f94dc4ad4c87e3b6889",
+  "workflow": "ios-testflight.yml",
+  "runId": 35712590305,
+  "runAttempt": 2,
+  "runUrl": "https://github.com/SeventhOdyssey71/marenfinance/actions/runs/35712590305",
+  "conclusion": "success",
+  "hostedTestsPassed": true,
+  "releaseSimulatorBuildPassed": true,
+  "releaseDebugMarkerCheckPassed": true,
+  "buildNumber": "77",
+  "appStoreUploadAccepted": true,
+  "uploadAcceptedAt": "2026-09-22T10:19:56Z",
+  "deliveryUuid": "f188b363-b75b-48d3-8a86-989a7064c106",
+  "processingVerified": false,
+  "testFlightAvailabilityVerified": false,
+  "whatToTest": "Fix 500 MUSD vault borrowing with projected Mezo insertion hints and reliable sponsored gas estimation; add dollar-formatted balances and a subtle home gradient.",
+  "notes": [
+    "The first archive job was blocked before startup by a transient GitHub Actions billing/spending-limit gate; one failed-job retry started normally and completed.",
+    "Apple accepted the uploaded IPA. Processing completion and tester availability are not established by the upload receipt.",
+    "Build 77 is the first uploaded build containing the exact-wallet 500 MUSD projected-hints fix from commit 214ea7b."
+  ],
+  "acceptanceEvidence": [
+    "Selected build 77 above 23 existing App Store Connect builds.",
+    "No errors uploading archive at '/Users/runner/work/_temp/export/Maren.ipa'.",
+    "UPLOAD SUCCEEDED with no errors",
+    "Delivery UUID: f188b363-b75b-48d3-8a86-989a7064c106"
+  ]
+}

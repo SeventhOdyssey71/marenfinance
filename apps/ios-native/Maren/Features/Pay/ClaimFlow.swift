@@ -71,7 +71,7 @@ struct ClaimFlow: View {
                         Unavailable(label: "Read on claim")
                     }
                     Text("The secret is held only to sign this claim and is never shown or logged.")
-                        .font(.system(size: 13)).foregroundStyle(Theme.Palette.tertiary)
+                        .font(.system(size: 13)).foregroundStyle(Theme.Palette.muted)
                         .fixedSize(horizontal: false, vertical: true)
                 }
             }

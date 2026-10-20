@@ -1,0 +1,165 @@
+{
+  "trustedForwarderFraming": {
+    "state": "success",
+    "gas": "789132"
+  },
+  "observedAt": "2026-09-22T09:46:22.188Z",
+  "chainId": 31611,
+  "rpc": "https://rpc.test.mezo.org",
+  "blockNumber": "15696997",
+  "wallet": "0x4b0b25687fee0eb9d90617d656490dfd2964c0ef",
+  "reportedBuild": 73,
+  "amountWei": "500000000000000000000",
+  "snapshot": {
+    "userCollateralWei": "45000000000000000",
+    "userDebtWei": "334434878629836825441",
+    "userMaxBeforeFeeWei": "1811621279870163174559",
+    "userCurrentCR": "11550532950169895241",
+    "borrowingPaused": false,
+    "troveOpen": true,
+    "reserveWei": "0",
+    "idleWei": "212000000000000000",
+    "minimumNetDebtWei": "1800000000000000000000",
+    "gasCompensationWei": "200000000000000000000",
+    "governor": "0x6552059B6eFc6aA4AE3ea45f28ED4D92acE020cD",
+    "poolStatus": ["69061097205866344", "2550090174948009107970", "2155696483286676582"],
+    "entireTrove": [
+      "69061097205866344",
+      "2750084790152317068015",
+      "5384795692039955",
+      "0",
+      "0",
+      "0"
+    ],
+    "ceilingWei": "5348046163995027657753",
+    "borrowingRateWei": "1000000000000000",
+    "priceWei": "85842246340000000000000",
+    "musdBalanceWei": "314000000000000000000",
+    "upper": "0x57a270C711Ccea7AFCB5361d214eAef149C5fA9B",
+    "lower": "0x306919805Eed1aD4772d92e18d00A1c132b07C19",
+    "feeExempt": false,
+    "btcBalanceWei": "4999999849996826",
+    "projectedInsertion": {
+      "drawn": "500000000000000000000",
+      "protocolFee": "500000000000000000",
+      "projectedPrincipal": "3250584790152317068015",
+      "currentNicr": "2511235197298818",
+      "targetNicr": "2124574550865053",
+      "targetHints": [
+        "0x8E42315A5276f7069D516a38d97b9D16507f5e87",
+        "0x41Cbf317fcF3d5128ECF46e1B9f96dDf2994850A"
+      ]
+    }
+  },
+  "limits": {
+    "userMaxNetWei": "1809811468401761413145",
+    "capacityMaxNetWei": "2595360628418599949833",
+    "poolMaxNetWei": "542900102092489732720",
+    "overallMaxNetWei": "542900102092489732720",
+    "requestedWithinLimits": true,
+    "feeWei": "500000000000000000",
+    "postBorrowUserCR": "4626589670848561016",
+    "postBorrowPoolCR": "1823779498426461686"
+  },
+  "simulations": [
+    {
+      "mode": "old-zero-hints",
+      "hints": [
+        "0x0000000000000000000000000000000000000000",
+        "0x0000000000000000000000000000000000000000"
+      ],
+      "gasMode": "fallback-660k",
+      "gas": "660000",
+      "estimate": "1952877",
+      "padded": "2989315",
+      "fixedPolicyAccepts": false,
+      "simulation": {
+        "state": "reverted",
+        "detail": "The contract function \"borrow\" reverted."
+      }
+    },
+    {
+      "mode": "old-zero-hints",
+      "hints": [
+        "0x0000000000000000000000000000000000000000",
+        "0x0000000000000000000000000000000000000000"
+      ],
+      "gasMode": "estimated-policy-budget",
+      "gas": "1500000",
+      "estimate": "1952877",
+      "padded": "2989315",
+      "fixedPolicyAccepts": false,
+      "simulation": {
+        "state": "reverted",
+        "detail": "The contract function \"borrow\" reverted."
+      }
+    },
+    {
+      "mode": "current-neighbour-hints",
+      "hints": [
+        "0x57a270C711Ccea7AFCB5361d214eAef149C5fA9B",
+        "0x306919805Eed1aD4772d92e18d00A1c132b07C19"
+      ],
+      "gasMode": "fallback-660k",
+      "gas": "660000",
+      "estimate": "1257780",
+      "padded": "1946670",
+      "fixedPolicyAccepts": false,
+      "simulation": {
+        "state": "reverted",
+        "detail": "The contract function \"borrow\" reverted."
+      }
+    },
+    {
+      "mode": "current-neighbour-hints",
+      "hints": [
+        "0x57a270C711Ccea7AFCB5361d214eAef149C5fA9B",
+        "0x306919805Eed1aD4772d92e18d00A1c132b07C19"
+      ],
+      "gasMode": "estimated-policy-budget",
+      "gas": "1946670",
+      "estimate": "1257780",
+      "padded": "1946670",
+      "fixedPolicyAccepts": false,
+      "simulation": {
+        "state": "success"
+      }
+    },
+    {
+      "mode": "target-insertion-hints",
+      "hints": [
+        "0x8E42315A5276f7069D516a38d97b9D16507f5e87",
+        "0x41Cbf317fcF3d5128ECF46e1B9f96dDf2994850A"
+      ],
+      "gasMode": "fallback-660k",
+      "gas": "660000",
+      "estimate": "486088",
+      "padded": "789132",
+      "fixedPolicyAccepts": true,
+      "simulation": {
+        "state": "success"
+      }
+    },
+    {
+      "mode": "target-insertion-hints",
+      "hints": [
+        "0x8E42315A5276f7069D516a38d97b9D16507f5e87",
+        "0x41Cbf317fcF3d5128ECF46e1B9f96dDf2994850A"
+      ],
+      "gasMode": "estimated-policy-budget",
+      "gas": "789132",
+      "estimate": "486088",
+      "padded": "789132",
+      "fixedPolicyAccepts": true,
+      "simulation": {
+        "state": "success"
+      }
+    }
+  ],
+  "publicTransactions": 0,
+  "limitations": [
+    "Read-only direct eth_call from the public wallet address; no private key or user signature was requested.",
+    "This pinned snapshot cannot identify an earlier failed request without its original signed payload or request log.",
+    "The trusted-forwarder framing probe is an unsigned read-only eth_call from the trusted address with the wallet suffix; it verifies ERC2771 target execution, not signature verification or a broadcast."
+  ]
+}

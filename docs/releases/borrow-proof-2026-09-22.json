@@ -1,0 +1,330 @@
+{
+  "recordedAt": "2026-09-22T07:47:35.997Z",
+  "sourceRevision": "ebd7aac7e9272e4f828c048de4cb05431bcd553a",
+  "workerVersion": "aaa0afa9-1585-4119-a2c5-2bfac983f0f5",
+  "network": "Mezo testnet",
+  "chainId": 31611,
+  "vault": "0x46252B00AB59384518d9dB6D1f210ffF1221645b",
+  "forwarder": "0x22cC1Adfb0C91D9359746dE3F7E8cB7F2B8eA98C",
+  "wallet": "0xc06eDC6325e374778ec88cDCeC7a2E7FA4B7E8CE",
+  "keeper": "0x54196397D6f01b48739dB3957257cB33cD341885",
+  "musd": "0x118917a40FAF1CD7a13dB0Ef56C86De7973Ac503",
+  "refinance": {
+    "hash": "0x163e5f3d662c4e5af12432923437502e38e498ea7dbc6e1fa10ee29f964986c7",
+    "blockNumber": "15695381",
+    "ceilingBeforeMusd": "2749.20",
+    "ceilingAfterMusd": "5348.05"
+  },
+  "funding": {
+    "btc": {
+      "hash": "0xae1b21f818b1222ae1954ad94a01bd79025cba2bd95ac67e57a62901f3809ba0",
+      "blockNumber": "15695409",
+      "amountWei": "2001000000000000"
+    },
+    "musd": {
+      "hash": "0x7094de3fd9bb19e177bef526ac866ea810442af890e7cfb0b48a51529a9aa07f",
+      "blockNumber": "15695411",
+      "amountWei": "20000000000000000"
+    }
+  },
+  "collateralWei": "2000000000000000",
+  "borrowAmountWei": "10000000000000000000",
+  "steps": {
+    "deposit": {
+      "state": "success",
+      "at": "2026-09-22T07:39:46.200Z",
+      "before": {
+        "at": "2026-09-22T07:39:44.529Z",
+        "btcWei": "2001000000000000",
+        "musdWei": "20000000000000000",
+        "collateralWei": "0",
+        "debtWei": "0"
+      },
+      "hash": "0x82333290d9c355630f9f67b1f031d2da44e104256907fda9ee1547316bf8e26e",
+      "nonce": 0,
+      "to": "0x46252B00AB59384518d9dB6D1f210ffF1221645b",
+      "valueWei": "2000000000000000",
+      "stopped": false,
+      "blockNumber": "15695434",
+      "gasUsed": "379733",
+      "gasCostWei": "55441018",
+      "after": {
+        "at": "2026-09-22T07:40:41.856Z",
+        "btcWei": "999944558982",
+        "musdWei": "20000000000000000",
+        "collateralWei": "2000000000000000",
+        "debtWei": "0"
+      },
+      "reconciled": true
+    },
+    "borrow": {
+      "state": "success",
+      "at": "2026-09-22T07:41:10.013Z",
+      "before": {
+        "at": "2026-09-22T07:41:08.670Z",
+        "btcWei": "999944558982",
+        "musdWei": "20000000000000000",
+        "collateralWei": "2000000000000000",
+        "debtWei": "0"
+      },
+      "forwarderNonce": "0",
+      "httpStatus": 202,
+      "relayResponse": {
+        "hash": "0x4fe42b829ee2461484b003024521507441feb3d7e6c0b5219c91ac0d6bb3e2f3",
+        "state": "submitted",
+        "success": false,
+        "payer": "0xc06eDC6325e374778ec88cDCeC7a2E7FA4B7E8CE",
+        "nonce": 34,
+        "sponsorship": "free-tier",
+        "freeActionsRemaining": 24,
+        "function": "marenVault.borrow",
+        "statusUrl": "/status/0x4fe42b829ee2461484b003024521507441feb3d7e6c0b5219c91ac0d6bb3e2f3"
+      },
+      "hash": "0x4fe42b829ee2461484b003024521507441feb3d7e6c0b5219c91ac0d6bb3e2f3",
+      "blockNumber": "15695456",
+      "gasUsed": "479592",
+      "gasCostWei": "70020432",
+      "relaySettlement": {
+        "hash": "0x4fe42b829ee2461484b003024521507441feb3d7e6c0b5219c91ac0d6bb3e2f3",
+        "state": "confirmed",
+        "success": true,
+        "blockNumber": "15695456",
+        "gasUsed": "479592",
+        "effectiveGasPrice": "146",
+        "gasCostWei": "70020432",
+        "from": "0xd90245ee16B2f58eD8654961BBf2fa835046df89"
+      },
+      "after": {
+        "at": "2026-09-22T07:41:23.716Z",
+        "btcWei": "999944558982",
+        "musdWei": "10020000000000000000",
+        "collateralWei": "2000000000000000",
+        "debtWei": "10010000000000000001"
+      }
+    },
+    "approve": {
+      "state": "success",
+      "at": "2026-09-22T07:41:54.582Z",
+      "before": {
+        "at": "2026-09-22T07:41:53.117Z",
+        "btcWei": "999944558982",
+        "musdWei": "10020000000000000000",
+        "collateralWei": "2000000000000000",
+        "debtWei": "10010000000000000001"
+      },
+      "hash": "0xe9ec450e5d99fa63a6f17b49097fbdfe7a025fec63af790436148eca9f626461",
+      "nonce": 1,
+      "to": "0x118917a40FAF1CD7a13dB0Ef56C86De7973Ac503",
+      "valueWei": "0",
+      "blockNumber": "15695466",
+      "gasUsed": "46382",
+      "gasCostWei": "6771772",
+      "after": {
+        "at": "2026-09-22T07:42:04.827Z",
+        "btcWei": "999937787210",
+        "musdWei": "10020000000000000000",
+        "collateralWei": "2000000000000000",
+        "debtWei": "10010000000000000001"
+      }
+    },
+    "repay": {
+      "state": "success",
+      "at": "2026-09-22T07:42:22.678Z",
+      "before": {
+        "at": "2026-09-22T07:42:21.399Z",
+        "btcWei": "999937787210",
+        "musdWei": "10020000000000000000",
+        "collateralWei": "2000000000000000",
+        "debtWei": "10010000000000000001"
+      },
+      "forwarderNonce": "1",
+      "httpStatus": 202,
+      "relayResponse": {
+        "hash": "0xf4cf26ea7ab1fa116c6ae5d73cb2d901d7b4945e3291df7aabd2c0d699082ae4",
+        "state": "submitted",
+        "success": false,
+        "payer": "0xc06eDC6325e374778ec88cDCeC7a2E7FA4B7E8CE",
+        "nonce": 35,
+        "sponsorship": "free-tier",
+        "freeActionsRemaining": 23,
+        "function": "marenVault.repay",
+        "statusUrl": "/status/0xf4cf26ea7ab1fa116c6ae5d73cb2d901d7b4945e3291df7aabd2c0d699082ae4"
+      },
+      "hash": "0xf4cf26ea7ab1fa116c6ae5d73cb2d901d7b4945e3291df7aabd2c0d699082ae4",
+      "blockNumber": "15695474",
+      "gasUsed": "407649",
+      "gasCostWei": "59516754",
+      "relaySettlement": {
+        "hash": "0xf4cf26ea7ab1fa116c6ae5d73cb2d901d7b4945e3291df7aabd2c0d699082ae4",
+        "state": "confirmed",
+        "success": true,
+        "blockNumber": "15695474",
+        "gasUsed": "407649",
+        "effectiveGasPrice": "146",
+        "gasCostWei": "59516754",
+        "from": "0xd90245ee16B2f58eD8654961BBf2fa835046df89"
+      },
+      "after": {
+        "at": "2026-09-22T07:42:34.134Z",
+        "btcWei": "999937787210",
+        "musdWei": "9999760810117628",
+        "collateralWei": "2000000000000000",
+        "debtWei": "0"
+      }
+    },
+    "withdraw": {
+      "state": "success",
+      "at": "2026-09-22T07:43:12.295Z",
+      "before": {
+        "at": "2026-09-22T07:43:11.020Z",
+        "btcWei": "999937787210",
+        "musdWei": "9999760810117628",
+        "collateralWei": "2000000000000000",
+        "debtWei": "0"
+      },
+      "forwarderNonce": "2",
+      "httpStatus": 202,
+      "relayResponse": {
+        "hash": "0xe61cdd56bc3d01928db758c621e8f5c1ff8ddbf81653408945220668d4b82059",
+        "state": "submitted",
+        "success": false,
+        "payer": "0xc06eDC6325e374778ec88cDCeC7a2E7FA4B7E8CE",
+        "nonce": 36,
+        "sponsorship": "free-tier",
+        "freeActionsRemaining": 22,
+        "function": "marenVault.withdraw",
+        "statusUrl": "/status/0xe61cdd56bc3d01928db758c621e8f5c1ff8ddbf81653408945220668d4b82059"
+      },
+      "hash": "0xe61cdd56bc3d01928db758c621e8f5c1ff8ddbf81653408945220668d4b82059",
+      "blockNumber": "15695485",
+      "gasUsed": "123034",
+      "gasCostWei": "17962964",
+      "relaySettlement": {
+        "hash": "0xe61cdd56bc3d01928db758c621e8f5c1ff8ddbf81653408945220668d4b82059",
+        "state": "confirmed",
+        "success": true,
+        "blockNumber": "15695485",
+        "gasUsed": "123034",
+        "effectiveGasPrice": "146",
+        "gasCostWei": "17962964",
+        "from": "0xd90245ee16B2f58eD8654961BBf2fa835046df89"
+      },
+      "after": {
+        "at": "2026-09-22T07:43:19.250Z",
+        "btcWei": "2000999937787210",
+        "musdWei": "9999760810117628",
+        "collateralWei": "0",
+        "debtWei": "0"
+      }
+    },
+    "return-musd": {
+      "state": "success",
+      "at": "2026-09-22T07:43:41.422Z",
+      "before": {
+        "at": "2026-09-22T07:43:40.031Z",
+        "btcWei": "2000999937787210",
+        "musdWei": "9999760810117628",
+        "collateralWei": "0",
+        "debtWei": "0"
+      },
+      "hash": "0x55e316902f1a05ca8d8bc751b2b8134d2d7988980f43da735d9a280216aa0f74",
+      "nonce": 2,
+      "to": "0x118917a40FAF1CD7a13dB0Ef56C86De7973Ac503",
+      "valueWei": "0",
+      "blockNumber": "15695492",
+      "gasUsed": "29797",
+      "gasCostWei": "4350362",
+      "after": {
+        "at": "2026-09-22T07:43:49.208Z",
+        "btcWei": "2000999933436848",
+        "musdWei": "0",
+        "collateralWei": "0",
+        "debtWei": "0"
+      }
+    },
+    "return-btc": {
+      "state": "success",
+      "at": "2026-09-22T07:44:11.781Z",
+      "before": {
+        "at": "2026-09-22T07:44:09.912Z",
+        "btcWei": "2000999933436848",
+        "musdWei": "0",
+        "collateralWei": "0",
+        "debtWei": "0"
+      },
+      "hash": "0xa95b79b68b3c4d16234316b2feb083d8418f22331bd3e7a2f6c2a81206aeecb5",
+      "nonce": 3,
+      "to": "0x54196397D6f01b48739dB3957257cB33cD341885",
+      "valueWei": "2000999930370848",
+      "stopped": false,
+      "blockNumber": "15695500",
+      "gasUsed": "21000",
+      "gasCostWei": "3066000",
+      "after": {
+        "at": "2026-09-22T07:46:14.242Z",
+        "btcWei": "0",
+        "musdWei": "0",
+        "collateralWei": "0",
+        "debtWei": "0"
+      },
+      "reconciled": true
+    }
+  },
+  "returned": {
+    "btcWei": "2000999930370848",
+    "musdWei": "9999760810117628",
+    "recipient": "0x54196397D6f01b48739dB3957257cB33cD341885"
+  },
+  "costs": {
+    "disposableWalletGasWei": "69629152",
+    "relayerGasWei": "147500150",
+    "borrowingFeeAndInterestMusdWei": "10000239189882372"
+  },
+  "finalState": {
+    "at": "2026-09-22T07:46:14.242Z",
+    "btcWei": "0",
+    "musdWei": "0",
+    "collateralWei": "0",
+    "debtWei": "0"
+  },
+  "relayerAfter": {
+    "accepting": true,
+    "recovery": {
+      "durable": true,
+      "blocked": false,
+      "pending": 0,
+      "pendingRefunds": 0,
+      "oldestPendingAt": null,
+      "replacementPolicy": "rebroadcast-identical"
+    },
+    "budget": {
+      "day": "2026-09-22",
+      "limitWei": "10000000000000000",
+      "committedWei": "147500150",
+      "reservedWei": "147500150",
+      "inFlightWei": "0",
+      "remainingWei": "9999999852499850",
+      "committedPct": 0,
+      "reservedPct": 0,
+      "halted": false,
+      "pendingRefunds": 0
+    },
+    "nonce": {
+      "next": 37,
+      "inFlight": 0,
+      "queued": 0,
+      "resyncs": 0
+    }
+  },
+  "checks": [
+    "Public relayer admitted borrow, repay and withdraw with HTTP 202 and confirmed all three on-chain.",
+    "Borrow credited exactly 10 MUSD; sponsored actions did not reduce the disposable wallet BTC balance.",
+    "Debt and collateral are zero; all remaining MUSD and BTC returned to the original keeper.",
+    "Recovery pending/refunds are zero after settlement."
+  ],
+  "notes": [
+    "Disposable key and signed payloads were stored only in private temporary files; no signing material is included here.",
+    "Legacy deposit and BTC-return receipts required read-only reconciliation because fee metadata/transaction lookup was temporarily unavailable; persisted hashes were not resubmitted.",
+    "This proves the public API and deployed contracts with a controlled wallet; it is not an interactive browser-wallet or native device acceptance test."
+  ]
+}

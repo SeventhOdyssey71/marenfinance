@@ -92,7 +92,7 @@ function key(parts: readonly unknown[], source: DataSource) {
 /** The context a live read needs. Null whenever a read would be meaningless. */
 function useLiveContext() {
   const source = useDataSource();
-  const client = usePublicClient();
+  const client = usePublicClient({ chainId: targetChain.id });
   const ctx =
     source.ready && client && source.account
       ? { client, network: source.network, account: source.account }
@@ -113,7 +113,7 @@ function useLiveContext() {
  */
 export function usePrice(): PriceFeed {
   const source = useDataSource();
-  const client = usePublicClient();
+  const client = usePublicClient({ chainId: targetChain.id });
 
   const query = useQuery({
     queryKey: key(['price'], source),
@@ -245,7 +245,7 @@ export function useActivity(): UseQueryResult<ActivityWindow> {
  */
 export function useProtocolStats(): UseQueryResult<ProtocolStats> {
   const source = useDataSource();
-  const client = usePublicClient();
+  const client = usePublicClient({ chainId: targetChain.id });
   return useQuery<ProtocolStats>({
     queryKey: ['maren', source.network, 'protocol'],
     queryFn: async () => {
@@ -327,7 +327,7 @@ export function usePrimaryHandle(): UseQueryResult<string | null> {
  */
 export function useResolvedHandle(query: string): UseQueryResult<Handle | null> {
   const source = useDataSource();
-  const client = usePublicClient();
+  const client = usePublicClient({ chainId: targetChain.id });
   const trimmed = query.trim();
   const isHandle = trimmed.startsWith('@') && trimmed.length > 1;
 
@@ -344,7 +344,7 @@ export function useResolvedHandle(query: string): UseQueryResult<Handle | null> 
 /** Is a handle free to register? `null` while unknown — never guessed. */
 export function useHandleAvailable(handle: string): UseQueryResult<boolean> {
   const source = useDataSource();
-  const client = usePublicClient();
+  const client = usePublicClient({ chainId: targetChain.id });
   const cleaned = handle.trim().replace(/^@/, '').toLowerCase();
 
   return useQuery<boolean>({

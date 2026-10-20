@@ -58,7 +58,7 @@ struct SplitFlow: View {
                             } label: {
                                 Image(systemName: "minus.circle")
                                     .font(.system(size: 16, weight: .semibold))
-                                    .foregroundStyle(Theme.Palette.tertiary)
+                                    .foregroundStyle(Theme.Palette.muted)
                                     .frame(width: 44, height: 44, alignment: .trailing)
                             }
                             .accessibilityLabel("Remove this recipient")
@@ -72,12 +72,13 @@ struct SplitFlow: View {
                         .accessibilityLabel("Recipient")
                     Divider().overlay(Theme.Palette.ink.opacity(0.07))
                     HStack {
+                        Text("$").font(.figure(20, weight: .semibold)).foregroundStyle(Theme.Palette.ink)
                         TextField("0", text: $leg.amount)
                             .font(.figure(20, weight: .semibold))
                             .foregroundStyle(Theme.Palette.ink)
                             .keyboardType(.decimalPad)
                             .accessibilityLabel("Amount in MUSD")
-                        Text("MUSD").font(.figure(15, weight: .semibold)).foregroundStyle(Theme.Palette.tertiary)
+                        Text("MUSD").font(.figure(15, weight: .semibold)).foregroundStyle(Theme.Palette.muted)
                     }
                 }
             }
@@ -107,6 +108,14 @@ struct SplitFlow: View {
             ReviewRow(label: shortRecipient($0.recipient), value: MoneyFormat.musd($0.amount))
         })
         GasNote(mode: .sponsored)
+        // Split runs `ensureMusdAllowance` like Send and repay do, so a first-time splitter
+        // pays a self-paid approval before the sponsored split — which the Gasless note alone
+        // implies they will not. Send discloses it; this screen did not.
+        Text("Your first payment needs a one-time, uncapped MUSD approval that you pay in BTC.")
+            .font(.text(12))
+            .foregroundStyle(Theme.Palette.muted)
+            .padding(.horizontal, Theme.Space.md)
+            .fixedSize(horizontal: false, vertical: true)
         SubmitBar(title: "Send to \(validLegs.count)", submitting: stage == .submitting) {
             Task { await submit() }
         }

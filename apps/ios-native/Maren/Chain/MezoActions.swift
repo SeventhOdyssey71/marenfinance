@@ -10,9 +10,8 @@ import web3
 //   2. Submit, yielding a hash — relayed as a signed ForwardRequest, or self-submitted.
 //   3. `Receipt.confirm` — the single R15 checkpoint. A hash is not a success.
 //
-// The live path is GATED on a configured relayer URL. None is set in this repo, so
-// `submit` returns `.declined` with the same honest sentence the RN app uses, rather than
-// producing a receipt and a hash that do not exist on chain.
+// The live path requires a configured relayer URL. A missing configuration declines before
+// signing; acceptance still requires an on-chain receipt before the UI reports success.
 
 enum ActionResult: Sendable {
     case ok(Delivered)
@@ -90,6 +89,40 @@ struct MezoActions {
         return padded > cap ? cap : padded
     }
 
+    /// Vault calls must retain the full estimate margin within sponsorship policy.
+    /// Silently clamping or guessing after a failed estimate can sign an unusable request.
+    static func vaultRelayGasLimit(directEstimate: BigUInt) -> BigUInt? {
+        guard directEstimate > 0 else { return nil }
+        let padded = directEstimate + directEstimate / 2 + 60_000
+        return padded <= BigUInt(MAX_RELAY_GAS) ? padded : nil
+    }
+
+    /// THE ESTIMATE FOR `deposit` IS STRUCTURALLY UNTRUSTWORTHY. `MarenVault.deposit` wraps
+    /// `addColl` in `_tryPushCollateral`, whose catch leaves the BTC idle instead of
+    /// reverting. So the cheap fallback always succeeds, `eth_estimateGas` prices THAT, and
+    /// a limit derived from it guarantees the push fails. The estimator returns ~294k against
+    /// the live chain; the push needs far more. This is a fixed point that resolves to the
+    /// wrong branch every time, and it is silent — the deposit still returns success.
+    ///
+    /// It ran for five weeks. Trove collateral was 0.069061 BTC on 18 August and still
+    /// 0.069061 BTC on 22 September while idle grew to 0.212 BTC, which left the pooled
+    /// trove at 183% ICR against its own 180% borrow floor and capped pool-wide borrowing at
+    /// ~159 MUSD. Every collateral figure looked healthy throughout.
+    ///
+    /// The floor therefore has to be sized from the PUSH path, independently of the estimate.
+    /// Measured against the live 233-trove sorted list, `topUpCollateral` — which is
+    /// `_syncState` + `_price` + `addColl` plus overhead, i.e. the same work — costs 716,827
+    /// gas for a small amount and 983,223 for a large one. A deposit adds share minting on
+    /// top, and EIP-150 forwards only 63/64 of what remains to the inner call. 1.2M clears
+    /// all of that with room for the list to grow.
+    ///
+    /// Over-provisioning is close to free: gas is refunded if unused, and at Mezo's observed
+    /// 146 wei the whole limit is ~0.00000018 BTC. Under-provisioning costs a silent failure
+    /// nobody notices for a month, so the asymmetry is not close.
+    static func depositGasLimit(directEstimate: BigUInt) -> BigUInt {
+        max(BigUInt(1_200_000), directEstimate + directEstimate / 4 + 30_000)
+    }
+
     /// Submit a sponsored `pay` to `to`. Face ID → build calldata → sign ForwardRequest →
     /// POST to the relayer → confirm the receipt. Declines honestly when no relayer is set or
     /// the Keychain key does not derive `loadedAddress`.
@@ -113,15 +146,54 @@ struct MezoActions {
     }
 
     /// A relayed (gasless) MarenVault write — `function` is "borrow" | "repay" | "withdraw".
+    static func vaultWriteUnavailableReason(_ snap: MezoSnapshot) -> String? {
+        guard let collateral = snap.vaultCollWei, let debt = snap.vaultDebtWei else {
+            return "Your pooled vault position could not be verified. Refresh before continuing."
+        }
+        guard collateral > 0 || debt > 0 else {
+            return "There is no Maren pooled position to manage. Direct Mezo loans must be repaid or withdrawn in Mezo."
+        }
+        return nil
+    }
+
     func vaultWrite(_ function: String, loadedAddress: String, amountWei: BigUInt) async -> ActionResult {
+        do {
+            // Validate the route again before every vault signature, including repay/withdraw.
+            let snap = try await rpc.fetchSnapshot(loadedAddress)
+            if let reason = Self.vaultWriteUnavailableReason(snap) {
+                return .declined(reason: reason)
+            }
+            if function == "borrow" {
+                let fresh = snap.priceUpdatedAt.map { MezoMarenClient.isFresh(updatedAt: $0) } ?? false
+                let available = MezoMarenClient.pooledBorrowAvailability(snap, priceIsFresh: fresh)
+                guard let max = available.amountWei, amountWei > 0, amountWei <= max else {
+                    return .declined(reason: available.reason ?? "That amount exceeds the current borrowing limit. Refresh the vault and choose a smaller amount.")
+                }
+            }
+        } catch {
+            return .declined(reason: "The current vault position could not be verified, so nothing was submitted. Refresh the vault and try again.")
+        }
         let key: Data
         switch await accessKey(loadedAddress) {
         case .ok(let k): key = k
         case .fail(let reason): return .declined(reason: reason)
         }
         let data: Data
-        do { data = try MarenEncoding.vaultWriteCalldata(function: function, amount: amountWei) }
-        catch { return .declined(reason: prepFailed) }
+        if function == "repay",
+           let reason = await ensureMusdAllowance(privateKey: key, loadedAddress: loadedAddress,
+               spender: MarenAddresses.of(chain.network).marenVault, needed: amountWei) {
+            return .declined(reason: reason)
+        }
+        do {
+            guard let operation = MezoRPC.VaultHintOperation(rawValue: function) else {
+                return .declined(reason: prepFailed)
+            }
+            let hints = try await rpc.pooledTroveHints(operation: operation, amount: amountWei,
+                                                      owner: loadedAddress)
+            data = try MarenEncoding.vaultWriteCalldata(function: function, amount: amountWei, hints: hints)
+        } catch {
+            return .declined(reason: "The pooled vault's transaction hints could not be read. The vault transaction was not submitted. Refresh and try again.")
+        }
         return await relayCall(privateKey: key, loadedAddress: loadedAddress,
                                to: MarenAddresses.of(chain.network).marenVault, data: data)
     }
@@ -135,15 +207,25 @@ struct MezoActions {
         case .fail(let reason): return .declined(reason: reason)
         }
         do {
-            let data = try MarenEncoding.depositCalldata()
+            let hints = try await rpc.pooledTroveHints(operation: .deposit, amount: valueWei, owner: loadedAddress)
+            let data = try MarenEncoding.depositCalldata(hints: hints)
+            let estimate = try await rpc.estimateGas(from: loadedAddress,
+                to: MarenAddresses.of(chain.network).marenVault, data: data,
+                value: valueWei, sponsored: false)
+            guard let gasLimit = Int(exactly: Self.depositGasLimit(directEstimate: estimate)) else {
+                return .declined(reason: prepFailed)
+            }
             let hash = try await sendSelfPaid(privateKey: key, loadedAddress: loadedAddress,
                                               to: MarenAddresses.of(chain.network).marenVault,
-                                              value: valueWei, data: data, gasLimit: 500_000)
+                                              value: valueWei, data: data, gasLimit: gasLimit)
             let client = EthereumHttpClient(url: chain.rpcURLs[0], network: .custom(String(chain.chainId)))
             let outcome = await Receipt.confirm(client: client, hash: hash, sponsored: false)
             await MezoSnapshotStore.shared.invalidate()  // cached reads are stale now
+            await ActivityHistoryStore.shared.invalidate()
             if case .delivered(let d) = outcome { return .ok(d) }
             return .failed(outcome)
+        } catch let rejection as SelfPaidRejected {
+            return .declined(reason: rejection.readable)
         } catch {
             return .declined(reason: prepFailed)
         }
@@ -206,6 +288,8 @@ struct MezoActions {
             }
             let data = try MarenEncoding.claimLinkCalldata(linkId: BigUInt(linkId), recipient: loadedAddress, signature: sigData)
             return await relayCall(privateKey: key, loadedAddress: loadedAddress, to: maren.marenPay, data: data)
+        } catch let rejection as SelfPaidRejected {
+            return .declined(reason: rejection.readable)
         } catch {
             return .declined(reason: prepFailed)
         }
@@ -430,6 +514,7 @@ struct MezoActions {
         // after a deposit could be served the PRE-transaction balance — the exact "it went
         // through but nothing moved" that the receipt-gating elsewhere exists to prevent.
         await MezoSnapshotStore.shared.invalidate()
+        await ActivityHistoryStore.shared.invalidate()
         if case .delivered(let d) = outcome { return .ok(d) }
         return .failed(outcome)
     }
@@ -474,6 +559,12 @@ struct MezoActions {
             let client = EthereumHttpClient(url: chain.rpcURLs[0], network: .custom(String(chain.chainId)))
             if case .delivered = await Receipt.confirm(client: client, hash: hash, sponsored: false) { return nil }
             return "The one-time MUSD approval has not confirmed. It may still settle and spend BTC gas. The payment has not been submitted. Check the approval on the explorer before retrying: \(hash)"
+        } catch let rejection as SelfPaidRejected {
+            // The most common first-run failure in the whole app: this approve is self-paid
+            // and runs before every "gasless" payment, so a wallet with no BTC lands here.
+            // Give it the node's actual reason rather than the generic line, and never the
+            // explorer link above — that hash was never broadcast.
+            return rejection.readable
         } catch {
             return "The one-time MUSD approval could not be submitted, so nothing was sent."
         }
@@ -488,12 +579,27 @@ struct MezoActions {
         }
         let maren = MarenAddresses.of(chain.network)
         do {
-            let estimate = (try? await rpc.estimateGas(from: loadedAddress, to: to, data: data)) ?? BigUInt(400_000)
+            let gasLimit: BigUInt
+            if to.lowercased() == maren.marenVault.lowercased() {
+                let estimate: BigUInt
+                do {
+                    estimate = try await rpc.estimateGas(from: loadedAddress, to: to, data: data)
+                } catch {
+                    return .declined(reason: "Mezo could not estimate this vault transaction. The vault limits or RPC may have changed. The vault transaction was not submitted. Refresh and try again.")
+                }
+                guard let padded = Self.vaultRelayGasLimit(directEstimate: estimate) else {
+                    return .declined(reason: "This vault transaction needs more gas than sponsorship currently allows. The vault transaction was not submitted.")
+                }
+                gasLimit = padded
+            } else {
+                let estimate = (try? await rpc.estimateGas(from: loadedAddress, to: to, data: data)) ?? BigUInt(400_000)
+                gasLimit = Self.relayGasLimit(directEstimate: estimate)
+            }
             let nonce = try await rpc.forwarderNonce(hub: maren.marenForwarder, owner: loadedAddress)
             let deadline = UInt64(Date().timeIntervalSince1970) + RELAY_DEADLINE_SECONDS
             let request = MarenEncoding.ForwardRequest(
                 from: loadedAddress, to: to, value: 0,
-                gas: Self.relayGasLimit(directEstimate: estimate), nonce: nonce,
+                gas: gasLimit, nonce: nonce,
                 deadline: deadline, data: data
             )
             let signature = try Self.signForwardRequest(
@@ -511,6 +617,7 @@ struct MezoActions {
             let outcome = await Receipt.confirm(client: client, hash: accepted.hash, sponsored: true,
                                                 mintedIdFrom: mintedIdFrom)
             await MezoSnapshotStore.shared.invalidate()  // cached reads are stale now
+            await ActivityHistoryStore.shared.invalidate()
             if case .delivered(let d) = outcome { return .ok(d) }
             return .failed(outcome)
         } catch let refused as RelayRefused {
@@ -520,12 +627,15 @@ struct MezoActions {
                     let outcome = await Receipt.confirm(client: client, hash: hash, sponsored: true,
                                                         mintedIdFrom: mintedIdFrom)
                     await MezoSnapshotStore.shared.invalidate()
+                    await ActivityHistoryStore.shared.invalidate()
                     if case .delivered(let delivered) = outcome { return .ok(delivered) }
                     return .failed(outcome)
                 }
                 return .failed(.submissionUnknown(reason: refused.reason.detail))
             }
             return .declined(reason: refused.reason.detail)
+        } catch let rejection as SelfPaidRejected {
+            return .declined(reason: rejection.readable)
         } catch {
             return .declined(reason: prepFailed)
         }
@@ -547,8 +657,53 @@ struct MezoActions {
         // Establish the identity BEFORE external submission. Even a lost RPC response leaves
         // a real hash to reconcile; never misclassify an attempted broadcast as a decline.
         let hash = raw.web3.keccak256.web3.hexString
-        _ = try? await client.networkProvider.send(method: "eth_sendRawTransaction",
-                                                   params: [raw.web3.hexString], receive: String.self)
+        do {
+            _ = try await client.networkProvider.send(method: "eth_sendRawTransaction",
+                                                      params: [raw.web3.hexString], receive: String.self)
+        } catch JSONRPCError.executionError(let result) {
+            // A NODE REJECTION IS A FACT, NOT AN AMBIGUITY. This used to be `try?`, which
+            // reconciled a lost response and a definitive refusal into the same silence: the
+            // locally-derived hash was returned either way, `Receipt.confirm` then polled a
+            // transaction that had never been broadcast for the full 60 seconds, and the user
+            // was told it "may still land" and handed an explorer link to nothing.
+            //
+            // That is the first thing a new tester meets, because the one-time MUSD approve
+            // runs self-paid before every "gasless" payment — so an empty BTC balance, the
+            // expected state of a fresh wallet, produced a minute of spinner and a fabricated
+            // hash instead of "you need testnet BTC for gas". Web already got this right.
+            //
+            // `executionError` is the node answering; anything else below is the network
+            // failing to deliver an answer, where the old reconciliation logic is still right.
+            throw SelfPaidRejected(detail: result.error.message)
+        }
         return hash
+    }
+}
+
+/// A self-paid broadcast the node refused outright. Nothing was sent and no gas was spent,
+/// so the caller can decline plainly instead of reporting an uncertain outcome.
+struct SelfPaidRejected: Error {
+    let detail: String
+
+    /// The rejections a tester actually provokes, in their words rather than the node's.
+    /// Anything unrecognised keeps the node's own message, which is still more use than
+    /// "the transaction could not be prepared".
+    var readable: String {
+        let d = detail.lowercased()
+        if d.contains("insufficient funds") {
+            return "This wallet does not hold enough BTC to pay the gas for this. "
+                 + "Deposits, approvals and Earn are paid by you, not sponsored."
+        }
+        if d.contains("nonce too low") || d.contains("already known") || d.contains("replacement") {
+            return "A transaction from this wallet is already in flight. "
+                 + "Wait for it to confirm before trying again."
+        }
+        if d.contains("underpriced") || d.contains("fee too low") {
+            return "The network raised its fee while this was being prepared. Try again."
+        }
+        if d.contains("intrinsic gas") || d.contains("exceeds block gas limit") {
+            return "This transaction is too large for the network to accept."
+        }
+        return detail
     }
 }

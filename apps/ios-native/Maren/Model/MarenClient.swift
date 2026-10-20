@@ -146,12 +146,12 @@ struct StubMarenClient: MarenClient {
         let now = Date()
         return [
             ActivityItem(id: "1", kind: .receive, title: "Received from @ada",
-                         subtitle: "MarenPay transfer", amount: "+250.00 MUSD",
+                         subtitle: "MarenPay transfer", amount: "+$250.00",
                          date: now.addingTimeInterval(-3_600),
                          status: .confirmed, hash: "0xdemo00000000000000000000000000000000000000000000000000000000a1",
                          memo: "lunch", counterparty: "@ada", sponsored: true),
             ActivityItem(id: "2", kind: .borrow, title: "Borrowed MUSD",
-                         subtitle: "Against BTC vault", amount: "+2,000.00 MUSD",
+                         subtitle: "Against BTC vault", amount: "+$2,000.00",
                          date: now.addingTimeInterval(-86_400),
                          status: .confirmed, hash: "0xdemo00000000000000000000000000000000000000000000000000000000b2",
                          sponsored: true),

@@ -1199,16 +1199,11 @@ contract MarenVault is AccessControl, ERC2771Context, ReentrancyGuard {
     /// @dev Trove collateral and net debt, INCLUDING pending redistributions and EXCLUDING
     ///      the 200 MUSD gas compensation. Uses the 6-return Mezo variant, not Liquity's 4.
     function _troveCollAndNetDebt() private view returns (uint256 coll, uint256 netDebt) {
-        (
-            uint256 c,
-            uint256 principal,
-            uint256 interest,
-            uint256 pendColl,
-            uint256 pendPrincipal,
-            uint256 pendInterest
-        ) = troveManager.getEntireDebtAndColl(address(this));
-        coll = c + pendColl;
-        uint256 gross = principal + interest + pendPrincipal + pendInterest;
+        // Mezo includes each pending redistribution in the first three totals.
+        // The final three values describe a subset, not additional balances.
+        (uint256 c, uint256 principal, uint256 interest,,,) = troveManager.getEntireDebtAndColl(address(this));
+        coll = c;
+        uint256 gross = principal + interest;
         netDebt = gross > MUSD_GAS_COMPENSATION ? gross - MUSD_GAS_COMPENSATION : 0;
     }
 

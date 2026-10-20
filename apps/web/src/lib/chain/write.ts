@@ -333,7 +333,7 @@ export interface MarenWriteOptions {
 export function useMarenWrites(options: MarenWriteOptions = {}): MarenWrites {
   const { address, isConnected } = useAccount();
   const chainId = useChainId();
-  const client = usePublicClient();
+  const client = usePublicClient({ chainId: targetChain.id });
   const { writeContractAsync } = useWriteContract();
   const { signTypedDataAsync } = useSignTypedData();
   const relayer = useRelayerStatus();
@@ -561,6 +561,23 @@ export function useMarenWrites(options: MarenWriteOptions = {}): MarenWrites {
           functionName: 'deposit',
           args: [upper, lower],
           value: amountWei,
+          /**
+           * Pinned, because an ESTIMATE IS THE WRONG NUMBER HERE. `MarenVault.deposit` wraps
+           * `addColl` in `_tryPushCollateral`, whose catch leaves the BTC idle rather than
+           * reverting — so the cheap fallback always succeeds, the estimator prices that, and
+           * a limit taken from it guarantees the push fails. Silently: the deposit still
+           * reports success. Leaving this to viem's automatic estimate is what let trove
+           * collateral sit unchanged at 0.069061 BTC from 18 August to 22 September while
+           * idle collateral grew to 0.212 BTC, which capped pool-wide borrowing at ~159 MUSD.
+           *
+           * Sized from the push path instead: `topUpCollateral` — the same
+           * `_syncState` + `_price` + `addColl` work — measured 716,827 gas against the live
+           * 233-trove list, 983,223 for a large amount, and EIP-150 forwards only 63/64 of
+           * what remains to the inner call. Unused gas is refunded and the whole limit is
+           * ~0.00000018 BTC at Mezo's observed 146 wei, so over-provisioning is close to free
+           * while under-provisioning fails silently for weeks.
+           */
+          gas: 1_200_000n,
         } as const;
         return submitCall(
           account,

@@ -75,21 +75,199 @@ struct MezoRPC: Sendable {
         return Self.word(out, 0)
     }
 
-    /// A direct-call gas estimate, with failover. Used to size the relayed gas cap.
-    func estimateGas(from: String, to: String, data: Data) async throws -> BigUInt {
+    /// A direct-call simulation, with failover. Sponsored simulations explicitly use zero
+    /// gas price so a user holding no BTC can still estimate; this never sets a broadcast fee.
+    func estimateGas(from: String, to: String, data: Data, value: BigUInt = 0,
+                     sponsored: Bool = true) async throws -> BigUInt {
         var lastError = "no endpoints configured"
         for url in chain.rpcURLs {
             do {
-                let tx = EthereumTransaction(from: EthereumAddress(from), to: EthereumAddress(to),
-                                             value: 0, data: data, nonce: nil, gasPrice: nil, gasLimit: nil,
-                                             chainId: chain.chainId)
-                return try await makeClient(url).eth_estimateGas(tx)
+                return try await Self.estimateGas(using: URLSession.shared, url: url,
+                    from: from, to: to, data: data, value: value, sponsored: sponsored)
             } catch {
                 lastError = String(describing: error)
                 continue
             }
         }
         throw MezoRPCError.allEndpointsFailed(lastError)
+    }
+
+    /// Build the exact JSON-RPC body. web3.swift's convenience wrapper omits gasPrice,
+    /// so sponsored estimates use this explicit request instead.
+    static func gasEstimateRequest(url: URL, from: String, to: String, data: Data,
+                                   value: BigUInt = 0, sponsored: Bool = true) throws -> URLRequest {
+        var transaction = ["from": from, "to": to, "data": data.web3.hexString,
+                           "value": "0x" + String(value, radix: 16)]
+        if sponsored { transaction["gasPrice"] = "0x0" }
+        var request = URLRequest(url: url, timeoutInterval: 20)
+        request.httpMethod = "POST"
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        request.httpBody = try JSONSerialization.data(withJSONObject: [
+            "jsonrpc": "2.0", "id": 1, "method": "eth_estimateGas", "params": [transaction]
+        ])
+        return request
+    }
+
+    static func decodeGasEstimate(data: Data, response: URLResponse) throws -> BigUInt {
+        guard let http = response as? HTTPURLResponse, (200...299).contains(http.statusCode) else {
+            throw MezoRPCError.decode("gas estimation HTTP request failed")
+        }
+        guard let payload = try JSONSerialization.jsonObject(with: data) as? [String: Any],
+              payload["jsonrpc"] as? String == "2.0", payload["id"] as? Int == 1,
+              !payload.keys.contains("error"), let hex = payload["result"] as? String,
+              hex.range(of: "^0x[1-9a-fA-F][0-9a-fA-F]*$", options: .regularExpression) != nil,
+              let estimate = BigUInt(String(hex.dropFirst(2)), radix: 16) else {
+            throw MezoRPCError.decode("invalid gas estimate or RPC simulation failure")
+        }
+        return estimate
+    }
+
+    static func estimateGas(using session: URLSession, url: URL, from: String, to: String,
+                            data: Data, value: BigUInt = 0, sponsored: Bool = true) async throws -> BigUInt {
+        let request = try gasEstimateRequest(url: url, from: from, to: to, data: data,
+                                            value: value, sponsored: sponsored)
+        let (body, response) = try await session.data(for: request)
+        return try decodeGasEstimate(data: body, response: response)
+    }
+
+    /// Zero neighbours are valid at a list boundary, but a missing/truncated RPC response
+    /// must never silently become a zero hint. The contract validates hints again at execution.
+    static func decodeTroveHint(_ data: Data) throws -> String {
+        guard data.count == 32, data.prefix(12).allSatisfy({ $0 == 0 }) else {
+            throw MezoRPCError.decode("invalid trove hint address")
+        }
+        return address(data, 0)
+    }
+
+    enum VaultHintOperation: String { case borrow, repay, withdraw, deposit }
+
+    /// Mezo sorts by collateral / PRINCIPAL, excluding interest. Entire-trove reads already
+    /// include pending rewards. Project the adjustment before looking for its destination.
+    struct VaultHintState {
+        let trove: TroveRead
+        let reserveWei: BigUInt
+        let idleWei: BigUInt
+        let userDebtWei: BigUInt
+        let borrowingRateWei: BigUInt
+        let minimumNetDebtWei: BigUInt
+        let gasCompensationWei: BigUInt
+    }
+
+    static func projectedTrove(operation: VaultHintOperation, amount: BigUInt,
+                               state: VaultHintState) throws -> TroveRead {
+        var coll = state.trove.collWei
+        var principal = state.trove.principalWei
+        var interest = state.trove.interestWei
+        switch operation {
+        case .borrow:
+            let draw = amount > state.reserveWei ? amount - state.reserveWei : 0
+            principal += draw + draw * state.borrowingRateWei / BigUInt(10).power(18)
+        case .repay:
+            let available = state.reserveWei + min(amount, state.userDebtWei)
+            let floor = state.minimumNetDebtWei + state.gasCompensationWei
+            let gross = principal + interest
+            let room = gross > floor ? gross - floor : 0
+            let pushed = min(available, room)
+            // Mezo repays accrued interest first, then principal. The vault may retain
+            // funds in reserve if the best-effort protocol push cannot run.
+            let interestPaid = min(pushed, interest)
+            interest -= interestPaid
+            principal -= pushed - interestPaid
+        case .withdraw:
+            let pulled = amount > state.idleWei ? amount - state.idleWei : 0
+            guard pulled <= coll else { throw MezoRPCError.decode("withdraw exceeds pooled collateral") }
+            coll -= pulled
+        case .deposit:
+            // _tryPushCollateral receives only this deposit, not pre-existing idle BTC.
+            coll += amount
+        }
+        guard principal > 0 else { throw MezoRPCError.decode("invalid projected trove principal") }
+        return TroveRead(collWei: coll, principalWei: principal, interestWei: interest)
+    }
+
+    static func insertionHints(_ data: Data, vault: String,
+                               current: MarenEncoding.TroveHints) throws -> MarenEncoding.TroveHints {
+        guard data.count == 64 else { throw MezoRPCError.decode("invalid insertion hint pair") }
+        var upper = try decodeTroveHint(Data(data.prefix(32)))
+        var lower = try decodeTroveHint(Data(data.suffix(32)))
+        // findInsertPosition sees the vault in the list; reInsert removes it first.
+        if upper.lowercased() == vault.lowercased() { upper = current.upper }
+        if lower.lowercased() == vault.lowercased() { lower = current.lower }
+        guard upper.lowercased() != vault.lowercased(), lower.lowercased() != vault.lowercased(),
+              upper.lowercased() != lower.lowercased() || upper == MarenEncoding.TroveHints.none.upper else {
+            throw MezoRPCError.decode("invalid self-referencing insertion hints")
+        }
+        return MarenEncoding.TroveHints(upper: upper, lower: lower)
+    }
+
+    static func inactiveTroveHints(operation: VaultHintOperation, amount: BigUInt,
+                                   idleWei: BigUInt) throws -> MarenEncoding.TroveHints {
+        // An unopened pool still accepts deposits/repayments and lets idle BTC leave.
+        if operation == .deposit || operation == .repay || (operation == .withdraw && amount <= idleWei) {
+            return .none
+        }
+        throw MezoRPCError.decode("pooled trove is not active")
+    }
+
+    func pooledTroveHints(operation: VaultHintOperation, amount: BigUInt,
+                          owner: String) async throws -> MarenEncoding.TroveHints {
+        let vault = MarenAddresses.of(chain.network).marenVault
+        let protocolAddresses = MusdAddresses.of(chain.network)
+        let sorted = protocolAddresses.sortedTroves
+        func read(_ to: String, _ function: String, account: String? = nil) throws -> BatchCall {
+            let enc = ABIFunctionEncoder(function)
+            if let account { try enc.encode(EthereumAddress(account)) }
+            return BatchCall(to: to, data: try enc.encoded())
+        }
+        // Resolve the protocol's fee exemption registry, then read all changing projection
+        // inputs in one Multicall snapshot. A failed read never becomes a guessed zero.
+        let governor = try Self.decodeTroveHint(await call(to: protocolAddresses.borrowerOperations,
+            data: ABIFunctionEncoder("governableVariables").encoded()))
+        let calls = try [
+            read(sorted, "contains", account: vault),
+            read(protocolAddresses.troveManager, "getEntireDebtAndColl", account: vault),
+            read(vault, "reserveMUSD"), read(vault, "idleCollateral"),
+            read(vault, "previewDebtOf", account: owner),
+            read(protocolAddresses.borrowerOperations, "borrowingRate"),
+            read(vault, "MIN_NET_DEBT"), read(vault, "MUSD_GAS_COMPENSATION"),
+            read(sorted, "getPrev", account: vault), read(sorted, "getNext", account: vault),
+            read(governor, "isAccountFeeExempt", account: vault)
+        ]
+        let replies = try await multicall(calls)
+        func required(_ index: Int, bytes: Int = 32) throws -> Data {
+            guard replies.indices.contains(index), let data = replies[index], data.count == bytes else {
+                throw MezoRPCError.decode("missing pooled hint state")
+            }
+            return data
+        }
+        func uint(_ index: Int) throws -> BigUInt { Self.word(try required(index), 0) }
+        let membership = try uint(0)
+        guard membership <= 1 else { throw MezoRPCError.decode("invalid sorted trove membership") }
+        if membership == 0 {
+            return try Self.inactiveTroveHints(operation: operation, amount: amount, idleWei: uint(3))
+        }
+        let exempt = try uint(10)
+        guard exempt <= 1 else { throw MezoRPCError.decode("invalid borrowing fee exemption") }
+        let state = try VaultHintState(trove: Self.decodeEntireTrove(required(1, bytes: 192)),
+            reserveWei: uint(2), idleWei: uint(3), userDebtWei: uint(4),
+            borrowingRateWei: exempt == 1 ? 0 : uint(5), minimumNetDebtWei: uint(6),
+            gasCompensationWei: uint(7))
+        let current = try MarenEncoding.TroveHints(upper: Self.decodeTroveHint(required(8)),
+                                                  lower: Self.decodeTroveHint(required(9)))
+        let projected = try Self.projectedTrove(operation: operation, amount: amount, state: state)
+        let ratio = ABIFunctionEncoder("computeNominalCR")
+        try ratio.encode(projected.collWei)
+        try ratio.encode(projected.principalWei)
+        let ratioData = try await call(to: protocolAddresses.hintHelpers, data: ratio.encoded())
+        guard ratioData.count == 32 else { throw MezoRPCError.decode("invalid projected nominal ratio") }
+        let insert = ABIFunctionEncoder("findInsertPosition")
+        try insert.encode(Self.word(ratioData, 0))
+        try insert.encode(EthereumAddress(current.upper))
+        try insert.encode(EthereumAddress(current.lower))
+        let result = try await call(to: sorted, data: insert.encoded())
+        // Hints can age between reads and signing. The contract validates them, and the
+        // real estimate plus full, unclamped relay margin remains the final gas guard.
+        return try Self.insertionHints(result, vault: vault, current: current)
     }
 
     // MARK: typed reads
@@ -201,10 +379,14 @@ struct MezoRPC: Sendable {
         let enc = ABIFunctionEncoder("getEntireDebtAndColl")
         try enc.encode(EthereumAddress(account))
         let out = try await call(to: MusdAddresses.of(chain.network).troveManager, data: try enc.encoded())
-        let coll = Self.word(out, 0) + Self.word(out, 3)
-        let principal = Self.word(out, 1) + Self.word(out, 4)
-        let interest = Self.word(out, 2) + Self.word(out, 5)
-        return TroveRead(collWei: coll, principalWei: principal, interestWei: interest)
+        return try Self.decodeEntireTrove(out)
+    }
+
+    /// Mezo includes pending redistribution in words 0–2 already. Words 3–5 only
+    /// describe that included portion; adding them again doubles redistributed debt.
+    static func decodeEntireTrove(_ out: Data) throws -> TroveRead {
+        guard out.count >= 192 else { throw MezoRPCError.decode("getEntireDebtAndColl returned a short result") }
+        return TroveRead(collWei: word(out, 0), principalWei: word(out, 1), interestWei: word(out, 2))
     }
 
     /// A pooled position in `MarenVault`, keyed by the user's EOA. Most Maren loans live here,
@@ -521,6 +703,13 @@ struct MezoSnapshot: Sendable {
     /// Both are trove-wide, not per user: the ceiling is shared by every depositor.
     var troveCapacityWei: BigUInt?
     var troveTotalDebtWei: BigUInt?
+    var troveCollateralWei: BigUInt?
+    var reserveMusdWei: BigUInt?
+    var vaultMaxBorrowableWei: BigUInt?
+    var borrowingRateWei: BigUInt?
+    var borrowingPaused: Bool?
+    var troveOpen: Bool?
+    var troveStatus: BigUInt?
 }
 
 extension MezoRPC {
@@ -561,6 +750,13 @@ extension MezoRPC {
             // is how a tester was shown 1,319 MUSD against a real limit of 84.
             .init(to: musd.troveManager, data: try encAddr("getTroveMaxBorrowingCapacity", maren.marenVault)),
             .init(to: musd.troveManager, data: try encAddr("getTroveDebt", maren.marenVault)),
+            .init(to: musd.troveManager, data: try encAddr("getEntireDebtAndColl", maren.marenVault)),
+            .init(to: maren.marenVault, data: try enc("reserveMUSD")),
+            .init(to: maren.marenVault, data: try encAddr("maxBorrowable", account)),
+            .init(to: maren.marenVault, data: try enc("borrowingPaused")),
+            .init(to: maren.marenVault, data: try enc("troveOpen")),
+            .init(to: musd.troveManager, data: try encAddr("getTroveStatus", maren.marenVault)),
+            .init(to: musd.borrowerOperations, data: try enc("borrowingRate")),
         ]
 
         let r = try await multicall(calls)
@@ -577,9 +773,7 @@ extension MezoRPC {
         if let c = r[2] { snap.vaultCollWei = Self.word(c, 0) }
         if let d = r[3] { snap.vaultDebtWei = Self.word(d, 0) }
         if let t = r[4] {
-            snap.trove = TroveRead(collWei: Self.word(t, 0) + Self.word(t, 3),
-                                   principalWei: Self.word(t, 1) + Self.word(t, 4),
-                                   interestWei: Self.word(t, 2) + Self.word(t, 5))
+            snap.trove = try? Self.decodeEntireTrove(t)
         }
         if let m = r[5] { snap.musdWei = Self.word(m, 0) }
         if let b = r[6] { snap.btcWei = Self.word(b, 0) }
@@ -593,7 +787,17 @@ extension MezoRPC {
         }
         if let s = r[9] { snap.earnStalePrice = Self.word(s, 0) == 1 }
         if let c = r[10] { snap.troveCapacityWei = Self.word(c, 0) }
-        if let d = r[11] { snap.troveTotalDebtWei = Self.word(d, 0) }
+        // The entire tuple includes pending redistribution, unlike the old stored-debt read.
+        if let d = r[12], let pooled = try? Self.decodeEntireTrove(d) {
+            snap.troveTotalDebtWei = pooled.principalWei + pooled.interestWei
+            snap.troveCollateralWei = pooled.collWei
+        }
+        if let d = r[13], d.count >= 32 { snap.reserveMusdWei = Self.word(d, 0) }
+        if let d = r[14], d.count >= 32 { snap.vaultMaxBorrowableWei = Self.word(d, 0) }
+        if let d = r[15], d.count >= 32 { snap.borrowingPaused = Self.word(d, 0) != 0 }
+        if let d = r[16], d.count >= 32 { snap.troveOpen = Self.word(d, 0) != 0 }
+        if let d = r[17], d.count >= 32 { snap.troveStatus = Self.word(d, 0) }
+        if let d = r[18], d.count >= 32 { snap.borrowingRateWei = Self.word(d, 0) }
         return snap
     }
 }

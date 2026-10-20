@@ -56,7 +56,7 @@ struct ScanView: View {
                         .allowsHitTesting(false)
                 )
             Text("Point the camera at a Maren payment or claim QR.")
-                .font(.system(size: 14)).foregroundStyle(Theme.Palette.tertiary)
+                .font(.system(size: 14)).foregroundStyle(Theme.Palette.muted)
         }
     }
 

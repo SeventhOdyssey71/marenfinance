@@ -1,0 +1,37 @@
+{
+  "chainId": 31611,
+  "vault": "0x46252B00AB59384518d9dB6D1f210ffF1221645b",
+  "keeper": "0x54196397D6f01b48739dB3957257cB33cD341885",
+  "transactionHash": "0x163e5f3d662c4e5af12432923437502e38e498ea7dbc6e1fa10ee29f964986c7",
+  "receipt": {
+    "status": "0x1",
+    "blockNumber": "0xef7e15",
+    "gasUsed": "0x630fd",
+    "effectiveGasPrice": "0x124",
+    "from": "0x54196397d6f01b48739db3957257cb33cd341885",
+    "to": "0x46252b00ab59384518d9db6d1f210fff1221645b"
+  },
+  "before": {
+    "block": 15695380,
+    "capacityWei": "2749201745454545454545",
+    "collateralWei": "69061097205866344",
+    "principalWei": "2747273767922884000000",
+    "interestWei": "2300777327783018989",
+    "totalDebtWei": "2749574545250667018989",
+    "pendingRedistributionsWei": ["0", "0", "0"],
+    "interestRateBps": "100"
+  },
+  "after": {
+    "block": 15695381,
+    "capacityWei": "5348046163995027657753",
+    "collateralWei": "69061097205866344",
+    "principalWei": "2747783682832630594524",
+    "interestWei": "2300780810088620523",
+    "totalDebtWei": "2750084463642719215047",
+    "pendingRedistributionsWei": ["0", "0", "0"],
+    "interestRateBps": "100"
+  },
+  "capacityIncreased": true,
+  "interestRateUnchanged": true,
+  "publicBorrowProof": "borrow-proof-2026-09-22.json"
+}

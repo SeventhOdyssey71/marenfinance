@@ -37,8 +37,8 @@ const connectors = [
           metadata: {
             name: 'Maren Finance',
             description: 'Spend Bitcoin. Never sell it.',
-            url: 'https://maren.finance',
-            icons: ['https://maren.finance/icon.svg'],
+            url: 'https://marenfinance.xyz',
+            icons: ['https://marenfinance.xyz/icon.png'],
           },
         }),
       ]

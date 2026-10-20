@@ -8,8 +8,10 @@ MUSD against it from as little as 0.001 BTC, and spend it: pay a `@name`, send a
 request money, and put idle MUSD to work. Your collateral backs the loan and can be liquidated
 if its value falls too far. Repay the debt to withdraw the remaining collateral.
 
-It is built mobile-first. The iOS TestFlight beta is the public client. The web dashboard runs
-locally and is disabled in production; payment-link claims remain available in the browser.
+Use the [web app](https://www.marenfinance.xyz/app) with a browser wallet on Mezo
+testnet, or join the iOS TestFlight beta. Payment-link claims also work in the browser.
+Borrowing depends on both your collateral and available capacity in the shared pool;
+a healthy personal position does not guarantee that the pool can extend another loan.
 
 <Warning>
   **Maren is pre-audit and lives on Mezo testnet only.** Every contract runs on Mezo matsnet (chain
@@ -67,8 +69,9 @@ The full trajectory, with the honest state of each phase, is on the [Roadmap](/g
     requests, and Earn all run against the real MUSD protocol.
   </Card>
   <Card title="Proven on-chain" icon="link">
-    The borrow path has executed on-chain from the app — 2,110.72 MUSD drawn through the pooled
-    trove across 3 accounts, all of them ours or beta testers'. No external user has borrowed yet;
+    The borrow path has executed on-chain from the app — 3,604.72 MUSD drawn through the pooled
+    trove across 7 borrowing accounts, read live on matsnet on 2026-09-23, all of them ours or beta
+    testers'. No external user has borrowed yet;
     that is what the TestFlight beta is for. The pooled trove is live inside Mezo's own
     `TroveManager`. Every claim carries a transaction hash.
   </Card>

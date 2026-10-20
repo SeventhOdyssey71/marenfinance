@@ -3,8 +3,9 @@ import type { Hash } from 'viem';
 import { createViemAdapter } from '../src/chain.js';
 import { loadConfig } from '../src/config.js';
 import { isRelayError } from '../src/errors.js';
+import { parseForwardRequest } from '../src/forwarder.js';
 import { settle, settlementHttpStatus } from '../src/receipt.js';
-import { makeEnv, RELAYER_KEY } from './helpers.js';
+import { makeEnv, RELAYER_KEY, signedRequest } from './helpers.js';
 
 /**
  * M3 — receipt-error handling had zero test protection.
@@ -40,6 +41,71 @@ function stubNode(respond: (method: string) => Response) {
 
 afterEach(() => {
   vi.unstubAllGlobals();
+});
+
+describe.each(['eth_call', 'eth_estimateGas'])('%s failure classification', (stage) => {
+  function failAtStage(failure: () => Response) {
+    const methods: string[] = [];
+    stubNode((method) => {
+      methods.push(method);
+      return method === stage
+        ? failure()
+        : new Response(JSON.stringify({ jsonrpc: '2.0', id: 1, result: '0x' }));
+    });
+    return methods;
+  }
+
+  it.each([3, -32000])('preserves a genuine EVM revert (RPC code %s)', async (code) => {
+    const methods = failAtStage(
+      () =>
+        new Response(
+          JSON.stringify({
+            jsonrpc: '2.0',
+            id: 1,
+            error: { code, message: 'execution reverted: BorrowingCeiling' },
+          }),
+        ),
+    );
+    await expect(
+      adapter().simulate(parseForwardRequest(await signedRequest())),
+    ).rejects.toMatchObject({
+      code: 'SIMULATION_REVERTED',
+      status: 422,
+      message: expect.stringContaining('BorrowingCeiling'),
+    });
+    expect(methods).not.toContain('eth_sendRawTransaction');
+    if (stage === 'eth_call') expect(methods).not.toContain('eth_estimateGas');
+  });
+
+  it('reports an HTTP outage as upstream unavailable without leaking its body', async () => {
+    failAtStage(() => new Response('private-provider-token/signed-calldata', { status: 503 }));
+    await expect(
+      adapter().simulate(parseForwardRequest(await signedRequest())),
+    ).rejects.toMatchObject({
+      code: 'UPSTREAM_ERROR',
+      status: 502,
+      message: expect.not.stringContaining('private-provider-token'),
+    });
+  });
+
+  it('does not mistake an internal RPC error for a contract revert', async () => {
+    failAtStage(
+      () =>
+        new Response(
+          JSON.stringify({
+            jsonrpc: '2.0',
+            id: 1,
+            error: { code: -32603, message: 'node unavailable' },
+          }),
+        ),
+    );
+    await expect(
+      adapter().simulate(parseForwardRequest(await signedRequest())),
+    ).rejects.toMatchObject({
+      code: 'UPSTREAM_ERROR',
+      status: 502,
+    });
+  });
 });
 
 describe('receipt reading', () => {

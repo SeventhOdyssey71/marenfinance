@@ -2,6 +2,138 @@ import Foundation
 import BigInt
 import web3
 
+// MARK: - Activity scan cache
+//
+// Mezo caps eth_getLogs at 10,000 blocks. A cold Activity load therefore reads four windows
+// across three contracts. Mined logs do not change, so repeating that entire crawl on every
+// tab visit only makes the UI slow. This store persists the covered range and re-reads the
+// latest 100 blocks for ordinary reorgs; concurrent Home/Activity loads share one task.
+
+actor ActivityHistoryStore {
+    static let shared = ActivityHistoryStore()
+    static let version = 1
+    static let reorgDepth = 100
+    static let maxRows = 50
+
+    struct Entry: Codable, Sendable {
+        let version: Int
+        let chainId: Int
+        let account: String
+        let contracts: [String]
+        let fromBlock: Int
+        let toBlock: Int
+        let items: [ActivityItem]
+    }
+
+    struct Plan: Sendable {
+        let fromBlock: Int
+        let reuse: Entry?
+    }
+
+    private struct Running {
+        let generation: Int
+        let task: Task<Entry, Error>
+    }
+
+    private var generation = 0
+    private var inFlight: [String: Running] = [:]
+
+    private static var directory: URL {
+        FileManager.default.urls(for: .cachesDirectory, in: .userDomainMask)[0]
+            .appendingPathComponent("maren-activity", isDirectory: true)
+    }
+
+    private static func key(chainId: Int, account: String) -> String {
+        "\(chainId)-\(account.lowercased())"
+    }
+
+    private static func fileURL(key: String) -> URL {
+        directory.appendingPathComponent("activity-\(key).json")
+    }
+
+    private static func read(key: String, chainId: Int, account: String,
+                             contracts: [String]) -> Entry? {
+        guard let data = try? Data(contentsOf: fileURL(key: key)),
+              let entry = try? JSONDecoder().decode(Entry.self, from: data),
+              entry.version == version, entry.chainId == chainId,
+              entry.account == account.lowercased(),
+              entry.contracts == contracts.map({ $0.lowercased() }),
+              entry.fromBlock >= 0, entry.toBlock >= entry.fromBlock
+        else { return nil }
+        return entry
+    }
+
+    private static func write(_ entry: Entry, key: String) {
+        try? FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        guard let data = try? JSONEncoder().encode(entry) else { return }
+        try? data.write(to: fileURL(key: key), options: .atomic)
+    }
+
+    func activity(chainId: Int, account: String, contracts: [String],
+                  fetch: @escaping @Sendable (Entry?) async throws -> Entry) async throws -> [ActivityItem] {
+        let cacheKey = Self.key(chainId: chainId, account: account)
+        if let running = inFlight[cacheKey], running.generation == generation {
+            return try await running.task.value.items
+        }
+
+        let cached = Self.read(key: cacheKey, chainId: chainId, account: account, contracts: contracts)
+        let startedAt = generation
+        let task = Task { try await fetch(cached) }
+        inFlight[cacheKey] = Running(generation: startedAt, task: task)
+        do {
+            let entry = try await task.value
+            if generation == startedAt {
+                Self.write(entry, key: cacheKey)
+                inFlight[cacheKey] = nil
+                return entry.items
+            }
+            // A transaction settled while this crawl was running. Do not let its older result
+            // repaint either Home or Activity; join the fresh incremental scan instead.
+            return try await activity(chainId: chainId, account: account,
+                                      contracts: contracts, fetch: fetch)
+        } catch {
+            if generation == startedAt { inFlight[cacheKey] = nil }
+            throw error
+        }
+    }
+
+    /// A confirmed write makes a scan already in flight stale. Keep its on-disk coverage as
+    /// the resume point, but prevent that task from being shared or overwriting the next scan.
+    func invalidate() {
+        generation += 1
+        inFlight.removeAll()
+    }
+
+    static func plan(cached: Entry?, coldFloor: Int, head: Int) -> Plan {
+        guard let cached,
+              cached.fromBlock <= coldFloor,
+              cached.toBlock <= head,
+              cached.toBlock + 1 >= coldFloor
+        else { return Plan(fromBlock: coldFloor, reuse: nil) }
+        return Plan(fromBlock: max(coldFloor, cached.toBlock - reorgDepth + 1), reuse: cached)
+    }
+
+    static func merged(reuse: Entry?, freshItems: [ActivityItem], fromBlock: Int,
+                       toBlock: Int, chainId: Int, account: String,
+                       contracts: [String]) -> Entry {
+        let kept = reuse?.items.filter { ($0.blockNumber ?? Int.max) < fromBlock } ?? []
+        let ordered = (kept + freshItems).sorted {
+            let left = $0.blockNumber ?? Int.min
+            let right = $1.blockNumber ?? Int.min
+            if left != right { return left > right }
+            return ($0.date ?? .distantPast) > ($1.date ?? .distantPast)
+        }
+        var seen = Set<String>()
+        let items = ordered.filter { seen.insert($0.id).inserted }.prefix(maxRows)
+        return Entry(
+            version: version, chainId: chainId, account: account.lowercased(),
+            contracts: contracts.map({ $0.lowercased() }),
+            fromBlock: min(reuse?.fromBlock ?? fromBlock, fromBlock), toBlock: toBlock,
+            items: Array(items)
+        )
+    }
+}
+
 // MARK: - MezoMarenClient
 //
 // The real Mezo implementation of `MarenClient`. Reads run against the public testnet RPC
@@ -111,69 +243,79 @@ struct MezoMarenClient: MarenClient {
     }
 
     func position() async throws -> Position {
-        // ONE batched read. This used to be priceObservation -> vaultPosition -> trove, three
-        // requests nose to tail at ~300ms each before anything could render.
-        let snap = try await snapshot()
-        guard let priceWei = snap.priceWei, let updatedAt = snap.priceUpdatedAt else {
-            throw MezoRPCError.decode("oracle returned a non-positive price")
+        try Self.position(from: await snapshot())
+    }
+
+    static func position(from snap: MezoSnapshot) throws -> Position {
+        let price = snap.priceWei ?? 0
+        let fresh = snap.priceUpdatedAt.map { isFresh(updatedAt: $0) } == true && price > 0
+        guard let coll = snap.vaultCollWei, let debt = snap.vaultDebtWei else {
+            throw MezoRPCError.decode("The vault position could not be read. No borrowing limit is available.")
         }
-        // THE SAME 60s GATE `priceFeed()` APPLIES. This read used to take the oracle price with
-        // no staleness check at all, so Finance could print a collateral ratio and a
-        // drop-to-liquidation line directly above its own "price unavailable" banner, both
-        // computed from a price the protocol would have rejected. A stale price now withholds
-        // every price-derived field; collateral and debt need no oracle and still show.
-        // A clock-skewed future timestamp (negative age) is treated as fresh, matching priceFeed.
-        let priceIsFresh = Self.isFresh(updatedAt: updatedAt)
-
-        // POOLED FIRST, best-effort. Most Maren loans are pooled positions held in MarenVault
-        // and keyed by the user's EOA; the raw TroveManager trove is owned by the vault, not the
-        // user, so a read that only hit `trove()` reported "no debt" for a real pooled borrower.
-        // A pooled debt carries no per-user 200 MUSD gas compensation, so nothing is subtracted.
-        // A vault read failure must NOT hide a direct trove, so it is tolerated (try?).
-        if let debt = snap.vaultDebtWei, debt > 0 {
-            return Self.buildPosition(collWei: snap.vaultCollWei ?? 0, ratioDebtWei: debt,
-                                      shownDebtWei: debt, priceWei: priceWei,
-                                      priceIsFresh: priceIsFresh,
-                                      troveCapacityWei: snap.troveCapacityWei,
-                                      troveTotalDebtWei: snap.troveTotalDebtWei)
+        if coll > 0 || debt > 0 {
+            var result = buildPosition(collWei: coll, ratioDebtWei: debt, shownDebtWei: debt,
+                priceWei: price, priceIsFresh: fresh, liquidationPercent: 140)
+            result.liquidationThresholdPercent = 140
+            result.usesPooledVault = true
+            let availability = pooledBorrowAvailability(snap, priceIsFresh: fresh)
+            result.leftToBorrow = availability.amountWei.flatMap { Wei.toDecimal($0) }
+            result.borrowUnavailableReason = availability.reason
+            result.borrowReserveMusd = snap.reserveMusdWei.flatMap { Wei.toDecimal($0) }
+            result.borrowFeeRate = snap.borrowingRateWei.flatMap { Wei.toDecimal($0) }
+            return result
         }
-
-        // Otherwise a direct trove (>= the 1,800 MUSD protocol minimum), owned by the EOA. Its
-        // principal includes the 200 MUSD gas compensation: the ratio is computed against the
-        // gross debt, but the "borrowed" figure shown subtracts the gas comp back out.
-        let trove = snap.trove
-        if let trove {
-            let grossDebtWei = trove.principalWei + trove.interestWei
-            if grossDebtWei > 0, trove.collWei > 0 {
-                let netPrincipal = trove.principalWei > MUSD_GAS_COMPENSATION ? trove.principalWei - MUSD_GAS_COMPENSATION : BigUInt(0)
-                return Self.buildPosition(collWei: trove.collWei, ratioDebtWei: grossDebtWei,
-                                          shownDebtWei: netPrincipal + trove.interestWei,
-                                          priceWei: priceWei, priceIsFresh: priceIsFresh)
-            }
+        if let trove = snap.trove, trove.principalWei + trove.interestWei > 0 {
+            let net = trove.principalWei > MUSD_GAS_COMPENSATION ? trove.principalWei - MUSD_GAS_COMPENSATION : 0
+            var result = buildPosition(collWei: trove.collWei, ratioDebtWei: trove.principalWei + trove.interestWei,
+                shownDebtWei: net + trove.interestWei, priceWei: price, priceIsFresh: fresh)
+            // The native signing path targets MarenVault, not BorrowerOperations for an EOA.
+            result.leftToBorrow = nil
+            result.liquidationThresholdPercent = 110
+            result.usesPooledVault = false
+            result.borrowUnavailableReason = "This is a direct Mezo loan. Manage it in Mezo; Maren borrowing uses collateral deposited into the pooled vault."
+            return result
         }
+        return Position(bitcoinLocked: 0, borrowed: 0, leftToBorrow: fresh ? 0 : nil,
+            borrowUnavailableReason: "Deposit Bitcoin into the vault before borrowing.",
+            collateralRatioPercent: nil, dropToLiquidationPercent: nil, health: HealthStatus.none)
+    }
 
-        // NO EQUIVALENT OF THE OLD "both reads failed" GUARD IS NEEDED, and removing it is
-        // not a loss of honesty. It existed because each read was its own request with its own
-        // `try?`, so "nil" could mean either "no position" or "the network failed" and the two
-        // had to be told apart. In one batched call the transport either succeeded — in which
-        // case a reverting sub-call genuinely means this account has no trove and no pooled
-        // position — or it threw, and `snapshot()` above has already propagated that.
+    struct BorrowAvailability {
+        let amountWei: BigUInt?
+        let reason: String?
+    }
 
-        // No debt on either route. Collateral may still sit in the vault with nothing borrowed.
-        // "No debt" is a fact about the vault, so the health reads `.none` either way; the
-        // headroom is priced collateral, so it is withheld when the price is stale.
-        let collWei = snap.vaultCollWei ?? trove?.collWei ?? BigUInt(0)
-        let collateralValueWei = collWei * priceWei / BigUInt(10).power(18)
-        return Position(
-            bitcoinLocked: Wei.toDecimal(collWei) ?? 0,
-            borrowed: 0,
-            leftToBorrow: priceIsFresh
-                ? (Wei.toDecimal(collateralValueWei).map { $0 / (MarenPolicy.marenHealthyFloorPercent / 100) } ?? 0)
-                : nil,
-            collateralRatioPercent: nil,
-            dropToLiquidationPercent: nil,
-            health: HealthStatus.none
-        )
+    /// Same piecewise debt budget as the SDK: existing reserve is free of origination fees;
+    /// only the new protocol draw consumes capacity and pooled collateral headroom.
+    static func pooledBorrowAvailability(_ snap: MezoSnapshot, priceIsFresh: Bool) -> BorrowAvailability {
+        guard priceIsFresh, let price = snap.priceWei, price > 0 else {
+            return BorrowAvailability(amountWei: nil, reason: "The price feed is unavailable or stale. Borrowing will resume when a fresh price can be checked.")
+        }
+        guard let capacity = snap.troveCapacityWei, let debt = snap.troveTotalDebtWei,
+              let poolColl = snap.troveCollateralWei, let reserve = snap.reserveMusdWei,
+              let userBudget = snap.vaultMaxBorrowableWei, let rate = snap.borrowingRateWei,
+              let paused = snap.borrowingPaused, let open = snap.troveOpen, let status = snap.troveStatus else {
+            return BorrowAvailability(amountWei: nil, reason: "The current pool borrowing limit could not be verified. Refresh before borrowing.")
+        }
+        if paused { return BorrowAvailability(amountWei: 0, reason: "New borrowing is paused. Repayment remains available.") }
+        if !open || status != 1 { return BorrowAvailability(amountWei: 0, reason: "The pooled loan is not active. Borrowing needs an operator to restore the pool.") }
+        let wad = BigUInt(10).power(18)
+        let poolAllowed = poolColl * price / (wad * 180 / 100)
+        guard poolAllowed >= debt else {
+            return BorrowAvailability(amountWei: 0, reason: "The shared pool is below its 180% borrowing floor. The operator must add collateral or reduce pool debt before anyone can borrow.")
+        }
+        func net(_ budget: BigUInt) -> BigUInt { budget * wad / (wad + rate) }
+        let userLimit = userBudget <= reserve ? userBudget : reserve + net(userBudget - reserve)
+        let ceilingLimit = reserve + net(capacity > debt ? capacity - debt : 0)
+        let poolLimit = reserve + net(poolAllowed - debt)
+        let amount = min(userLimit, ceilingLimit, poolLimit)
+        let reason: String?
+        if ceilingLimit < userLimit && ceilingLimit <= poolLimit {
+            reason = "The shared pool's Mezo borrowing capacity is limiting this amount. A keeper refinance may restore capacity; adding collateral alone does not reset that ceiling."
+        } else if poolLimit < userLimit {
+            reason = "The shared pool's collateral ratio limits this amount, even if your own collateral has more room."
+        } else { reason = nil }
+        return BorrowAvailability(amountWei: amount, reason: reason)
     }
 
     /// Is an oracle observation inside the 60s window Mezo's own `PriceFeed.fetchPrice()`
@@ -200,7 +342,8 @@ struct MezoMarenClient: MarenClient {
     static func buildPosition(collWei: BigUInt, ratioDebtWei: BigUInt, shownDebtWei: BigUInt,
                               priceWei: BigUInt, priceIsFresh: Bool,
                               troveCapacityWei: BigUInt? = nil,
-                              troveTotalDebtWei: BigUInt? = nil) -> Position {
+                              troveTotalDebtWei: BigUInt? = nil,
+                              liquidationPercent: UInt = 110) -> Position {
         let borrowed = Wei.toDecimal(shownDebtWei) ?? 0
         guard priceIsFresh else {
             return Position(
@@ -246,13 +389,13 @@ struct MezoMarenClient: MarenClient {
             leftWei = min(leftWei, ceilingHeadroom)
         }
 
-        // How far BTC can fall before the 110% Mezo liquidation cliff.
-        // liqPrice = debt * 1.1 / coll, kept in the same 1e18 price scale (the * WAD is what
+        // Distance to the route-specific liquidation threshold.
+        // liqPrice = debt * threshold / coll, kept in the same 1e18 price scale (the * WAD is what
         // makes the units match `priceWei`; without it the drop collapsed to ~99% for a
         // small-collateral position). drop% = (price - liqPrice) / price * 100.
         var drop: Decimal? = nil
         if collWei > 0 {
-            let liqPriceWei = ratioDebtWei * MezoLiquidationNumerator * BigUInt(10).power(18) / (collWei * 10)
+            let liqPriceWei = ratioDebtWei * BigUInt(liquidationPercent) * BigUInt(10).power(18) / (collWei * 100)
             drop = priceWei > liqPriceWei
                 ? Decimal(string: String((priceWei - liqPriceWei) * 100 / priceWei))
                 : 0
@@ -262,9 +405,9 @@ struct MezoMarenClient: MarenClient {
             bitcoinLocked: Wei.toDecimal(collWei) ?? 0,
             borrowed: borrowed,
             leftToBorrow: Wei.toDecimal(leftWei) ?? 0,
-            collateralRatioPercent: ratio,
-            dropToLiquidationPercent: drop,
-            health: health(ratioPercent: ratio)
+            collateralRatioPercent: ratioDebtWei == 0 ? nil : ratio,
+            dropToLiquidationPercent: ratioDebtWei == 0 ? nil : drop,
+            health: ratioDebtWei == 0 ? HealthStatus.none : ratio < Decimal(liquidationPercent) ? .liquidatable : health(ratioPercent: ratio)
         )
     }
 
@@ -487,19 +630,30 @@ struct MezoMarenClient: MarenClient {
             let items = rows.compactMap { Self.activityItem(from: $0) }
             if items.count == rows.count { return items }
         }
+        let contracts = [maren.marenVault, maren.marenPay, maren.marenEarn]
+        return try await ActivityHistoryStore.shared.activity(
+            chainId: chain.chainId, account: accountAddress, contracts: contracts
+        ) { cached in
+            try await scanActivity(contracts: contracts, cached: cached)
+        }
+    }
+
+    private func scanActivity(contracts: [String], cached: ActivityHistoryStore.Entry?) async throws -> ActivityHistoryStore.Entry {
         let acct = "0x" + String(accountAddress.dropFirst(2)).lowercased().leftPadded(to: 64)
         let names = Self.eventNamesByTopic
-        let contracts = [maren.marenVault, maren.marenPay, maren.marenEarn]
         let chainId = chain.chainId
 
         var lastError = "no endpoints"
         for url in chain.rpcURLs {
             do {
                 let head = try await EthereumHttpClient(url: url, network: .custom(String(chainId))).eth_blockNumber()
-                let floor = max(0, head - MEZO_MAX_LOG_RANGE * 4)
+                // Inclusive endpoints: +1 keeps this to exactly four 10k windows, rather
+                // than four windows plus a fifth one-block request.
+                let coldFloor = max(0, head - MEZO_MAX_LOG_RANGE * 4 + 1)
+                let plan = ActivityHistoryStore.plan(cached: cached, coldFloor: coldFloor, head: head)
 
                 var windows: [(Int, Int)] = []
-                var from = floor
+                var from = plan.fromBlock
                 while from <= head {
                     let to = min(head, from + MEZO_MAX_LOG_RANGE - 1)
                     windows.append((from, to))
@@ -529,7 +683,12 @@ struct MezoMarenClient: MarenClient {
 
                 let times = await Self.blockTimestamps(url: url, chainId: chainId,
                                                        blocks: Array(Set(mine.map { $0.block })))
-                return mine.compactMap { decodeActivity($0, account: acct, names: names, times: times) }
+                let fresh = mine.compactMap { decodeActivity($0, account: acct, names: names, times: times) }
+                return ActivityHistoryStore.merged(
+                    reuse: plan.reuse, freshItems: fresh, fromBlock: plan.fromBlock,
+                    toBlock: head, chainId: chainId, account: accountAddress,
+                    contracts: contracts
+                )
             } catch {
                 lastError = String(describing: error)
                 continue
@@ -593,11 +752,12 @@ struct MezoMarenClient: MarenClient {
     static func activityItem(from r: SubgraphActivity.Row) -> ActivityItem? {
         let amount = Wei.toDecimal(r.amountWei) ?? 0
         let id = "\(r.txHash)-\(r.blockNumber)-\(r.kind)-\(r.outgoing ? "out" : "in")"
-        func musd(_ sign: String) -> String { "\(sign)\(MoneyFormat.musd(amount, unit: false)) MUSD" }
+        func musd(_ sign: String) -> String { "\(sign)\(MoneyFormat.musd(amount))" }
         func btc(_ sign: String) -> String { "\(sign)\(MoneyFormat.btc(amount, unit: false)) BTC" }
         func row(_ kind: ActivityItem.Kind, _ title: String, _ subtitle: String, _ text: String) -> ActivityItem {
             ActivityItem(id: id, kind: kind, title: title, subtitle: subtitle, amount: text,
-                         date: r.timestamp, hash: r.txHash, memo: r.memo, counterparty: r.counterparty)
+                         date: r.timestamp, blockNumber: r.blockNumber, hash: r.txHash,
+                         memo: r.memo, counterparty: r.counterparty)
         }
         switch r.kind {
         case "Deposited":   return row(.deposit, "Deposited Bitcoin", "Vault collateral", btc("+"))
@@ -662,10 +822,11 @@ struct MezoMarenClient: MarenClient {
         let date = times[log.block]
         let id = (log.txHash ?? UUID().uuidString) + "-" + String(log.logIndex)
 
-        func musd(_ sign: String) -> String { "\(sign)\(MoneyFormat.musd(amount, unit: false)) MUSD" }
+        func musd(_ sign: String) -> String { "\(sign)\(MoneyFormat.musd(amount))" }
         func btc(_ sign: String) -> String { "\(sign)\(MoneyFormat.btc(amount, unit: false)) BTC" }
         func row(_ kind: ActivityItem.Kind, _ title: String, _ subtitle: String, _ amountText: String) -> ActivityItem {
-            ActivityItem(id: id, kind: kind, title: title, subtitle: subtitle, amount: amountText, date: date)
+            ActivityItem(id: id, kind: kind, title: title, subtitle: subtitle,
+                         amount: amountText, date: date, blockNumber: log.block)
         }
 
         switch name {
@@ -709,9 +870,6 @@ struct MezoMarenClient: MarenClient {
         return .liquidatable
     }
 }
-
-/// 1.10 expressed as a numerator over 10, to keep the drop-to-liquidation maths in integers.
-private let MezoLiquidationNumerator = BigUInt(11)
 
 /// MUSD's origination fee, 0.1%, as a 1e18 fraction. Mirrors BORROWING_RATE in
 /// packages/sdk/src/constants.ts (1e15), and read live from BorrowerOperations there.

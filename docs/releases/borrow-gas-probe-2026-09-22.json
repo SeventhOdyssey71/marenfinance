@@ -1,0 +1,46 @@
+{
+  "observedAt": "2026-09-22T09:11:34.901Z",
+  "chainId": 31611,
+  "historicalBlock": "15695455",
+  "amountWei": "10000000000000000000",
+  "owner": "0xc06eDC6325e374778ec88cDCeC7a2E7FA4B7E8CE",
+  "vault": "0x46252B00AB59384518d9dB6D1f210ffF1221645b",
+  "simulationMode": "signed forwarder eth_call",
+  "estimatedWithZeroUserBalance": true,
+  "simulationGasPrice": "0",
+  "publicTransactions": 0,
+  "rows": [
+    {
+      "mode": "old-native-fallback",
+      "hints": [
+        "0x0000000000000000000000000000000000000000",
+        "0x0000000000000000000000000000000000000000"
+      ],
+      "directEstimate": "1158787",
+      "signedGas": "660000",
+      "simulation": "reverted"
+    },
+    {
+      "mode": "old-native-successful-estimate",
+      "hints": [
+        "0x0000000000000000000000000000000000000000",
+        "0x0000000000000000000000000000000000000000"
+      ],
+      "directEstimate": "1158787",
+      "signedGas": "1500000",
+      "simulation": "success"
+    },
+    {
+      "mode": "fixed-native-estimated-hints",
+      "hints": [
+        "0x57a270C711Ccea7AFCB5361d214eAef149C5fA9B",
+        "0x306919805Eed1aD4772d92e18d00A1c132b07C19"
+      ],
+      "directEstimate": "476464",
+      "signedGas": "774696",
+      "simulation": "success"
+    }
+  ],
+  "conclusion": "The zero-hint 660,000-gas fallback fails. Current neighbours with the measured estimate and full 50% plus 60,000 gas margin succeed below the policy cap.",
+  "limitation": "Reproduces a native failure mode; it does not identify an unobserved user request or prove their device has installed the fix."
+}

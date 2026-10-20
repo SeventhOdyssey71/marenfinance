@@ -1,7 +1,6 @@
 'use client';
 
 import Link from 'next/link';
-import { TESTFLIGHT_URL } from '@/lib/links';
 import { useEffect, useRef, useState } from 'react';
 
 /**
@@ -16,6 +15,7 @@ type NavLink = { href: string; label: string };
 const links: readonly NavLink[] = [
   { href: '#product', label: 'Product' },
   { href: '#faq', label: 'FAQ' },
+  { href: '/app', label: 'Open web app' },
 ];
 
 export function Nav() {
@@ -68,8 +68,8 @@ export function Nav() {
             <a href="/docs" className="hidden text-sm lg:inline-flex">
               Docs
             </a>
-            <a href={TESTFLIGHT_URL} target="_blank" rel="noopener noreferrer" className="nav-cta">
-              Join iOS beta
+            <a href="/app" className="nav-cta">
+              Open app
             </a>
 
             <button

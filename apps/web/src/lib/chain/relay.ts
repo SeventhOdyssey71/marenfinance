@@ -1,6 +1,6 @@
 import { getAddress, slice, type Address, type Hash, type Hex } from 'viem';
 
-import { ExplainedError, type RevertReason } from './errors';
+import { describeMusdRequire, ExplainedError, type RevertReason } from './errors';
 
 /**
  * The relayer client. Everything the app needs to hand a signed call to
@@ -611,12 +611,21 @@ export function relayFailureReason(status: number, body: RelayErrorBody | null):
         title: 'Maren does not sponsor this action',
         detail: `The relayer only forwards a fixed set of calls to Maren’s own contracts, and this is not one of them. ${nothingSent} You can send it yourself.`,
       };
-    case 'SIMULATION_REVERTED':
+    case 'SIMULATION_REVERTED': {
+      // Lead with WHY when the protocol said so. The relayer puts MUSD's own require string
+      // in `detail`, and the same explainer table that serves self-paid reverts can read it —
+      // so a sponsored borrow that trips Recovery Mode or a stale oracle now says that,
+      // instead of the generic sentence every relayed refusal used to collapse into.
+      const explained = body?.detail ? describeMusdRequire(body.detail) : null;
+      if (explained) {
+        return { ...explained, name: code, detail: `${explained.detail} ${nothingSent}` };
+      }
       return {
         name: code,
         title: 'This would have failed on-chain',
         detail: `The relayer ran the call against Mezo before paying for it and it reverted, so it was never broadcast. ${nothingSent}`,
       };
+    }
     default:
       return {
         name: code,

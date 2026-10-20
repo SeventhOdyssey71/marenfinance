@@ -28,8 +28,9 @@ way.
   <Step title="Phase 2: beta and gasless (shipped, 2026-09)">
     The iOS app has a **TestFlight beta** invite on matsnet and the **gasless relayer is hosted** on
     Cloudflare. Eligible actions are sponsored while the service is available; deposits, approvals
-    when needed, and link creation still require BTC. The public website serves landing, docs, and
-    claims; its dashboard is intentionally disabled for the iOS-first release.
+    when needed, and link creation still require BTC. The public website includes the
+    [testnet web app](https://www.marenfinance.xyz/app), docs, and payment-link claims.
+    Borrowing availability also depends on the pooled trove having capacity.
   </Step>
   <Step title="Phase 3: audit (the gate to mainnet)">
     An independent third-party audit including `MarenVault`, `MarenEarn` and `MarenRelayHub`, with
@@ -76,11 +77,12 @@ Every measure of success is readable from the chain by anyone. The one that matt
 | Spend ratio                                 | Whether people spend Bitcoin, not just borrow against it |
 
 <Info>
-  Read live on matsnet on 2026-09-07, the pilot showed 3 funded positions, 2,110.72 MUSD borrowed,
-  14 payments totalling 27.70 MUSD, 39.00 MUSD of Earn TVL across 3 depositors, and a spend ratio of
-  **66.7% (2 of 3 borrowers have spent)**. These are testnet numbers from a handful of accounts,
-  most of them ours — they show the loop works end to end, not that demand exists. Regenerate them
-  with `pnpm --filter @maren/metrics start`. See [Verify on-chain](/developers/verify-on-chain).
+  Read live on matsnet on **2026-09-23**, the pilot showed 6 funded positions, 3,604.72 MUSD
+  borrowed, 17 payments totalling 82.70 MUSD, 2 handles registered, 54.00 MUSD of Earn TVL across 4
+  depositors, and a spend ratio of **57.1% (4 of 7 borrowers have spent)**. These are testnet
+  numbers from a handful of accounts, most of them ours — they show the loop works end to end, not
+  that demand exists. Regenerate them with `pnpm --filter @maren/metrics start`. See [Verify
+  on-chain](/developers/verify-on-chain), which publishes the same figures from the same run.
 </Info>
 
 <CardGroup cols={2}>

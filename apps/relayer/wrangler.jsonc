@@ -29,7 +29,18 @@
     "RELAYER_FORWARDER_ADDRESS": "0x22cC1Adfb0C91D9359746dE3F7E8cB7F2B8eA98C",
     "RELAYER_ALLOWED_TARGETS": "marenPay:0xe475Ff919D54E055809f516E3bed8a5c7a101836,marenRegistry:0x9e123Cdd0CD524812CF9F552d3FAB13d8143b77E,marenVault:0x46252B00AB59384518d9dB6D1f210ffF1221645b",
     "RELAYER_MAX_DAILY_SPONSORED_BTC": "0.01",
-    "RELAYER_FREE_ACTIONS_PER_ADDRESS": "25",
+    // Lifetime per address, not per day, with no reset and no paid tier configured —
+    // action 26 was refused outright. Onboarding alone spends two (commit + register),
+    // and the first reporting tester was at 6 before real testing started, so 25 does
+    // not survive a two-week window. Raising it is retroactive: evaluatePolicy compares
+    // lifetimeActions against this value on every request, so addresses already over the
+    // old limit are sponsored again without touching stored counters.
+    //
+    // Cost is not the constraint. A sponsored borrow settled 479,592 gas at 146 wei =
+    // 7e-8 BTC, so 250 actions each for 20 testers is ~0.00035 BTC against a 0.01 BTC
+    // daily budget. The real rate limit is maxActionsPerAddressPerDay (50), which is a
+    // POLICY_DEFAULTS constant and deliberately not env-overridable.
+    "RELAYER_FREE_ACTIONS_PER_ADDRESS": "250",
     "RELAYER_IP_SALT": "maren-testnet-relayer-ipsalt-v1",
     // Browser origins allowed to call /relay (CORS). The web app runs here; add
     // your own preview/custom domains as needed. Empty would deny all cross-origin.

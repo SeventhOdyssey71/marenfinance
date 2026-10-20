@@ -61,10 +61,22 @@ async function stop(child: ChildProcess): Promise<void> {
   if (child.exitCode === null && child.signalCode === null) child.kill('SIGKILL');
   children.delete(child);
 }
+/**
+ * The budget is for a SLOW MACHINE, not for a fast assertion.
+ *
+ * The whole suite runs in about 7s locally, so 30s looked generous — but the checks that
+ * matter here stop the worker, start a fresh one and then wait for an alarm to fire and
+ * settle, and a cold workerd boot on a CI runner is several times slower than a warm one
+ * locally. 'alarm rebroadcast + settlement' duly timed out at 30s on GitHub Actions while
+ * passing in 7s on a laptop.
+ *
+ * Raising the ceiling does not weaken anything: the predicate is unchanged, so a genuine
+ * regression still fails, it just no longer fails on a runner having a slow minute.
+ */
 async function until(
   check: () => Promise<boolean>,
   label: string,
-  timeout = 30_000,
+  timeout = 90_000,
 ): Promise<void> {
   const end = Date.now() + timeout;
   while (Date.now() < end) {

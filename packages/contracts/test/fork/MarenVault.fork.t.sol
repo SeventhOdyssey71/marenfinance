@@ -546,9 +546,9 @@ contract MarenVaultForkTest is Test {
     }
 
     function _entireDebtOf(address borrower) internal view returns (uint256) {
-        (, uint256 principal, uint256 interest,, uint256 pendPrincipal, uint256 pendInterest) =
+        (, uint256 principal, uint256 interest,,,) =
             ITroveManager(TROVE_MANAGER).getEntireDebtAndColl(borrower);
-        return principal + interest + pendPrincipal + pendInterest;
+        return principal + interest;
     }
 
     function _netDebtOf(address borrower) internal view returns (uint256) {
@@ -556,8 +556,8 @@ contract MarenVaultForkTest is Test {
     }
 
     function _nominalCrOf(address borrower) internal view returns (uint256) {
-        (uint256 coll,,, uint256 pendColl,,) = ITroveManager(TROVE_MANAGER).getEntireDebtAndColl(borrower);
-        return IHintHelpers(HINT_HELPERS).computeNominalCR(coll + pendColl, _entireDebtOf(borrower));
+        (uint256 coll,,,,,) = ITroveManager(TROVE_MANAGER).getEntireDebtAndColl(borrower);
+        return IHintHelpers(HINT_HELPERS).computeNominalCR(coll, _entireDebtOf(borrower));
     }
 
     function _insertPositionFor(uint256 nicr) internal view returns (address upper, address lower) {

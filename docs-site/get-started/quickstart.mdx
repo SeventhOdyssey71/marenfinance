@@ -15,18 +15,19 @@ protocol underneath.
 <Steps>
   <Step title="Get the app">
     Maren's launch is mobile-first. The iOS app is in **TestFlight beta**:
-    [join the beta](https://testflight.apple.com/join/uhmv9YPE), build 1.0.0 (5). It runs against
+    [join the beta](https://testflight.apple.com/join/uhmv9YPE), which runs against
     Mezo matsnet and holds its signing key in the iOS Keychain behind Face ID, so there is no
     wallet to connect.
 
     <Note>
-      The web client at `/app` is built and runs locally, but it is **switched off in production**
-      while the iOS beta runs — every `/app/*` URL returns 404 today. Run it yourself with
-      `pnpm --filter @maren/web dev`; see [Run locally](/developers/run-locally).
+      The [web app](https://www.marenfinance.xyz/app) is available on testnet. Connect a
+      browser wallet, switch it to Mezo matsnet, and fund it with testnet BTC for deposits
+      and any approvals. Borrow limits include the shared pool's current capacity; if it
+      needs keeper maintenance, the app explains this before requesting a signature.
     </Note>
 
   </Step>
-  <Step title="If you are running the web client locally">
+  <Step title="Connect a browser wallet">
     Add the Mezo matsnet network to your wallet and switch to it. The primary RPC is
     `https://rpc.test.mezo.org`; a second endpoint is listed on [Networks](/reference/networks)
     for failover. The native gas token is **BTC with 18 decimals**, not 8, because Mezo is an
@@ -41,8 +42,12 @@ protocol underneath.
   </Step>
 
 <Step title="Fund the account with a little testnet BTC">
-  You need a small amount of matsnet BTC for gas. A BTC deposit is a transaction you submit and pay
-  for yourself, always: see the note below.
+  You need a small amount of matsnet BTC for gas. Request it from Mezo's testnet faucet at
+  [faucet.test.mezo.org](https://faucet.test.mezo.org) — paste the address you just connected and
+  pick BTC. The faucet is rate-limited per address and per IP, so top up before you need it rather
+  than mid-flow. If the faucet is down or will not pay out, ask the team at **exorbilabs@gmail.com**
+  and we will fund the address directly. A BTC deposit is a transaction you submit and pay for
+  yourself, always: see the note below.
 </Step>
 
   <Step title="Deposit Bitcoin into the Social Vault">

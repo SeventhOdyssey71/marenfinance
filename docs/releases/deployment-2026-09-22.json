@@ -1,0 +1,39 @@
+{
+  "sourceRevision": "ebd7aac7e9272e4f828c048de4cb05431bcd553a",
+  "web": {
+    "deploymentId": "dpl_2TcFTQRN1D3fNtaGZsMe34Sqmrm9",
+    "status": "READY",
+    "url": "https://marenfinance-5auhxlhrz-suilance-s-projects.vercel.app",
+    "aliases": [
+      "https://www.marenfinance.xyz",
+      "https://marenfinance.vercel.app",
+      "https://marenfinance.xyz"
+    ],
+    "httpChecks": "http-2026-09-22.json",
+    "browserChecks": "browser-2026-09-22.json",
+    "connectedBrowserChecks": "connected-browser-2026-09-22.json"
+  },
+  "relayer": {
+    "version": "aaa0afa9-1585-4119-a2c5-2bfac983f0f5",
+    "evidence": "../../apps/relayer/evidence/deployment-2026-09-22.json"
+  },
+  "chain": {
+    "configurationAttestation": "testnet-configuration-2026-09-22.json",
+    "keeperRefinanceSubmitted": true,
+    "publicBorrowRecoveryVerified": true,
+    "contractSourceFixDeployed": false,
+    "keeperRepairEvidence": "keeper-repair-2026-09-22.json",
+    "publicBorrowProof": "borrow-proof-2026-09-22.json"
+  },
+  "native": {
+    "unitTestsPassed": 86,
+    "releaseSimulatorBuild": "passed",
+    "uploaded": true,
+    "uploadBlock": null,
+    "uploadWorkflow": "testflight-2026-09-22.json",
+    "buildNumber": "9",
+    "uploadAcceptedByApple": true,
+    "processingVerified": false,
+    "testFlightAvailabilityVerified": false
+  }
+}

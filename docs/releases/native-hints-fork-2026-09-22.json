@@ -1,0 +1,82 @@
+{
+  "checkedAt": "2026-09-22T09:48:27.750571+00:00",
+  "passed": true,
+  "test": "packages/contracts/test/fork/NativeBorrowHints.fork.t.sol",
+  "testSha256": "51c23732317cbb7a5e364b2ff2ad796b1ce8c8cddb74f16df27cbd56ecdfadf6",
+  "toolchain": {
+    "forge": "1.4.3-v1.4.3",
+    "forgeCommit": "fa9f934bdac4bcf57e694e852a61997dda90668a",
+    "solc": "0.8.28"
+  },
+  "command": "MAREN_NATIVE_HINTS_FORK_RPC=https://rpc.test.mezo.org forge test --root packages/contracts --match-contract NativeBorrowHintsForkTest -vvv",
+  "result": {
+    "passed": 1,
+    "failed": 0,
+    "skipped": 0,
+    "durationSeconds": 10.15
+  },
+  "scope": "Pinned deployed-bytecode LOCAL fork execution. Direct vm.prank(user) target calls, no key/signature/broadcast. Mezo oracle precompile stubbed at observed snapshot price; no replacement vault, keeper refinance, balance top-up, or public-chain mutation.",
+  "snapshot": {
+    "chainId": 31611,
+    "blockNumber": 15696997,
+    "blockHash": "0xfea2950a7a29c55b094ae3bf80d5062d2a939dfe0abf1c44fc3d44fd72404501",
+    "timestamp": 1790069126,
+    "priceWei": "85842246340000000000000",
+    "vault": "0x46252B00AB59384518d9dB6D1f210ffF1221645b",
+    "user": "0x4b0b25687fee0eb9d90617d656490dfd2964c0ef",
+    "userCollateralWei": "45000000000000000",
+    "userPreviewDebtWei": "334434878629836825441",
+    "userMusdBalanceWei": "314000000000000000000"
+  },
+  "borrow": {
+    "amountWei": "500000000000000000000",
+    "feeWei": "500000000000000000",
+    "gasCap": 789132,
+    "principalOnlyNicr": true,
+    "hintHelper": "0x4e4cBA3779d56386ED43631b4dCD6d8EacEcBCF6",
+    "upper": "0x8E42315A5276f7069D516a38d97b9D16507f5e87",
+    "lower": "0x41Cbf317fcF3d5128ECF46e1B9f96dDf2994850A",
+    "assertions": [
+      "500 MUSD credited to user",
+      "Pool principal increases by 500.5 MUSD",
+      "Reserve remains zero"
+    ]
+  },
+  "repay": {
+    "amountWei": "500500000000000000000",
+    "minimumOuterSuccessTargetGas": 270399,
+    "minimumFullPushTargetGas": 351313,
+    "paddedBudgetIncludingIntrinsicGas": 498598,
+    "assertions": [
+      "Entire 500.5 MUSD repayment reaches pool, reserve zero",
+      "Accrued interest paid before principal",
+      "Pool composite debt falls by exact pushed amount",
+      "User token balance falls by exact repayment",
+      "User debt falls by repayment within two wei share-rounding tolerance"
+    ]
+  },
+  "withdraw": {
+    "amountWei": "1000000000000000",
+    "minimumOuterSuccessTargetGas": 88065,
+    "paddedBudgetIncludingIntrinsicGas": 225079,
+    "assertions": [
+      "Uses idle BTC first",
+      "User BTC increases by 0.001",
+      "User collateral and pool idle BTC each fall by 0.001",
+      "Underlying pool trove collateral remains unchanged"
+    ]
+  },
+  "gasPolicy": {
+    "padding": "estimate + floor(estimate / 2) + 60000",
+    "maximum": 1500000,
+    "newFloorOrCapIntroduced": false,
+    "measurement": "Binary-search LOCAL target call threshold from reverted snapshots, plus transaction intrinsic gas before padding. Known protocol accounts/storage cooled before calls. These are not live RPC estimateGas responses or transaction receipts."
+  },
+  "publicTransactions": 0,
+  "limitations": [
+    "The separately recorded read-only user-borrow-probe-2026-09-22.json demonstrates zero hints failing at 1.5m; this fork omits that expensive archive list walk.",
+    "Neighbor seeds come from that independent RPC probe, then canonical computeNominalCR and sorted.findInsertPosition validate them against local fork state.",
+    "This test checks deployed target execution and accounting, not ERC-2771 signature verification or a public/native-wallet transaction.",
+    "A fresh pinned RPC read, the regenerated probe artifact, and this fork all returned user preview debt 334434878629836825441; no tolerance is applied to the pinned initial-debt assertion."
+  ]
+}

@@ -93,9 +93,12 @@ The first argument is Mezo's `TroveManager`; the second is `MarenVault`, which o
 
 ## The keeper
 
-A keeper runs per-block health checks on the pooled trove. It tops up collateral, repays debt,
-and internally liquidates unhealthy users by seizing their collateral at a 5% penalty and
-repaying their share of pooled debt. Liquidation is gated on `KEEPER_ROLE` and is **not**
+The vault exposes keeper functions for per-block health checks on the pooled trove: topping up
+collateral, repaying debt, refinancing the borrowing ceiling, and internally liquidating unhealthy
+users by seizing their collateral at a 5% penalty and repaying their share of pooled debt. **No
+automated keeper process runs them today.** They have been executed by hand in production — see the
+[incident log](/security/risk) for the refinance run on 22 September 2026 — using
+`tools/ops/refinance-trove.mjs`. Liquidation is gated on `KEEPER_ROLE` and is **not**
 permissionless — a call from any other address reverts with `AccessControlUnauthorizedAccount` —
 and the 5% penalty goes to the insurance buffer, not to the caller. On matsnet that role is held by
 a single operator key, and **the keeper process itself is not yet written**, so keeper liveness is a

@@ -13,11 +13,9 @@
 #   - `workflow_dispatch`                       -> test, archive, and upload to TestFlight.
 #     Shipping a build is a decision someone makes, not something a merge does by accident.
 #
-# THE BUILD NUMBER IS `github.run_number`, NOT the value in project.yml. App Store Connect
-# rejects a duplicate build number for the same marketing version, and the surest way to
-# hit that is a human editing a file. The run number is monotonic and unique per workflow,
-# so every upload is accepted. `manageAppVersionAndBuildNumber` is false in
-# ExportOptions.plist, so Xcode will not silently rewrite what we set here.
+# Build numbers are selected above all existing App Store Connect builds, including
+# Xcode Cloud builds. GitHub run numbers are not a shared counter across upload lanes.
+# manageAppVersionAndBuildNumber stays false so the archived number is preserved.
 #
 # WHY macos-26 AND AN SDK GATE. Apple rejects any App Store Connect upload whose binary was
 # built with an SDK older than iOS 26 ("This app was built with the iOS 18.2 SDK. All iOS and
@@ -70,7 +68,7 @@ on:
 
 concurrency:
   # Two uploads racing would burn build numbers and could interleave in App Store Connect.
-  group: ios-testflight-${{ github.ref }}
+  group: ios-testflight-${{ github.event_name == 'pull_request' && github.ref || 'finance-maren-app' }}
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 permissions:
@@ -298,8 +296,112 @@ jobs:
           echo "$ASC_KEY" | base64 --decode > "$HOME/.appstoreconnect/private_keys/AuthKey_${ASC_KEY_ID}.p8"
           chmod 600 "$HOME/.appstoreconnect/private_keys/AuthKey_${ASC_KEY_ID}.p8"
 
-      # project.yml holds the marketing version (1.0.0). The build number comes from the run
-      # number so it is unique without anyone remembering to bump a file.
+      # Apple API and build-version references:
+      # https://developer.apple.com/documentation/appstoreconnectapi/get-v1-builds
+      # https://developer.apple.com/documentation/appstoreconnectapi/generating-tokens-for-api-requests
+      # https://developer.apple.com/documentation/bundleresources/information-property-list/cfbundleversion
+      - name: Select build number above existing App Store Connect builds
+        env:
+          ASC_KEY_ID: ${{ secrets.APP_STORE_CONNECT_KEY_ID }}
+          ASC_ISSUER_ID: ${{ secrets.APP_STORE_CONNECT_ISSUER_ID }}
+        run: |
+          set +x
+          cat > "$RUNNER_TEMP/asc-build-number.mjs" <<'JS'
+          import { createPrivateKey, sign } from 'node:crypto';
+          import { readFileSync, appendFileSync } from 'node:fs';
+          import { homedir } from 'node:os';
+          import assert from 'node:assert/strict';
+          const origin = 'https://api.appstoreconnect.apple.com';
+          const bundleId = 'finance.maren.app';
+          function major(version) {
+            if (typeof version !== 'string' || !/^\d{1,4}(?:\.\d{1,2}){0,2}$/.test(version)) {
+              throw new Error('Existing build version is outside the supported numeric format; inspect it before uploading.');
+            }
+            return Number(version.split('.')[0]);
+          }
+          function nextBuild(versions) {
+            const next = Math.max(0, ...versions.map(major)) + 1;
+            if (next > 9999) throw new Error('Build-number range exhausted; choose a reviewed versioning policy.');
+            return String(next);
+          }
+          async function listBuilds(appId, request) {
+            const versions = [];
+            let next = `${origin}/v1/builds?` + new URLSearchParams({
+              'filter[app]': appId, 'fields[builds]': 'version', limit: '200',
+            });
+            const seen = new Set();
+            while (next) {
+              if (seen.has(next) || seen.size >= 100) throw new Error('Build pagination did not finish safely.');
+              seen.add(next);
+              const page = await request(next);
+              if (!Array.isArray(page.data)) throw new Error('Missing App Store Connect build data.');
+              versions.push(...page.data.map(build => build.attributes?.version));
+              next = page.links?.next;
+            }
+            return versions;
+          }
+          async function main() {
+            if (process.env.ASC_BUILD_NUMBER_SELF_TEST === '1') {
+              assert.equal(nextBuild(['9', '66']), '67');
+              assert.equal(nextBuild(['66.2.1', '9']), '67');
+              assert.equal(nextBuild([]), '1');
+              assert.throws(() => nextBuild(['invalid']));
+              assert.throws(() => nextBuild(['9999.99.99']));
+              let pages = 0;
+              const versions = await listBuilds('test', async () => ++pages === 1
+                ? { data: [{ attributes: { version: '9' } }], links: { next: `${origin}/v1/builds?cursor=2` } }
+                : { data: [{ attributes: { version: '66' } }], links: {} });
+              assert.equal(nextBuild(versions), '67');
+              assert.equal(pages, 2);
+              console.log('Build-number regression checks passed.');
+              return;
+            }
+            const keyId = process.env.ASC_KEY_ID;
+            const issuer = process.env.ASC_ISSUER_ID;
+            if (!keyId || !issuer) throw new Error('Missing App Store Connect API credentials.');
+            const key = createPrivateKey(readFileSync(`${homedir()}/.appstoreconnect/private_keys/AuthKey_${keyId}.p8`));
+            const b64 = value => Buffer.from(JSON.stringify(value)).toString('base64url');
+            async function request(rawUrl) {
+              const url = new URL(rawUrl);
+              if (url.origin !== origin || url.username || url.password || !['/v1/apps', '/v1/builds'].includes(url.pathname)) {
+                throw new Error('Refusing an unexpected App Store Connect pagination URL.');
+              }
+              const now = Math.floor(Date.now() / 1000);
+              const unsigned = `${b64({ alg: 'ES256', kid: keyId, typ: 'JWT' })}.${b64({ iss: issuer, iat: now, exp: now + 120, aud: 'appstoreconnect-v1' })}`;
+              const signature = sign('sha256', Buffer.from(unsigned), { key, dsaEncoding: 'ieee-p1363' }).toString('base64url');
+              const response = await fetch(url, {
+                headers: { Authorization: `Bearer ${unsigned}.${signature}` },
+                redirect: 'error', signal: AbortSignal.timeout(30000),
+              });
+              if (!response.ok) throw new Error(`App Store Connect read failed (HTTP ${response.status}); no build number selected.`);
+              return response.json();
+            }
+            const apps = await request(`${origin}/v1/apps?` + new URLSearchParams({
+              'filter[bundleId]': bundleId, 'fields[apps]': 'bundleId', limit: '2',
+            }));
+            if (!Array.isArray(apps.data) || apps.data.length !== 1 || apps.data[0].attributes?.bundleId !== bundleId ||
+                typeof apps.data[0].id !== 'string' || !/^\d+$/.test(apps.data[0].id) || apps.links?.next) {
+              throw new Error('Expected exactly the existing Maren app finance.maren.app.');
+            }
+            const versions = await listBuilds(apps.data[0].id, request);
+            const selected = nextBuild(versions);
+            if (process.argv[2] === 'check') {
+              if (!process.env.BUILD_NUMBER || Number(process.env.BUILD_NUMBER) < Number(selected)) {
+                throw new Error('Another upload lane advanced the build number; rerun to select a fresh number.');
+              }
+              console.log(`Build ${process.env.BUILD_NUMBER} remains above all visible App Store Connect builds.`);
+            } else {
+              if (!process.env.GITHUB_ENV) throw new Error('Missing workflow environment output.');
+              appendFileSync(process.env.GITHUB_ENV, `BUILD_NUMBER=${selected}\n`);
+              console.log(`Selected build ${selected} above ${versions.length} existing App Store Connect builds.`);
+            }
+          }
+          main().catch(error => { console.error(error.message); process.exitCode = 1; });
+          JS
+          ASC_BUILD_NUMBER_SELF_TEST=1 node "$RUNNER_TEMP/asc-build-number.mjs"
+          node "$RUNNER_TEMP/asc-build-number.mjs"
+
+      # project.yml retains the approved native marketing version.
       # NOTE ON LOGGING: this does NOT pipe through xcpretty. Signing and provisioning errors
       # are emitted in a form xcpretty drops on the floor, so a failed archive printed only
       # "** ARCHIVE FAILED **" with no cause at all — the log is useless exactly when it is
@@ -318,7 +420,7 @@ jobs:
             -sdk iphoneos \
             -destination 'generic/platform=iOS' \
             -archivePath "$RUNNER_TEMP/Maren.xcarchive" \
-            CURRENT_PROJECT_VERSION=${{ github.run_number }} \
+            CURRENT_PROJECT_VERSION="$BUILD_NUMBER" \
             > "$LOG" 2>&1
           RC=$?
           set -e
@@ -368,7 +470,7 @@ jobs:
       - name: Upload the .ipa as a workflow artifact
         uses: actions/upload-artifact@v4
         with:
-          name: Maren-ipa-build-${{ github.run_number }}
+          name: Maren-ipa-build-${{ env.BUILD_NUMBER }}
           path: ${{ runner.temp }}/export/*.ipa
           retention-days: 14
           if-no-files-found: error
@@ -384,7 +486,8 @@ jobs:
           ipas=("$RUNNER_TEMP"/export/*.ipa)
           if [ "${#ipas[@]}" -ne 1 ]; then echo "::error::Expected exactly one IPA"; exit 1; fi
           IPA="${ipas[0]}"
-          echo "Uploading $IPA (build ${{ github.run_number }})"
+          node "$RUNNER_TEMP/asc-build-number.mjs" check
+          echo "Uploading $IPA (build $BUILD_NUMBER)"
           xcrun altool --upload-app -f "$IPA" -t ios \
             --apiKey "$ASC_KEY_ID" --apiIssuer "$ASC_ISSUER_ID"
 
@@ -395,10 +498,10 @@ jobs:
           UPLOAD_OUTCOME: ${{ steps.upload.outcome }}
         run: |
           {
-            echo "### Maren iOS build ${{ github.run_number }}"
+            echo "### Maren iOS build ${BUILD_NUMBER:-unassigned}"
             echo ""
             echo "- Marketing version: from project.yml (1.0.0)"
-            echo "- Build number: ${{ github.run_number }}"
+            echo "- Build number: ${BUILD_NUMBER:-unassigned}"
             echo "- TestFlight upload step outcome: $UPLOAD_OUTCOME"
             if [ -n "$WHAT_TO_TEST" ]; then
               printf -- '- What to test: %s\n' "$WHAT_TO_TEST"

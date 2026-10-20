@@ -14,7 +14,7 @@
     "lint": "turbo run lint",
     "typecheck": "turbo run typecheck",
     "test": "turbo run test",
-    "release:check": "node tools/release/check.mjs",
+    "release:check": "node tools/release/check.mjs --web-app --require-recovery",
     "release:test": "pnpm --filter @maren/release test",
     "release:attest": "pnpm --filter @maren/release attest",
     "clean": "turbo run clean && rm -rf node_modules",

@@ -77,16 +77,12 @@ struct LiquidationRisk {
     /// Build from a proposed position. Returns nil when there is nothing to say — no
     /// collateral, no debt, or no usable price — rather than inventing a reassuring number.
     ///
-    /// `liquidationPrice = debt × 1.10 / collateral` is price-independent and matches the
-    /// threshold `buildPosition` and the Home card already use, deliberately: Mezo's 110%
-    /// cliff, not Maren's own 140% keeper threshold. The keeper is not built yet, so 110% is
-    /// what would actually happen today, and one screen quoting 140% while Home quotes 110%
-    /// would read as a bug. Revisit this when the keeper ships. The drop is measured against the live price, so it
-    /// needs one; when the oracle is stale every price-derived figure is withheld, which is
-    /// why `priceUsd` is optional here and the whole struct is optional in return.
-    static func of(collateralBtc: Decimal, debtMusd: Decimal, priceUsd: Decimal?) -> LiquidationRisk? {
+    /// Route-specific liquidation threshold: 140% for vault users, 110% for direct Mezo loans.
+    /// A stale or unavailable price withholds the projected distance.
+    static func of(collateralBtc: Decimal, debtMusd: Decimal, priceUsd: Decimal?,
+                   liquidationPercent: Decimal = MarenPolicy.mezoLiquidationPercent) -> LiquidationRisk? {
         guard collateralBtc > 0, debtMusd > 0 else { return nil }
-        let liq = debtMusd * MarenPolicy.mezoLiquidationPercent / 100 / collateralBtc
+        let liq = debtMusd * liquidationPercent / 100 / collateralBtc
         guard let price = priceUsd, price > 0, liq > 0 else { return nil }
         let ratio = collateralBtc * price / debtMusd * 100
         // Already below the cliff: a negative "can fall" is meaningless, so clamp at zero and

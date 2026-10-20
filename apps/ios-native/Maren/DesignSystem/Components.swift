@@ -165,7 +165,7 @@ struct StatRow<Value: View>: View {
                     if let hint {
                         Text("· \(hint)")
                             .font(.text(15))
-                            .foregroundStyle(Theme.Palette.tertiary)
+                            .foregroundStyle(Theme.Palette.muted)
                             .lineLimit(1)
                             .truncationMode(.tail)
                     }
@@ -255,7 +255,7 @@ struct Unavailable: View {
             Text(label)
                 .font(.text(15, weight: .medium))
         }
-        .foregroundStyle(Theme.Palette.tertiary)
+        .foregroundStyle(Theme.Palette.muted)
         .accessibilityLabel("\(label). This value could not be loaded and is not shown as zero.")
     }
 }

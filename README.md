@@ -67,29 +67,30 @@ last few hours".
 **Mainnet is not deployed.** The mainnet entries in `addresses.ts` are all zeroes and the
 deployment block is `null`, which callers must handle as unavailable rather than empty.
 
-### Release status (14 September 2026)
+### Release status (22 September 2026)
 
-The web and backend finalization changes have been deployed. The new TestFlight
-build remains blocked by GitHub Actions billing. See the
-[deployment report](docs/TESTNET-DEPLOYMENT-2026-09-14.md) for version IDs, live
-checks, and the remaining native/device acceptance gates.
+The browser and borrowing recovery candidate is documented in the
+[22 September recovery report](docs/releases/borrowing-recovery-2026-09-22.md).
+Keeper refinance and a public sponsored borrow, full repayment and collateral withdrawal are confirmed.
+Apple accepted native build 9 on 22 September; processing and tester availability still need confirmation.
+The [14 September deployment report](docs/TESTNET-DEPLOYMENT-2026-09-14.md)
+records the previous deployment and its then-observed GitHub billing block.
 
 The testnet relayer is hosted on Cloudflare and `/healthz` reports accepting requests.
 Both clients have relay submission code. Deposits, token approvals when needed, and
 link creation can still require the user's BTC; sponsorship is specific to each action.
 
-The current public release is **iOS-first**. The website serves the landing page, docs,
-and `/claim`; `/app` is deliberately disabled by `MAREN_WEB_APP_ENABLED`. The native
+The website includes the **testnet web app at `/app`**, landing page, docs,
+and `/claim`. The native
 SwiftUI app has live chain reads and writes and a [TestFlight invite](https://testflight.apple.com/join/uhmv9YPE).
 Invite availability and a fresh installation still need device verification for each release.
 
 See [Testnet release candidate](docs/TESTNET-RELEASE.md) for the finalization work,
 validation results, rollout order, and device acceptance matrix. The broader
 [Production and grant readiness](docs/PRODUCTION-READINESS.md) plan covers grant
-evidence and mainnet gates. Run
-`pnpm release:check` for a dated, read-only HTTP check; add `--web-app` only for a
-release that intentionally enables the dashboard. Use `--require-recovery` after
-the new backend rollout and `pnpm release:attest` for contract/client alignment.
+evidence and mainnet gates.
+`pnpm release:check` checks the active web app and durable relay recovery.
+Use `pnpm release:attest` for contract/client alignment.
 Passing these checks does not prove
 transaction settlement or make the contracts ready for mainnet.
 
@@ -183,7 +184,7 @@ against live matsnet, so a change to Mezo's deployed bytecode surfaces as a morn
 failure rather than as a surprise during a deployment, and an 88% line-coverage floor on
 `MarenVault`.
 The same nightly workflow also records HTTP availability, relay configuration,
-and CORS for the intended iOS-first release with `pnpm release:check`.
+and CORS for the active testnet web release with `pnpm release:check`.
 
 ## How this repository treats facts
 

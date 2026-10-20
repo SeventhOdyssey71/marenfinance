@@ -31,6 +31,20 @@ export function Reveal({ children, delay = 0, as, className = '' }: RevealProps)
       setShown(true);
       return;
     }
+    // ALREADY ON SCREEN? DO NOT HIDE IT. The server renders this content visible — `.reveal`
+    // alone has no opacity rule — and arming adds `.reveal-ready` (opacity 0) to wait for the
+    // observer. For anything above the fold that means painted text is taken away after
+    // hydration and handed back a frame or two later, which reads as a blank hero on a cold
+    // load: measured against production, TTFB was 0.5s with the headline present in the HTML,
+    // and the hero still showed empty while the nav did not. An entrance animation is not
+    // worth un-painting the first thing anyone sees, so already-visible elements skip
+    // straight to shown and never animate.
+    const box = el.getBoundingClientRect();
+    if (box.top < window.innerHeight && box.bottom > 0) {
+      setShown(true);
+      return;
+    }
+
     setArmed(true);
     const io = new IntersectionObserver(
       (entries) => {

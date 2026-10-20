@@ -71,6 +71,7 @@ const MATSNET: ProtocolStats = {
   troveNetDebtWei: 1_801_836_820_565_243_436_690n,
   troveIcrWei: 1_510_537_706_637_935_891n, // 151.05%
   reserveMusdWei: musd('1800'),
+  borrowingRateWei: WAD / 1000n,
   troveMaxBorrowingCapacityWei: 2_749_201_745_454_545_454_545n,
   troveOpen: true,
   depositCapWei: btc('5'),
@@ -84,7 +85,11 @@ const MATSNET: ProtocolStats = {
 };
 
 /** The same trove, recapitalised past the floor. Only `troveIcrWei` moves. */
-const HEALTHY_POOL: ProtocolStats = { ...MATSNET, troveIcrWei: 2_400_000_000_000_000_000n };
+const HEALTHY_POOL: ProtocolStats = {
+  ...MATSNET,
+  troveCollateralWei: btc('0.077'),
+  troveIcrWei: 2_400_000_000_000_000_000n,
+};
 
 /**
  * A healthy Maren pool inside an UNHEALTHY MUSD. The combination is the whole point: every
@@ -196,6 +201,69 @@ describe('borrow — the transaction that produced this module', () => {
   it('fails closed while the chain has not been read', () => {
     expect(preflightBorrow(state({ stats: undefined }), musd('1')).ok).toBe(false);
     expect(preflightBorrow(state({ position: undefined }), musd('1')).ok).toBe(false);
+  });
+});
+
+describe('borrow capacity across the pool and borrower', () => {
+  const position = { ...POSITION, collateralWei: btc('0.1'), vaultMaxBorrowableWei: musd('3000') };
+  const pool = {
+    ...HEALTHY_POOL,
+    troveCollateralWei: btc('0.1'),
+    troveNetDebtWei: musd('2000'),
+    troveMaxBorrowingCapacityWei: musd('2300'),
+    reserveMusdWei: musd('20'),
+  };
+
+  it('adds existing reserve to fee-adjusted whole-trove capacity', () => {
+    const max = musd('20') + (musd('100') * 1000n) / 1001n;
+    const quote = state({ position, stats: pool });
+    expect(preflightBorrow(quote, max).ok).toBe(true);
+    expect(preflightBorrow(quote, max).maxWei).toBe(max);
+    expect(preflightBorrow(quote, max + 1n).ok).toBe(false);
+  });
+
+  it('allows reserve-served borrowing when Mezo capacity is fully drawn', () => {
+    const quote = state({
+      position,
+      stats: { ...pool, troveMaxBorrowingCapacityWei: musd('2200') },
+    });
+    expect(preflightBorrow(quote, musd('20')).ok).toBe(true);
+    expect(preflightBorrow(quote, musd('21')).ok).toBe(false);
+  });
+
+  it('stops the range when both reserve and capacity are exhausted', () => {
+    const quote = state({
+      position,
+      stats: { ...pool, reserveMusdWei: 0n, troveMaxBorrowingCapacityWei: musd('2200') },
+    });
+    expect(preflightBorrow(quote, 1n)).toMatchObject({ ok: false, rangeDead: true, maxWei: 0n });
+  });
+
+  it('limits borrowing by the shared trove floor even if the user and capacity allow more', () => {
+    const quote = state({
+      position,
+      stats: {
+        ...pool,
+        troveCollateralWei: btc('0.064'),
+        troveMaxBorrowingCapacityWei: musd('10000'),
+      },
+    });
+    const result = preflightBorrow(quote, musd('100'));
+    expect(result.ok).toBe(false);
+    expect(result.blocker?.title).toContain('shared vault');
+    expect(result.maxWei).toBeLessThan(musd('100'));
+  });
+
+  it('does not quote a fallback fee when the current fee read failed', () => {
+    expect(
+      preflightBorrow(state({ position, stats: { ...pool, borrowingRateWei: null } }), 1n),
+    ).toMatchObject({ ok: false, rangeDead: true, maxWei: 0n });
+  });
+
+  it('does not route a direct position through the pooled-vault write', () => {
+    const quote = state({ position: { ...position, route: 'direct' }, stats: pool });
+    expect(preflightBorrow(quote, 1n).blocker?.title).toContain('direct trove');
+    expect(preflightBorrow(quote, 1n).rangeDead).toBe(true);
   });
 });
 

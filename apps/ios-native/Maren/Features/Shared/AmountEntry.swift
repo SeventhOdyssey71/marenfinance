@@ -14,8 +14,8 @@ struct AmountReadout: View {
     let unitLabel: String            // "MUSD" or "BTC"
     /// The big-figure prefix — "$" for MUSD, empty for BTC.
     var prefix: String = "$"
-    /// Whether to show the fiat/crypto toggle affordance (MUSD only; it's 1:1 so cosmetic).
-    var showToggle: Bool = true
+    /// Only show a toggle when the caller provides a real conversion action.
+    var showToggle: Bool = false
     var onToggle: () -> Void = {}
 
     private var isZero: Bool { raw.isEmpty || Decimal(string: raw) == 0 }
@@ -25,24 +25,28 @@ struct AmountReadout: View {
         VStack(spacing: Theme.Space.sm) {
             HStack(alignment: .firstTextBaseline, spacing: 2) {
                 if !prefix.isEmpty {
-                    Text(prefix).font(.system(size: 34, weight: .bold, design: .rounded))
+                    Text(prefix).font(.figure(34, weight: .bold))
                 }
-                Text(shown).font(.system(size: 60, weight: .bold, design: .rounded))
+                // .figure is the same rounded face with monospaced digits. Every other number
+                // in the app already goes through it; this one bypassed it, so the widest and
+                // most-typed figure on screen re-flowed on each keystroke — and
+                // .numericText() made the shifting more obvious, not less.
+                Text(shown).font(.figure(60, weight: .bold))
                     .contentTransition(.numericText())
             }
-            .foregroundStyle(isZero ? Theme.Palette.tertiary : Theme.Palette.ink)
+            .foregroundStyle(isZero ? Theme.Palette.muted : Theme.Palette.ink)
             .animation(.snappy(duration: 0.18), value: raw)
             .lineLimit(1)
             .minimumScaleFactor(0.5)
 
             Button(action: onToggle) {
                 HStack(spacing: 6) {
-                    Text("\(shown) \(unitLabel)").font(.text(15, weight: .medium))
+                    Text(unitLabel).font(.text(15, weight: .medium))
                     if showToggle {
                         Image(systemName: "arrow.up.arrow.down").font(.system(size: 13, weight: .semibold))
                     }
                 }
-                .foregroundStyle(Theme.Palette.tertiary)
+                .foregroundStyle(Theme.Palette.muted)
             }
             .buttonStyle(.plain)
             .disabled(!showToggle)

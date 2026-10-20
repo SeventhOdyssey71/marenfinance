@@ -12,6 +12,7 @@ import {
 
 import { describeRevert, type RevertReason } from './errors';
 import { priceGate, type PriceFeed } from './price';
+import { borrowPosition } from './borrow-position';
 import type { Balances, EarnPosition, Position, ProtocolStats } from '../data/types';
 
 /**
@@ -297,6 +298,17 @@ export function preflightBorrow(state: VaultState, amountWei: bigint): Preflight
   if (!stats) return blocked(reading('the shared trove'));
   if (!position) return blocked(reading('your position'));
 
+  if (position.route === 'direct') {
+    return blocked(
+      local(
+        'position',
+        'Manage this direct trove on Mezo',
+        'This client submits to the Maren pooled vault. It cannot borrow against your separate direct trove.',
+      ),
+      { rangeDead: true },
+    );
+  }
+
   if (stats.borrowingPaused) {
     return blocked(fromContract('pool', 'BorrowingIsPaused'), { rangeDead: true });
   }
@@ -349,15 +361,32 @@ export function preflightBorrow(state: VaultState, amountWei: bigint): Preflight
     );
   }
 
-  const ceiling = borrowCeiling(position, priceWei);
+  if (stats.borrowingRateWei === null || stats.borrowingRateWei === undefined) {
+    return blocked(reading('the current borrowing fee'), { rangeDead: true });
+  }
+  const quotePosition = borrowPosition(position, stats);
+  const ceiling = borrowCeiling(quotePosition, priceWei);
+  if (ceiling.binding === 'unavailable') {
+    return blocked(reading('the shared borrowing limits'), { rangeDead: true });
+  }
+  if (ceiling.binding === 'pool' && ceiling.amountWei === 0n) {
+    return blocked(
+      local(
+        'pool',
+        'The shared vault needs more borrowing headroom',
+        'The shared trove cannot take on more debt at its current collateral ratio. Your collateral remains in place; borrowing resumes when the pool has capacity.',
+      ),
+      { rangeDead: true },
+    );
+  }
   if (ceiling.amountWei === 0n) {
     return blocked(
       ceiling.mezoHeadroomWei === 0n
         ? local(
             'pool',
             'This trove is at Mezo’s borrowing ceiling',
-            `Mezo fixes a per-trove ceiling at the price the trove opened at, and this one is ` +
-              `fully drawn. Adding collateral does not raise it; only a refinance does.`,
+            `The shared trove has no available reserve or new-debt capacity. ` +
+              `A pool repayment or keeper refinance must restore capacity before you can borrow.`,
           )
         : fromContract('position', 'InsufficientCollateralRatio', [
             collateralRatio(position.collateralWei, position.debtWei, priceWei),
@@ -372,26 +401,32 @@ export function preflightBorrow(state: VaultState, amountWei: bigint): Preflight
   }
   if (amountWei > ceiling.amountWei) {
     return blocked(
-      ceiling.binding === 'ceiling'
+      ceiling.binding === 'pool'
         ? local(
             'input',
-            'Past Mezo’s per-trove ceiling',
-            `The trove can draw ${formatMusd(ceiling.mezoHeadroomWei)} more in total, whatever ` +
-              `your own ratio allows. Ask for less.`,
+            'Past the shared vault’s borrowing limit',
+            `The shared trove can support ${formatMusd(ceiling.amountWei)} more while keeping its collateral buffer. Ask for less.`,
           )
-        : local(
-            'input',
-            'Past Maren’s floor',
-            `Borrowing that much would put you under Maren’s ` +
-              `${formatCollateralRatio(MAREN_VAULT.minBorrowCr)} floor. The most you can draw ` +
-              `right now is ${formatMusd(ceiling.amountWei)}.`,
-          ),
+        : ceiling.binding === 'ceiling'
+          ? local(
+              'input',
+              'Past Mezo’s per-trove ceiling',
+              `The trove can draw ${formatMusd(ceiling.mezoHeadroomWei)} more in total, whatever ` +
+                `your own ratio allows. Ask for less.`,
+            )
+          : local(
+              'input',
+              'Past Maren’s floor',
+              `Borrowing that much would put you under Maren’s ` +
+                `${formatCollateralRatio(MAREN_VAULT.minBorrowCr)} floor. The most you can draw ` +
+                `right now is ${formatMusd(ceiling.amountWei)}.`,
+            ),
       { maxWei: ceiling.amountWei },
     );
   }
 
   // Belt to the ceiling's braces: recompute the resulting ratio the way the contract will.
-  const preview = previewBorrow(position, priceWei, amountWei);
+  const preview = previewBorrow(quotePosition, priceWei, amountWei);
   if (preview.collateralRatio < MAREN_VAULT.minBorrowCr) {
     return blocked(
       fromContract('position', 'InsufficientCollateralRatio', [

@@ -81,7 +81,11 @@ private struct VaultSection: View {
                     // Headroom is priced collateral, so a stale oracle leaves it genuinely
                     // unknown; `rowValue` renders that as Unavailable, never as a figure.
                     StatRow(label: "Left to borrow") { rowValue(model.displayPosition?.leftToBorrow.map { MoneyFormat.musd($0) }) }
-                    StatRow(label: "Drop to liquidation", hint: "at 110%", showsDivider: false) { dropValue }
+                    if let reason = model.displayPosition?.borrowUnavailableReason {
+                        Text(reason).font(.text(13)).foregroundStyle(Theme.Palette.warning)
+                            .fixedSize(horizontal: false, vertical: true).padding(.vertical, Theme.Space.sm)
+                    }
+                    StatRow(label: "Drop to liquidation", hint: "at \(model.position?.liquidationThresholdPercent ?? 140)%", showsDivider: false) { dropValue }
                 }
             }
         }
@@ -102,7 +106,7 @@ private struct VaultSection: View {
         if let ratio = model.displayPosition?.collateralRatioPercent {
             MoneyText(text: MoneyFormat.ratio(ratio), size: 17, weight: .semibold)
         } else if model.displayPosition?.borrowed == 0 {
-            Text("No debt").font(.figure(15, weight: .medium)).foregroundStyle(Theme.Palette.tertiary)
+            Text("No debt").font(.figure(15, weight: .medium)).foregroundStyle(Theme.Palette.muted)
         } else {
             Unavailable()
         }
@@ -112,7 +116,7 @@ private struct VaultSection: View {
         if let drop = model.displayPosition?.dropToLiquidationPercent, (model.displayPosition?.borrowed ?? 0) > 0 {
             MoneyText(text: MoneyFormat.percent(drop), size: 17, weight: .semibold)
         } else if model.displayPosition?.borrowed == 0 {
-            Text("—").font(.figure(15, weight: .medium)).foregroundStyle(Theme.Palette.tertiary)
+            Text("—").font(.figure(15, weight: .medium)).foregroundStyle(Theme.Palette.muted)
         } else {
             Unavailable()
         }
@@ -157,12 +161,10 @@ private struct VaultSection: View {
         return ratio * debt0 * collateral / (coll0 * debt)
     }
 
-    // The BTC price at which (collateralBtc, debtMusd) hits the 110% Mezo liquidation cliff —
-    // price-independent: liqPrice = debt × 1.10 / collateral, in USD per BTC. Matches the same
-    // threshold buildPosition uses for drop-to-liquidation.
+    // Liquidation price uses the position route: the vault liquidates at 140%, direct Mezo at 110%.
     private func liquidationPrice(collateral: Decimal, debt: Decimal) -> Decimal? {
         guard collateral > 0, debt > 0 else { return nil }
-        return debt * MarenPolicy.mezoLiquidationPercent / 100 / collateral
+        return debt * (model.position?.liquidationThresholdPercent ?? 140) / 100 / collateral
     }
 
     /// The risk of a proposed (collateral, debt) pair, from the live oracle price.
@@ -175,7 +177,8 @@ private struct VaultSection: View {
               // The ratio implies the price: ratio = coll x price / debt, so price = ratio x debt / coll.
               collateral > 0, debt > 0 else { return nil }
         let price = ratio / 100 * debt / collateral
-        return LiquidationRisk.of(collateralBtc: collateral, debtMusd: debt, priceUsd: price)
+        return LiquidationRisk.of(collateralBtc: collateral, debtMusd: debt, priceUsd: price,
+            liquidationPercent: model.position?.liquidationThresholdPercent ?? 140)
             ?? LiquidationRisk(dropPercent: 0, price: liq, ratioPercent: ratio)
     }
 
@@ -217,6 +220,8 @@ private struct VaultSection: View {
                 gas: .youPayBtc,
                 submitTitle: "Deposit Bitcoin",
                 makeIntent: { Intent(kind: .deposit, amount: $0, unit: .btc) },
+                fundingPrompt: "A deposit moves your own Bitcoin, so you send it and pay the "
+                    + "network fee yourself. Maren cannot sponsor a transaction that carries value.",
                 reviewRows: { amt in
                     var rows = [ReviewRow(label: "Bitcoin deposited", value: MoneyFormat.btc(amt))]
                     if let locked = p?.bitcoinLocked {
@@ -230,19 +235,20 @@ private struct VaultSection: View {
             return AmountFlowConfig(
                 navTitle: "Borrow MUSD",
                 unit: .musd,
-                explainer: "1.00% APR, simple interest, fixed for the life of this loan. You can borrow up to Maren’s 180% floor — the amount available here already stops short of it.",
+                explainer: p?.borrowUnavailableReason ?? "The available amount respects both your collateral and the shared pool. New debt beyond the pool reserve includes an origination fee.",
                 presets: [],
                 available: p?.leftToBorrow ?? nil,
                 availableLabel: "Left to borrow",
+                requiresAvailable: true,
                 gas: .sponsored,
                 submitTitle: "Borrow MUSD",
                 makeIntent: { Intent(kind: .borrow, amount: $0, unit: .musd) },
                 liveRisk: { amt in
-                    self.risk(collateral: p?.bitcoinLocked ?? 0, debt: (p?.borrowed ?? 0) + amt)
+                    self.risk(collateral: p?.bitcoinLocked ?? 0, debt: p?.debtAfterBorrow(amt) ?? amt)
                 },
                 reviewRows: { amt in
                     var rows = [ReviewRow(label: "Borrowing", value: MoneyFormat.musd(amt))]
-                    let newDebt = (p?.borrowed ?? 0) + amt
+                    let newDebt = p?.debtAfterBorrow(amt) ?? amt
                     let coll = p?.bitcoinLocked ?? 0
                     if p?.borrowed != nil {
                         rows.append(ReviewRow(label: "New borrowed total", value: MoneyFormat.musd(newDebt)))
@@ -256,10 +262,11 @@ private struct VaultSection: View {
             return AmountFlowConfig(
                 navTitle: "Repay MUSD",
                 unit: .musd,
-                explainer: "Reduces your principal and raises your collateral ratio. Interest is simple and non-compounding, fixed at the rate this vault opened at.",
+                explainer: p?.usesPooledVault == true ? "Reduces your debt and raises your collateral ratio. The repayment is sponsored; the first one needs a one-time, uncapped MUSD approval that you pay in BTC." : "Repayment here is for Maren pooled loans. Manage direct Mezo loans in Mezo; refresh if your pooled position is unavailable.",
                 presets: [500, 1_000],
-                available: model.balances?.musd,
+                available: p?.usesPooledVault == true ? model.balances?.musd : nil,
                 availableLabel: "Your MUSD balance",
+                requiresAvailable: true,
                 gas: .sponsored,
                 submitTitle: "Repay MUSD",
                 makeIntent: { Intent(kind: .repay, amount: $0, unit: .musd) },
@@ -276,10 +283,11 @@ private struct VaultSection: View {
             return AmountFlowConfig(
                 navTitle: "Withdraw Bitcoin",
                 unit: .btc,
-                explainer: "Removes collateral. Maren refuses any withdrawal that would take the vault below 180%, so the amount available is already limited by your outstanding debt.",
+                explainer: p?.usesPooledVault == true ? "Removes collateral. Maren refuses any withdrawal that would take the vault below 180%. Your locked balance is shown below; outstanding debt may reduce what you can withdraw." : "Withdrawal here is for Maren pooled collateral. Manage direct Mezo loans in Mezo; refresh if your pooled position is unavailable.",
                 presets: [0.01, 0.05],
-                available: p?.bitcoinLocked,
+                available: p?.usesPooledVault == true ? p?.bitcoinLocked : nil,
                 availableLabel: "Bitcoin locked",
+                requiresAvailable: true,
                 gas: .sponsored,
                 submitTitle: "Withdraw Bitcoin",
                 makeIntent: { Intent(kind: .withdraw, amount: $0, unit: .btc) },
@@ -330,7 +338,7 @@ private struct EarnSection: View {
                 if let balance = model.displayEarnBalance {
                     MoneyText(text: MoneyFormat.musd(balance), size: 34, weight: .bold)
                     Text("Supplied to the Stability Pool")
-                        .font(.text(13)).foregroundStyle(Theme.Palette.tertiary)
+                        .font(.text(13)).foregroundStyle(Theme.Palette.muted)
                 } else {
                     Unavailable(label: "Couldn’t read your pool balance")
                 }
@@ -394,7 +402,7 @@ private struct EarnSection: View {
             MoneyText(text: MoneyFormat.btc(y.btcRealised), size: 28, weight: .bold)
         }
         Text("Realised over the last \(y.windowDays) \(y.windowDays == 1 ? "day" : "days")")
-            .font(.text(13)).foregroundStyle(Theme.Palette.tertiary)
+            .font(.text(13)).foregroundStyle(Theme.Palette.muted)
 
         Text(seizedSummary(y))
             .font(.text(13)).foregroundStyle(Theme.Palette.muted)
@@ -409,7 +417,7 @@ private struct EarnSection: View {
                     .foregroundStyle(Theme.Palette.ink)
                 Text("realised · trailing · not a forecast")
                     .font(.text(12, weight: .medium))
-                    .foregroundStyle(Theme.Palette.tertiary)
+                    .foregroundStyle(Theme.Palette.muted)
             }
         } else {
             Text(withheldPercentReason(y))
@@ -450,7 +458,7 @@ private struct EarnSection: View {
             .foregroundStyle(Theme.Palette.ink)
         if y.windowDays > 0 {
             Text("No liquidation gains in the last \(y.windowDays) \(y.windowDays == 1 ? "day" : "days").")
-                .font(.text(13)).foregroundStyle(Theme.Palette.tertiary)
+                .font(.text(13)).foregroundStyle(Theme.Palette.muted)
                 .fixedSize(horizontal: false, vertical: true)
         }
     }
@@ -465,7 +473,7 @@ private struct EarnSection: View {
                 if let exposure = model.displayEarnExposure {
                     MoneyText(text: MoneyFormat.musd(exposure.musdBacking), size: 28, weight: .bold)
                     Text("MUSD backing the Stability Pool")
-                        .font(.text(13)).foregroundStyle(Theme.Palette.tertiary)
+                        .font(.text(13)).foregroundStyle(Theme.Palette.muted)
                     if exposure.btcSeized > 0 {
                         Divider().overlay(Theme.Palette.ink.opacity(0.07))
                         seizedLine(exposure)

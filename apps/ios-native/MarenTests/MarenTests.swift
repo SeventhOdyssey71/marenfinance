@@ -1,10 +1,44 @@
 import XCTest
 import SwiftUI
+import CryptoKit
 import BigInt
 import web3
 @testable import Maren
 
 final class MarenTests: XCTestCase {
+    func testAppReviewCredentialsRestoreOnlyConfiguredWallet() throws {
+        let email = "review-fixture@maren.finance"
+        let code = "fixture-access-code-with-high-entropy-2026"
+        var material = Data("maren-app-review-v1".utf8)
+        material.append(0)
+        material.append(contentsOf: email.utf8)
+        material.append(0)
+        material.append(contentsOf: code.utf8)
+        let key = Data(SHA256.hash(data: material))
+        let expectedAddress = try Keystore.address(of: key)
+
+        let result = AppReviewAccess.unlock(
+            email: "  REVIEW-FIXTURE@MAREN.FINANCE ", accessCode: "  \(code)  ",
+            expectedEmail: email, expectedAddress: expectedAddress
+        )
+        guard case .success(let wallet) = result else {
+            return XCTFail("Correct review credentials must restore the configured wallet")
+        }
+        XCTAssertEqual(wallet.privateKey, key)
+        XCTAssertEqual(wallet.address.lowercased(), expectedAddress.lowercased())
+
+        XCTAssertEqual(
+            AppReviewAccess.unlock(email: email, accessCode: code + "x",
+                                   expectedEmail: email, expectedAddress: expectedAddress),
+            .failure(.refused)
+        )
+        XCTAssertEqual(
+            AppReviewAccess.unlock(email: "", accessCode: "",
+                                   expectedEmail: email, expectedAddress: expectedAddress),
+            .failure(.incomplete)
+        )
+    }
+
     func testStubIsHonestlyDemo() async throws {
         // The Wave 1 stub must expose the price feed as unavailable, never a fake number.
         let client = StubMarenClient()
@@ -130,9 +164,13 @@ final class MarenTests: XCTestCase {
     // isolated; the test hops onto the main actor to call it under Swift 6 strict concurrency.
     @MainActor
     func testMoneyGreysDecimals() {
-        let (head, tail) = MoneyText.split("1,240.50 MUSD")
-        XCTAssertEqual(head, "1,240")
-        XCTAssertEqual(tail, ".50 MUSD")
+        let (head, tail) = MoneyText.split(MoneyFormat.musd(Decimal(string: "1240.509999999999999999")!))
+        XCTAssertEqual(head, "$1,240")
+        XCTAssertEqual(tail, ".50")
+        // Formatting must never round a spendable value up or put a currency mark in input data.
+        XCTAssertEqual(MoneyFormat.musd(Decimal(string: "1732.019999999999999999")!, unit: false), "1,732.01")
+        XCTAssertEqual(MoneyFormat.musd(0), "$0.00")
+        XCTAssertEqual(MoneyFormat.musd(Decimal(string: "-1.009999999999999999")!), "-$1.00")
     }
 
     // MARK: - Realised-yield annualisation
@@ -505,11 +543,123 @@ final class MarenTests: XCTestCase {
         XCTAssertLessThan(left, 3_400)
     }
 
-    func testMissingCeilingLeavesTheRatioHeadroomUnchanged() throws {
-        // An unreadable ceiling must not silently zero the borrow control.
+    func testRatioMetricsHelperWithoutPoolInputs() throws {
+        // The metrics helper is not the actionable pool quote; position(from:) applies required shared reads.
         let p = position(priceIsFresh: true)
         XCTAssertNotNil(p.leftToBorrow)
         XCTAssertGreaterThan(try XCTUnwrap(p.leftToBorrow), 0)
+    }
+
+    private func pooledSnapshot() -> MezoSnapshot {
+        let wad = BigUInt(10).power(18)
+        var snap = MezoSnapshot()
+        snap.priceWei = 60_000 * wad
+        snap.priceUpdatedAt = BigUInt(Date().timeIntervalSince1970)
+        snap.vaultCollWei = wad
+        snap.vaultDebtWei = 0
+        snap.vaultMaxBorrowableWei = 30_000 * wad
+        snap.troveCapacityWei = 2_000 * wad
+        snap.troveTotalDebtWei = 2_000 * wad
+        snap.troveCollateralWei = wad / 10
+        snap.reserveMusdWei = 100 * wad
+        snap.borrowingRateWei = wad / 1_000
+        snap.borrowingPaused = false
+        snap.troveOpen = true
+        snap.troveStatus = 1
+        return snap
+    }
+
+    func testEntireTroveDoesNotDoubleCountPendingRedistribution() throws {
+        let words: [BigUInt] = [100, 200, 30, 10, 20, 3]
+        let data = words.reduce(into: Data()) { result, value in
+            let bytes = value.serialize()
+            result.append(Data(repeating: 0, count: 32 - bytes.count)); result.append(bytes)
+        }
+        let trove = try MezoRPC.decodeEntireTrove(data)
+        XCTAssertEqual(trove.collWei, 100)
+        XCTAssertEqual(trove.principalWei, 200)
+        XCTAssertEqual(trove.interestWei, 30)
+        XCTAssertThrowsError(try MezoRPC.decodeEntireTrove(data.prefix(160)))
+    }
+
+    func testDebtFreeUserIsStillBoundBySharedCapacityButCanUseReserve() throws {
+        let result = try MezoMarenClient.position(from: pooledSnapshot())
+        XCTAssertEqual(result.leftToBorrow, 100)
+        XCTAssertEqual(result.borrowed, 0)
+        XCTAssertNil(result.collateralRatioPercent)
+        XCTAssertTrue(result.borrowUnavailableReason?.contains("refinance") == true)
+    }
+
+    func testPooledBorrowChargesOnlyNewProtocolDraw() throws {
+        var snap = pooledSnapshot()
+        let wad = BigUInt(10).power(18)
+        snap.troveCapacityWei = 20_000 * wad
+        snap.troveCollateralWei = wad
+        snap.vaultMaxBorrowableWei = 200 * wad
+        let available = MezoMarenClient.pooledBorrowAvailability(snap, priceIsFresh: true)
+        XCTAssertEqual(available.amountWei, 100 * wad + 100 * wad * wad / (wad + wad / 1_000))
+        let result = try MezoMarenClient.position(from: snap)
+        XCTAssertEqual(result.debtAfterBorrow(150), Decimal(string: "150.05"))
+    }
+
+    func testPooledGlobalRatioCanBlockEvenReserveDraws() {
+        var snap = pooledSnapshot()
+        snap.troveCollateralWei = BigUInt(10).power(18) / 100
+        let available = MezoMarenClient.pooledBorrowAvailability(snap, priceIsFresh: true)
+        XCTAssertEqual(available.amountWei, 0)
+        XCTAssertTrue(available.reason?.contains("180%") == true)
+    }
+
+    func testUnreadablePoolStateWithholdsBorrowLimit() throws {
+        var snap = pooledSnapshot()
+        snap.troveTotalDebtWei = nil
+        XCTAssertNil(try MezoMarenClient.position(from: snap).leftToBorrow)
+        snap = pooledSnapshot(); snap.borrowingRateWei = nil
+        XCTAssertNil(try MezoMarenClient.position(from: snap).leftToBorrow)
+        snap = pooledSnapshot(); snap.reserveMusdWei = nil
+        XCTAssertNil(try MezoMarenClient.position(from: snap).leftToBorrow)
+        snap = pooledSnapshot(); snap.vaultDebtWei = nil
+        XCTAssertThrowsError(try MezoMarenClient.position(from: snap))
+    }
+
+    func testPausedAndInactivePoolsDoNotOfferBorrowing() {
+        var snap = pooledSnapshot(); snap.borrowingPaused = true
+        XCTAssertEqual(MezoMarenClient.pooledBorrowAvailability(snap, priceIsFresh: true).amountWei, 0)
+        snap = pooledSnapshot(); snap.troveStatus = 3
+        XCTAssertEqual(MezoMarenClient.pooledBorrowAvailability(snap, priceIsFresh: true).amountWei, 0)
+        XCTAssertNil(MezoMarenClient.pooledBorrowAvailability(pooledSnapshot(), priceIsFresh: false).amountWei)
+    }
+
+    func testDirectLoanDoesNotOfferPooledBorrowWrites() throws {
+        var snap = pooledSnapshot()
+        snap.vaultCollWei = 0; snap.vaultDebtWei = 0
+        snap.trove = .init(collWei: BigUInt(10).power(18), principalWei: 2_200 * BigUInt(10).power(18), interestWei: 0)
+        let result = try MezoMarenClient.position(from: snap)
+        XCTAssertNil(result.leftToBorrow)
+        XCTAssertTrue(result.borrowUnavailableReason?.contains("direct Mezo") == true)
+        XCTAssertEqual(result.usesPooledVault, false)
+        XCTAssertTrue(MezoActions.vaultWriteUnavailableReason(snap)?.contains("in Mezo") == true)
+    }
+
+    func testAllVaultWritesRequireVerifiedPooledPositionBeforeSigning() throws {
+        let pooled = pooledSnapshot()
+        XCTAssertNil(MezoActions.vaultWriteUnavailableReason(pooled))
+        XCTAssertEqual(try MezoMarenClient.position(from: pooled).usesPooledVault, true)
+        var missing = pooled; missing.vaultDebtWei = nil
+        XCTAssertNotNil(MezoActions.vaultWriteUnavailableReason(missing))
+        var empty = pooled; empty.vaultCollWei = 0; empty.vaultDebtWei = 0
+        XCTAssertNotNil(MezoActions.vaultWriteUnavailableReason(empty))
+    }
+
+    func testPooledLiquidationDistanceUsesInternal140PercentThreshold() throws {
+        var snap = pooledSnapshot()
+        snap.vaultDebtWei = 20_000 * BigUInt(10).power(18)
+        let result = try MezoMarenClient.position(from: snap)
+        XCTAssertEqual(result.liquidationThresholdPercent, 140)
+        XCTAssertEqual(result.dropToLiquidationPercent, 53)
+        let risk = try XCTUnwrap(LiquidationRisk.of(collateralBtc: 1, debtMusd: 20_000,
+            priceUsd: 60_000, liquidationPercent: 140))
+        XCTAssertEqual(risk.price, 28_000)
     }
 
     func testStalePriceWithholdsEveryPriceDerivedFigure() {
@@ -626,6 +776,48 @@ final class TestnetFinalizationTests: XCTestCase {
             XCTAssertTrue(reason.submissionMayExist)
             XCTAssertFalse(reason.detail.contains("Nothing was submitted"))
         }
+    }
+
+    func testUpstreamErrorIsOnlyCertainWhenTheRelayerSaysNothingWasSubmitted() {
+        // The relayer raises UPSTREAM_ERROR both from `simulationFailure` (nothing sent) and
+        // from a failed receipt read (already broadcast). Only its own wording separates them,
+        // so the status code alone must never be enough to tell someone to retry a payment.
+        let certain = relay.failureReason(status: 502, code: "UPSTREAM_ERROR",
+                                          detail: "could not complete simulation; no transaction was submitted")
+        XCTAssertFalse(certain.submissionMayExist)
+        XCTAssertTrue(certain.detail.contains("never submitted"))
+
+        let ambiguous = relay.failureReason(status: 502, code: "UPSTREAM_ERROR",
+                                            detail: "could not read the transaction receipt")
+        XCTAssertTrue(ambiguous.submissionMayExist)
+    }
+
+    func testGasCapIsReportedAsSizeNotAsUnsupported() {
+        let reason = relay.failureReason(status: 403, code: "GAS_LIMIT_TOO_HIGH")
+        XCTAssertFalse(reason.submissionMayExist)
+        XCTAssertTrue(reason.title.contains("too large"))
+        XCTAssertFalse(reason.detail.contains("not one of them"))
+    }
+
+    func testNodeRejectionsAreTranslatedRatherThanSwallowed() {
+        // The first thing a fresh wallet hits: the self-paid MUSD approve with no BTC.
+        let broke = SelfPaidRejected(detail: "insufficient funds for gas * price + value")
+        XCTAssertTrue(broke.readable.contains("does not hold enough BTC"))
+        XCTAssertTrue(SelfPaidRejected(detail: "nonce too low").readable.contains("already in flight"))
+        XCTAssertTrue(SelfPaidRejected(detail: "transaction underpriced").readable.contains("raised its fee"))
+        // Anything unrecognised keeps the node's own words rather than a generic line.
+        XCTAssertEqual(SelfPaidRejected(detail: "some novel refusal").readable, "some novel refusal")
+    }
+
+    func testMusdShortfallMatchDoesNotClaimEveryInsufficientRevert() {
+        // "insufficient allowance" is not a MUSD balance problem; the old broad match caught
+        // it and told the user they were short of MUSD. Checked through the public surface.
+        let allowance = relay.failureReason(status: 422, code: "SIMULATION_REVERTED",
+                                            detail: "ERC20: insufficient allowance")
+        XCTAssertFalse(allowance.detail.contains("not enough MUSD"))
+        let shortfall = relay.failureReason(status: 422, code: "SIMULATION_REVERTED",
+                                            detail: "MarenPay: doesnt have enough musd")
+        XCTAssertTrue(shortfall.detail.contains("not enough MUSD"))
     }
 
     func testExplicitPreBroadcastRefusalsRemainDeclines() {
@@ -795,5 +987,258 @@ extension TestnetFinalizationTests {
         XCTAssertNil(draft.matchingHash(in: [try log(owner: ownerTopic, key: ownerTopic)], contract: contract))
         XCTAssertNil(draft.matchingHash(in: [try log(owner: ownerTopic, key: keyTopic, removed: true)], contract: contract))
         XCTAssertNil(draft.matchingHash(in: [valid], contract: payer))
+    }
+}
+
+final class VaultTransactionPreparationTests: XCTestCase {
+    let upper = "0x57a270C711Ccea7AFCB5361d214eAef149C5fA9B"
+    let lower = "0x306919805Eed1aD4772d92e18d00A1c132b07C19"
+
+    func testVaultEncodersPreserveLiveNeighbours() throws {
+        let hints = MarenEncoding.TroveHints(upper: upper, lower: lower)
+        let words = "00000000000000000000000057a270c711ccea7afcb5361d214eaef149c5fa9b" +
+                    "000000000000000000000000306919805eed1ad4772d92e18d00a1c132b07c19"
+        // Independently generated with cast calldata borrow(uint256,address,address), 10e18.
+        let borrow = try MarenEncoding.vaultWriteCalldata(function: "borrow",
+            amount: BigUInt(10).power(19), hints: hints)
+        XCTAssertEqual(borrow.web3.hexString, "0xd5164184" +
+            "0000000000000000000000000000000000000000000000008ac7230489e80000" + words)
+        for function in ["repay", "withdraw"] {
+            let data = try MarenEncoding.vaultWriteCalldata(function: function, amount: 1, hints: hints)
+            XCTAssertEqual(String(data.web3.hexString.suffix(128)), words)
+        }
+        XCTAssertEqual(try MarenEncoding.depositCalldata(hints: hints).web3.hexString,
+                       "0xf9609f08" + words)
+    }
+
+    func testTroveHintDecoderRejectsMissingAndMalformedReplies() throws {
+        XCTAssertThrowsError(try MezoRPC.decodeTroveHint(Data()))
+        XCTAssertThrowsError(try MezoRPC.decodeTroveHint(Data(repeating: 0, count: 31)))
+        XCTAssertThrowsError(try MezoRPC.decodeTroveHint(Data(repeating: 1, count: 32)))
+        let encoded = try XCTUnwrap(Data(hex: "0x000000000000000000000000" + upper.dropFirst(2)))
+        XCTAssertEqual(try MezoRPC.decodeTroveHint(encoded), upper.lowercased())
+        // A true list boundary is different from a missing reply.
+        XCTAssertEqual(try MezoRPC.decodeTroveHint(Data(repeating: 0, count: 32)),
+                       MarenEncoding.TroveHints.none.upper)
+    }
+
+    func testVaultGasKeepsMarginAndNeverClampsAnOversizedEstimate() {
+        // Historical public testnet proof: hinted borrow costs 476,464; fallback 660k
+        // cannot execute the old zero-hint 1,158,787-gas operation.
+        XCTAssertEqual(MezoActions.vaultRelayGasLimit(directEstimate: 476_464), BigUInt(774_696))
+        XCTAssertNil(MezoActions.vaultRelayGasLimit(directEstimate: 1_158_787))
+        XCTAssertNil(MezoActions.vaultRelayGasLimit(directEstimate: 0))
+        XCTAssertEqual(MezoActions.vaultRelayGasLimit(directEstimate: 960_000), BigUInt(MAX_RELAY_GAS))
+        XCTAssertNil(MezoActions.vaultRelayGasLimit(directEstimate: 960_001))
+    }
+}
+
+extension VaultTransactionPreparationTests {
+    private var rpcURL: URL { URL(string: "https://rpc.test.example")! }
+
+    func testSponsoredEstimateActuallySendsZeroGasPriceOverRPC() throws {
+        let request = try MezoRPC.gasEstimateRequest(url: rpcURL, from: upper, to: lower,
+                                                     data: Data([0xab, 0xcd]))
+        XCTAssertEqual(request.httpMethod, "POST")
+        let body = try XCTUnwrap(JSONSerialization.jsonObject(with: XCTUnwrap(request.httpBody)) as? [String: Any])
+        XCTAssertEqual(body["method"] as? String, "eth_estimateGas")
+        XCTAssertEqual(body["id"] as? Int, 1)
+        let parameters = try XCTUnwrap(body["params"] as? [[String: String]])
+        XCTAssertEqual(parameters, [["from": upper, "to": lower, "data": "0xabcd", "value": "0x0", "gasPrice": "0x0"]])
+    }
+
+    func testSelfPaidDepositEstimatePreservesValueWithoutZeroFeeOverride() throws {
+        let request = try MezoRPC.gasEstimateRequest(url: rpcURL, from: upper, to: lower,
+                                                     data: Data([0xab]), value: 2_000, sponsored: false)
+        let body = try XCTUnwrap(JSONSerialization.jsonObject(with: XCTUnwrap(request.httpBody)) as? [String: Any])
+        let parameters = try XCTUnwrap(body["params"] as? [[String: String]])
+        XCTAssertEqual(parameters[0]["value"], "0x7d0")
+        XCTAssertNil(parameters[0]["gasPrice"])
+    }
+
+    func testEstimateRejectsHTTPAndRPCFailuresBeforeUsingResult() throws {
+        func response(_ status: Int) -> HTTPURLResponse {
+            HTTPURLResponse(url: rpcURL, statusCode: status, httpVersion: nil, headerFields: nil)!
+        }
+        let valid = Data(#"{"jsonrpc":"2.0","id":1,"result":"0x74530"}"#.utf8)
+        XCTAssertEqual(try MezoRPC.decodeGasEstimate(data: valid, response: response(200)), BigUInt(476_464))
+        XCTAssertThrowsError(try MezoRPC.decodeGasEstimate(data: valid, response: response(503)))
+        let failed = Data(#"{"jsonrpc":"2.0","id":1,"result":"0x74530","error":{"code":-32000,"message":"reverted"}}"#.utf8)
+        XCTAssertThrowsError(try MezoRPC.decodeGasEstimate(data: failed, response: response(200)))
+    }
+
+    func testMalformedEstimateCannotBecomeGuessedVaultGas() throws {
+        let response = HTTPURLResponse(url: rpcURL, statusCode: 200, httpVersion: nil, headerFields: nil)!
+        for result in ["0x0", "0x00", "0x01", "123", "invalid", "0x-1", "0x1g"] {
+            let body = try JSONSerialization.data(withJSONObject: ["jsonrpc": "2.0", "id": 1, "result": result])
+            XCTAssertThrowsError(try MezoRPC.decodeGasEstimate(data: body, response: response))
+        }
+        for body in ["{}", "not JSON", #"{"jsonrpc":"2.0","id":2,"result":"0x1"}"#] {
+            XCTAssertThrowsError(try MezoRPC.decodeGasEstimate(data: Data(body.utf8), response: response))
+        }
+    }
+
+    func testDepositKeepsItsExistingFloorForCaughtInnerCallFailure() {
+        // The floor must dominate the estimate: `eth_estimateGas` prices the idle fallback
+        // (~294k live), and anything derived from it silently skips the collateral push.
+        XCTAssertEqual(MezoActions.depositGasLimit(directEstimate: 100_000), BigUInt(1_200_000))
+        XCTAssertEqual(MezoActions.depositGasLimit(directEstimate: 294_000), BigUInt(1_200_000))
+        // Above the floor the estimate still wins, so a genuinely expensive push is funded.
+        XCTAssertEqual(MezoActions.depositGasLimit(directEstimate: 1_200_000), BigUInt(1_530_000))
+    }
+}
+
+final class ActivityHistoryCacheTests: XCTestCase {
+    private let account = "0x4b0b25687fee0eb9d90617d656490dfd2964c0ef"
+    private let contracts = ["0x1111111111111111111111111111111111111111"]
+
+    private func item(_ id: String, block: Int, seconds: TimeInterval) -> ActivityItem {
+        ActivityItem(id: id, kind: .borrow, title: "Borrowed", subtitle: "Maren Credit",
+                     amount: "+$500.00", date: Date(timeIntervalSince1970: seconds),
+                     blockNumber: block)
+    }
+
+    func testActivityPlanResumesFromReorgWindow() {
+        let cached = ActivityHistoryStore.Entry(
+            version: ActivityHistoryStore.version, chainId: 31611, account: account,
+            contracts: contracts, fromBlock: 1_000, toBlock: 5_000, items: []
+        )
+
+        let warm = ActivityHistoryStore.plan(cached: cached, coldFloor: 1_000, head: 5_100)
+        XCTAssertEqual(warm.fromBlock, 4_901)
+        XCTAssertNotNil(warm.reuse)
+
+        let cold = ActivityHistoryStore.plan(cached: nil, coldFloor: 1_000, head: 5_100)
+        XCTAssertEqual(cold.fromBlock, 1_000)
+        XCTAssertNil(cold.reuse)
+
+        let expired = ActivityHistoryStore.plan(cached: cached, coldFloor: 5_002, head: 45_001)
+        XCTAssertEqual(expired.fromBlock, 5_002)
+        XCTAssertNil(expired.reuse)
+    }
+
+    func testActivityMergeReplacesReorgWindowAndKeepsOlderRows() {
+        let cached = ActivityHistoryStore.Entry(
+            version: ActivityHistoryStore.version, chainId: 31611, account: account,
+            contracts: contracts, fromBlock: 100, toBlock: 190,
+            items: [item("old", block: 100, seconds: 100),
+                    item("replaced", block: 190, seconds: 190)]
+        )
+        let merged = ActivityHistoryStore.merged(
+            reuse: cached,
+            freshItems: [item("replacement", block: 190, seconds: 191),
+                         item("new", block: 200, seconds: 200)],
+            fromBlock: 180, toBlock: 200, chainId: 31611,
+            account: account.uppercased(), contracts: contracts
+        )
+
+        XCTAssertEqual(merged.fromBlock, 100)
+        XCTAssertEqual(merged.toBlock, 200)
+        XCTAssertEqual(merged.account, account)
+        XCTAssertEqual(merged.items.map(\.id), ["new", "replacement", "old"])
+        XCTAssertFalse(merged.items.contains(where: { $0.id == "replaced" }))
+    }
+}
+
+extension VaultTransactionPreparationTests {
+    private var wad: BigUInt { BigUInt(10).power(18) }
+
+    private func hintState(principal: BigUInt = 2_750, interest: BigUInt = 7,
+                           reserve: BigUInt = 0, idle: BigUInt = 3,
+                           userDebt: BigUInt = 500, rate: BigUInt? = nil) -> MezoRPC.VaultHintState {
+        MezoRPC.VaultHintState(trove: .init(collWei: 100 * wad, principalWei: principal * wad,
+            interestWei: interest * wad), reserveWei: reserve * wad, idleWei: idle * wad,
+            userDebtWei: userDebt * wad, borrowingRateWei: rate ?? wad / 1_000,
+            minimumNetDebtWei: 1_800 * wad, gasCompensationWei: 200 * wad)
+    }
+
+    func testBorrowTargetsPostOperationPrincipalWithFeeAndReserve() throws {
+        let allDrawn = try MezoRPC.projectedTrove(operation: .borrow, amount: 500 * wad, state: hintState())
+        XCTAssertEqual(allDrawn.principalWei, 3_250 * wad + wad / 2)
+        XCTAssertEqual(allDrawn.interestWei, 7 * wad) // excluded from the NICR denominator
+        XCTAssertEqual(allDrawn.collWei, 100 * wad)
+        let partlyReserved = try MezoRPC.projectedTrove(operation: .borrow, amount: 500 * wad,
+                                                       state: hintState(reserve: 100))
+        XCTAssertEqual(partlyReserved.principalWei, 3_150 * wad + 4 * wad / 10)
+        let fullyReserved = try MezoRPC.projectedTrove(operation: .borrow, amount: 500 * wad,
+                                                       state: hintState(reserve: 600))
+        XCTAssertEqual(fullyReserved.principalWei, 2_750 * wad)
+        let exempt = try MezoRPC.projectedTrove(operation: .borrow, amount: 500 * wad,
+                                                state: hintState(rate: 0))
+        XCTAssertEqual(exempt.principalWei, 3_250 * wad)
+    }
+
+    func testRepaymentUsesInterestFirstAndIncludesExistingReserve() throws {
+        let result = try MezoRPC.projectedTrove(operation: .repay, amount: 100 * wad,
+                                                state: hintState(reserve: 20))
+        XCTAssertEqual(result.principalWei, 2_637 * wad) // 120 pushed: 7 interest + 113 principal
+        XCTAssertEqual(result.interestWei, 0)
+        let interestOnly = try MezoRPC.projectedTrove(operation: .repay, amount: 5 * wad, state: hintState())
+        XCTAssertEqual(interestOnly.principalWei, 2_750 * wad)
+        XCTAssertEqual(interestOnly.interestWei, 2 * wad)
+    }
+
+    func testRepaymentClampsToUserDebtAndPreservesProtocolDebtFloor() throws {
+        let clamped = try MezoRPC.projectedTrove(operation: .repay, amount: 1_000 * wad,
+                                                 state: hintState(userDebt: 10))
+        XCTAssertEqual(clamped.principalWei, 2_747 * wad)
+        let floor = try MezoRPC.projectedTrove(operation: .repay, amount: 500 * wad,
+                                               state: hintState(principal: 2_050, interest: 10))
+        XCTAssertEqual(floor.principalWei, 2_000 * wad)
+        XCTAssertEqual(floor.interestWei, 0)
+        let atFloor = try MezoRPC.projectedTrove(operation: .repay, amount: 100 * wad,
+                                                 state: hintState(principal: 2_000, interest: 0))
+        XCTAssertEqual(atFloor.principalWei, 2_000 * wad)
+    }
+
+    func testWithdrawalConsumesIdleFirstAndDepositPushesOnlyNewValue() throws {
+        let withdrawal = try MezoRPC.projectedTrove(operation: .withdraw, amount: 10 * wad, state: hintState())
+        XCTAssertEqual(withdrawal.collWei, 93 * wad)
+        let idleOnly = try MezoRPC.projectedTrove(operation: .withdraw, amount: 2 * wad, state: hintState())
+        XCTAssertEqual(idleOnly.collWei, 100 * wad)
+        let deposit = try MezoRPC.projectedTrove(operation: .deposit, amount: 10 * wad, state: hintState())
+        XCTAssertEqual(deposit.collWei, 110 * wad)
+        XCTAssertEqual(deposit.principalWei, 2_750 * wad)
+        XCTAssertThrowsError(try MezoRPC.projectedTrove(operation: .withdraw, amount: 104 * wad, state: hintState()))
+    }
+
+    func testInsertionHintNormalizationExcludesVaultBeforeReinsert() throws {
+        let vault = MarenAddresses.of(.testnet).marenVault
+        let current = MarenEncoding.TroveHints(upper: upper, lower: lower)
+        func pair(_ first: String, _ second: String) throws -> Data {
+            try XCTUnwrap(Data(hex: "0x" + String(repeating: "0", count: 24) + first.dropFirst(2) +
+                String(repeating: "0", count: 24) + second.dropFirst(2)))
+        }
+        let below = try MezoRPC.insertionHints(pair(vault, lower), vault: vault, current: current)
+        XCTAssertEqual(below.upper, upper)
+        XCTAssertEqual(below.lower, lower.lowercased())
+        let above = try MezoRPC.insertionHints(pair(upper, vault), vault: vault, current: current)
+        XCTAssertEqual(above.upper, upper.lowercased())
+        XCTAssertEqual(above.lower, lower)
+        let boundary = MarenEncoding.TroveHints.none
+        let onlyTrove = try MezoRPC.insertionHints(pair(vault, boundary.lower), vault: vault, current: boundary)
+        XCTAssertEqual(onlyTrove.upper, boundary.upper)
+        XCTAssertEqual(onlyTrove.lower, boundary.lower)
+        XCTAssertThrowsError(try MezoRPC.insertionHints(Data(), vault: vault, current: current))
+        XCTAssertThrowsError(try MezoRPC.insertionHints(pair(upper, upper), vault: vault, current: current))
+    }
+
+    func testReportedFiveHundredBorrowKeepsFullMeasuredGasMargin() {
+        XCTAssertEqual(MezoActions.vaultRelayGasLimit(directEstimate: 486_088), BigUInt(789_132))
+        XCTAssertNil(MezoActions.vaultRelayGasLimit(directEstimate: 1_257_780)) // current neighbours
+        XCTAssertNil(MezoActions.vaultRelayGasLimit(directEstimate: 1_952_877)) // zero hints
+    }
+}
+
+
+extension VaultTransactionPreparationTests {
+    func testUnopenedPoolStillAllowsIdleCollateralExitAndReserveRepayment() throws {
+        for operation: MezoRPC.VaultHintOperation in [.deposit, .repay, .withdraw] {
+            let hints = try MezoRPC.inactiveTroveHints(operation: operation, amount: 3, idleWei: 3)
+            XCTAssertEqual(hints.upper, MarenEncoding.TroveHints.none.upper)
+            XCTAssertEqual(hints.lower, MarenEncoding.TroveHints.none.lower)
+        }
+        XCTAssertThrowsError(try MezoRPC.inactiveTroveHints(operation: .withdraw, amount: 4, idleWei: 3))
+        XCTAssertThrowsError(try MezoRPC.inactiveTroveHints(operation: .borrow, amount: 1, idleWei: 3))
     }
 }

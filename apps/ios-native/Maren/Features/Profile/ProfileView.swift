@@ -14,6 +14,8 @@ struct ProfileView: View {
     @Environment(MarenSession.self) private var session
     @State private var account: Account?
     @State private var showSetup = false
+    @State private var showReviewAccess = false
+    @State private var confirmReviewAccess = false
     @State private var protection: KeyProtection?
     @State private var loadingAccount = true
     @AppStorage("finance.maren.swift.backupPending") private var backupPending = false
@@ -39,11 +41,11 @@ struct ProfileView: View {
             howItWorksCard
             if !actions.canSettle {
                 Text("Reads run live against Mezo testnet. Deposit, Earn and creating a claimable link are self-paid: you sign, pay a little BTC gas, and they settle on-chain now. Sending, borrowing, repaying, splitting, claiming a link, payment requests and claiming a name go through a relayer, which isn’t configured in this build, so those decline honestly rather than pretend to settle.")
-                    .font(.text(13)).foregroundStyle(Theme.Palette.tertiary)
+                    .font(.text(13)).foregroundStyle(Theme.Palette.muted)
                     .fixedSize(horizontal: false, vertical: true)
             }
         }
-        .task {
+        .task(id: session.address) {
             loadingAccount = true
             account = try? await client.account()
             loadingAccount = false
@@ -53,6 +55,22 @@ struct ProfileView: View {
                 protection = newProtection
                 if newProtection == nil { session.signOut() }
             }
+        }
+        .fullScreenCover(isPresented: $showReviewAccess) {
+            OnboardingReviewAccessStep(
+                onBack: { showReviewAccess = false },
+                onWallet: installReviewWallet
+            )
+        }
+        .confirmationDialog(
+            "Switch to the App Review wallet?",
+            isPresented: $confirmReviewAccess,
+            titleVisibility: .visible
+        ) {
+            Button("Continue to App Review access") { showReviewAccess = true }
+            Button("Cancel", role: .cancel) {}
+        } message: {
+            Text("This replaces the signing key currently stored on this device. Save that wallet's private key first if you need it again.")
         }
         .onAppear(perform: refreshProtection)
     }
@@ -79,7 +97,7 @@ struct ProfileView: View {
                 if let caption = displayAccount?.titleCaption {
                     Text(caption)
                         .font(.text(13))
-                        .foregroundStyle(Theme.Palette.tertiary)
+                        .foregroundStyle(Theme.Palette.muted)
                         .fixedSize(horizontal: false, vertical: true)
                 }
                 HStack(spacing: Theme.Space.sm) {
@@ -124,6 +142,32 @@ struct ProfileView: View {
                 PillButton(title: protection == nil ? "Restore wallet" : (backupPending ? "Back up wallet" : "Manage wallet"), variant: .quiet) {
                     showSetup = true
                 }
+                if !AppReviewAccess.configuredEmail.isEmpty {
+                    PillButton(title: "App Review access", icon: "checkmark.seal", variant: .quiet) {
+                        confirmReviewAccess = true
+                    }
+                    .accessibilityHint("Switches to the testnet review wallet using the credentials supplied to Apple.")
+                }
+            }
+        }
+    }
+
+    private func installReviewWallet(_ key: Data, address: String) {
+        Task {
+            guard let derived = try? Keystore.address(of: key),
+                  derived.lowercased() == address.lowercased(),
+                  address.lowercased() == AppReviewAccess.configuredAddress.lowercased() else { return }
+            do {
+                protection = try await Keystore.shared.store(privateKey: key)
+                OnboardingFlags.markBackedUp()
+                backupPending = false
+                session.adopt(address: address, name: "App Review")
+                account = nil
+                loadingAccount = true
+                showReviewAccess = false
+            } catch {
+                // The credentials screen remains open, so no public wallet state changes if
+                // Keychain refuses the already-validated key.
             }
         }
     }
@@ -150,7 +194,7 @@ struct ProfileView: View {
         switch protection {
         case .keychainBiometric: return Theme.Palette.success
         case .sessionOnly: return Theme.Palette.warning
-        case .none: return Theme.Palette.tertiary
+        case .none: return Theme.Palette.muted
         }
     }
     private var keyTitle: String {
@@ -321,7 +365,7 @@ private struct HandleCard: View {
             Spacer(minLength: 0)
         }
         Text(phaseDetail)
-            .font(.text(13)).foregroundStyle(Theme.Palette.tertiary)
+            .font(.text(13)).foregroundStyle(Theme.Palette.muted)
             .fixedSize(horizontal: false, vertical: true)
 
         switch phase {
@@ -357,7 +401,7 @@ private struct HandleCard: View {
         case .revealable: return Theme.Palette.success
         case .waiting: return Theme.Palette.warning
         case .expired: return Theme.Palette.danger
-        case .notCommitted, .unknown, .none: return Theme.Palette.tertiary
+        case .notCommitted, .unknown, .none: return Theme.Palette.muted
         }
     }
 

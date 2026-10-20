@@ -60,6 +60,9 @@ struct AmountField: View {
                 Text("Amount")
                     .labelStyle()
                 HStack(alignment: .firstTextBaseline, spacing: 8) {
+                    if unit == "MUSD" {
+                        Text("$").font(.figure(32, weight: .bold)).foregroundStyle(Theme.Palette.ink)
+                    }
                     TextField("0", text: $text)
                         .font(.figure(40, weight: .bold))
                         .foregroundStyle(Theme.Palette.ink)
@@ -68,12 +71,12 @@ struct AmountField: View {
                         .accessibilityLabel("Amount in \(unit)")
                     Text(unit)
                         .font(.figure(20, weight: .semibold))
-                        .foregroundStyle(Theme.Palette.tertiary)
+                        .foregroundStyle(Theme.Palette.muted)
                 }
                 if let caption {
                     Text(caption)
                         .font(.system(size: 13))
-                        .foregroundStyle(Theme.Palette.tertiary)
+                        .foregroundStyle(Theme.Palette.muted)
                         .fixedSize(horizontal: false, vertical: true)
                 }
             }
@@ -129,7 +132,7 @@ struct TextEntryCard: View {
                 if let footnote {
                     Text(footnote)
                         .font(.system(size: 13))
-                        .foregroundStyle(Theme.Palette.tertiary)
+                        .foregroundStyle(Theme.Palette.muted)
                         .fixedSize(horizontal: false, vertical: true)
                 }
             }
@@ -289,7 +292,7 @@ struct OutcomeView: View {
                     .multilineTextAlignment(.center)
                     .fixedSize(horizontal: false, vertical: true)
                 if let caption = detail?.caption {
-                    Text(caption).font(.text(14)).foregroundStyle(Theme.Palette.tertiary)
+                    Text(caption).font(.text(14)).foregroundStyle(Theme.Palette.muted)
                 }
                 if let hero = detail?.hero {
                     Text(hero)
@@ -323,7 +326,7 @@ struct OutcomeView: View {
                     HStack(spacing: Theme.Space.sm) {
                         Image(systemName: row.icon)
                             .font(.system(size: 13, weight: .semibold))
-                            .foregroundStyle(Theme.Palette.tertiary)
+                            .foregroundStyle(Theme.Palette.muted)
                             .frame(width: 18)
                         Text(row.label).font(.text(14)).foregroundStyle(Theme.Palette.muted)
                         Spacer(minLength: Theme.Space.sm)
@@ -345,7 +348,7 @@ struct OutcomeView: View {
         Group {
             if let hash = explorerHash {
                 HStack(spacing: Theme.Space.sm) {
-                    PillButton(title: "Explorer", variant: .quiet) { openURL(explorerURL(hash)) }
+                    PillButton(title: "View on explorer", variant: .quiet) { openURL(explorerURL(hash)) }
                     PillButton(title: "Done", variant: .primary, action: onDone)
                 }
             } else {

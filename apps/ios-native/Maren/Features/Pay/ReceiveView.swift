@@ -25,7 +25,7 @@ struct ReceiveView: View {
                     infoCard(account)
                     actions(link: link, address: account.address)
                 } else {
-                    MCard { Text("Loading your account…").font(.text(15)).foregroundStyle(Theme.Palette.tertiary) }
+                    MCard { Text("Loading your account…").font(.text(15)).foregroundStyle(Theme.Palette.muted) }
                 }
             }
             .padding(.horizontal, Theme.Space.md)

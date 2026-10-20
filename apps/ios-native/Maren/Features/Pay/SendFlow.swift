@@ -122,11 +122,14 @@ struct SendFlow: View {
             )
             .padding(.horizontal, Theme.Space.md)
             if isHandle { handlePreview.padding(.horizontal, Theme.Space.md) }
-            Text("Maren sponsors the payment gas when available. Your first payment may need a separate MUSD approval paid with BTC.")
-                .font(.text(13)).foregroundStyle(Theme.Palette.tertiary)
+            // The approval is `type(uint256).max` (MezoActions.approveCalldata). Saying only
+            // "an approval" while granting an unlimited allowance is the kind of omission this
+            // app does not make elsewhere, so the copy names it.
+            Text("Payments are sponsored. The first one needs a one-time MUSD approval that you pay in BTC. It is uncapped, which is what keeps every payment after it gasless.")
+                .font(.text(13)).foregroundStyle(Theme.Palette.muted)
                 .padding(.horizontal, Theme.Space.md)
             Spacer()
-            PillButton(title: "Send \(MoneyFormat.musd(amount ?? 0, unit: false)) MUSD", variant: .primary) {
+            PillButton(title: "Send \(MoneyFormat.musd(amount ?? 0))", variant: .primary) {
                 Task { await submit() }
             }
             .disabled(!canSend)
@@ -154,7 +157,7 @@ struct SendFlow: View {
             if resolving {
                 ProgressView().controlSize(.small)
                 Text("Resolving \(trimmedRecipient)…")
-                    .font(.text(13)).foregroundStyle(Theme.Palette.tertiary)
+                    .font(.text(13)).foregroundStyle(Theme.Palette.muted)
             } else if let resolvedAddress {
                 Image(systemName: "checkmark.circle.fill")
                     .font(.system(size: 12)).foregroundStyle(Theme.Palette.success)
@@ -166,7 +169,7 @@ struct SendFlow: View {
                     .truncationMode(.middle)
             } else {
                 Text("\(trimmedRecipient) isn’t registered yet.")
-                    .font(.text(13)).foregroundStyle(Theme.Palette.tertiary)
+                    .font(.text(13)).foregroundStyle(Theme.Palette.muted)
             }
             Spacer(minLength: 0)
         }
@@ -179,7 +182,7 @@ struct SendFlow: View {
         VStack(spacing: Theme.Space.md) {
             header(title: "Send")
             Spacer(minLength: 0)
-            AmountReadout(raw: raw, unitLabel: "MUSD", onToggle: {})
+            AmountReadout(raw: raw, unitLabel: "MUSD")
             if overBalance {
                 Text("More than your balance").font(.text(13, weight: .medium)).foregroundStyle(Theme.Palette.warning)
             }
@@ -199,9 +202,9 @@ struct SendFlow: View {
             MusdCoin(size: 38)
             VStack(alignment: .leading, spacing: 1) {
                 Text("MUSD").font(.text(15, weight: .medium)).foregroundStyle(Theme.Palette.ink)
-                Text(balance.map { "\(MoneyFormat.musd($0, unit: false)) available" }
-                     ?? (balanceLoaded ? "Balance unavailable" : "0,000.00 available"))
-                    .font(.text(13)).foregroundStyle(Theme.Palette.tertiary)
+                Text(balance.map { "\(MoneyFormat.musd($0)) available" }
+                     ?? (balanceLoaded ? "Balance unavailable" : "$0,000.00 available"))
+                    .font(.text(13)).foregroundStyle(Theme.Palette.muted)
                     .skeleton(!balanceLoaded && balance == nil)
             }
             Spacer()
@@ -225,10 +228,10 @@ struct SendFlow: View {
             Spacer()
             LogoLoader()
             VStack(spacing: 4) {
-                Text("Sending \(MoneyFormat.musd(amount ?? 0, unit: false)) MUSD")
+                Text("Sending \(MoneyFormat.musd(amount ?? 0))")
                     .font(.display(20, weight: .semibold)).foregroundStyle(Theme.Palette.ink)
                 Text("to \(shortRecipient)")
-                    .font(.text(14)).foregroundStyle(Theme.Palette.tertiary)
+                    .font(.text(14)).foregroundStyle(Theme.Palette.muted)
             }
             Spacer()
         }
@@ -246,7 +249,7 @@ struct SendFlow: View {
         guard case .delivered = outcome, let amount else { return nil }
         return OutcomeDetail(
             caption: "You sent",
-            hero: "\(MoneyFormat.musd(amount, unit: false)) MUSD",
+            hero: MoneyFormat.musd(amount),
             rows: [OutcomeRow(icon: trimmedRecipient.hasPrefix("@") ? "at" : "person.fill",
                               label: "To", value: shortRecipient)]
         )

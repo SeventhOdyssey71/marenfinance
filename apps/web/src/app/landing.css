@@ -17,7 +17,9 @@
 
   /* ── Neutralised: the old saturated sticker fills, now clean surfaces so any
      leftover usage desaturates to the calm palette. ── */
-  --pink: #ffffff;
+  /* Named for the sticker fill it used to be. It is white now and still drawn,
+     so it carries a role name rather than a colour name. */
+  --sticker-fill: #ffffff;
   --cyan: #ffffff;
   --lime: #eef0f2;
   --khaki: #ffffff;
@@ -188,38 +190,12 @@
   background: var(--ink);
   color: #fff;
 }
-.landing .u-btn-cta {
-  background: var(--lime);
-  color: #101013;
-}
-/* Glassmorphic glow — the primary "launch" pill. A soft pink→violet halo sits
-   behind a clean pill, matching the ugly.cash "Get the APP" treatment. */
-.landing .u-btn-glow {
-  background: var(--card);
-  color: var(--ink);
-  /* A crisp, vivid pink ring hugging the pill, then a tight bloom — the
-     ugly.cash "Get the APP" halo, not a soft lavender blur. */
-  box-shadow:
-    0 0 0 1.5px rgba(250, 0, 255, 0.9),
-    0 0 0 4px rgba(250, 0, 255, 0.16),
-    0 0 16px 1px rgba(250, 0, 255, 0.5),
-    0 6px 20px -8px rgba(250, 0, 255, 0.45);
-}
 @media (hover: hover) {
   .landing .u-btn:hover {
     background: #e2e2e7;
   }
   .landing .u-btn-dark:hover {
     background: var(--graphite);
-  }
-  .landing .u-btn-cta:hover {
-    background: color-mix(in srgb, var(--lime) 84%, #fff);
-  }
-  .landing .u-btn-glow:hover {
-    box-shadow:
-      0 0 0 1px rgba(16, 16, 19, 0.08),
-      0 10px 36px -6px rgba(250, 0, 255, 0.6),
-      0 6px 18px -6px rgba(140, 90, 255, 0.6);
   }
 }
 @media (max-width: 640px) {
@@ -317,7 +293,7 @@
 }
 
 /* ── Scroll-progress indicator (rare-ui, restyled) ────────────────────────── */
-/* A soft, borderless white pill floating bottom-centre: ink text, pink `--pink`
+/* A soft, borderless white pill floating bottom-centre: ink text, `--sticker-fill`
    progress ring, shared `--soft` shadow. Colour only — layout stays in the JSX.
    Sits at z-40, below the z-50 nav pill, and at the opposite edge, so the two
    never collide. */
@@ -335,7 +311,7 @@
   stroke: rgba(16, 16, 19, 0.14);
 }
 .landing .sp-fill {
-  stroke: var(--pink);
+  stroke: var(--sticker-fill);
 }
 .landing .sp-item {
   color: rgba(16, 16, 19, 0.55);
@@ -347,7 +323,7 @@
   background: rgba(16, 16, 19, 0.06);
 }
 .landing .sp-dot-on {
-  background: var(--pink);
+  background: var(--sticker-fill);
 }
 .landing .sp-dot-off {
   background: rgba(16, 16, 19, 0.3);

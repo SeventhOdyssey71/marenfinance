@@ -1,26 +1,26 @@
 {
-  "readAt": "2026-08-18T21:40:20.459Z",
+  "readAt": "2026-09-16T12:44:41.257Z",
   "source": "tools/docs/stamp-live.mjs",
   "note": "Generated. Numbers in the documents are placed by hand; this file is what you check them against.",
   "mainnet": {
     "chainId": 31612,
-    "blockNumber": 11223333,
-    "troveCount": 25,
-    "troveOwnersCount": 25,
+    "blockNumber": 11887622,
+    "troveCount": 19,
+    "troveOwnersCount": 19,
     "troveCountAgrees": true,
-    "btcPriceUsd": "64546.56",
-    "btcPriceRaw": "64546567440000000000000",
-    "oracleUpdatedAt": "2026-08-18T21:40:14.000Z"
+    "btcPriceUsd": "75915.9",
+    "btcPriceRaw": "75915900000000000000000",
+    "oracleUpdatedAt": "2026-09-16T12:44:35.000Z"
   },
   "matsnet": {
     "chainId": 31611,
-    "blockNumber": 14970255,
+    "blockNumber": 15571987,
     "vault": "0x46252B00AB59384518d9dB6D1f210ffF1221645b",
     "collateralBtc": "0.069061",
-    "debtMusd": "2001.97",
-    "icrPercent": "222.6",
-    "btcPriceUsd": "64545.74",
-    "oracleUpdatedAt": "2026-08-18T21:40:13.000Z"
+    "debtMusd": "2749.13",
+    "icrPercent": "190.6",
+    "btcPriceUsd": "75912.54",
+    "oracleUpdatedAt": "2026-09-16T12:44:33.000Z"
   },
   "quotedIn": {
     "mainnet.troveCount": ["docs/src/01-thesis.md", "docs/ARCHITECTURE.md"],

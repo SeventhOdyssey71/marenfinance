@@ -1,0 +1,106 @@
+{
+  "checkedAt": "2026-09-22T01:42:41.318Z",
+  "origin": "https://www.marenfinance.xyz",
+  "scope": "Anonymous fresh-browser route, hydration, layout and wallet-menu checks; no signing or wallet transaction.",
+  "pages": [
+    {
+      "label": "landing-desktop",
+      "path": "/",
+      "status": 200,
+      "url": "https://www.marenfinance.xyz/",
+      "title": "Maren Finance: Spend Bitcoin. Never sell it.",
+      "text": "Skip to content\nMaren\nProduct\nFAQ\nOpen web app\nDocs\nOpen app\nWeb + iOS beta · Mezo testnet\nSpend Bitcoin.\nNever sell it.\n\nBorrow MUSD against your Bitcoin and pay anyone by @handle. Try the full loop with testnet funds.\n\nJoin the iOS beta\nOpen web app\n\nTestnet only · pre-audit · no real funds\n\nA CLOSER LOOK\nEvery screen, considered.\n\nReal screens from the app: amount-first flows, handles resolved to an address before you sign, and honest on-chain receipts.\n\nDraw MUSD against your Bitcoin\nPay any @handle, resolved before you sign\nA receipt that only says done when the chain does\nHOW IT WORKS\nDeposit. Draw. Spend.\n\nThree steps on Mezo testnet. Borrow against Bitcoin without selling it, then mo",
+      "width": 1440,
+      "scrollWidth": 1440,
+      "buttons": [
+        "",
+        "01\nWhat happens if the price of Bitcoin falls?",
+        "02\nDoes Maren custody my Bitcoin?",
+        "03\nWhat does “gasless” actually mean?",
+        "04\nHas Maren been audited?",
+        "Product"
+      ],
+      "menu": null,
+      "errors": [],
+      "passed": true
+    },
+    {
+      "label": "app-desktop",
+      "path": "/app",
+      "status": 200,
+      "url": "https://www.marenfinance.xyz/app",
+      "title": "App · Maren Finance",
+      "text": "Maren\nConnect wallet\nACCOUNT\nYour position\nNo wallet connected\n\nMaren shows you your own position and nothing else. Connect and every figure on this screen becomes a contract read you can check on the explorer.\n\nConnect wallet\nUse a wallet that supports Mezo. Funds will arrive at the address you connect.\nTHE SOCIAL VAULT\nEVERYONE’S, NOT YOURS\n$85,671.49\nBTC / USD\n\nFrom Mezo's oracle precompile, 4s ago.\n\nVAULT COLLATERAL\n—\nneeds a live price\nVAULT DEBT\n—\nnet of the liquidation reserve\nVAULT HEALTH\n—\nMaren's floor is 180%\nBORROWING CEILING\n—\nfixed when the trove opened\nMUSD IN RESERVE\n—\nserved without new trove debt\nWhy the ceiling does not move\n\nTestnet funds only. Maren’s contracts are pre-a",
+      "width": 1440,
+      "scrollWidth": 1440,
+      "buttons": ["Connect wallet", "Connect wallet"],
+      "menu": "Injected\n\nMezo is a standard EVM chain. Any wallet that can add a network works.",
+      "errors": [],
+      "passed": true
+    },
+    {
+      "label": "vault-mobile",
+      "path": "/app/vault",
+      "status": 200,
+      "url": "https://www.marenfinance.xyz/app/vault",
+      "title": "App · Maren Finance",
+      "text": "Maren\nConnect wallet\nVAULT\nBitcoin credit\nConnect to open a position\n\nDraw MUSD against Bitcoin at 1.00% APR, fixed. Minimum deposit 0.001 BTC.\n\nConnect wallet\nUse a wallet that supports Mezo. Funds will arrive at the address you connect.\nTHE SOCIAL VAULT\nONE TROVE, SHARED\n215.1%\nvault health\nHealthy\n110\n180 floor\n250 target\n300+\n\nPercentages are collateral ratios. Maren refuses to lend below 180%; pooled positions can be liquidated below 140%, and direct troves below 110%.\n\nVAULT COLLATERAL\n0.069061 BTC\n$5,916.61\nVAULT DEBT\n2,549.55 MUSD\ndrawn by everyone in it\nCAPACITY USED\n5.6%\nof a 5 BTC cap\n0.281061 BTC deposited\n4.718938 BTC of room left\n\nEveryone here shares one trove on MUSD: your Bi",
+      "width": 390,
+      "scrollWidth": 390,
+      "buttons": ["Connect wallet", "Connect wallet"],
+      "menu": null,
+      "errors": [],
+      "passed": true
+    },
+    {
+      "label": "finance-mobile",
+      "path": "/app/finance",
+      "status": 200,
+      "url": "https://www.marenfinance.xyz/app/finance",
+      "title": "App · Maren Finance",
+      "text": "Maren\nConnect wallet\nFINANCE\nVault\nEarn\nVAULT\nBitcoin credit\nConnect to open a position\n\nDraw MUSD against Bitcoin at 1.00% APR, fixed. Minimum deposit 0.001 BTC.\n\nConnect wallet\nUse a wallet that supports Mezo. Funds will arrive at the address you connect.\nTHE SOCIAL VAULT\nONE TROVE, SHARED\n215.1%\nvault health\nHealthy\n110\n180 floor\n250 target\n300+\n\nPercentages are collateral ratios. Maren refuses to lend below 180%; pooled positions can be liquidated below 140%, and direct troves below 110%.\n\nVAULT COLLATERAL\n0.069061 BTC\n$5,916.61\nVAULT DEBT\n2,549.55 MUSD\ndrawn by everyone in it\nCAPACITY USED\n5.6%\nof a 5 BTC cap\n0.281061 BTC deposited\n4.718938 BTC of room left\n\nEveryone here shares one tro",
+      "width": 390,
+      "scrollWidth": 390,
+      "buttons": ["Connect wallet", "Vault", "Earn", "Connect wallet"],
+      "menu": null,
+      "errors": [],
+      "passed": true
+    },
+    {
+      "label": "pay-mobile",
+      "path": "/pay?to=0x54196397D6f01b48739dB3957257cB33cD341885&amount=1",
+      "status": 200,
+      "url": "https://www.marenfinance.xyz/app/pay?to=0x54196397D6f01b48739dB3957257cB33cD341885&amount=1",
+      "title": "App · Maren Finance",
+      "text": "Maren\nConnect wallet\nPAY\nMove dollars\nConnect to send MUSD\n\nSend MUSD to an @handle or a plain address, with an optional memo written on-chain.\n\nConnect wallet\nUse a wallet that supports Mezo. Funds will arrive at the address you connect.\n\nMaren pays the gas for this action.\n\nTry the x402 testnet demo\nBuy a paid API response with a gasless signature.\n\nTestnet funds only. Maren’s contracts are pre-audit. Pooled collateral is segregated in accounting, not custody.\n\nVault 0x4625…645b\nDocs\nHome\nFinance\nActivity\nProfile",
+      "width": 390,
+      "scrollWidth": 390,
+      "buttons": ["Connect wallet", "Connect wallet"],
+      "menu": null,
+      "errors": [],
+      "passed": true
+    },
+    {
+      "label": "docs-desktop",
+      "path": "/docs",
+      "status": 200,
+      "url": "https://www.marenfinance.xyz/docs",
+      "title": "Maren Finance · Maren Finance",
+      "text": "Maren\nStart testing\niOS beta\nGET STARTED\nMaren Finance\nQuickstart\nRoadmap\nTHE PRODUCT\nThe Social Vault\nBorrow\nPay\nEarn\nActivity\nHOW IT WORKS\nThe pooled vault\nGasless\nPreflight\nRedemptions\nREFERENCE\nContracts\nNetworks\nSDK\nSECURITY\nRisk\nAudits\nDEVELOPERS\nRun locally\nVerify on-chain\nGet started\nMaren Finance\n\nSpend Bitcoin. Never sell it. A money app for Bitcoin, built on Mezo.\n\nMaren is a money app for Bitcoin, built on Mezo. Deposit Bitcoin, borrow MUSD against it from as little as 0.001 BTC, and spend it: pay a @name, send a money link, request money, and put idle MUSD to work. Your collateral backs the loan and can be liquidated if its value falls too far. Repay the debt to withdraw the rem",
+      "width": 1440,
+      "scrollWidth": 1440,
+      "buttons": ["", ""],
+      "menu": null,
+      "errors": [],
+      "passed": true
+    }
+  ],
+  "browserRelayHealth": {
+    "httpStatus": 200,
+    "accepting": true,
+    "chainId": 31611,
+    "pending": 0,
+    "pendingRefunds": 0
+  },
+  "passed": true
+}

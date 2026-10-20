@@ -1,0 +1,95 @@
+{
+  "checkedAt": "2026-09-22T07:52:47.702Z",
+  "url": "https://www.marenfinance.xyz/app/finance",
+  "scope": "Public production UI with read-only injected test provider, not an authenticated real wallet. Real RPC reads; no private key, signing, approval, transaction submission or balance overrides.",
+  "account": "0x54196397D6f01b48739dB3957257cB33cD341885",
+  "chainId": 31611,
+  "errors": [],
+  "requests": ["wallet_requestPermissions", "eth_requestAccounts", "eth_chainId"],
+  "blockedMethods": [],
+  "status": 200,
+  "connectors": ["Injected"],
+  "relayer": {
+    "url": "https://maren-relayer.rolandojude18.workers.dev/healthz",
+    "status": 200,
+    "accepting": true,
+    "chainId": 31611,
+    "pendingRecovery": 0,
+    "problems": []
+  },
+  "rendered": {
+    "text": "Maren\n0x5419\u20261885\nFINANCE\nVault\nEarn\nVAULT\nBitcoin credit\nYOUR POSITION\nIN THE SOCIAL VAULT\nCOLLATERAL\n0.01 BTC\n$852.75\nTOTAL DEBT\n40.53 MUSD\nno reserve, social vault\nBORROW LIMIT\n5,348.04 MUSD\nfixed when this trove opened\nTHE SOCIAL VAULT\nONE TROVE, SHARED\n214.1%\nvault health\nHealthy\n110\n180 floor\n250 target\n300+\n\nPercentages are collateral ratios. Maren refuses to lend below 180%; pooled positions can be liquidated below 140%, and direct troves below 110%.\n\nVAULT COLLATERAL\n0.069061 BTC\n$5,889.19\nVAULT DEBT\n2,550.08 MUSD\ndrawn by everyone in it\nCAPACITY USED\n5.6%\nof a 5 BTC cap\n0.281061 BTC deposited\n4.718938 BTC of room left\nYOUR COLLATERAL IN IT\n0.01 BTC\n3.5% of the vault\nYOUR DEBT IN IT\n40.53 MUSD\nyours alone, not the vault's\n\nEveryone here shares one trove on MUSD: your Bitcoin is segregated in accounting, not custody, so a fall faster than the keeper can act could socialise losses.\n\nHow Maren limits that risk\nDeposit\nBorrow\nRepay\nWithdraw\nBORROW MUSD\n1.00% APR, fixed for the life of this loan\n300.26\nMUSD\nHealthy\n0 MUSD\nRecommended \u00b7 250%\n432.78\n\nCapped by Maren\u2019s 180% floor. Mezo\u2019s ceiling would allow 2,595.36 MUSD.\n\nRESULTING RATIO\n250.0%\nHealthy\nLIQUIDATION PRICE\n$47,754.10\npooled positions liquidate at 140%\nBITCOIN CAN FALL\n44%\nfrom today\u2019s price\nOrigination fee \u00b7 applies only above the pool\u2019s existing MUSD reserve\n0.30 MUSD\nLiquidation reserve \u00b7 refunded when the trove closes\nnone on this route\nTotal debt after\n341.10 MUSD\nBorrow 300.26 MUSD\nMaren pays the gas for this action.\n\nTestnet funds only. Maren\u2019s contracts are pre-audit. Pooled collateral is segregated in accounting, not custody.\n\nVault 0x4625\u2026645b\nDocs\nHome\nFinance\nActivity\nProfile",
+    "inputs": [
+      {
+        "type": "range",
+        "min": "0",
+        "max": "1000",
+        "value": "693",
+        "disabled": false,
+        "ariaLabel": "Amount to borrow"
+      }
+    ],
+    "buttons": [
+      {
+        "text": "0x5419\u20261885",
+        "disabled": false
+      },
+      {
+        "text": "Vault",
+        "disabled": false
+      },
+      {
+        "text": "Earn",
+        "disabled": false
+      },
+      {
+        "text": "Deposit",
+        "disabled": false
+      },
+      {
+        "text": "Borrow",
+        "disabled": false
+      },
+      {
+        "text": "Repay",
+        "disabled": false
+      },
+      {
+        "text": "Withdraw",
+        "disabled": false
+      },
+      {
+        "text": "Recommended \u00b7 250%",
+        "disabled": false
+      },
+      {
+        "text": "Borrow 300.26 MUSD",
+        "disabled": false
+      }
+    ],
+    "requests": ["wallet_requestPermissions", "eth_requestAccounts", "eth_chainId"],
+    "blockedMethods": [],
+    "width": 390,
+    "scrollWidth": 390
+  },
+  "passed": true,
+  "checks": {
+    "connectedThroughWalletMenu": true,
+    "positiveBorrowPreview": true,
+    "positiveDisplayedMaximum": true,
+    "feeShown": true,
+    "resultingRatio250Percent": true,
+    "pooledLiquidation140Percent": true,
+    "sponsorshipConfirmedAfterHealthProbe": true,
+    "noSigningOrTransactionRequests": true,
+    "noHorizontalOverflow": true,
+    "noPageErrors": true
+  },
+  "notes": [
+    "A fresh browser profile used an injected EIP-1193 test provider exposing only the stated public address and chain. Account-access permission is simulated; no real wallet ownership or authentication is proved.",
+    "Provider has no key and rejects every method except account/chain discovery and connection permission; no transaction controls were clicked.",
+    "Chain position, pool figures and borrowing arithmetic were populated by the production app using real public RPC reads, without balance or RPC-result overrides.",
+    "An initial capture showed the conservative not-live relayer message before its health probe completed. A bounded follow-up wait confirmed accepting health and sponsored-gas copy.",
+    "Range input max=1000 is a UI step scale, not MUSD; the rendered maximum was 432.78 MUSD and selected preview 300.26 MUSD."
+  ]
+}

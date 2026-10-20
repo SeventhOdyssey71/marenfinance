@@ -181,8 +181,8 @@ contract MarenEarn is ERC4626, AccessControl, ERC2771Context, ReentrancyGuard {
     ///      and this stays the payable-balance cap.
     function maxWithdraw(address owner) public view override returns (uint256) {
         uint256 byShares = super.maxWithdraw(owner);
-        uint256 payable_ = IERC20(asset()).balanceOf(address(this))
-            + stabilityPool.getCompoundedMUSDDeposit(address(this));
+        uint256 payable_ =
+            IERC20(asset()).balanceOf(address(this)) + stabilityPool.getCompoundedMUSDDeposit(address(this));
         return byShares < payable_ ? byShares : payable_;
     }
 
@@ -195,8 +195,8 @@ contract MarenEarn is ERC4626, AccessControl, ERC2771Context, ReentrancyGuard {
     ///      payable balance is genuinely the smaller number.
     function maxRedeem(address owner) public view override returns (uint256) {
         uint256 held = balanceOf(owner);
-        uint256 payable_ = IERC20(asset()).balanceOf(address(this))
-            + stabilityPool.getCompoundedMUSDDeposit(address(this));
+        uint256 payable_ =
+            IERC20(asset()).balanceOf(address(this)) + stabilityPool.getCompoundedMUSDDeposit(address(this));
         if (super.maxWithdraw(owner) <= payable_) return held;
         uint256 shares = convertToShares(payable_);
         return shares < held ? shares : held;

@@ -94,7 +94,7 @@ enum HealthStatus: String, Sendable, CaseIterable, Codable {
 
     var tone: Color {
         switch self {
-        case .none: return Theme.Palette.tertiary
+        case .none: return Theme.Palette.muted
         case .healthy: return Theme.Palette.success
         case .caution, .warning: return Theme.Palette.warning
         case .danger, .liquidatable: return Theme.Palette.danger
@@ -120,7 +120,17 @@ struct Position: Sendable, Equatable, Codable {
     let bitcoinLocked: Decimal        // BTC, from the vault, no oracle needed
     let borrowed: Decimal             // MUSD, from the vault, no oracle needed
     /// MUSD headroom under the 180% floor. Price-derived: nil when the oracle price is stale.
-    let leftToBorrow: Decimal?
+    var leftToBorrow: Decimal?
+    var borrowUnavailableReason: String? = nil
+    var borrowReserveMusd: Decimal? = nil
+    var borrowFeeRate: Decimal? = nil
+    var liquidationThresholdPercent: Decimal? = nil
+    var usesPooledVault: Bool? = nil
+
+    func debtAfterBorrow(_ amount: Decimal) -> Decimal {
+        let freshDraw = max(0, amount - (borrowReserveMusd ?? 0))
+        return borrowed + amount + freshDraw * (borrowFeeRate ?? 0)
+    }
     let collateralRatioPercent: Decimal?
     let dropToLiquidationPercent: Decimal?   // how far BTC can fall before liquidation
     /// Derived from the collateral ratio, so it is absent whenever the ratio is. `.none` means
@@ -285,6 +295,9 @@ struct ActivityItem: Sendable, Equatable, Identifiable, Codable {
     /// "January 1" header dated 1970. Nil is the honest answer, and the UI groups and labels it
     /// as "Time unknown".
     let date: Date?
+    /// The mined block, used to resume Activity scans without re-reading old immutable logs.
+    /// Optional so locally-created/demo rows and older on-disk snapshots remain decodable.
+    var blockNumber: Int? = nil
 
     // Optional receipt detail. Defaulted so the Chain client (which does not populate them yet)
     // keeps compiling; a nil field renders as an honest gap in the receipt, never a fake value.

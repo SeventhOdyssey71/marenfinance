@@ -1,0 +1,31 @@
+{
+  "app": "Maren",
+  "bundleId": "finance.maren.app",
+  "sourceCommit": "0ef27694d0b4e3d778b6925cab55a7af1e24aa09",
+  "workflow": "ios-testflight.yml",
+  "runId": 35718155620,
+  "runAttempt": 1,
+  "runUrl": "https://github.com/SeventhOdyssey71/marenfinance/actions/runs/35718155620",
+  "conclusion": "success",
+  "hostedTestsPassed": true,
+  "releaseSimulatorBuildPassed": true,
+  "releaseDebugMarkerCheckPassed": true,
+  "buildNumber": "79",
+  "appStoreUploadAccepted": true,
+  "uploadAcceptedAt": "2026-09-22T11:07:27Z",
+  "deliveryUuid": "fef324d5-9689-4e27-bd4e-7b3c5cc93d8a",
+  "processingVerified": false,
+  "testFlightAvailabilityVerified": false,
+  "whatToTest": "Transaction history now reuses its last chain scan and refreshes only recent blocks after a transaction. Home uses a light-purple top gradient.",
+  "notes": [
+    "Apple accepted the uploaded IPA. Processing completion and tester availability are not established by the upload receipt.",
+    "Build 79 is the first uploaded build containing the incremental activity history cache and top-only lavender Home wash from commit 0ef2769.",
+    "A warm history refresh re-reads the latest 100 blocks for reorg safety and preserves older confirmed rows from the persisted scan."
+  ],
+  "acceptanceEvidence": [
+    "Selected build 79 above 25 existing App Store Connect builds.",
+    "Artifact Maren-ipa-build-79 was uploaded with artifact ID 10691231298.",
+    "UPLOAD SUCCEEDED with no errors",
+    "Delivery UUID: fef324d5-9689-4e27-bd4e-7b3c5cc93d8a"
+  ]
+}
