@@ -1,19 +1,12 @@
 'use client';
 
-import { useEffect, useState, type ReactNode } from 'react';
+import { type ReactNode } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 
 import { ActivityIcon, FinanceIcon, HomeIcon, ProfileIcon } from '@/components/ui/icons';
 import { ChainStatus, VaultProvenance } from '@/components/app/chain-status';
-import { IntroOnboarding } from '@/components/app/intro-onboarding';
 import { ConnectButton, NetworkGuard } from '@/components/app/wallet';
-
-/**
- * The first-run flag, same semantics as the iOS `hasOnboarded` boolean: written once when
- * the intro is finished or skipped, and its presence means "do not show the intro again".
- */
-const ONBOARDED_KEY = 'maren.hasOnboarded';
 
 /**
  * The app shell — the native app, running in a browser.
@@ -139,35 +132,6 @@ function Disclosure({ className = '' }: { className?: string }) {
 export function AppShell({ children }: { children: ReactNode }) {
   const pathname = usePathname() ?? '/app';
 
-  /**
-   * The first-run intro, gated on localStorage so it shows once and then never again. It
-   * mounts only AFTER the effect runs, so a returning visitor (the common case) never sees
-   * the violet splash flash over the app; a brand-new visitor sees a beat of the app chrome
-   * before the opaque overlay covers it, which is the acceptable side of that trade. This
-   * is deliberately before the connect gate: the intro's final CTA hands off to the normal
-   * signed-out screen, which owns SignIn.
-   */
-  const [showIntro, setShowIntro] = useState(false);
-
-  useEffect(() => {
-    try {
-      if (localStorage.getItem(ONBOARDED_KEY) !== '1') setShowIntro(true);
-    } catch {
-      // Private-mode or blocked storage: no persistence, so treat as already onboarded
-      // rather than trapping the person on an intro that can never be dismissed.
-    }
-  }, []);
-
-  function finishIntro() {
-    try {
-      localStorage.setItem(ONBOARDED_KEY, '1');
-    } catch {
-      // Storage unavailable — the flag will not persist, but the intro still closes for
-      // this session, which is the honest best-effort.
-    }
-    setShowIntro(false);
-  }
-
   return (
     <div className="flex min-h-screen flex-col">
       {/* First focusable element in the shell, visible only once focused. */}
@@ -210,10 +174,6 @@ export function AppShell({ children }: { children: ReactNode }) {
           </div>
         </main>
       </div>
-
-      {/* First-run intro, above the bottom nav (z-40). Opaque, so it fully covers the app
-          it is handing off to. */}
-      {showIntro ? <IntroOnboarding onComplete={finishIntro} /> : null}
     </div>
   );
 }
