@@ -60,7 +60,8 @@ contract NativeBorrowHintsForkTest is Test {
         ForkOracleStub(ORACLE).set(int256(PRICE), block.timestamp);
         coldTargets = [VAULT, MANAGER, SORTED, MUSD, OPERATIONS, HELPER, PRICE_FEED, ORACLE];
         // Cooling all known dependencies keeps hint-discovery reads from subsidising execution.
-        string[4] memory getters = ["activePool()", "defaultPool()", "interestRateManager()", "governableVariables()"];
+        string[4] memory getters =
+            ["activePool()", "defaultPool()", "interestRateManager()", "governableVariables()"];
         for (uint256 i; i < getters.length; ++i) {
             (bool success, bytes memory result) = OPERATIONS.staticcall(abi.encodeWithSignature(getters[i]));
             if (success && result.length == 32) coldTargets.push(abi.decode(result, (address)));
@@ -105,7 +106,8 @@ contract NativeBorrowHintsForkTest is Test {
     function _repayWithProjectedHints() private {
         uint256 repayment = AMOUNT + FEE;
         RepayState memory beforeState;
-        (beforeState.coll, beforeState.principal, beforeState.interest,,,) = manager.getEntireDebtAndColl(VAULT);
+        (beforeState.coll, beforeState.principal, beforeState.interest,,,) =
+            manager.getEntireDebtAndColl(VAULT);
         beforeState.reserve = pool.reserveMUSD();
         beforeState.grossDebt = beforeState.principal + beforeState.interest;
         uint256 room = beforeState.grossDebt > 2000e18 ? beforeState.grossDebt - 2000e18 : 0;
@@ -136,11 +138,15 @@ contract NativeBorrowHintsForkTest is Test {
         assertEq(pool.reserveMUSD(), 0, "no catch-and-hold fallback at this snapshot");
         (, uint256 principalAfter, uint256 interestAfter,,,) = manager.getEntireDebtAndColl(VAULT);
         assertEq(
-            principalAfter, beforeState.principal - beforeState.principalReduction, "interest is paid before principal"
+            principalAfter,
+            beforeState.principal - beforeState.principalReduction,
+            "interest is paid before principal"
         );
         assertEq(principalAfter + interestAfter, beforeState.grossDebt - beforeState.pushed);
         assertEq(beforeState.userBalance - IMUSD(MUSD).balanceOf(USER), repayment);
-        assertApproxEqAbs(beforeState.userDebt - pool.previewDebtOf(USER), repayment, 2, "user repayment accounting");
+        assertApproxEqAbs(
+            beforeState.userDebt - pool.previewDebtOf(USER), repayment, 2, "user repayment accounting"
+        );
     }
 
     function _withdrawWithProjectedHints() private {
