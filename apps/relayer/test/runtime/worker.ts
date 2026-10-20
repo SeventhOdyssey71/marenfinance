@@ -64,8 +64,27 @@ export class RecoveryCheckDO extends DurableObject<Env> {
   }
 
   override async fetch(request: Request): Promise<Response> {
-    await this.#ready;
     const path = new URL(request.url).pathname;
+    /**
+     * DRAIN THE BODY BEFORE THE SLOW AWAIT, not after it.
+     *
+     * This used to read the body at the bottom of the handler, after `await this.#ready`.
+     * `#ready` is `initialize()`, which does chain I/O, and the request here has been
+     * forwarded from the outer worker — so on a cold start, by the time the read came
+     * round, workerd had already torn the stream down: "Can't read from request stream
+     * after response has been sent". It never reproduced locally, where initialize()
+     * against a warm local Anvil returns in milliseconds, and it failed on CI runners
+     * every time. Raising the test timeout only moved the failure to the next check,
+     * which is what ruled slowness out.
+     *
+     * The product handler never had this shape — `POST /relay` reads `c.req.json()` as
+     * its first statement — so this was the fixture's bug, not the relayer's.
+     */
+    const payload =
+      request.method === 'POST' && (path === '/reserve' || path === '/prepare')
+        ? ((await request.json()) as { id: string })
+        : null;
+    await this.#ready;
     if (path === '/state')
       return Response.json({
         instance: this.#instance,
@@ -88,7 +107,8 @@ export class RecoveryCheckDO extends DurableObject<Env> {
       return new Response('simulated lost response', { status: 503 });
     }
     if (path !== '/reserve' && path !== '/prepare') return new Response('unknown', { status: 404 });
-    const { id } = (await request.json()) as { id: string };
+    if (!payload) return new Response('body required', { status: 400 });
+    const { id } = payload;
     const fees = await this.#chain.estimateFees();
     const gasLimit = 100_000n;
     const record: RecoveryRecord = {
