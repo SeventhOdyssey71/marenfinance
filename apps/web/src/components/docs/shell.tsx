@@ -3,9 +3,33 @@
 import Link from 'next/link';
 import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { Sidebar, type SidebarGroup } from './sidebar';
-import { TESTFLIGHT_URL } from '@/lib/links';
 import { ThemeToggle } from './theme-toggle';
 import { IconMenu, IconClose } from './icons';
+
+function Brand({ onNavigate }: { onNavigate?: () => void }) {
+  return (
+    <Link href="/docs" className="doc-brand" aria-label="Maren docs home" onClick={onNavigate}>
+      {/* The real brand mark, the same asset the app nav uses. */}
+      {/* eslint-disable-next-line @next/next/no-img-element */}
+      <img className="doc-mark" src="/brand/maren-mark.png" alt="" aria-hidden />
+      <span>Maren</span>
+      <span className="doc-brand-sub">Docs</span>
+    </Link>
+  );
+}
+
+function TopLinks({ onNavigate }: { onNavigate?: () => void }) {
+  return (
+    <>
+      <Link className="doc-toplink" href="/docs/get-started/quickstart" onClick={onNavigate}>
+        Start testing
+      </Link>
+      <Link className="doc-toplink" href="/app" onClick={onNavigate}>
+        Open app
+      </Link>
+    </>
+  );
+}
 
 export function DocsShell({ nav, children }: { nav: SidebarGroup[]; children: ReactNode }) {
   const [open, setOpen] = useState(false);
@@ -21,7 +45,7 @@ export function DocsShell({ nav, children }: { nav: SidebarGroup[]; children: Re
     return () => desktop.removeEventListener('change', closeOnDesktop);
   }, []);
 
-  // Lock the page scroll behind the mobile drawer, and close it on Escape.
+  // Lock the page scroll behind the mobile drawer, trap focus in it, close on Escape.
   useEffect(() => {
     document.documentElement.style.overflow = open ? 'hidden' : '';
     if (!open) return;
@@ -58,31 +82,23 @@ export function DocsShell({ nav, children }: { nav: SidebarGroup[]; children: Re
         <button
           ref={menu}
           type="button"
-          className="doc-menu-btn"
-          aria-label={open ? 'Close navigation' : 'Open navigation'}
+          className="doc-iconbtn doc-menu-btn"
+          aria-label="Open navigation"
           aria-expanded={open}
           aria-controls="docs-drawer"
-          onClick={() => setOpen((v) => !v)}
+          onClick={() => setOpen(true)}
         >
-          {open ? <IconClose /> : <IconMenu />}
+          <IconMenu />
         </button>
 
-        <Link href="/docs" className="doc-brand" aria-label="Maren docs home">
-          {/* The real brand mark, the same asset the app nav uses. */}
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img className="doc-mark" src="/brand/maren-mark.png" alt="" aria-hidden />
-          <span>Maren</span>
-        </Link>
-
-        <Link className="doc-toplink" href="/docs/get-started/quickstart">
-          Start testing
-        </Link>
+        <Brand />
 
         <div className="doc-topbar-spacer" />
 
-        <a className="doc-toplink" href={TESTFLIGHT_URL} target="_blank" rel="noreferrer noopener">
-          <span>iOS beta</span>
-        </a>
+        <div className="doc-topbar-links">
+          <TopLinks />
+        </div>
+        <span className="doc-topbar-sep" aria-hidden />
         <ThemeToggle />
       </header>
 
@@ -105,17 +121,26 @@ export function DocsShell({ nav, children }: { nav: SidebarGroup[]; children: Re
             aria-modal="true"
             aria-label="Documentation navigation"
           >
-            <button
-              type="button"
-              className="doc-toplink"
-              onClick={() => {
-                setOpen(false);
-                menu.current?.focus();
-              }}
-            >
-              <IconClose /> Close navigation
-            </button>
-            <Sidebar nav={nav} onNavigate={() => setOpen(false)} />
+            <div className="doc-drawer-head">
+              <button
+                type="button"
+                className="doc-iconbtn doc-drawer-close"
+                aria-label="Close navigation"
+                onClick={() => {
+                  setOpen(false);
+                  menu.current?.focus();
+                }}
+              >
+                <IconClose />
+              </button>
+              <Brand onNavigate={() => setOpen(false)} />
+            </div>
+            <div className="doc-drawer-body">
+              <Sidebar nav={nav} onNavigate={() => setOpen(false)} />
+            </div>
+            <div className="doc-drawer-foot">
+              <TopLinks onNavigate={() => setOpen(false)} />
+            </div>
           </div>
         </div>
       ) : null}

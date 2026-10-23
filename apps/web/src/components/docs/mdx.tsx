@@ -51,6 +51,44 @@ function remarkCodeMeta() {
   };
 }
 
+/**
+ * Keep literal JSX props such as `<CardGroup cols={2}>`.
+ *
+ * next-mdx-remote strips every `{...}` attribute expression by default (`blockJS`), which
+ * silently turned `cols={2}` into `undefined` and stacked every card group in one column.
+ * Its stripping runs after our remark plugins, so a numeric or boolean literal is rewritten
+ * here to a plain attribute first. Anything that is real JavaScript is left alone, and
+ * still blocked.
+ */
+function remarkLiteralProps() {
+  type Attr = { type?: string; name?: string; value?: unknown };
+  type Node = { type?: string; attributes?: Attr[]; children?: unknown[] };
+  return (tree: unknown) => {
+    const visit = (node: Node) => {
+      if (
+        (node.type === 'mdxJsxFlowElement' || node.type === 'mdxJsxTextElement') &&
+        Array.isArray(node.attributes)
+      ) {
+        node.attributes = node.attributes.flatMap((attr) => {
+          const value = attr.value as { type?: string; value?: string } | null | undefined;
+          if (attr.type !== 'mdxJsxAttribute' || value?.type !== 'mdxJsxAttributeValueExpression') {
+            return [attr];
+          }
+          const raw = (value.value ?? '').trim();
+          if (/^-?\d+(\.\d+)?$/.test(raw)) return [{ ...attr, value: raw }];
+          if (raw === 'true') return [{ ...attr, value: null }];
+          if (raw === 'false') return [];
+          return [attr];
+        });
+      }
+      if (Array.isArray(node.children)) {
+        for (const child of node.children) visit(child as Node);
+      }
+    };
+    visit(tree as Node);
+  };
+}
+
 function Anchor({ href, children, ...rest }: ComponentProps<'a'>) {
   const rewritten = rewriteDocsHref(href);
   if (rewritten && /^https?:/.test(rewritten)) {
@@ -138,7 +176,7 @@ export async function Mdx({ source }: { source: string }) {
     components,
     options: {
       mdxOptions: {
-        remarkPlugins: [remarkGfm, remarkCodeMeta],
+        remarkPlugins: [remarkGfm, remarkCodeMeta, remarkLiteralProps],
         rehypePlugins: [rehypeSlug],
       },
     },

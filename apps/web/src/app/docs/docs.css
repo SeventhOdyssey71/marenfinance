@@ -1,965 +1,1551 @@
 /*
- * Docs section styling.
+ * Docs: a flat, square reading surface with its own light/dark pair.
  *
- * This is a scoped reproduction of the approved reference (docs-site/reference), rebuilt
- * as a self-contained themed world under `.maren-docs`. It does not inherit the app's
- * forced-light scope: light is the default, the OS preference decides until the reader
- * toggles, and the toggle drives `data-theme` on the document element.
+ * The look is "blueprint": 1px hairlines, square corners, no shadows, a grey sidebar
+ * column that runs from the top bar down, and small bracketed mono labels for section
+ * names. Reading type is inherited from <body> (Neue Montreal); code and labels use
+ * Geist Mono via --font-mono. Nothing here sets a sans family.
+ *
+ * The theme lives on the `.maren-docs` wrapper as `data-theme`; with no saved choice
+ * the OS preference decides. The window scrolls (not an inner pane), so sticky bars,
+ * the scroll-spy, anchor jumps and the iOS toolbar collapse behave natively, and
+ * `html:has(.maren-docs)` paints the canvas so overscroll never shows another colour.
+ *
+ * Tokens are semantic and defined for light (the brand system) and a designed dark (ink
+ * #0e0e12 base, lifted surfaces, a lighter violet that holds AA). Measured: accent text
+ * 7.7:1 light / 7.9:1 dark; muted text 5.4:1 on the grey sidebar / 6.9:1 dark.
  */
 
-.maren-docs {
-  --docs-accent: #5b3df5;
-  --docs-accent-soft: rgba(91, 61, 245, 0.1);
-  --docs-accent-line: rgba(91, 61, 245, 0.22);
-  --docs-bg: #fbfbfd;
-  --docs-bg-side: #f6f6fa;
-  --docs-bg-card: #ffffff;
-  --docs-bg-code: #f4f4f8;
-  --docs-ink: #191922;
-  --docs-ink-soft: #56566a;
-  --docs-ink-faint: #8a8a9c;
-  --docs-line: rgba(20, 18, 45, 0.09);
-  --docs-line-strong: rgba(20, 18, 45, 0.14);
-  --docs-warn-bg: #fef6ec;
-  --docs-warn-line: #e9b872;
-  --docs-warn-ink: #92500b;
-  --docs-note-bg: #eef1fe;
-  --docs-note-line: #9db0f5;
-  --docs-note-ink: #33417f;
-  --docs-info-bg: #eef6fe;
-  --docs-info-line: #9cc4f2;
-  --docs-info-ink: #235087;
-  --docs-tip-bg: #e9f8f0;
-  --docs-tip-line: #86d3ac;
-  --docs-tip-ink: #0b6b45;
-  --docs-ok: #0f9d6a;
-  --docs-radius: 12px;
-  --docs-sans:
-    var(--font-satoshi), -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial,
-    sans-serif;
-  --docs-mono:
-    var(--font-geist-mono), ui-monospace, 'SF Mono', 'JetBrains Mono', Menlo, Consolas, monospace;
-  --docs-measure: 46rem;
+/* ---------------------------------------------------------------- tokens */
 
-  /* The docs are a self-contained scroll pane, so the window never scrolls behind
-     them and macOS overscroll cannot rubber-band the marketing background into view. */
-  height: 100dvh;
-  overflow-y: auto;
-  overscroll-behavior: none;
-  background: var(--docs-bg);
-  color: var(--docs-ink);
-  font-family: var(--docs-sans);
-  font-size: 15px;
-  line-height: 1.6;
-  -webkit-font-smoothing: antialiased;
+.maren-docs {
+  --docs-bg: #ffffff;
+  --docs-side-bg: #f5f5f7;
+  --docs-side-hover: #ededf0;
+  --docs-side-active: #e6e6ea;
+  --docs-bg-subtle: #f7f7f8;
+  --docs-bg-inset: #f0f0f2;
+  --docs-code-bg: #f7f7f8;
+  --docs-text: #0e0e12;
+  --docs-text-muted: #64646e;
+  --docs-text-faint: #8b8b94;
+  --docs-line: rgba(14, 14, 18, 0.09);
+  --docs-line-strong: rgba(14, 14, 18, 0.16);
+  --docs-line-solid: #e9e9eb;
+  --docs-accent: #5b3df5;
+  --docs-accent-text: #4a2be0;
+  --docs-accent-underline: rgba(74, 43, 224, 0.32);
+  --docs-focus: #5b3df5;
+  --docs-selection: rgba(91, 61, 245, 0.18);
+  --docs-scrim: rgba(14, 14, 18, 0.32);
+  --docs-image-outline: rgba(0, 0, 0, 0.08);
+  --docs-code-tint: rgba(14, 14, 18, 0.06);
+
+  --docs-warn-bg: #fdf8f0;
+  --docs-warn-line: rgba(180, 83, 9, 0.24);
+  --docs-warn-ink: #a34b08;
+  --docs-info-bg: #f6f4ff;
+  --docs-info-line: rgba(91, 61, 245, 0.2);
+  --docs-info-ink: #4a2be0;
+  --docs-note-bg: #f7f7f8;
+  --docs-note-line: rgba(14, 14, 18, 0.1);
+  --docs-note-ink: #64646e;
+  --docs-tip-bg: #f1f8f4;
+  --docs-tip-line: rgba(15, 138, 95, 0.24);
+  --docs-tip-ink: #0a7650;
+  --docs-required: #a34b08;
+
+  --docs-topbar-h: 56px;
+  --docs-side-w: 264px;
+  --docs-rail-w: 248px;
+  /* The reading measure. Neue Montreal is narrow and its "0" is wide, so a literal
+     68ch here runs ~88 characters a line; 38rem at 17px holds ~75. */
+  --docs-measure: 38rem;
+
+  color-scheme: light;
 }
 
 @media (prefers-color-scheme: dark) {
-  html:not([data-theme]) .maren-docs {
-    --docs-accent: #8b77ff;
-    --docs-accent-soft: rgba(139, 119, 255, 0.14);
-    --docs-accent-line: rgba(139, 119, 255, 0.28);
-    --docs-bg: #0b0b10;
-    --docs-bg-side: #0e0e14;
-    --docs-bg-card: #14141c;
-    --docs-bg-code: #13131b;
-    --docs-ink: #e9e9f1;
-    --docs-ink-soft: #a6a6ba;
-    --docs-ink-faint: #70708a;
+  .maren-docs:not([data-theme='light']) {
+    --docs-bg: #0e0e12;
+    --docs-side-bg: #131317;
+    --docs-side-hover: #1a1a1f;
+    --docs-side-active: #222228;
+    --docs-bg-subtle: #15151a;
+    --docs-bg-inset: #1d1d23;
+    --docs-code-bg: #131317;
+    --docs-text: #ededf2;
+    --docs-text-muted: #9d9da8;
+    --docs-text-faint: #6c6c76;
     --docs-line: rgba(255, 255, 255, 0.08);
-    --docs-line-strong: rgba(255, 255, 255, 0.14);
-    --docs-warn-bg: #241a0d;
-    --docs-warn-line: #6b4e22;
-    --docs-warn-ink: #f0c886;
-    --docs-note-bg: #16192b;
-    --docs-note-line: #3a4270;
-    --docs-note-ink: #b9c4f5;
-    --docs-info-bg: #101b2b;
-    --docs-info-line: #2f4a70;
-    --docs-info-ink: #a9c8f2;
-    --docs-tip-bg: #0e2019;
-    --docs-tip-line: #285344;
-    --docs-tip-ink: #7fd6ac;
-    --docs-ok: #34d399;
+    --docs-line-strong: rgba(255, 255, 255, 0.15);
+    --docs-line-solid: #222226;
+    --docs-accent: #7c66ff;
+    --docs-accent-text: #a898ff;
+    --docs-accent-underline: rgba(168, 152, 255, 0.4);
+    --docs-focus: #8f7bff;
+    --docs-selection: rgba(124, 102, 255, 0.34);
+    --docs-scrim: rgba(0, 0, 0, 0.6);
+    --docs-image-outline: rgba(255, 255, 255, 0.08);
+    --docs-code-tint: rgba(255, 255, 255, 0.08);
+
+    --docs-warn-bg: #19140d;
+    --docs-warn-line: rgba(233, 162, 79, 0.26);
+    --docs-warn-ink: #e9a24f;
+    --docs-info-bg: #141322;
+    --docs-info-line: rgba(124, 102, 255, 0.24);
+    --docs-info-ink: #a898ff;
+    --docs-note-bg: #15151a;
+    --docs-note-line: rgba(255, 255, 255, 0.1);
+    --docs-note-ink: #9d9da8;
+    --docs-tip-bg: #0f1a15;
+    --docs-tip-line: rgba(76, 199, 154, 0.26);
+    --docs-tip-ink: #4cc79a;
+    --docs-required: #e9a24f;
+
+    color-scheme: dark;
   }
 }
 
-html[data-theme='dark'] .maren-docs {
-  --docs-accent: #8b77ff;
-  --docs-accent-soft: rgba(139, 119, 255, 0.14);
-  --docs-accent-line: rgba(139, 119, 255, 0.28);
-  --docs-bg: #0b0b10;
-  --docs-bg-side: #0e0e14;
-  --docs-bg-card: #14141c;
-  --docs-bg-code: #13131b;
-  --docs-ink: #e9e9f1;
-  --docs-ink-soft: #a6a6ba;
-  --docs-ink-faint: #70708a;
+.maren-docs[data-theme='dark'] {
+  --docs-bg: #0e0e12;
+  --docs-side-bg: #131317;
+  --docs-side-hover: #1a1a1f;
+  --docs-side-active: #222228;
+  --docs-bg-subtle: #15151a;
+  --docs-bg-inset: #1d1d23;
+  --docs-code-bg: #131317;
+  --docs-text: #ededf2;
+  --docs-text-muted: #9d9da8;
+  --docs-text-faint: #6c6c76;
   --docs-line: rgba(255, 255, 255, 0.08);
-  --docs-line-strong: rgba(255, 255, 255, 0.14);
-  --docs-warn-bg: #241a0d;
-  --docs-warn-line: #6b4e22;
-  --docs-warn-ink: #f0c886;
-  --docs-note-bg: #16192b;
-  --docs-note-line: #3a4270;
-  --docs-note-ink: #b9c4f5;
-  --docs-info-bg: #101b2b;
-  --docs-info-line: #2f4a70;
-  --docs-info-ink: #a9c8f2;
-  --docs-tip-bg: #0e2019;
-  --docs-tip-line: #285344;
-  --docs-tip-ink: #7fd6ac;
-  --docs-ok: #34d399;
+  --docs-line-strong: rgba(255, 255, 255, 0.15);
+  --docs-line-solid: #222226;
+  --docs-accent: #7c66ff;
+  --docs-accent-text: #a898ff;
+  --docs-accent-underline: rgba(168, 152, 255, 0.4);
+  --docs-focus: #8f7bff;
+  --docs-selection: rgba(124, 102, 255, 0.34);
+  --docs-scrim: rgba(0, 0, 0, 0.6);
+  --docs-image-outline: rgba(255, 255, 255, 0.08);
+  --docs-code-tint: rgba(255, 255, 255, 0.08);
+
+  --docs-warn-bg: #19140d;
+  --docs-warn-line: rgba(233, 162, 79, 0.26);
+  --docs-warn-ink: #e9a24f;
+  --docs-info-bg: #141322;
+  --docs-info-line: rgba(124, 102, 255, 0.24);
+  --docs-info-ink: #a898ff;
+  --docs-note-bg: #15151a;
+  --docs-note-line: rgba(255, 255, 255, 0.1);
+  --docs-note-ink: #9d9da8;
+  --docs-tip-bg: #0f1a15;
+  --docs-tip-line: rgba(76, 199, 154, 0.26);
+  --docs-tip-ink: #4cc79a;
+  --docs-required: #e9a24f;
+
+  color-scheme: dark;
 }
 
-html[data-theme='light'] .maren-docs {
-  --docs-accent: #5b3df5;
-  --docs-accent-soft: rgba(91, 61, 245, 0.1);
-  --docs-accent-line: rgba(91, 61, 245, 0.22);
-  --docs-bg: #fbfbfd;
-  --docs-bg-side: #f6f6fa;
-  --docs-bg-card: #ffffff;
-  --docs-bg-code: #f4f4f8;
-  --docs-ink: #191922;
-  --docs-ink-soft: #56566a;
-  --docs-ink-faint: #8a8a9c;
-  --docs-line: rgba(20, 18, 45, 0.09);
-  --docs-line-strong: rgba(20, 18, 45, 0.14);
-  --docs-warn-bg: #fef6ec;
-  --docs-warn-line: #e9b872;
-  --docs-warn-ink: #92500b;
-  --docs-note-bg: #eef1fe;
-  --docs-note-line: #9db0f5;
-  --docs-note-ink: #33417f;
-  --docs-info-bg: #eef6fe;
-  --docs-info-line: #9cc4f2;
-  --docs-info-ink: #235087;
-  --docs-tip-bg: #e9f8f0;
-  --docs-tip-line: #86d3ac;
-  --docs-tip-ink: #0b6b45;
-  --docs-ok: #0f9d6a;
+/* The canvas behind the docs (overscroll, the strip under iOS toolbars) matches the
+   theme, only while the docs are mounted. */
+html:has(.maren-docs) {
+  scroll-padding-top: 0;
+  background-color: #ffffff;
+}
+html:has(.maren-docs[data-theme='dark']) {
+  background-color: #0e0e12;
+  color-scheme: dark;
+}
+@media (prefers-color-scheme: dark) {
+  html:has(.maren-docs:not([data-theme])) {
+    background-color: #0e0e12;
+    color-scheme: dark;
+  }
+}
+html:has(.maren-docs) body {
+  background-color: transparent;
 }
 
-.maren-docs *,
-.maren-docs *::before,
-.maren-docs *::after {
-  box-sizing: border-box;
+/* Switching theme repaints in one step instead of animating every colour. The toggle's
+   own glyphs keep their cross-fade. */
+.maren-docs[data-theme-switching] *:not(.doc-theme-icon),
+.maren-docs[data-theme-switching] *::before,
+.maren-docs[data-theme-switching] *::after {
+  transition: none !important;
+}
+
+/* ---------------------------------------------------------------- base */
+
+.maren-docs {
+  min-height: 100dvh;
+  background-color: var(--docs-bg);
+  color: var(--docs-text);
+  font-size: 15px;
+  line-height: 1.6;
+}
+
+.maren-docs ::selection {
+  background-color: var(--docs-selection);
+  color: var(--docs-text);
+}
+
+.maren-docs :focus-visible {
+  outline-color: var(--docs-focus);
+  border-radius: 0;
 }
 
 .maren-docs a {
-  color: var(--docs-accent);
+  color: inherit;
   text-decoration: none;
 }
-.maren-docs a:hover {
-  text-decoration: underline;
+
+/* The blueprint label: small, mono, tracked capitals. Section names get brackets. */
+.doc-label,
+.doc-navgroup-title,
+.doc-toc-title,
+.doc-toc-fold-label,
+.doc-eyebrow {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  line-height: 16px;
+  font-weight: 400;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--docs-text-muted);
+  font-variant-numeric: normal;
+}
+.doc-navgroup-title::before,
+.doc-toc-title::before,
+.doc-toc-fold-label::before,
+.doc-eyebrow::before {
+  content: '[\00a0';
+}
+.doc-navgroup-title::after,
+.doc-toc-title::after,
+.doc-toc-fold-label::after,
+.doc-eyebrow::after {
+  content: '\00a0]';
+}
+
+/* ---------------------------------------------------------------- shell */
+
+.doc-shell {
+  display: grid;
+  grid-template-columns: var(--docs-side-w) minmax(0, 1fr);
+  min-height: 100dvh;
+}
+
+/* The top bar continues the sidebar column: its left cell is the same grey, with the
+   same hairline at its edge, so the column reads as one strip from top to bottom. */
+.doc-topbar {
+  position: sticky;
+  top: 0;
+  z-index: 30;
+  grid-column: 1 / -1;
+  grid-row: 1;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  height: var(--docs-topbar-h);
+  padding-inline: 20px 12px;
+  background:
+    linear-gradient(
+        to right,
+        transparent calc(var(--docs-side-w) - 1px),
+        var(--docs-line) calc(var(--docs-side-w) - 1px),
+        var(--docs-line) var(--docs-side-w),
+        transparent var(--docs-side-w)
+      )
+      no-repeat,
+    linear-gradient(to right, var(--docs-side-bg) var(--docs-side-w), var(--docs-bg) 0) no-repeat;
+  border-bottom: 1px solid var(--docs-line);
+}
+
+.doc-brand {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  height: 40px;
+  padding-inline: 4px;
+  margin-inline-start: -4px;
+  font-size: 16px;
+  font-weight: 500;
+  letter-spacing: -0.02em;
+  color: var(--docs-text);
+  white-space: nowrap;
+}
+.doc-mark {
+  display: block;
+  flex: none;
+  height: 20px;
+  width: auto;
+}
+.doc-brand-sub {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  font-weight: 400;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--docs-text-muted);
+}
+.doc-brand-sub::before {
+  content: '';
+  display: inline-block;
+  width: 1px;
+  height: 14px;
+  margin-inline-end: 10px;
+  vertical-align: -3px;
+  background-color: var(--docs-line-strong);
+}
+
+.doc-topbar-spacer {
+  flex: 1;
+}
+
+.doc-topbar-links {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+}
+
+.doc-toplink {
+  display: inline-flex;
+  align-items: center;
+  height: 36px;
+  padding-inline: 12px;
+  font-size: 14px;
+  color: var(--docs-text-muted);
+  white-space: nowrap;
+}
+
+.doc-topbar-sep {
+  width: 1px;
+  height: 20px;
+  margin-inline: 8px;
+  background-color: var(--docs-line);
+}
+
+.doc-iconbtn {
+  position: relative;
+  display: inline-grid;
+  place-items: center;
+  flex: none;
+  width: 40px;
+  height: 40px;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--docs-text-muted);
+  cursor: pointer;
+  transition: scale 150ms ease-out;
+}
+.doc-iconbtn:active {
+  scale: 0.96;
+}
+
+.doc-menu-btn {
+  display: none;
+}
+.doc-menu-btn,
+.doc-drawer-close {
+  margin-inline: -8px 4px;
+}
+
+/* Theme toggle: both glyphs are in the DOM; CSS shows the one for the current theme,
+   so the right icon is there on first paint and swaps with a cross-fade. */
+.doc-theme-icon {
+  grid-area: 1 / 1;
+  transition-property: opacity, scale, filter;
+  transition-duration: 200ms;
+  transition-timing-function: ease-out;
+}
+.doc-theme-sun {
+  opacity: 0;
+  scale: 0.25;
+  filter: blur(4px);
+}
+.maren-docs[data-theme='dark'] .doc-theme-sun {
+  opacity: 1;
+  scale: 1;
+  filter: none;
+}
+.maren-docs[data-theme='dark'] .doc-theme-moon {
+  opacity: 0;
+  scale: 0.25;
+  filter: blur(4px);
+}
+@media (prefers-color-scheme: dark) {
+  .maren-docs:not([data-theme]) .doc-theme-sun {
+    opacity: 1;
+    scale: 1;
+    filter: none;
+  }
+  .maren-docs:not([data-theme]) .doc-theme-moon {
+    opacity: 0;
+    scale: 0.25;
+    filter: blur(4px);
+  }
+}
+
+/* ---------------------------------------------------------------- sidebar */
+
+.doc-side {
+  grid-column: 1;
+  grid-row: 2;
+  position: sticky;
+  top: var(--docs-topbar-h);
+  align-self: start;
+  height: calc(100dvh - var(--docs-topbar-h));
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding: 28px 12px 48px;
+  background-color: var(--docs-side-bg);
+  border-inline-end: 1px solid var(--docs-line);
+  scrollbar-width: thin;
+}
+/* The grey column runs the full page height, also below where the sticky panel ends. */
+.doc-shell::before {
+  content: '';
+  grid-column: 1;
+  grid-row: 2;
+  background-color: var(--docs-side-bg);
+  border-inline-end: 1px solid var(--docs-line);
+  pointer-events: none;
+}
+
+.doc-navgroup + .doc-navgroup {
+  margin-top: 28px;
+}
+.doc-navgroup-title {
+  margin: 0 0 8px;
+  padding-inline: 12px;
+}
+.doc-navlink {
+  display: flex;
+  align-items: center;
+  min-height: 32px;
+  padding: 5px 12px;
+  font-size: 14px;
+  line-height: 1.4;
+  color: var(--docs-text-muted);
+}
+.doc-navlink.is-active {
+  background-color: var(--docs-side-active);
+  color: var(--docs-text);
+  font-weight: 500;
+}
+
+/* ---------------------------------------------------------------- page grid */
+
+.doc-main {
+  grid-column: 2;
+  grid-row: 2;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) var(--docs-rail-w);
+  min-width: 0;
+}
+
+/* ---------------------------------------------------------------- article */
+
+.doc {
+  justify-self: center;
+  width: 100%;
+  min-width: 0;
+  max-width: calc(var(--docs-measure) + 96px);
+  padding: 56px 48px 112px;
+  font-size: 17px;
+  line-height: 1.65;
+  overflow-wrap: break-word;
+}
+
+.doc-eyebrow {
+  margin-bottom: 16px;
+}
+
+.doc h1 {
+  margin: 0 0 14px;
+  font-size: 2.5rem;
+  line-height: 1.06;
+  font-weight: 500;
+  letter-spacing: -0.034em;
+  text-wrap: balance;
+}
+
+.doc-lede {
+  margin: 0;
+  font-size: 1.1875rem;
+  line-height: 1.5;
+  letter-spacing: -0.014em;
+  color: var(--docs-text-muted);
+  text-wrap: pretty;
+}
+
+.doc-body {
+  margin-top: 44px;
+  padding-top: 40px;
+  border-top: 1px solid var(--docs-line);
+}
+.doc-body > :first-child {
+  margin-top: 0;
+}
+
+.doc-body h2,
+.doc-body h3,
+.doc-body h4 {
+  font-weight: 500;
+  color: var(--docs-text);
+  text-wrap: balance;
+  scroll-margin-top: calc(var(--docs-topbar-h) + 24px);
+}
+.doc-body h2 {
+  margin: 60px 0 16px;
+  font-size: 1.625rem;
+  line-height: 1.2;
+  letter-spacing: -0.026em;
+}
+.doc-body h3 {
+  margin: 40px 0 12px;
+  font-size: 1.25rem;
+  line-height: 1.3;
+  letter-spacing: -0.018em;
+}
+.doc-body h4 {
+  margin: 32px 0 8px;
+  font-size: 1.0625rem;
+  line-height: 1.45;
+  letter-spacing: -0.012em;
+}
+.doc-body h2 + h3 {
+  margin-top: 24px;
+}
+
+.doc-body p {
+  margin: 0 0 22px;
+}
+
+.doc-body ul,
+.doc-body ol {
+  margin: 0 0 22px;
+  padding-inline-start: 1.25em;
+}
+.doc-body li + li {
+  margin-top: 8px;
+}
+.doc-body li > ul,
+.doc-body li > ol {
+  margin-top: 8px;
+  margin-bottom: 0;
+}
+.doc-body li > p {
+  margin-bottom: 8px;
+}
+.doc-body li > p:last-child {
+  margin-bottom: 0;
+}
+.doc-body li::marker {
+  color: var(--docs-text-faint);
+}
+.doc-body ol > li::marker {
+  font-family: var(--font-mono);
+  font-size: 0.8em;
+  color: var(--docs-text-muted);
+}
+
+.doc strong {
+  font-weight: 500;
+  color: var(--docs-text);
+}
+
+.doc-body hr {
+  margin: 48px 0;
+  border: 0;
+  border-top: 1px solid var(--docs-line);
+}
+
+.doc-body blockquote {
+  margin: 28px 0;
+  padding-inline-start: 18px;
+  border-inline-start: 1px solid var(--docs-line-strong);
+  color: var(--docs-text-muted);
+}
+.doc-body blockquote > :last-child {
+  margin-bottom: 0;
+}
+
+.doc-body img {
+  max-width: 100%;
+  height: auto;
+  outline: 1px solid var(--docs-image-outline);
+  outline-offset: -1px;
+}
+
+/* Prose links: the violet text tone with a soft underline that firms on hover. */
+.doc-lede a,
+.doc-body a:not(.doc-card) {
+  color: var(--docs-accent-text);
+  text-decoration-line: underline;
+  text-decoration-color: var(--docs-accent-underline);
+  text-decoration-thickness: 1px;
+  text-underline-offset: 0.22em;
+  transition: text-decoration-color 150ms ease-out;
 }
 
 /* Inline code */
-.maren-docs .doc-inline,
-.maren-docs :not(pre) > code {
-  font-family: var(--docs-mono);
-  font-size: 0.86em;
-  background: var(--docs-bg-code);
-  padding: 0.12em 0.4em;
-  border-radius: 5px;
-  border: 1px solid var(--docs-line);
+.doc-inline {
+  padding: 0.12em 0.36em;
+  background-color: var(--docs-bg-inset);
+  color: var(--docs-text);
+  font-family: var(--font-mono);
+  font-size: 0.82em;
+  letter-spacing: 0;
+  overflow-wrap: anywhere;
+  -webkit-box-decoration-break: clone;
+  box-decoration-break: clone;
+}
+.doc-body a .doc-inline {
+  color: inherit;
 }
 
-/* ---- shell ---- */
-.maren-docs .doc-shell {
-  display: grid;
-  grid-template-columns: 270px minmax(0, 1fr);
-  min-height: 100%;
-}
+/* ---------------------------------------------------------------- tables */
 
-.maren-docs .doc-topbar {
-  position: sticky;
-  top: 0;
-  z-index: 20;
-  grid-column: 1 / -1;
-  display: flex;
-  align-items: center;
-  gap: 18px;
-  height: 60px;
-  padding: 0 22px;
-  background: color-mix(in srgb, var(--docs-bg) 86%, transparent);
-  backdrop-filter: blur(10px);
-  border-bottom: 1px solid var(--docs-line);
-}
-
-.maren-docs .doc-brand {
-  display: flex;
-  align-items: center;
-  gap: 9px;
-  font-weight: 700;
-  letter-spacing: -0.02em;
-  font-size: 16px;
-  color: var(--docs-ink);
-}
-.maren-docs .doc-brand:hover {
-  text-decoration: none;
-}
-.maren-docs .doc-mark {
-  height: 22px;
-  width: auto;
-  flex: none;
-  display: block;
-}
-
-.maren-docs .doc-search {
-  flex: 1;
-  max-width: 420px;
-  display: flex;
-  align-items: center;
-  gap: 9px;
-  height: 36px;
-  padding: 0 12px;
-  border: 1px solid var(--docs-line-strong);
-  border-radius: 9px;
-  background: var(--docs-bg-card);
-  color: var(--docs-ink-faint);
-  font-size: 13px;
-  cursor: text;
-}
-.maren-docs .doc-search-k {
-  margin-left: auto;
-  font-family: var(--docs-mono);
-  font-size: 11px;
-  color: var(--docs-ink-faint);
-  border: 1px solid var(--docs-line);
-  border-radius: 5px;
-  padding: 1px 6px;
-}
-.maren-docs .doc-topbar-spacer {
-  flex: 1;
-}
-.maren-docs .doc-toplink {
-  display: inline-flex;
-  align-items: center;
-  gap: 7px;
-  color: var(--docs-ink-soft);
-  font-size: 13.5px;
-  font-weight: 500;
-}
-.maren-docs .doc-toplink:hover {
-  color: var(--docs-ink);
-  text-decoration: none;
-}
-.maren-docs .doc-tbtn,
-.maren-docs .doc-menu-btn {
-  display: grid;
-  place-items: center;
-  width: 34px;
-  height: 34px;
-  border-radius: 8px;
-  border: 1px solid var(--docs-line);
-  background: var(--docs-bg-card);
-  color: var(--docs-ink-soft);
-  cursor: pointer;
-  flex: none;
-}
-.maren-docs .doc-tbtn:hover,
-.maren-docs .doc-menu-btn:hover {
-  color: var(--docs-ink);
-  border-color: var(--docs-line-strong);
-}
-.maren-docs .doc-menu-btn {
-  display: none;
-}
-
-/* ---- sidebar ---- */
-.maren-docs .doc-side {
-  position: sticky;
-  top: 60px;
-  align-self: start;
-  height: calc(100vh - 60px);
-  overflow-y: auto;
-  padding: 22px 14px 40px 22px;
-  background: var(--docs-bg-side);
-  border-right: 1px solid var(--docs-line);
-}
-.maren-docs .doc-navgroup {
-  margin-bottom: 20px;
-}
-.maren-docs .doc-navgroup-title {
-  margin: 0 0 6px;
-  padding: 0 10px;
-  font-size: 11px;
-  font-weight: 700;
-  letter-spacing: 0.09em;
-  text-transform: uppercase;
-  color: var(--docs-ink-faint);
-}
-.maren-docs .doc-navlink {
-  display: block;
-  padding: 6px 10px;
-  border-radius: 7px;
-  font-size: 13.5px;
-  color: var(--docs-ink-soft);
-  font-weight: 450;
-}
-.maren-docs .doc-navlink:hover {
-  background: var(--docs-accent-soft);
-  color: var(--docs-ink);
-  text-decoration: none;
-}
-.maren-docs .doc-navlink.is-active {
-  background: var(--docs-accent-soft);
-  color: var(--docs-accent);
-  font-weight: 600;
-}
-
-/* ---- content ---- */
-.maren-docs .doc-main {
-  display: grid;
-  /* Size the content column to the reading measure, not to 1fr, so the on-page
-     TOC sits next to the text instead of being flung to the far edge with a chasm
-     between. The whole reading block is then centred, with balanced outer margins. */
-  grid-template-columns: minmax(0, var(--docs-measure)) 224px;
-  gap: 56px;
-  justify-content: center;
-  max-width: 1180px;
-  margin-inline: auto;
-  padding: 40px 44px 100px;
-}
-.maren-docs .doc {
-  max-width: var(--docs-measure);
-  min-width: 0;
-}
-.maren-docs .doc-eyebrow {
-  color: var(--docs-accent);
-  font-weight: 600;
-  font-size: 13px;
-  letter-spacing: 0.02em;
-  margin-bottom: 8px;
-}
-.maren-docs .doc h1 {
-  font-size: 2.05rem;
-  line-height: 1.12;
-  letter-spacing: -0.025em;
-  margin: 0 0 10px;
-  text-wrap: balance;
-  font-weight: 700;
-}
-.maren-docs .doc-lede {
-  font-size: 1.06rem;
-  color: var(--docs-ink-soft);
-  margin: 0 0 30px;
-  max-width: 40rem;
-}
-.maren-docs .doc h2 {
-  font-size: 1.32rem;
-  letter-spacing: -0.02em;
-  margin: 40px 0 12px;
-  font-weight: 680;
-  scroll-margin-top: 84px;
-}
-.maren-docs .doc h3 {
-  font-size: 1.08rem;
-  letter-spacing: -0.015em;
-  margin: 28px 0 10px;
-  font-weight: 650;
-  scroll-margin-top: 84px;
-}
-.maren-docs .doc p {
-  margin: 0 0 15px;
-}
-.maren-docs .doc h2 + p,
-.maren-docs .doc h3 + p {
-  margin-top: 0;
-}
-.maren-docs .doc ul,
-.maren-docs .doc ol {
-  margin: 0 0 15px;
-  padding-left: 22px;
-}
-.maren-docs .doc li {
-  margin: 4px 0;
-}
-.maren-docs .doc li::marker {
-  color: var(--docs-ink-faint);
-}
-.maren-docs .doc strong {
-  font-weight: 700;
-  color: var(--docs-ink);
-}
-.maren-docs .doc hr {
-  border: none;
-  border-top: 1px solid var(--docs-line);
-  margin: 34px 0;
-}
-.maren-docs .doc blockquote {
-  margin: 20px 0;
-  padding: 2px 16px;
-  border-left: 3px solid var(--docs-accent-line);
-  color: var(--docs-ink-soft);
-}
-
-/* tables */
-.maren-docs .doc-table-wrap {
-  margin: 20px 0;
+.doc-table-wrap {
+  margin: 32px 0;
   overflow-x: auto;
   border: 1px solid var(--docs-line);
-  border-radius: var(--docs-radius);
+  scrollbar-width: thin;
 }
-.maren-docs .doc table {
+.doc-table-wrap table {
   width: 100%;
   border-collapse: collapse;
-  font-size: 13.4px;
-}
-.maren-docs .doc th,
-.maren-docs .doc td {
-  text-align: left;
-  padding: 9px 14px;
-  border-bottom: 1px solid var(--docs-line);
-  vertical-align: top;
-}
-.maren-docs .doc thead th {
-  background: var(--docs-bg-side);
-  font-weight: 650;
-  color: var(--docs-ink);
-  white-space: nowrap;
-}
-.maren-docs .doc tbody tr:last-child td {
-  border-bottom: none;
-}
-.maren-docs .doc td code {
-  white-space: nowrap;
-}
-
-/* callouts */
-.maren-docs .doc-callout {
-  display: grid;
-  grid-template-columns: 22px 1fr;
-  gap: 12px;
-  padding: 15px 17px;
-  border-radius: var(--docs-radius);
-  margin: 22px 0;
   font-size: 14px;
-  line-height: 1.55;
-  border: 1px solid;
-}
-.maren-docs .doc-callout-icon {
-  width: 20px;
-  height: 20px;
-  margin-top: 1px;
-}
-.maren-docs .doc-callout p {
-  margin: 0 0 8px;
-}
-.maren-docs .doc-callout p:last-child {
-  margin-bottom: 0;
-}
-.maren-docs .doc-callout a,
-.maren-docs .doc-callout strong,
-.maren-docs .doc-callout code {
-  color: inherit;
-}
-.maren-docs .doc-callout-warn {
-  background: var(--docs-warn-bg);
-  border-color: var(--docs-warn-line);
-  color: var(--docs-warn-ink);
-}
-.maren-docs .doc-callout-note {
-  background: var(--docs-note-bg);
-  border-color: var(--docs-note-line);
-  color: var(--docs-note-ink);
-}
-.maren-docs .doc-callout-info {
-  background: var(--docs-info-bg);
-  border-color: var(--docs-info-line);
-  color: var(--docs-info-ink);
-}
-.maren-docs .doc-callout-tip {
-  background: var(--docs-tip-bg);
-  border-color: var(--docs-tip-line);
-  color: var(--docs-tip-ink);
-}
-.maren-docs .doc-callout strong {
-  font-weight: 700;
-}
-
-/* cards */
-.maren-docs .doc-cardgroup {
-  display: grid;
-  gap: 14px;
-  margin: 22px 0;
-}
-.maren-docs .doc-cols-2 {
-  grid-template-columns: repeat(2, 1fr);
-}
-.maren-docs .doc-cols-3 {
-  grid-template-columns: repeat(3, 1fr);
-}
-.maren-docs .doc-card {
-  display: block;
-  padding: 17px 18px;
-  border: 1px solid var(--docs-line-strong);
-  border-radius: var(--docs-radius);
-  background: var(--docs-bg-card);
-  transition:
-    border-color 0.12s,
-    transform 0.12s;
-}
-.maren-docs a.doc-card-link:hover {
-  text-decoration: none;
-  border-color: var(--docs-accent);
-  transform: translateY(-1px);
-}
-.maren-docs .doc-card-icon {
-  width: 22px;
-  height: 22px;
-  color: var(--docs-accent);
-  margin-bottom: 10px;
-}
-.maren-docs .doc-card-title {
-  font-weight: 650;
-  color: var(--docs-ink);
-  font-size: 15px;
-  margin-bottom: 4px;
-  letter-spacing: -0.01em;
-}
-.maren-docs .doc-card-body {
-  color: var(--docs-ink-soft);
-  font-size: 13.3px;
   line-height: 1.5;
 }
-.maren-docs .doc-card-body p {
-  margin: 0;
-}
-.maren-docs .doc-card-body code {
-  color: inherit;
-}
-
-/* steps */
-.maren-docs .doc-steps {
-  margin: 22px 0;
-  padding-left: 8px;
-}
-.maren-docs .doc-step {
-  position: relative;
-  display: grid;
-  grid-template-columns: 30px 1fr;
-  gap: 14px;
-  padding-bottom: 22px;
-  counter-increment: docstep;
-}
-.maren-docs .doc-steps {
-  counter-reset: docstep;
-}
-.maren-docs .doc-step::before {
-  content: '';
-  position: absolute;
-  left: 14px;
-  top: 30px;
-  bottom: 0;
-  width: 1px;
-  background: var(--docs-line-strong);
-}
-.maren-docs .doc-step:last-child {
-  padding-bottom: 0;
-}
-.maren-docs .doc-step:last-child::before {
-  display: none;
-}
-.maren-docs .doc-step-marker {
-  position: relative;
-  z-index: 1;
-  width: 28px;
-  height: 28px;
-  border-radius: 999px;
-  background: var(--docs-accent-soft);
-  border: 1px solid var(--docs-accent-line);
-  color: var(--docs-accent);
-  display: grid;
-  place-items: center;
-  font-size: 13px;
-  font-weight: 700;
-  font-family: var(--docs-mono);
-}
-.maren-docs .doc-step-marker::before {
-  content: counter(docstep);
-}
-.maren-docs .doc-step-title {
-  font-weight: 650;
-  color: var(--docs-ink);
-  font-size: 15px;
-  margin: 3px 0 6px;
-  letter-spacing: -0.01em;
-}
-.maren-docs .doc-step-body > :last-child {
-  margin-bottom: 0;
-}
-
-/* API fields */
-.maren-docs .doc-field {
-  padding: 14px 0;
-  border-top: 1px solid var(--docs-line);
-}
-.maren-docs .doc-field:last-of-type {
+.doc-table-wrap th,
+.doc-table-wrap td {
+  padding: 11px 16px;
+  text-align: start;
+  vertical-align: top;
   border-bottom: 1px solid var(--docs-line);
 }
-.maren-docs .doc-field-head {
-  display: flex;
-  align-items: baseline;
-  flex-wrap: wrap;
-  gap: 8px 10px;
+.doc-table-wrap th + th,
+.doc-table-wrap td + td {
+  border-inline-start: 1px solid var(--docs-line);
 }
-.maren-docs .doc-field-name {
-  font-family: var(--docs-mono);
-  font-size: 13px;
-  color: var(--docs-ink);
-  background: var(--docs-bg-code);
-  border: 1px solid var(--docs-line);
-  padding: 2px 7px;
-  border-radius: 6px;
-}
-.maren-docs .doc-field-type {
-  font-family: var(--docs-mono);
-  font-size: 12px;
-  color: var(--docs-accent);
-}
-.maren-docs .doc-field-required {
+.doc-table-wrap thead th {
+  padding-block: 10px;
+  background-color: var(--docs-bg-subtle);
+  font-family: var(--font-mono);
   font-size: 11px;
-  font-weight: 700;
-  letter-spacing: 0.04em;
+  line-height: 16px;
+  font-weight: 400;
+  letter-spacing: 0.08em;
   text-transform: uppercase;
-  color: var(--docs-warn-ink);
+  color: var(--docs-text-muted);
+  white-space: nowrap;
 }
-.maren-docs .doc-field-default {
-  font-size: 12px;
-  color: var(--docs-ink-faint);
+.doc-table-wrap tbody tr:last-child > * {
+  border-bottom: 0;
 }
-.maren-docs .doc-field-body {
-  margin-top: 7px;
-  color: var(--docs-ink-soft);
-  font-size: 13.6px;
-}
-.maren-docs .doc-field-body > :last-child {
-  margin-bottom: 0;
+.doc-table-wrap td .doc-inline {
+  white-space: nowrap;
+  overflow-wrap: normal;
 }
 
-/* frame */
-.maren-docs .doc-frame {
-  margin: 22px 0;
-}
-.maren-docs .doc-frame-inner {
-  padding: 16px;
-  background: var(--docs-bg-side);
-  border: 1px solid var(--docs-line);
-  border-radius: var(--docs-radius);
-}
-.maren-docs .doc-frame img {
-  max-width: 100%;
-  height: auto;
-  display: block;
-  margin: 0 auto;
-}
-.maren-docs .doc-frame-caption {
-  margin-top: 9px;
-  text-align: center;
-  font-size: 12.5px;
-  color: var(--docs-ink-faint);
-}
+/* ---------------------------------------------------------------- callouts */
 
-/* accordion */
-.maren-docs .doc-accgroup {
-  margin: 12px 0;
-}
-.maren-docs .doc-acc {
-  border: 1px solid var(--docs-line-strong);
-  border-radius: var(--docs-radius);
-  margin: 12px 0;
-  background: var(--docs-bg-card);
-  overflow: hidden;
-}
-.maren-docs .doc-acc-summary {
-  list-style: none;
-  cursor: pointer;
-  display: flex;
-  align-items: center;
-  gap: 11px;
-  padding: 14px 17px;
-  font-weight: 600;
-  font-size: 14.5px;
-  color: var(--docs-ink);
-}
-.maren-docs .doc-acc-summary::-webkit-details-marker {
-  display: none;
-}
-.maren-docs .doc-acc-title {
-  min-width: 0;
-}
-.maren-docs .doc-acc-chev {
-  margin-left: auto;
-  color: var(--docs-ink-faint);
-  transition: transform 0.15s;
-  flex: none;
-}
-.maren-docs .doc-acc[open] .doc-acc-chev {
-  transform: rotate(90deg);
-}
-.maren-docs .doc-acc-icon {
-  width: 18px;
-  height: 18px;
-  color: var(--docs-accent);
-  flex: none;
-}
-.maren-docs .doc-acc-body {
-  padding: 0 17px 15px 46px;
-  color: var(--docs-ink-soft);
-  font-size: 13.8px;
+.doc-callout {
+  --tone-bg: var(--docs-note-bg);
+  --tone-line: var(--docs-note-line);
+  --tone-ink: var(--docs-note-ink);
+  margin: 32px 0;
+  padding: 14px 20px 18px;
+  border: 1px solid var(--tone-line);
+  background-color: var(--tone-bg);
+  font-size: 16px;
   line-height: 1.6;
 }
-.maren-docs .doc-acc-body > :last-child {
+.doc-callout-warn {
+  --tone-bg: var(--docs-warn-bg);
+  --tone-line: var(--docs-warn-line);
+  --tone-ink: var(--docs-warn-ink);
+}
+.doc-callout-info {
+  --tone-bg: var(--docs-info-bg);
+  --tone-line: var(--docs-info-line);
+  --tone-ink: var(--docs-info-ink);
+}
+.doc-callout-tip {
+  --tone-bg: var(--docs-tip-bg);
+  --tone-line: var(--docs-tip-line);
+  --tone-ink: var(--docs-tip-ink);
+}
+.doc-callout-label {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 8px;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  line-height: 16px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--tone-ink);
+}
+.doc-callout-icon {
+  flex: none;
+  width: 14px;
+  height: 14px;
+}
+.doc-callout-body > :last-child {
   margin-bottom: 0;
 }
+.doc-callout-body p,
+.doc-callout-body ul,
+.doc-callout-body ol {
+  margin-bottom: 12px;
+}
+.doc-callout .doc-inline {
+  background-color: var(--docs-code-tint);
+}
 
-/* code blocks */
-.maren-docs .doc-code {
-  position: relative;
-  margin: 22px 0;
+/* ---------------------------------------------------------------- cards */
+
+/* A card group is a ruled grid: cells share their hairlines, like a spec sheet. */
+.doc-cardgroup {
+  display: grid;
+  margin: 32px 0;
+  padding: 1px 0 0 1px;
 }
-.maren-docs .doc-pre {
-  margin: 0;
-  padding: 15px 17px;
-  background: var(--docs-bg-code);
-  border: 1px solid var(--docs-line);
-  border-radius: var(--docs-radius);
-  overflow-x: auto;
-  font-family: var(--docs-mono);
-  font-size: 13px;
-  line-height: 1.65;
-  color: var(--docs-ink);
+.doc-cols-1 {
+  grid-template-columns: minmax(0, 1fr);
 }
-.maren-docs .doc-pre code {
-  font-family: inherit;
-  font-size: inherit;
-  background: none;
-  border: none;
-  padding: 0;
+.doc-cols-2 {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+/* Three across does not fit a reading measure without crushing the text, so a cols=3
+   group becomes ruled rows, like cols=1. */
+.doc-cols-3 {
+  grid-template-columns: minmax(0, 1fr);
+}
+.doc-cols-1 > .doc-card:has(> .doc-card-icon),
+.doc-cols-3 > .doc-card:has(> .doc-card-icon) {
+  display: grid;
+  grid-template-columns: 18px minmax(0, 1fr);
+  column-gap: 16px;
+  align-content: start;
+}
+.doc-cols-1 > .doc-card > .doc-card-icon,
+.doc-cols-3 > .doc-card > .doc-card-icon {
+  grid-row: span 2;
+  margin: 2px 0 0;
+}
+.doc-cardgroup > .doc-card {
+  margin: -1px 0 0 -1px;
+}
+
+.doc-card {
+  display: flex;
+  flex-direction: column;
+  margin: 16px 0;
+  padding: 18px 20px 20px;
+  border: 1px solid var(--docs-line-solid);
+  background-color: var(--docs-bg);
+  color: var(--docs-text);
+  transition: background-color 150ms ease-out;
+}
+.doc-card-icon {
+  display: block;
+  flex: none;
+  width: 18px;
+  height: 18px;
+  margin-bottom: 20px;
+  color: var(--docs-text-muted);
+}
+.doc-card-title {
+  margin-bottom: 6px;
+  font-size: 16px;
+  line-height: 1.35;
+  font-weight: 500;
+  letter-spacing: -0.014em;
+  color: var(--docs-text);
+}
+.doc-card-body {
+  font-size: 14px;
+  line-height: 1.55;
+  color: var(--docs-text-muted);
+}
+.doc-card-body > :last-child {
+  margin-bottom: 0;
+}
+.doc-card-body p {
+  margin: 0 0 8px;
+}
+.doc-card-body .doc-inline {
   color: inherit;
-  white-space: pre;
 }
-.maren-docs .doc-code-lang {
-  position: absolute;
-  top: 9px;
-  right: 46px;
-  font-family: var(--docs-mono);
-  font-size: 11px;
-  letter-spacing: 0.04em;
-  text-transform: uppercase;
-  color: var(--docs-ink-faint);
-  pointer-events: none;
+a.doc-card .doc-card-title::after {
+  content: '\2192';
+  display: inline-block;
+  margin-inline-start: 6px;
+  color: var(--docs-text-faint);
+  transition: translate 150ms ease-out;
 }
-.maren-docs .doc-copy {
+
+/* ---------------------------------------------------------------- steps */
+
+.doc-steps {
+  margin: 36px 0;
+  counter-reset: docstep;
+}
+.doc-step {
+  position: relative;
+  display: grid;
+  grid-template-columns: 28px minmax(0, 1fr);
+  column-gap: 18px;
+  padding-bottom: 28px;
+  counter-increment: docstep;
+}
+.doc-step::before {
+  content: '';
   position: absolute;
-  top: 8px;
-  right: 8px;
+  inset-inline-start: 13.5px;
+  top: 28px;
+  bottom: 0;
+  width: 1px;
+  background-color: var(--docs-line-strong);
+}
+.doc-step:last-child {
+  padding-bottom: 0;
+}
+.doc-step:last-child::before {
+  display: none;
+}
+.doc-step-marker {
   display: grid;
   place-items: center;
   width: 28px;
   height: 28px;
-  border-radius: 7px;
-  border: 1px solid var(--docs-line);
-  background: var(--docs-bg-card);
-  color: var(--docs-ink-soft);
-  cursor: pointer;
-  opacity: 0;
-  transition: opacity 0.12s;
-}
-.maren-docs .doc-code:hover .doc-copy,
-.maren-docs .doc-copy:focus-visible {
-  opacity: 1;
-}
-.maren-docs .doc-copy:hover {
-  color: var(--docs-ink);
-  border-color: var(--docs-line-strong);
-}
-
-/* tabbed strips shared by Tabs and CodeGroup */
-.maren-docs .doc-tabs,
-.maren-docs .doc-codegroup {
-  margin: 22px 0;
   border: 1px solid var(--docs-line-strong);
-  border-radius: var(--docs-radius);
-  overflow: hidden;
+  background-color: var(--docs-bg);
+  font-family: var(--font-mono);
+  font-size: 11px;
+  letter-spacing: 0.02em;
+  color: var(--docs-text);
 }
-.maren-docs .doc-tabstrip {
-  display: flex;
-  gap: 2px;
-  padding: 6px 6px 0;
-  background: var(--docs-bg-side);
-  border-bottom: 1px solid var(--docs-line);
-  overflow-x: auto;
+.doc-step-marker::before {
+  content: counter(docstep, decimal-leading-zero);
 }
-.maren-docs .doc-tabbtn {
-  appearance: none;
-  border: none;
-  background: none;
-  cursor: pointer;
-  padding: 8px 12px;
-  font-size: 13px;
-  font-weight: 550;
-  color: var(--docs-ink-soft);
-  border-bottom: 2px solid transparent;
-  white-space: nowrap;
-  font-family: inherit;
+.doc-step-title {
+  margin: 1px 0 6px;
+  font-size: 17px;
+  line-height: 1.5;
+  font-weight: 500;
+  letter-spacing: -0.014em;
+  color: var(--docs-text);
 }
-.maren-docs .doc-tabbtn:hover {
-  color: var(--docs-ink);
-}
-.maren-docs .doc-tabbtn.is-active {
-  color: var(--docs-accent);
-  border-bottom-color: var(--docs-accent);
-}
-.maren-docs .doc-tabpanel {
-  padding: 16px 17px;
-}
-.maren-docs .doc-tabpanel > :first-child {
-  margin-top: 0;
-}
-.maren-docs .doc-tabpanel > :last-child {
+.doc-step-body > :last-child {
   margin-bottom: 0;
 }
-.maren-docs .doc-codegroup .doc-code {
-  margin: 0;
+
+/* ---------------------------------------------------------------- API fields */
+
+.doc-field {
+  padding: 16px 0;
+  border-top: 1px solid var(--docs-line);
 }
-.maren-docs .doc-codegroup .doc-pre {
-  border: none;
-  border-radius: 0;
+.doc-field:last-of-type {
+  border-bottom: 1px solid var(--docs-line);
 }
-.maren-docs .doc-codegroup .doc-code-lang {
-  display: none;
+.doc-field + :not(.doc-field) {
+  margin-top: 28px;
+}
+.doc-field-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 6px 12px;
+}
+.doc-field-name {
+  padding: 2px 7px;
+  background-color: var(--docs-bg-inset);
+  font-family: var(--font-mono);
+  font-size: 13px;
+  letter-spacing: 0;
+  color: var(--docs-text);
+}
+.doc-field-type {
+  font-family: var(--font-mono);
+  font-size: 12px;
+  letter-spacing: 0;
+  color: var(--docs-text-muted);
+}
+.doc-field-required {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--docs-required);
+}
+.doc-field-default {
+  font-family: var(--font-mono);
+  font-size: 12px;
+  letter-spacing: 0;
+  color: var(--docs-text-muted);
+}
+.doc-field-body {
+  margin-top: 8px;
+  font-size: 16px;
+  line-height: 1.6;
+}
+.doc-field-body > :last-child {
+  margin-bottom: 0;
 }
 
-/* unknown component fallback */
-.maren-docs .doc-unknown {
-  margin: 18px 0;
+/* ---------------------------------------------------------------- frame */
+
+.doc-frame {
+  margin: 32px 0;
+}
+.doc-frame-inner {
+  padding: 16px;
+  border: 1px solid var(--docs-line);
+  background-color: var(--docs-bg-subtle);
+}
+.doc-frame img {
+  display: block;
+  max-width: 100%;
+  height: auto;
+  margin-inline: auto;
+}
+.doc-frame-caption {
+  margin-top: 10px;
+  text-align: center;
+  font-size: 13px;
+  color: var(--docs-text-muted);
+}
+
+/* ---------------------------------------------------------------- accordion */
+
+.doc-acc,
+.doc-accgroup {
+  margin: 32px 0;
+  border: 1px solid var(--docs-line);
+}
+.doc-accgroup > .doc-acc {
+  margin: 0;
+  border: 0;
+}
+.doc-accgroup > .doc-acc + .doc-acc {
+  border-top: 1px solid var(--docs-line);
+}
+.doc-acc-summary {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-height: 52px;
+  padding: 14px 16px 14px 18px;
+  list-style: none;
+  cursor: pointer;
+  font-size: 16px;
+  line-height: 1.45;
+  font-weight: 500;
+  letter-spacing: -0.012em;
+  color: var(--docs-text);
+}
+.doc-acc-summary:focus-visible {
+  outline-offset: -2px;
+}
+.doc-acc-summary::-webkit-details-marker {
+  display: none;
+}
+.doc-acc-icon {
+  flex: none;
+  width: 18px;
+  height: 18px;
+  color: var(--docs-text-muted);
+}
+.doc-acc-title {
+  min-width: 0;
+}
+.doc-acc-chev {
+  flex: none;
+  margin-inline-start: auto;
+  color: var(--docs-text-muted);
+  transition: rotate 200ms ease-out;
+}
+.doc-acc[open] > .doc-acc-summary .doc-acc-chev {
+  rotate: 90deg;
+}
+.doc-acc-body {
+  padding: 0 20px 20px 18px;
+  font-size: 16px;
+  line-height: 1.65;
+}
+.doc-acc:has(> .doc-acc-summary .doc-acc-icon) > .doc-acc-body {
+  padding-inline-start: 48px;
+}
+.doc-acc-body > :last-child {
+  margin-bottom: 0;
+}
+
+/* ---------------------------------------------------------------- code */
+
+.doc-code {
+  position: relative;
+  margin: 32px 0;
+  border: 1px solid var(--docs-line);
+  background-color: var(--docs-code-bg);
+}
+.doc-code-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  height: 40px;
+  padding-inline: 16px 4px;
+  border-bottom: 1px solid var(--docs-line);
+}
+.doc-code-lang {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  line-height: 16px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--docs-text-muted);
+}
+.doc-code-float {
+  position: absolute;
+  top: 4px;
+  inset-inline-end: 4px;
+}
+.doc-pre {
+  margin: 0;
+  padding: 16px 20px 18px;
+  overflow-x: auto;
+  font-family: var(--font-mono);
+  font-size: 13px;
+  line-height: 1.7;
+  letter-spacing: 0;
+  color: var(--docs-text);
+  tab-size: 2;
+  scrollbar-width: thin;
+}
+.doc-code-float + .doc-pre {
+  padding-inline-end: 52px;
+}
+.doc-pre code {
+  font: inherit;
+  white-space: pre;
+}
+
+/* Copy: a quiet 32px control (a 44px hit area), the glyphs cross-fade. */
+.doc-copy {
+  position: relative;
+  display: inline-grid;
+  place-items: center;
+  flex: none;
+  width: 32px;
+  height: 32px;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--docs-text-muted);
+  cursor: pointer;
+  transition: scale 150ms ease-out;
+}
+.doc-copy::after {
+  content: '';
+  position: absolute;
+  inset: -6px;
+}
+.doc-copy:active {
+  scale: 0.96;
+}
+.doc-copy-icon {
+  grid-area: 1 / 1;
+  transition-property: opacity, scale, filter;
+  transition-duration: 200ms;
+  transition-timing-function: ease-out;
+}
+.doc-copy-done {
+  opacity: 0;
+  scale: 0.25;
+  filter: blur(4px);
+}
+.doc-copy[data-copied] .doc-copy-idle {
+  opacity: 0;
+  scale: 0.25;
+  filter: blur(4px);
+}
+.doc-copy[data-copied] .doc-copy-done {
+  opacity: 1;
+  scale: 1;
+  filter: none;
+  color: var(--docs-text);
+}
+
+/* ---------------------------------------------------------------- tabs */
+
+.doc-tabs,
+.doc-codegroup {
+  margin: 32px 0;
+  border: 1px solid var(--docs-line);
+}
+.doc-codegroup {
+  background-color: var(--docs-code-bg);
+}
+.doc-tabbar {
+  display: flex;
+  align-items: center;
+  border-bottom: 1px solid var(--docs-line);
+}
+.doc-tabs > .doc-tabbar {
+  background-color: var(--docs-bg-subtle);
+}
+.doc-tabbar > .doc-copy {
+  margin-inline: 8px 4px;
+}
+.doc-tabstrip {
+  display: flex;
+  flex: 1;
+  min-width: 0;
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+.doc-tabbtn {
+  position: relative;
+  flex: none;
+  height: 40px;
+  padding: 0 16px;
+  border: 0;
+  border-inline-end: 1px solid var(--docs-line);
+  background: none;
+  cursor: pointer;
+  font: inherit;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  line-height: 16px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--docs-text-muted);
+  white-space: nowrap;
+}
+.doc-tabbtn:focus-visible {
+  outline-offset: -2px;
+}
+.doc-tabbtn.is-active {
+  background-color: var(--docs-bg);
+  color: var(--docs-text);
+}
+.doc-codegroup .doc-tabbtn.is-active {
+  background-color: var(--docs-code-bg);
+}
+.doc-tabbtn.is-active::after {
+  content: '';
+  position: absolute;
+  inset-inline: 0;
+  bottom: -1px;
+  height: 1px;
+  background-color: inherit;
+}
+.doc-tabbtn.is-active::before {
+  content: '';
+  position: absolute;
+  inset-inline: 0;
+  top: 0;
+  height: 2px;
+  background-color: var(--docs-text);
+}
+.doc-codegroup .doc-tabbar {
+  background-color: var(--docs-bg-subtle);
+}
+.doc-tabpanel {
+  padding: 20px;
+}
+.doc-tabpanel > :first-child {
+  margin-top: 0;
+}
+.doc-tabpanel > :last-child {
+  margin-bottom: 0;
+}
+.doc-codegroup .doc-code {
+  margin: 0;
+  border: 0;
+  background: none;
+}
+
+/* ---------------------------------------------------------------- unknown component */
+
+.doc-unknown {
+  margin: 28px 0;
   padding: 14px 16px;
   border: 1px dashed var(--docs-line-strong);
-  border-radius: var(--docs-radius);
-  color: var(--docs-ink-soft);
+  color: var(--docs-text-muted);
 }
-.maren-docs .doc-unknown-tag {
+.doc-unknown-tag {
   display: inline-block;
-  margin-right: 8px;
-  font-family: var(--docs-mono);
-  font-size: 11px;
-  color: var(--docs-accent);
-  background: var(--docs-accent-soft);
+  margin-inline-end: 8px;
   padding: 1px 6px;
-  border-radius: 5px;
+  background-color: var(--docs-bg-inset);
+  font-family: var(--font-mono);
+  font-size: 12px;
+  color: var(--docs-text);
 }
 
-/* right TOC */
-.maren-docs .doc-toc {
+/* ---------------------------------------------------------------- on-page TOC */
+
+.doc-rail {
+  border-inline-start: 1px solid var(--docs-line);
+}
+.doc-toc {
   position: sticky;
-  top: 100px;
-  align-self: start;
-  font-size: 13px;
+  top: var(--docs-topbar-h);
+  max-height: calc(100dvh - var(--docs-topbar-h));
+  overflow-y: auto;
+  padding: 56px 24px 32px;
+  scrollbar-width: none;
 }
-.maren-docs .doc-toc-title {
-  margin: 0 0 10px;
-  font-size: 11px;
-  letter-spacing: 0.09em;
-  text-transform: uppercase;
-  color: var(--docs-ink-faint);
-  font-weight: 700;
+.doc-toc-title {
+  margin: 0 0 14px;
 }
-.maren-docs .doc-toc-link {
+.doc-toc-list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  border-inline-start: 1px solid var(--docs-line);
+}
+.doc-toc-link {
+  position: relative;
   display: block;
-  padding: 4px 0 4px 12px;
-  color: var(--docs-ink-soft);
-  border-left: 2px solid var(--docs-line);
-  font-weight: 450;
+  padding: 5px 0 5px 14px;
+  font-size: 13px;
+  line-height: 1.45;
+  color: var(--docs-text-muted);
 }
-.maren-docs .doc-toc-d3 {
-  padding-left: 24px;
+.doc-toc-d3 {
+  padding-inline-start: 26px;
 }
-.maren-docs .doc-toc-link.is-on {
-  color: var(--docs-accent);
-  border-left-color: var(--docs-accent);
+.doc-toc-link.is-on {
+  color: var(--docs-text);
 }
-.maren-docs .doc-toc-link:hover {
-  color: var(--docs-ink);
-  text-decoration: none;
+.doc-toc-link.is-on::before {
+  content: '';
+  position: absolute;
+  inset-block: 0;
+  inset-inline-start: -1px;
+  width: 2px;
+  background-color: var(--docs-accent);
 }
 
-/* mobile drawer */
-.maren-docs .doc-drawer {
-  position: fixed;
-  inset: 0;
-  z-index: 40;
+/* The same list, folded under the lede, for widths without the right rail. */
+.doc-toc-mobile {
+  display: none;
+  margin-top: 32px;
+  border: 1px solid var(--docs-line);
+}
+.doc-toc-mobile > summary {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  min-height: 48px;
+  padding: 0 14px 0 16px;
+  list-style: none;
+  cursor: pointer;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--docs-text-muted);
+}
+.doc-toc-mobile > summary::-webkit-details-marker {
   display: none;
 }
-.maren-docs .doc-drawer-scrim {
-  position: absolute;
-  inset: 0;
-  background: rgba(8, 8, 12, 0.5);
+.doc-toc-mobile > summary:focus-visible {
+  outline-offset: -2px;
 }
-.maren-docs .doc-drawer-panel {
-  position: absolute;
-  top: 0;
-  left: 0;
-  bottom: 0;
-  width: 280px;
-  max-width: 84vw;
-  overflow-y: auto;
-  padding: 20px 16px 40px;
-  background: var(--docs-bg-side);
-  border-right: 1px solid var(--docs-line);
+.doc-toc-mobile > summary svg {
+  transition: rotate 200ms ease-out;
+}
+.doc-toc-mobile[open] > summary {
+  border-bottom: 1px solid var(--docs-line);
+}
+.doc-toc-mobile[open] > summary svg {
+  rotate: 90deg;
+}
+.doc-toc-mobile ol {
+  margin: 0;
+  padding: 6px 0 8px;
+  list-style: none;
+}
+.doc-toc-mobile a {
+  display: flex;
+  align-items: center;
+  min-height: 40px;
+  padding: 6px 16px;
+  font-size: 15px;
+  line-height: 1.4;
+  color: var(--docs-text-muted);
+}
+.doc-toc-mobile .doc-toc-d3 {
+  padding-inline-start: 30px;
 }
 
-@media (max-width: 1040px) {
-  .maren-docs .doc-main {
-    grid-template-columns: 1fr;
+/* ---------------------------------------------------------------- pager */
+
+.doc-pager {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  margin-top: 80px;
+  padding: 1px 0 0 1px;
+}
+.doc-pager-link {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin: -1px 0 0 -1px;
+  padding: 16px 20px 18px;
+  border: 1px solid var(--docs-line-solid);
+  color: var(--docs-text);
+  transition: background-color 150ms ease-out;
+}
+.doc-pager-next {
+  grid-column: 2;
+  text-align: end;
+}
+.doc-pager-label {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  line-height: 16px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--docs-text-muted);
+}
+.doc-pager-prev .doc-pager-label::before {
+  content: '\2190\00a0';
+}
+.doc-pager-next .doc-pager-label::after {
+  content: '\00a0\2192';
+}
+.doc-pager-title {
+  font-size: 16px;
+  line-height: 1.4;
+  font-weight: 500;
+  letter-spacing: -0.014em;
+}
+
+/* ---------------------------------------------------------------- drawer */
+
+.doc-drawer {
+  position: fixed;
+  inset: 0;
+  z-index: 50;
+}
+.doc-drawer-scrim {
+  position: absolute;
+  inset: 0;
+  background-color: var(--docs-scrim);
+}
+.doc-drawer-panel {
+  position: absolute;
+  inset-block: 0;
+  inset-inline-start: 0;
+  display: flex;
+  flex-direction: column;
+  width: min(320px, 86vw);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  background-color: var(--docs-side-bg);
+  border-inline-end: 1px solid var(--docs-line);
+}
+.doc-drawer-head {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  display: flex;
+  align-items: center;
+  flex: none;
+  height: var(--docs-topbar-h);
+  padding-inline: 12px 8px;
+  background-color: var(--docs-side-bg);
+  border-bottom: 1px solid var(--docs-line);
+}
+.doc-drawer-body {
+  flex: 1;
+  padding: 24px 8px 16px;
+}
+.doc-drawer-body .doc-navlink {
+  min-height: 44px;
+  font-size: 16px;
+}
+.doc-drawer-foot {
+  display: flex;
+  flex-direction: column;
+  flex: none;
+  padding: 8px 8px calc(16px + env(safe-area-inset-bottom));
+  border-top: 1px solid var(--docs-line);
+}
+.doc-drawer-foot .doc-toplink {
+  height: 44px;
+  font-size: 16px;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .doc-drawer-scrim {
+    animation: doc-fade-in 200ms ease-out;
   }
-  .maren-docs .doc-toc {
+  .doc-drawer-panel {
+    animation: doc-slide-in 260ms var(--ease-entrance, ease-out);
+  }
+}
+@keyframes doc-fade-in {
+  from {
+    opacity: 0;
+  }
+}
+@keyframes doc-slide-in {
+  from {
+    transform: translateX(-100%);
+  }
+}
+
+/* ---------------------------------------------------------------- hover (pointer devices) */
+
+@media (hover: hover) {
+  .doc-toplink:hover,
+  .doc-iconbtn:hover {
+    background-color: var(--docs-bg-inset);
+    color: var(--docs-text);
+  }
+  .doc-navlink:not(.is-active):hover {
+    background-color: var(--docs-side-hover);
+    color: var(--docs-text);
+  }
+  .doc-drawer-head .doc-iconbtn:hover,
+  .doc-drawer-foot .doc-toplink:hover {
+    background-color: var(--docs-side-hover);
+  }
+  .doc-toc-link:not(.is-on):hover,
+  .doc-toc-mobile a:hover {
+    color: var(--docs-text);
+  }
+  .doc-lede a:hover,
+  .doc-body a:not(.doc-card):hover {
+    text-decoration-color: currentColor;
+  }
+  a.doc-card:hover,
+  .doc-pager-link:hover {
+    background-color: var(--docs-bg-subtle);
+  }
+  a.doc-card:hover .doc-card-title::after {
+    translate: 2px 0;
+  }
+  .doc-acc-summary:hover,
+  .doc-toc-mobile > summary:hover {
+    background-color: var(--docs-bg-subtle);
+  }
+  .doc-copy:hover {
+    background-color: var(--docs-bg-inset);
+    color: var(--docs-text);
+  }
+  .doc-tabbtn:not(.is-active):hover {
+    color: var(--docs-text);
+  }
+}
+
+/* ---------------------------------------------------------------- responsive */
+
+@media (max-width: 1199px) {
+  .doc-main {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .doc-rail {
     display: none;
+  }
+  .doc-toc-mobile {
+    display: block;
+  }
+  .doc-toc-mobile + .doc-body {
+    margin-top: 40px;
+    padding-top: 0;
+    border-top: 0;
   }
 }
 
 @media (max-width: 780px) {
-  .maren-docs .doc-shell {
-    grid-template-columns: 1fr;
+  .doc-shell {
+    grid-template-columns: minmax(0, 1fr);
   }
-  .maren-docs .doc-side {
+  .doc-shell::before,
+  .doc-side,
+  .doc-topbar-links,
+  .doc-topbar-sep {
     display: none;
   }
-  .maren-docs .doc-main {
-    padding: 26px 20px 80px;
+  .doc-main {
+    grid-column: 1;
   }
-  .maren-docs .doc-search {
-    display: none;
+  .doc-topbar {
+    padding-inline: 12px 8px;
+    background: var(--docs-bg);
   }
-  .maren-docs .doc-menu-btn {
-    display: grid;
+  .doc-menu-btn {
+    display: inline-grid;
   }
-  .maren-docs .doc-drawer {
-    display: block;
+  .doc-iconbtn {
+    width: 44px;
+    height: 44px;
   }
-  .maren-docs .doc-toplink-label {
-    display: none;
+  .doc {
+    padding: 32px 20px 88px;
+    font-size: 16.5px;
+  }
+  .doc h1 {
+    font-size: 2rem;
+  }
+  .doc-lede {
+    font-size: 1.0625rem;
+  }
+  .doc-body {
+    margin-top: 32px;
+    padding-top: 32px;
+  }
+  .doc-toc-mobile {
+    margin-top: 28px;
+  }
+  .doc-toc-mobile + .doc-body {
+    margin-top: 32px;
+  }
+  .doc-body h2 {
+    margin-top: 48px;
+    font-size: 1.4375rem;
+  }
+  .doc-cols-2,
+  .doc-cols-3 {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .doc-callout {
+    padding: 12px 16px 16px;
+  }
+  .doc-acc:has(> .doc-acc-summary .doc-acc-icon) > .doc-acc-body {
+    padding-inline-start: 18px;
+  }
+  .doc-pre {
+    padding-inline: 16px;
+  }
+  .doc-tabpanel {
+    padding: 16px;
+  }
+  .doc-pager {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .doc-pager-next {
+    grid-column: 1;
   }
 }
 
-@media (prefers-reduced-motion: reduce) {
-  .maren-docs * {
-    transition-duration: 0.001ms !important;
-  }
-}
-
-@media (max-width: 480px) {
-  .maren-docs .doc-topbar {
-    gap: 12px;
-    padding-inline: 12px;
-  }
-  .maren-docs .doc-topbar-spacer {
+@media (min-width: 781px) {
+  .doc-drawer {
     display: none;
-  }
-  .maren-docs .doc-toplink {
-    white-space: nowrap;
-    font-size: 12px;
   }
 }

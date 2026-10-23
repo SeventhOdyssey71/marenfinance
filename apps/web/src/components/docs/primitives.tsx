@@ -49,8 +49,9 @@ export function Card({
   return <div className="doc-card">{inner}</div>;
 }
 
-export function CardGroup({ cols, children }: { cols?: number; children?: ReactNode }) {
-  const n = cols === 3 ? 3 : cols === 2 ? 2 : 1;
+export function CardGroup({ cols, children }: { cols?: number | string; children?: ReactNode }) {
+  const c = Number(cols);
+  const n = c === 3 ? 3 : c === 2 ? 2 : 1;
   return <div className={`doc-cardgroup doc-cols-${n}`}>{children}</div>;
 }
 
@@ -58,10 +59,24 @@ export function CardGroup({ cols, children }: { cols?: number; children?: ReactN
 /* Callouts                                                                    */
 /* -------------------------------------------------------------------------- */
 
-function Callout({ tone, icon, children }: { tone: string; icon: string; children?: ReactNode }) {
+function Callout({
+  tone,
+  icon,
+  label,
+  children,
+}: {
+  tone: string;
+  icon: string;
+  label: string;
+  children?: ReactNode;
+}) {
+  // The label names the kind of callout in words, so its meaning never rests on colour.
   return (
     <div className={`doc-callout doc-callout-${tone}`} role="note">
-      <DocIcon name={icon} className="doc-callout-icon" />
+      <div className="doc-callout-label">
+        <DocIcon name={icon} className="doc-callout-icon" />
+        <span>{label}</span>
+      </div>
       <div className="doc-callout-body">{children}</div>
     </div>
   );
@@ -69,7 +84,7 @@ function Callout({ tone, icon, children }: { tone: string; icon: string; childre
 
 export function Note({ children }: { children?: ReactNode }) {
   return (
-    <Callout tone="note" icon="note">
+    <Callout tone="note" icon="note" label="Note">
       {children}
     </Callout>
   );
@@ -77,7 +92,7 @@ export function Note({ children }: { children?: ReactNode }) {
 
 export function Info({ children }: { children?: ReactNode }) {
   return (
-    <Callout tone="info" icon="info">
+    <Callout tone="info" icon="info" label="Info">
       {children}
     </Callout>
   );
@@ -85,7 +100,7 @@ export function Info({ children }: { children?: ReactNode }) {
 
 export function Tip({ children }: { children?: ReactNode }) {
   return (
-    <Callout tone="tip" icon="tip">
+    <Callout tone="tip" icon="tip" label="Tip">
       {children}
     </Callout>
   );
@@ -93,7 +108,7 @@ export function Tip({ children }: { children?: ReactNode }) {
 
 export function Warning({ children }: { children?: ReactNode }) {
   return (
-    <Callout tone="warn" icon="triangle-exclamation">
+    <Callout tone="warn" icon="triangle-exclamation" label="Warning">
       {children}
     </Callout>
   );
