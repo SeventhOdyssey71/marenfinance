@@ -34,18 +34,18 @@ action per view; inline actions are violet text links. No shadows, no glows, no 
 
 ## Colour (Tailwind token classes; no new hex in components)
 
-| Role | Class |
-| --- | --- |
-| Page (landing, docs) | `bg-bg` (white) |
-| App working field | `bg-canvas` (#f9f9fb), set by the shell |
-| App rail | `bg-rail` (#f4f4f6) |
-| Card | `.card` (white, square, hairline, corner ticks; `.ticks` adds ticks to anything) |
-| Well, input, quiet button | `bg-surface-inset` |
-| Ink fill (dark band, Google button) | `bg-ink` |
-| Text | `text-text`, `text-text-muted`, `text-text-subtle` (decimals/placeholders only) |
-| Accent | `bg-violet-500` fill, `text-violet-400` text, `bg-violet-900` wash |
-| Meaning | `text-success`, `text-warning`, `text-danger`, `text-btc`, `text-musd`, money-in/out |
-| Hairline | `border-[var(--border-hairline)]` |
+| Role                                | Class                                                                                |
+| ----------------------------------- | ------------------------------------------------------------------------------------ |
+| Page (landing, docs)                | `bg-bg` (white)                                                                      |
+| App working field                   | `bg-canvas` (#f9f9fb), set by the shell                                              |
+| App rail                            | `bg-rail` (#f4f4f6)                                                                  |
+| Card                                | `.card` (white, square, hairline, corner ticks; `.ticks` adds ticks to anything)     |
+| Well, input, quiet button           | `bg-surface-inset`                                                                   |
+| Ink fill (dark band, Google button) | `bg-ink`                                                                             |
+| Text                                | `text-text`, `text-text-muted`, `text-text-subtle` (decimals/placeholders only)      |
+| Accent                              | `bg-violet-500` fill, `text-violet-400` text, `bg-violet-900` wash                   |
+| Meaning                             | `text-success`, `text-warning`, `text-danger`, `text-btc`, `text-musd`, money-in/out |
+| Hairline                            | `border-[var(--border-hairline)]`                                                    |
 
 Violet means "this is the action" or "this is the current place". One violet thing per
 view is the default. Status never relies on colour alone: pair it with a word or a sign.

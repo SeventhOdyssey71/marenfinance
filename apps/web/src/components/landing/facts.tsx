@@ -45,7 +45,9 @@ export function Facts() {
               className={`border-[var(--border-hairline)] p-6 md:p-8 ${i > 0 ? 'border-t' : ''} ${i === 1 ? 'sm:border-l sm:border-t-0' : ''} ${i === 3 ? 'sm:border-l' : ''}`}
             >
               <dt className="t-h3">{f.title}</dt>
-              <dd className="text-text-muted mt-2 text-pretty text-base leading-[1.55]">{f.body}</dd>
+              <dd className="text-text-muted mt-2 text-pretty text-base leading-[1.55]">
+                {f.body}
+              </dd>
             </div>
           ))}
         </dl>

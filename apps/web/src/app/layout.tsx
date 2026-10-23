@@ -77,10 +77,7 @@ export const viewport: Viewport = {
 
 export default function RootLayout({ children }: Readonly<{ children: ReactNode }>) {
   return (
-    <html
-      lang="en"
-      className={`${neueMontreal.variable} ${geistMono.variable}`}
-    >
+    <html lang="en" className={`${neueMontreal.variable} ${geistMono.variable}`}>
       <body className="bg-bg text-text antialiased">{children}</body>
     </html>
   );

@@ -38,8 +38,7 @@ const badgeSizing: Record<Size, string> = {
  */
 const variants: Record<Variant, string> = {
   primary: 'bg-violet-500 text-white hover:bg-violet-600',
-  secondary:
-    'bg-surface text-text border border-[var(--border-strong)] hover:bg-surface-inset',
+  secondary: 'bg-surface text-text border border-[var(--border-strong)] hover:bg-surface-inset',
   ghost: 'bg-transparent text-violet-400 hover:text-violet-600',
   dark: 'bg-ink text-white hover:bg-[#25252b]',
 };
@@ -212,7 +211,7 @@ export function TextPill({
   return (
     <Link
       href={href}
-      className={`bg-surface text-text inline-flex h-11 items-center rounded-[var(--radius-control)] border border-[var(--border-strong)] px-5 text-[0.9375rem] hover:bg-surface-inset ${PRESS} ${className}`}
+      className={`bg-surface text-text hover:bg-surface-inset inline-flex h-11 items-center rounded-[var(--radius-control)] border border-[var(--border-strong)] px-5 text-[0.9375rem] ${PRESS} ${className}`}
     >
       {children}
     </Link>

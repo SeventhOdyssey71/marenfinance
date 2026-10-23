@@ -88,7 +88,7 @@ export function HealthScale({
         ))}
         <span
           aria-hidden
-          className={`absolute top-1/2 size-3.5 -translate-x-1/2 -translate-y-1/2 rounded-[var(--radius-pill)] border-2 border-surface ${tone.dot}`}
+          className={`border-surface absolute top-1/2 size-3.5 -translate-x-1/2 -translate-y-1/2 rounded-[var(--radius-pill)] border-2 ${tone.dot}`}
           style={{ left: `${position}%` }}
         />
       </div>

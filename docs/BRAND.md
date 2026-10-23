@@ -93,8 +93,8 @@ the health chip — is coloured.
 
 ### Scale (web)
 
-| Role       | Size / line-height                     | Weight | Tracking   |
-| ---------- | -------------------------------------- | ------ | ---------- |
+| Role       | Size / line-height                      | Weight | Tracking   |
+| ---------- | --------------------------------------- | ------ | ---------- |
 | Display    | `clamp(2.75rem, 6.2vw, 5.25rem)` / 0.98 | 500    | `-0.045em` |
 | H1         | `clamp(1.875rem, 3.4vw, 2.5rem)` / 1.08 | 500    | `-0.032em` |
 | H2         | `clamp(1.5rem, 2.6vw, 1.875rem)` / 1.14 | 500    | `-0.026em` |

@@ -28,16 +28,16 @@ const items: readonly Item[] = [
       <>
         <p>
           Your position is measured by its collateral ratio. Mezo liquidates a trove at{' '}
-          <Em>110%</Em>. Maren’s own liquidation threshold is <Em>140%</Em>: below it, Maren
-          seizes that user’s collateral at a 5% penalty and repays their share of the pooled debt.
+          <Em>110%</Em>. Maren’s own liquidation threshold is <Em>140%</Em>: below it, Maren seizes
+          that user’s collateral at a 5% penalty and repays their share of the pooled debt.
         </p>
         <p>
-          The 30-point buffer means a fast drawdown reaches Maren’s threshold long before it
-          reaches the protocol’s cliff. The app shows your ratio and your distance to 140% on every
-          read. The keeper that acts on it is not automated yet: the contract functions are
-          deployed, but they are run by hand today. If Bitcoin falls far enough and fast enough, a
-          position can still be liquidated. That is the nature of a collateralised loan, and no
-          design removes it.
+          The 30-point buffer means a fast drawdown reaches Maren’s threshold long before it reaches
+          the protocol’s cliff. The app shows your ratio and your distance to 140% on every read.
+          The keeper that acts on it is not automated yet: the contract functions are deployed, but
+          they are run by hand today. If Bitcoin falls far enough and fast enough, a position can
+          still be liquidated. That is the nature of a collateralised loan, and no design removes
+          it.
         </p>
       </>
     ),
@@ -60,12 +60,12 @@ const items: readonly Item[] = [
           could socialise losses across depositors.
         </p>
         <p>
-          The mitigations are the 140/110 buffer, the 0.001 BTC deposit floor, and a
-          protocol-owned insurance buffer funded from the 5% liquidation penalty, which stands at
-          zero because nothing has been liquidated. Automated keeper monitoring is not built yet.
-          These are mitigations, not a guarantee. If you hold more than the protocol minimum, Maren
-          steers you to a direct trove, which carries no pooling risk at all, and the interface
-          says so at the point of decision.
+          The mitigations are the 140/110 buffer, the 0.001 BTC deposit floor, and a protocol-owned
+          insurance buffer funded from the 5% liquidation penalty, which stands at zero because
+          nothing has been liquidated. Automated keeper monitoring is not built yet. These are
+          mitigations, not a guarantee. If you hold more than the protocol minimum, Maren steers you
+          to a direct trove, which carries no pooling risk at all, and the interface says so at the
+          point of decision.
         </p>
       </>
     ),
@@ -99,9 +99,9 @@ const items: readonly Item[] = [
           you can only ever touch Maren’s own contracts, and can never move your Bitcoin.
         </p>
         <p>
-          BTC deposits carry native value and need your own BTC for gas. Payment links and
-          approvals can need gas too. Keep a small testnet BTC balance, and check the fee shown
-          before you sign.
+          BTC deposits carry native value and need your own BTC for gas. Payment links and approvals
+          can need gas too. Keep a small testnet BTC balance, and check the fee shown before you
+          sign.
         </p>
       </>
     ),
@@ -112,8 +112,7 @@ const items: readonly Item[] = [
       <>
         <p>
           <Em>Not yet. Maren is pre-audit.</Em> A third-party audit of MarenVault, MarenEarn and
-          MarenRelayHub, the three contracts in the planned audit scope, is required before
-          mainnet.
+          MarenRelayHub, the three contracts in the planned audit scope, is required before mainnet.
         </p>
         <p>
           Until that audit is complete and published, treat Maren as unaudited software and do not
@@ -195,12 +194,7 @@ export function Faq() {
 
       <div className="mx-auto mt-14 max-w-[880px] border-t border-[var(--border-hairline)]">
         {items.map((item, i) => (
-          <AccordionItem
-            key={item.q}
-            item={item}
-            open={open.has(i)}
-            onToggle={() => toggle(i)}
-          />
+          <AccordionItem key={item.q} item={item} open={open.has(i)} onToggle={() => toggle(i)} />
         ))}
       </div>
 

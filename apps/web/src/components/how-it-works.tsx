@@ -27,7 +27,11 @@ export function HowItWorks() {
   return (
     <LandingSection id="how" labelledBy="how-title">
       <Reveal>
-        <SectionHead id="how-title" label="How it works" title="Three steps from Bitcoin to a payment." />
+        <SectionHead
+          id="how-title"
+          label="How it works"
+          title="Three steps from Bitcoin to a payment."
+        />
         <ol role="list" className="card mx-auto mt-14 grid max-w-[880px] md:grid-cols-3">
           {STEPS.map((s, i) => (
             <li
