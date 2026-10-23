@@ -26,7 +26,7 @@ export function Segmented<T extends string>({
     <div
       role="tablist"
       aria-label={label}
-      className="bg-surface-inset inline-flex w-full max-w-xl gap-1 rounded-[var(--radius-pill)] p-1"
+      className="inline-flex w-full max-w-xl border border-[var(--border-hairline)] bg-surface p-1"
     >
       {options.map((option) => {
         const active = option.key === value;
@@ -37,9 +37,9 @@ export function Segmented<T extends string>({
             role="tab"
             aria-selected={active}
             onClick={() => onChange(option.key)}
-            className={`h-11 flex-1 rounded-[var(--radius-pill)] px-4 text-sm transition-colors duration-150 ease-out ${
+            className={`h-10 flex-1 px-4 text-sm transition-colors duration-150 ease-out ${
               active
-                ? 'bg-surface-raised text-text font-medium shadow-[0_1px_2px_rgba(16,16,19,0.06),0_4px_10px_-6px_rgba(16,16,19,0.18)]'
+                ? 'bg-surface-inset text-text font-medium'
                 : 'text-text-muted hover:text-text'
             }`}
           >
@@ -88,7 +88,7 @@ export function AmountField({
         {label}
       </label>
 
-      <div className="bg-surface-inset mt-2.5 flex items-baseline gap-3 rounded-[var(--radius-input)] px-4 py-3.5 outline-violet-500 transition-[outline-color] duration-150 focus-within:outline-2">
+      <div className="bg-surface mt-2.5 flex items-baseline gap-3 border border-[var(--border-strong)] px-4 py-3.5 transition-[border-color] duration-150 focus-within:border-violet-500">
         <input
           id={id}
           value={value}
@@ -133,7 +133,7 @@ export function AmountField({
               key={preset.label}
               type="button"
               onClick={() => onChange(preset.value)}
-              className="bg-surface-inset text-text-muted hover:text-text inline-flex h-9 items-center rounded-[var(--radius-pill)] px-3.5 text-[0.8125rem] transition-[color,background-color] duration-150 ease-out hover:bg-[#e8e8ec]"
+              className="bg-surface text-text-muted hover:text-text inline-flex h-9 items-center border border-[var(--border-hairline)] px-3.5 text-[0.8125rem] transition-[color,border-color] duration-150 ease-out hover:border-[var(--border-strong)]"
             >
               {preset.label}
             </button>

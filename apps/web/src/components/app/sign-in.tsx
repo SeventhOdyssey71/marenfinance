@@ -35,7 +35,7 @@ function PrivySignIn() {
         type="button"
         disabled={!ready}
         onClick={() => login({ loginMethods: ['google'] })}
-        className="bg-ink group inline-flex h-11 items-center justify-center gap-3 rounded-[var(--radius-pill)] px-5 text-[0.9375rem] font-medium text-white transition-[background-color,transform] duration-150 ease-out hover:bg-[#25252b] active:scale-[0.97] disabled:cursor-not-allowed disabled:opacity-60"
+        className="bg-ink group inline-flex h-11 items-center justify-center gap-3 px-5 text-[0.9375rem] text-white transition-[background-color] duration-150 ease-out hover:bg-[#25252b] active:brightness-95 disabled:cursor-not-allowed disabled:opacity-60"
       >
         <span
           aria-hidden

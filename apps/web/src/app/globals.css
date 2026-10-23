@@ -16,7 +16,8 @@
 @theme {
   /* Surfaces */
   --color-bg: #ffffff; /* the page */
-  --color-canvas: #f7f7f8; /* the app's working field, so white cards read as objects */
+  --color-canvas: #f9f9fb; /* the app's working field, so white cards read as objects */
+  --color-rail: #f4f4f6; /* the app sidebar, a step darker than the canvas */
   --color-surface: #ffffff; /* cards */
   --color-surface-raised: #ffffff; /* sheets and dialogs */
   --color-surface-inset: #f2f2f4; /* wells, inputs, quiet buttons */
@@ -51,10 +52,13 @@
   --font-sans: var(--font-neue), ui-sans-serif, system-ui, -apple-system, 'Segoe UI', sans-serif;
   --font-mono: var(--font-geist-mono), ui-monospace, 'SFMono-Regular', monospace;
 
-  /* Form: concentric by construction. A 20px card with 8px padding holds a 12px input. */
-  --radius-sm: 8px;
-  --radius-input: 12px;
-  --radius-card: 20px;
+  /* Form: square. Cards, inputs, buttons and nav rows have no radius at all; the
+     drawing is hairlines and corner ticks. Only true circles (status dots, avatars,
+     spinners) keep --radius-pill. */
+  --radius-sm: 0px;
+  --radius-input: 0px;
+  --radius-card: 0px;
+  --radius-control: 0px;
   --radius-pill: 999px;
 
   /* Motion */
@@ -64,10 +68,12 @@
 
 @layer theme {
   :root {
-    --border-hairline: rgba(14, 14, 18, 0.08);
-    --border-strong: rgba(14, 14, 18, 0.14);
-    --shadow-card: 0 1px 2px rgba(14, 14, 18, 0.04);
-    --shadow-pop: 0 2px 6px rgba(14, 14, 18, 0.05), 0 18px 48px -16px rgba(14, 14, 18, 0.22);
+    --border-hairline: rgba(14, 14, 18, 0.09);
+    --border-strong: rgba(14, 14, 18, 0.16);
+    --tick: rgba(14, 14, 18, 0.3);
+    /* Flat. Cards carry no shadow; only a sheet over a scrim gets a drop. */
+    --shadow-card: none;
+    --shadow-pop: 0 24px 64px -28px rgba(14, 14, 18, 0.28);
     --content-max: 1200px;
     color-scheme: light;
   }
@@ -161,18 +167,48 @@
     padding-inline: var(--container-pad);
   }
 
-  /* A card is a white object on the canvas: a hairline and the faintest drop. */
+  /* A card is a white square on the canvas: one hairline, and a small "+" tick at each
+     corner, drawn just outside the edge like registration marks on a print sheet. The
+     ticks are eight 1px gradients on one pseudo-element, so they cost no markup and
+     never take a click. `overflow: hidden` on a card clips them; don't. */
   .card {
+    position: relative;
     background-color: var(--color-surface);
     border: 1px solid var(--border-hairline);
-    border-radius: var(--radius-card);
-    box-shadow: var(--shadow-card);
+    border-radius: 0;
+  }
+
+  .card::before,
+  .ticks::before {
+    content: '';
+    position: absolute;
+    inset: -6px;
+    pointer-events: none;
+    background:
+      linear-gradient(var(--tick), var(--tick)) left 0 top 5px / 11px 1px no-repeat,
+      linear-gradient(var(--tick), var(--tick)) left 5px top 0 / 1px 11px no-repeat,
+      linear-gradient(var(--tick), var(--tick)) right 0 top 5px / 11px 1px no-repeat,
+      linear-gradient(var(--tick), var(--tick)) right 5px top 0 / 1px 11px no-repeat,
+      linear-gradient(var(--tick), var(--tick)) left 0 bottom 5px / 11px 1px no-repeat,
+      linear-gradient(var(--tick), var(--tick)) left 5px bottom 0 / 1px 11px no-repeat,
+      linear-gradient(var(--tick), var(--tick)) right 0 bottom 5px / 11px 1px no-repeat,
+      linear-gradient(var(--tick), var(--tick)) right 5px bottom 0 / 1px 11px no-repeat;
+  }
+
+  .ticks {
+    position: relative;
+  }
+
+  /* Nested cards drop their ticks: one set of registration marks per object. */
+  .card .card::before {
+    content: none;
   }
 
   .card-modal {
+    position: relative;
     background-color: var(--color-surface-raised);
-    border: 1px solid var(--border-hairline);
-    border-radius: 24px;
+    border: 1px solid var(--border-strong);
+    border-radius: 0;
     box-shadow: var(--shadow-pop);
   }
 
@@ -213,7 +249,20 @@
     text-wrap: balance;
   }
 
-  /* Labels are sentence case, quiet and small. No tracked-out capitals. */
+  /* Section labels: bracketed mono capitals, "[ RECENT ]". The brackets are part of
+     the text; this class sets the face. Used for the label above a group, never for a
+     form field (that is `.t-label`). */
+  .t-bracket {
+    font-family: var(--font-mono);
+    font-size: 0.75rem;
+    line-height: 1.4;
+    font-weight: 400;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: var(--color-text-muted);
+  }
+
+  /* Field labels: sentence case, quiet and small. */
   .t-label {
     font-size: 0.8125rem;
     line-height: 1.4;

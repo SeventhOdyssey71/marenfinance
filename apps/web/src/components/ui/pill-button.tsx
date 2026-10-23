@@ -37,10 +37,11 @@ const badgeSizing: Record<Size, string> = {
  * text. No pill carries an outline or a glow: the fill is the hierarchy.
  */
 const variants: Record<Variant, string> = {
-  primary: 'bg-violet-500 text-white hover:bg-violet-600 font-medium',
-  secondary: 'bg-surface-inset text-text hover:bg-[#e8e8ec] font-medium',
-  ghost: 'bg-transparent text-text-muted hover:text-text font-medium',
-  dark: 'bg-ink text-white hover:bg-[#25252b] font-medium',
+  primary: 'bg-violet-500 text-white hover:bg-violet-600',
+  secondary:
+    'bg-surface text-text border border-[var(--border-strong)] hover:bg-surface-inset',
+  ghost: 'bg-transparent text-violet-400 hover:text-violet-600',
+  dark: 'bg-ink text-white hover:bg-[#25252b]',
 };
 
 /**
@@ -50,7 +51,7 @@ const variants: Record<Variant, string> = {
  */
 const disabledVariants: Record<Variant, string> = {
   primary: 'disabled:bg-surface-inset disabled:text-text-subtle',
-  secondary: 'disabled:text-text-subtle disabled:hover:bg-surface-inset',
+  secondary: 'disabled:text-text-subtle disabled:hover:bg-surface',
   ghost: 'disabled:text-text-subtle',
   dark: 'disabled:bg-surface-inset disabled:text-text-subtle',
 };
@@ -65,7 +66,7 @@ const badgeVariants: Record<Variant, string> = {
 const RING_BADGE = 'border border-current/35';
 
 const PRESS =
-  'transition-[color,background-color,transform] duration-150 ease-[var(--ease-standard)] active:scale-[0.97]';
+  'transition-[color,background-color,border-color] duration-150 ease-[var(--ease-standard)] active:brightness-95';
 
 export type PillButtonProps = {
   href: string;
@@ -92,7 +93,10 @@ export function PillButton({
   className = '',
   ...rest
 }: PillButtonProps) {
-  const shape: Badge = badge ?? (variant === 'primary' ? 'filled' : 'bare');
+  // The square system draws every trailing icon bare. `badge` stays in the API so call
+  // sites keep compiling; a disc around an arrow belongs to the old pill.
+  void badge;
+  const shape: Badge = 'bare';
   const glyph = icon ?? <ArrowUpRight className="size-4" />;
 
   const inner = (
@@ -118,7 +122,7 @@ export function PillButton({
 
   const box = shape === 'bare' ? bareSizing[size] : sizing[size];
   // Press-scale, matching PillAction: a link should feel as physical as a button.
-  const classes = `group inline-flex items-center justify-between rounded-[var(--radius-pill)] ${PRESS} ${box} ${variants[variant]} ${className}`;
+  const classes = `group inline-flex items-center justify-between rounded-[var(--radius-control)] ${PRESS} ${box} ${variants[variant]} ${className}`;
 
   if (external) {
     return (
@@ -176,7 +180,7 @@ export function PillAction({
       type={type}
       onClick={onClick}
       disabled={disabled}
-      className={`group inline-flex items-center justify-center rounded-[var(--radius-pill)] ${PRESS} disabled:cursor-not-allowed disabled:active:scale-100 ${icon ? `${sizing[size]} justify-between` : bareSizing[size]} ${variants[variant]} ${disabledVariants[variant]} ${className}`}
+      className={`group inline-flex items-center justify-center rounded-[var(--radius-control)] ${PRESS} disabled:cursor-not-allowed disabled:active:scale-100 ${bareSizing[size]} ${icon ? 'justify-between' : ''} ${variants[variant]} ${disabledVariants[variant]} ${className}`}
       {...rest}
     >
       <span className="whitespace-nowrap">{children}</span>
@@ -186,7 +190,7 @@ export function PillAction({
       {icon ? (
         <span
           aria-hidden
-          className={`group-disabled:text-text-subtle grid shrink-0 place-items-center rounded-[var(--radius-pill)] transition-transform duration-150 ease-out group-enabled:group-hover:translate-x-0.5 group-disabled:bg-text/[0.05] ${badgeSizing[size]} ${badgeVariants[variant]}`}
+          className="group-disabled:text-text-subtle grid shrink-0 place-items-center transition-transform duration-150 ease-out group-enabled:group-hover:translate-x-0.5"
         >
           {icon}
         </span>
@@ -208,7 +212,7 @@ export function TextPill({
   return (
     <Link
       href={href}
-      className={`bg-surface-inset text-text inline-flex h-11 items-center rounded-[var(--radius-pill)] px-5 text-[0.9375rem] font-medium hover:bg-[#e8e8ec] ${PRESS} ${className}`}
+      className={`bg-surface text-text inline-flex h-11 items-center rounded-[var(--radius-control)] border border-[var(--border-strong)] px-5 text-[0.9375rem] hover:bg-surface-inset ${PRESS} ${className}`}
     >
       {children}
     </Link>

@@ -77,7 +77,7 @@ function AccountMenu({
         onClick={() => setOpen((v) => !v)}
         aria-expanded={open}
         aria-haspopup="menu"
-        className="bg-surface-inset hover:bg-[#e8e8ec] inline-flex h-10 items-center gap-2.5 rounded-[10px] px-3.5 text-sm transition-colors duration-150 ease-out"
+        className="bg-surface hover:bg-surface-inset inline-flex h-10 items-center gap-2.5 border border-[var(--border-strong)] px-3.5 text-sm transition-colors duration-150 ease-out"
       >
         <span aria-hidden className="bg-success size-1.5 rounded-[var(--radius-pill)]" />
         <span className="mono text-text text-[0.8125rem]">{shortAddress(address)}</span>
@@ -85,7 +85,7 @@ function AccountMenu({
       {open ? (
         <div
           role="menu"
-          className="bg-surface-raised absolute right-0 z-50 mt-2 w-64 rounded-[16px] border border-[var(--border-hairline)] p-1.5 shadow-[var(--shadow-pop)]"
+          className="bg-surface-raised absolute right-0 z-50 mt-2 w-64 border border-[var(--border-strong)] p-1 shadow-[var(--shadow-pop)]"
         >
           {identity ? (
             <div className="border-b border-[var(--border-hairline)] px-4 pb-2.5 pt-1.5">
@@ -100,7 +100,7 @@ function AccountMenu({
               signOut();
               setOpen(false);
             }}
-            className="text-text-muted hover:text-text hover:bg-surface-inset mt-1 flex h-11 w-full items-center rounded-[10px] px-3.5 text-sm transition-colors duration-150 ease-out"
+            className="text-text-muted hover:text-text hover:bg-surface-inset mt-1 flex h-11 w-full items-center px-3.5 text-sm transition-colors duration-150 ease-out"
           >
             {identity ? 'Sign out' : 'Disconnect'}
           </button>
@@ -129,12 +129,12 @@ function WagmiConnectButton() {
         onClick={() => setOpen((v) => !v)}
         aria-expanded={open}
         aria-haspopup="menu"
-        className="bg-violet-500 text-white hover:bg-violet-600 group inline-flex h-10 items-center gap-2.5 rounded-[var(--radius-pill)] pl-4 pr-1.5 text-sm font-medium transition-[color,background-color,transform] duration-150 ease-out active:scale-[0.97]"
+        className="bg-violet-500 text-white hover:bg-violet-600 group inline-flex h-10 items-center gap-2.5 px-4 text-sm transition-[background-color] duration-150 ease-out active:brightness-95"
       >
         {isPending ? 'Connecting…' : 'Connect wallet'}
         <span
           aria-hidden
-          className="grid size-7 shrink-0 place-items-center rounded-[var(--radius-pill)] bg-white/20 text-white transition-transform duration-150 ease-out group-hover:translate-x-0.5"
+          className="grid shrink-0 place-items-center text-white transition-transform duration-150 ease-out group-hover:translate-x-0.5"
         >
           <svg
             viewBox="0 0 16 16"
@@ -160,7 +160,7 @@ function WagmiConnectButton() {
       {open ? (
         <div
           role="menu"
-          className="bg-surface-raised absolute right-0 z-50 mt-2 w-64 rounded-[16px] border border-[var(--border-hairline)] p-1.5 shadow-[var(--shadow-pop)]"
+          className="bg-surface-raised absolute right-0 z-50 mt-2 w-64 border border-[var(--border-strong)] p-1 shadow-[var(--shadow-pop)]"
         >
           {connectors.map((connector) => (
             <button
@@ -171,7 +171,7 @@ function WagmiConnectButton() {
                 connect({ connector, chainId: targetChain.id });
                 setOpen(false);
               }}
-              className="text-text-muted hover:text-text hover:bg-surface-inset flex h-11 w-full items-center rounded-[10px] px-3.5 text-sm transition-colors duration-150 ease-out"
+              className="text-text-muted hover:text-text hover:bg-surface-inset flex h-11 w-full items-center px-3.5 text-sm transition-colors duration-150 ease-out"
             >
               {connector.name}
             </button>
@@ -221,12 +221,12 @@ function PrivyConnectButton() {
       type="button"
       disabled={!ready}
       onClick={() => login()}
-      className="bg-violet-500 text-white hover:bg-violet-600 group inline-flex h-10 items-center gap-2.5 rounded-[var(--radius-pill)] pl-4 pr-1.5 text-sm font-medium transition-[color,background-color,transform] duration-150 ease-out active:scale-[0.97] disabled:cursor-not-allowed disabled:opacity-60"
+      className="bg-violet-500 text-white hover:bg-violet-600 group inline-flex h-10 items-center gap-2.5 px-4 text-sm transition-[background-color] duration-150 ease-out active:brightness-95 disabled:cursor-not-allowed disabled:opacity-60"
     >
       {ready ? 'Sign in' : 'Loading…'}
       <span
         aria-hidden
-        className="grid size-7 shrink-0 place-items-center rounded-[var(--radius-pill)] bg-white/20 text-white transition-transform duration-150 ease-out group-hover:translate-x-0.5"
+        className="grid shrink-0 place-items-center text-white transition-transform duration-150 ease-out group-hover:translate-x-0.5"
       >
         <svg
           viewBox="0 0 16 16"

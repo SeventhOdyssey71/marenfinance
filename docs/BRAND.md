@@ -78,27 +78,31 @@ the health chip — is coloured.
 
 ## 3. Typography
 
-- **Display + UI: Satoshi** (Fontshare, free). Geometric grotesque; matches the reference
-  design language and is a deliberate nod to Satoshi Nakamoto — worth one line in the deck.
-  Self-host via `next/font/local`. Weights: 400, 500, 700, 900.
-- **Numerals + addresses: Geist Mono** (npm `geist`). All balances, CRs, APRs, hashes,
-  and addresses. Always `font-variant-numeric: tabular-nums` so digits don't jitter as
-  values update.
-- **Fallback if Satoshi cannot be fetched:** Geist Sans. Do not silently substitute
-  Inter — it reads generic and breaks the reference look.
+> **Web, from 2026-10-23:** Neue Montreal is the only typeface on the web (landing, app,
+> claim and pay pages, docs). The working spec is `apps/web/DESIGN.md`; this section
+> records the decision. The iOS app keeps SF Pro Rounded for now.
 
-### Scale
+- **Display + UI: Neue Montreal** (Pangram Pangram), self-hosted woff2 via `next/font/local`.
+  Two weights in UI: 400 to read, 500 to lead. Light (300) only above 48px. No bold.
+- **Machine strings: Geist Mono** (npm `geist`). Addresses, hashes, block numbers, env
+  names. Not balances.
+- **Figures** stay in Neue Montreal. The face ships **no tabular figures** (no `tnum`, and
+  the "1" is about half the width of the other digits), so `tabular-nums` does nothing.
+  Live-updating values jitter slightly; accept that rather than switching faces mid-number.
+- Labels are **sentence case**, 13px, muted. No tracked-out capitals.
 
-| Role       | Size / line-height                 | Weight   | Tracking            |
-| ---------- | ---------------------------------- | -------- | ------------------- |
-| Display    | `clamp(2.75rem, 6vw, 5rem)` / 1.02 | 700      | `-0.03em`           |
-| H1         | `2.5rem` / 1.1                     | 700      | `-0.025em`          |
-| H2         | `1.875rem` / 1.15                  | 700      | `-0.02em`           |
-| H3         | `1.25rem` / 1.3                    | 500      | `-0.01em`           |
-| Body       | `1rem` / 1.6                       | 400      | `0`                 |
-| Small      | `0.875rem` / 1.5                   | 400      | `0`                 |
-| Label      | `0.75rem` / 1.4                    | 500      | `0.06em`, uppercase |
-| Numeric-XL | `3rem` / 1                         | 500 mono | `-0.02em`           |
+### Scale (web)
+
+| Role       | Size / line-height                     | Weight | Tracking   |
+| ---------- | -------------------------------------- | ------ | ---------- |
+| Display    | `clamp(2.75rem, 6.2vw, 5.25rem)` / 0.98 | 500    | `-0.045em` |
+| H1         | `clamp(1.875rem, 3.4vw, 2.5rem)` / 1.08 | 500    | `-0.032em` |
+| H2         | `clamp(1.5rem, 2.6vw, 1.875rem)` / 1.14 | 500    | `-0.026em` |
+| H3         | `1.125rem` / 1.3                        | 500    | `-0.016em` |
+| Body       | `0.9375rem`–`1.125rem` / 1.6            | 400    | `-0.011em` |
+| Small      | `0.8125rem` / 1.5                       | 400    | `-0.005em` |
+| Label      | `0.8125rem` / 1.4, sentence case        | 400    | `-0.005em` |
+| Numeric-XL | `clamp(2.5rem, 6vw, 3.5rem)` / 1        | 500    | `-0.045em` |
 
 Headlines are tight and large. Body text never exceeds `68ch`.
 
