@@ -77,20 +77,20 @@ function AccountMenu({
         onClick={() => setOpen((v) => !v)}
         aria-expanded={open}
         aria-haspopup="menu"
-        className="bg-surface-inset hover:bg-text/[0.08] inline-flex h-11 items-center gap-2.5 rounded-[var(--radius-pill)] px-4 text-sm transition-colors duration-[120ms] ease-out"
+        className="bg-surface-inset hover:bg-[#e8e8ec] inline-flex h-10 items-center gap-2.5 rounded-[10px] px-3.5 text-sm transition-colors duration-150 ease-out"
       >
         <span aria-hidden className="bg-success size-1.5 rounded-[var(--radius-pill)]" />
-        <span className="num text-text">{shortAddress(address)}</span>
+        <span className="mono text-text text-[0.8125rem]">{shortAddress(address)}</span>
       </button>
       {open ? (
         <div
           role="menu"
-          className="bg-surface-raised absolute right-0 z-50 mt-2 w-64 rounded-[18px] p-2 shadow-[0_1px_2px_rgba(16,16,19,0.05),0_18px_44px_-16px_rgba(16,16,19,0.28)]"
+          className="bg-surface-raised absolute right-0 z-50 mt-2 w-64 rounded-[16px] border border-[var(--border-hairline)] p-1.5 shadow-[var(--shadow-pop)]"
         >
           {identity ? (
             <div className="border-b border-[var(--border-hairline)] px-4 pb-2.5 pt-1.5">
               {identity}
-              <p className="num text-text-subtle mt-1 text-xs">{shortAddress(address, 10, 8)}</p>
+              <p className="mono text-text-muted mt-1 text-xs">{shortAddress(address, 10, 8)}</p>
             </div>
           ) : null}
           <button
@@ -100,7 +100,7 @@ function AccountMenu({
               signOut();
               setOpen(false);
             }}
-            className="text-text-muted hover:text-text hover:bg-text/[0.05] mt-1 flex h-11 w-full items-center rounded-[var(--radius-pill)] px-4 text-sm transition-colors duration-[120ms] ease-out"
+            className="text-text-muted hover:text-text hover:bg-surface-inset mt-1 flex h-11 w-full items-center rounded-[10px] px-3.5 text-sm transition-colors duration-150 ease-out"
           >
             {identity ? 'Sign out' : 'Disconnect'}
           </button>
@@ -129,12 +129,12 @@ function WagmiConnectButton() {
         onClick={() => setOpen((v) => !v)}
         aria-expanded={open}
         aria-haspopup="menu"
-        className="bg-text text-bg hover:bg-text/90 active:bg-text/80 group inline-flex h-11 items-center gap-3 rounded-[var(--radius-pill)] pl-5 pr-2 text-sm font-medium transition-[color,background-color,transform] duration-[120ms] ease-out active:scale-[0.97]"
+        className="bg-violet-500 text-white hover:bg-violet-600 group inline-flex h-10 items-center gap-2.5 rounded-[var(--radius-pill)] pl-4 pr-1.5 text-sm font-medium transition-[color,background-color,transform] duration-150 ease-out active:scale-[0.97]"
       >
         {isPending ? 'Connecting…' : 'Connect wallet'}
         <span
           aria-hidden
-          className="grid size-8 shrink-0 place-items-center rounded-[var(--radius-pill)] bg-violet-500 text-white transition-transform duration-[120ms] ease-out group-hover:translate-x-0.5"
+          className="grid size-7 shrink-0 place-items-center rounded-[var(--radius-pill)] bg-white/20 text-white transition-transform duration-150 ease-out group-hover:translate-x-0.5"
         >
           <svg
             viewBox="0 0 16 16"
@@ -160,7 +160,7 @@ function WagmiConnectButton() {
       {open ? (
         <div
           role="menu"
-          className="bg-surface-raised absolute right-0 z-50 mt-2 w-64 rounded-[18px] p-2 shadow-[0_1px_2px_rgba(16,16,19,0.05),0_18px_44px_-16px_rgba(16,16,19,0.28)]"
+          className="bg-surface-raised absolute right-0 z-50 mt-2 w-64 rounded-[16px] border border-[var(--border-hairline)] p-1.5 shadow-[var(--shadow-pop)]"
         >
           {connectors.map((connector) => (
             <button
@@ -171,7 +171,7 @@ function WagmiConnectButton() {
                 connect({ connector, chainId: targetChain.id });
                 setOpen(false);
               }}
-              className="text-text-muted hover:text-text hover:bg-text/[0.05] flex h-11 w-full items-center rounded-[var(--radius-pill)] px-4 text-sm transition-colors duration-[120ms] ease-out"
+              className="text-text-muted hover:text-text hover:bg-surface-inset flex h-11 w-full items-center rounded-[10px] px-3.5 text-sm transition-colors duration-150 ease-out"
             >
               {connector.name}
             </button>
@@ -221,12 +221,12 @@ function PrivyConnectButton() {
       type="button"
       disabled={!ready}
       onClick={() => login()}
-      className="bg-text text-bg hover:bg-text/90 active:bg-text/80 group inline-flex h-11 items-center gap-3 rounded-[var(--radius-pill)] pl-5 pr-2 text-sm font-medium transition-[color,background-color,transform] duration-[120ms] ease-out active:scale-[0.97] disabled:cursor-not-allowed disabled:opacity-60"
+      className="bg-violet-500 text-white hover:bg-violet-600 group inline-flex h-10 items-center gap-2.5 rounded-[var(--radius-pill)] pl-4 pr-1.5 text-sm font-medium transition-[color,background-color,transform] duration-150 ease-out active:scale-[0.97] disabled:cursor-not-allowed disabled:opacity-60"
     >
       {ready ? 'Sign in' : 'Loading…'}
       <span
         aria-hidden
-        className="grid size-8 shrink-0 place-items-center rounded-[var(--radius-pill)] bg-violet-500 text-white transition-transform duration-[120ms] ease-out group-hover:translate-x-0.5"
+        className="grid size-7 shrink-0 place-items-center rounded-[var(--radius-pill)] bg-white/20 text-white transition-transform duration-150 ease-out group-hover:translate-x-0.5"
       >
         <svg
           viewBox="0 0 16 16"

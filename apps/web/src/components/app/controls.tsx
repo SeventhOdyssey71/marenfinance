@@ -37,7 +37,7 @@ export function Segmented<T extends string>({
             role="tab"
             aria-selected={active}
             onClick={() => onChange(option.key)}
-            className={`h-11 flex-1 rounded-[var(--radius-pill)] px-4 text-sm transition-colors duration-[120ms] ease-out ${
+            className={`h-11 flex-1 rounded-[var(--radius-pill)] px-4 text-sm transition-colors duration-150 ease-out ${
               active
                 ? 'bg-surface-raised text-text font-medium shadow-[0_1px_2px_rgba(16,16,19,0.06),0_4px_10px_-6px_rgba(16,16,19,0.18)]'
                 : 'text-text-muted hover:text-text'
@@ -84,11 +84,11 @@ export function AmountField({
 
   return (
     <div>
-      <label htmlFor={id} className="t-label text-text-subtle block">
+      <label htmlFor={id} className="t-label block">
         {label}
       </label>
 
-      <div className="mt-3 flex items-baseline gap-3 border-b border-[var(--border-hairline)] pb-3 focus-within:border-[var(--border-strong)]">
+      <div className="bg-surface-inset mt-2.5 flex items-baseline gap-3 rounded-[var(--radius-input)] px-4 py-3.5 outline-violet-500 transition-[outline-color] duration-150 focus-within:outline-2">
         <input
           id={id}
           value={value}
@@ -99,14 +99,14 @@ export function AmountField({
           placeholder="0.00"
           aria-describedby={error ? `${id}-error` : undefined}
           aria-invalid={error ? true : undefined}
-          className="num text-text placeholder:text-text-subtle/60 min-w-0 flex-1 bg-transparent text-3xl"
+          className="num text-text placeholder:text-text-subtle min-w-0 flex-1 bg-transparent text-[2rem] font-medium tracking-[-0.03em] outline-none"
         />
-        <span className="t-h3 text-text-muted shrink-0">{unit}</span>
+        <span className="text-text-muted shrink-0 text-lg">{unit}</span>
       </div>
 
       {max !== undefined ? (
         <div className="mt-3 flex items-center justify-between gap-4 text-sm">
-          <span className="text-text-subtle">{maxLabel ?? 'Available'}</span>
+          <span className="text-text-muted">{maxLabel ?? 'Available'}</span>
           {onMax ? (
             <button
               type="button"
@@ -116,7 +116,7 @@ export function AmountField({
               aria-label={`Use the full ${maxLabel ?? 'available'} balance, ${max}`}
               /* The glyph alone was about 18px of tap target. The negative margin keeps
                  the row looking identical while giving it a real one. */
-              className="text-text-muted hover:text-text -my-2 min-h-[44px] rounded-[var(--radius-pill)] px-1.5 py-2 transition-colors duration-[120ms] ease-out"
+              className="text-text-muted hover:text-text -my-2 min-h-[44px] rounded-[var(--radius-pill)] px-1.5 py-2 transition-colors duration-150 ease-out"
             >
               {max}
             </button>
@@ -133,7 +133,7 @@ export function AmountField({
               key={preset.label}
               type="button"
               onClick={() => onChange(preset.value)}
-              className="bg-surface-inset text-text-muted hover:text-text hover:bg-text/[0.08] inline-flex h-11 items-center rounded-[var(--radius-pill)] px-4 text-sm transition-colors duration-[120ms] ease-out"
+              className="bg-surface-inset text-text-muted hover:text-text inline-flex h-9 items-center rounded-[var(--radius-pill)] px-3.5 text-[0.8125rem] transition-[color,background-color] duration-150 ease-out hover:bg-[#e8e8ec]"
             >
               {preset.label}
             </button>
@@ -141,7 +141,7 @@ export function AmountField({
         </div>
       ) : null}
 
-      {hint ? <div className="text-text-subtle mt-3 text-xs leading-relaxed">{hint}</div> : null}
+      {hint ? <div className="text-text-muted mt-3 text-[0.8125rem] leading-relaxed">{hint}</div> : null}
       {error ? (
         <p id={`${id}-error`} role="alert" className="text-danger mt-3 text-sm">
           {error}
@@ -234,7 +234,7 @@ export function AmountSlider({
                 type="button"
                 onClick={marker.onSelect}
                 disabled={disabled}
-                className="disabled:text-text-subtle rounded-[var(--radius-pill)] text-violet-400 transition-colors duration-[120ms] ease-out hover:text-violet-400/80"
+                className="disabled:text-text-subtle rounded-[var(--radius-pill)] text-violet-400 transition-colors duration-150 ease-out hover:text-violet-400/80"
               >
                 {marker.label}
               </button>

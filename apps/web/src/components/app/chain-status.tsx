@@ -27,10 +27,10 @@ export function ChainStatus() {
   if (source.deployed) return null;
 
   return (
-    <p className="text-text-subtle text-xs leading-relaxed">
+    <p className="text-text-muted text-xs leading-relaxed">
       Maren is not deployed on Mezo {NETWORK}. Those addresses are still zero, so there is nothing
-      to read. Point <span className="num">NEXT_PUBLIC_MEZO_NETWORK</span> at{' '}
-      <span className="num">testnet</span>, where it is live.
+      to read. Point <span className="mono">NEXT_PUBLIC_MEZO_NETWORK</span> at{' '}
+      <span className="mono">testnet</span>, where it is live.
     </p>
   );
 }
@@ -48,7 +48,7 @@ export function VaultProvenance() {
       href={`${chain.blockExplorers.default.url}/address/${vault}`}
       target="_blank"
       rel="noreferrer noopener"
-      className="num text-text-muted hover:text-text transition-colors duration-[120ms] ease-out"
+      className="mono text-text-muted hover:text-text transition-colors duration-150 ease-out"
     >
       Vault {shortAddress(vault)}
     </a>

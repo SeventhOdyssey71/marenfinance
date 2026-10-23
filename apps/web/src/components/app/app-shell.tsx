@@ -5,22 +5,23 @@ import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 
 import { ActivityIcon, FinanceIcon, HomeIcon, ProfileIcon } from '@/components/ui/icons';
+import { Wordmark } from '@/components/ui/wordmark';
 import { ChainStatus, VaultProvenance } from '@/components/app/chain-status';
 import { ConnectButton, NetworkGuard } from '@/components/app/wallet';
 
 /**
- * The app shell — the native app, running in a browser.
+ * The app shell.
  *
- * The dApp is a phone experience on every screen size: one centered narrow column, a
- * quiet top bar (wordmark + connect control) and a floating glass bottom-nav pill with
- * the four fixed destinations the native app carries — Home, Finance, Activity, Profile.
- * The money flows (Send, Receive, Borrow, Deposit) are launched from Home, never a
- * top-level peer, exactly as they are on iOS. There is no desktop sidebar and no wide
- * dashboard: the same layout at 360px and at 1440px, so the product reads as the phone
- * app it is a port of.
+ * Desktop (lg and up) is a web app, not a phone screenshot: a quiet sidebar holds the
+ * wordmark, the four destinations and the disclosure, and the content gets a real
+ * working width on the canvas. Below lg it is the native app: a top bar with the
+ * wordmark and the connect control, and a floating tab bar at the thumb.
  *
- * The shell owns chrome only. Every screen keeps its own connected / disconnected states,
- * its own contract reads, and its own flows — this frames them.
+ * The four destinations match iOS: Home, Finance, Activity, Profile. Money flows
+ * (Send, Receive, Borrow, Deposit) launch from the screens, never from the nav.
+ *
+ * The shell owns chrome only. Every screen keeps its own connected and disconnected
+ * states, its own contract reads and its own flows.
  */
 
 type NavItem = {
@@ -36,31 +37,33 @@ const NAV: readonly NavItem[] = [
   { href: '/app/profile', label: 'Profile', Icon: ProfileIcon },
 ] as const;
 
-/**
- * Home matches exactly; everything else matches its subtree, so `/app/finance` stays
- * lit while a Vault or Earn sub-section is open. `/app` cannot use `startsWith` or it
- * would light for every route in the app.
- */
+/** Home matches exactly; everything else matches its subtree (Vault and Earn light Finance). */
 function isActive(pathname: string, href: string): boolean {
   if (href === '/app') return pathname === '/app';
+  if (href === '/app/finance')
+    return ['/app/finance', '/app/vault', '/app/earn'].some(
+      (p) => pathname === p || pathname.startsWith(p + '/'),
+    );
   return pathname === href || pathname.startsWith(href + '/');
 }
 
-/**
- * ONE nav element that changes position, not two that duplicate each other.
- *
- * Below `md` it stays the thumb-reachable bar pinned to the bottom, icon over label.
- * At `md` and up it becomes a pill sitting in the header, icon beside label. Rendering
- * a separate desktop copy would double the landmark, double the tab stops, and read the
- * four destinations twice to a screen reader — so the same list simply moves.
- */
-function AppNav({ pathname }: { pathname: string }) {
+function HomeLink({ className = '' }: { className?: string }) {
   return (
-    <nav
-      aria-label="App sections"
-      className="fixed inset-x-0 bottom-0 z-40 flex justify-center px-4 pb-[max(1rem,env(safe-area-inset-bottom))] md:static md:z-auto md:px-0 md:pb-0"
+    <Link
+      href="/"
+      aria-label="Maren Finance home"
+      className={`-m-1.5 inline-flex w-fit rounded-[10px] p-1.5 ${className}`}
     >
-      <ul className="bg-surface-raised/90 flex items-center gap-1 rounded-[var(--radius-pill)] p-1.5 shadow-[0_1px_2px_rgba(16,16,19,0.05),0_12px_32px_-12px_rgba(16,16,19,0.28)] backdrop-blur-xl md:gap-0.5 md:shadow-[0_1px_2px_rgba(16,16,19,0.04),0_8px_24px_-14px_rgba(16,16,19,0.2)]">
+      <Wordmark className="h-[20px] text-[19px]" />
+    </Link>
+  );
+}
+
+/** Desktop rail. One list; the mobile tab bar below is a separate landmark only at < lg. */
+function SideNav({ pathname }: { pathname: string }) {
+  return (
+    <nav aria-label="App sections" className="mt-8">
+      <ul className="flex flex-col gap-0.5">
         {NAV.map(({ href, label, Icon }) => {
           const active = isActive(pathname, href);
           return (
@@ -68,10 +71,43 @@ function AppNav({ pathname }: { pathname: string }) {
               <Link
                 href={href}
                 aria-current={active ? 'page' : undefined}
-                className={`flex min-h-[44px] min-w-[4.25rem] flex-col items-center justify-center gap-1 rounded-[var(--radius-pill)] px-3 py-2 text-[0.6875rem] transition-colors duration-[120ms] ease-out md:min-w-0 md:flex-row md:gap-2 md:px-4 md:text-sm ${
+                className={`flex h-10 items-center gap-3 rounded-[10px] px-3 text-[0.9375rem] transition-[color,background-color] duration-150 ease-out ${
                   active
-                    ? 'bg-surface-inset text-text md:bg-surface font-medium md:shadow-[0_1px_2px_rgba(16,16,19,0.06)]'
-                    : 'text-text-muted'
+                    ? 'bg-surface text-text font-medium shadow-[0_0_0_1px_var(--border-hairline),var(--shadow-card)]'
+                    : 'text-text-muted hover:text-text hover:bg-text/[0.04]'
+                }`}
+              >
+                <Icon
+                  className={`size-[18px] shrink-0 ${active ? 'text-violet-500' : ''}`}
+                  aria-hidden
+                />
+                {label}
+              </Link>
+            </li>
+          );
+        })}
+      </ul>
+    </nav>
+  );
+}
+
+/** Mobile tab bar: floating, glass, thumb-reachable. Hidden at lg, where the rail takes over. */
+function TabBar({ pathname }: { pathname: string }) {
+  return (
+    <nav
+      aria-label="App sections"
+      className="fixed inset-x-0 bottom-0 z-40 flex justify-center px-4 pb-[max(0.875rem,env(safe-area-inset-bottom))] lg:hidden"
+    >
+      <ul className="flex items-center gap-0.5 rounded-[var(--radius-pill)] border border-[var(--border-hairline)] bg-white/85 p-1 shadow-[var(--shadow-pop)] backdrop-blur-xl">
+        {NAV.map(({ href, label, Icon }) => {
+          const active = isActive(pathname, href);
+          return (
+            <li key={href}>
+              <Link
+                href={href}
+                aria-current={active ? 'page' : undefined}
+                className={`flex min-h-[48px] min-w-[4.5rem] flex-col items-center justify-center gap-0.5 rounded-[var(--radius-pill)] px-3 py-1.5 text-[0.6875rem] transition-colors duration-150 ease-out ${
+                  active ? 'bg-surface-inset text-text font-medium' : 'text-text-muted'
                 }`}
               >
                 <Icon className={`size-[20px] ${active ? 'text-violet-500' : ''}`} aria-hidden />
@@ -85,42 +121,25 @@ function AppNav({ pathname }: { pathname: string }) {
   );
 }
 
-/** The wordmark — SF Pro Rounded, the app's friendly display face, sentence case. */
-function Wordmark() {
-  return (
-    <Link
-      href="/"
-      aria-label="Maren Finance home"
-      className="-m-2 inline-flex w-fit rounded-[var(--radius-pill)] p-2"
-    >
-      <span
-        className="text-[22px] leading-none tracking-[-0.02em] text-[color:var(--color-text)]"
-        style={{
-          fontFamily: 'var(--font-sf-rounded), ui-rounded, system-ui, sans-serif',
-          fontWeight: 600,
-        }}
-      >
-        Maren
-      </span>
-    </Link>
-  );
-}
-
-/** The pre-audit disclosure and provenance — the two facts a user most needs. */
+/** The pre-audit disclosure and provenance, the two facts a user most needs. */
 function Disclosure({ className = '' }: { className?: string }) {
   return (
-    <div className={`text-text-subtle flex flex-col gap-3 text-xs leading-relaxed ${className}`}>
+    <div className={`text-text-muted flex flex-col gap-3 text-xs leading-relaxed ${className}`}>
+      <p className="flex items-center gap-2">
+        <span aria-hidden className="bg-success size-1.5 shrink-0 rounded-full" />
+        <span>Mezo testnet</span>
+      </p>
       <p className="max-w-[60ch]">
         Testnet funds only. Maren’s contracts are pre-audit. Pooled collateral is segregated in
         accounting, not custody.
       </p>
-      <div className="flex flex-wrap items-center gap-x-5 gap-y-2">
+      <div className="flex flex-wrap items-center gap-x-4 gap-y-1.5">
         <VaultProvenance />
         <a
           href="/docs"
           target="_blank"
           rel="noreferrer noopener"
-          className="text-text-muted hover:text-text transition-colors duration-[120ms] ease-out"
+          className="hover:text-text transition-colors duration-150 ease-out"
         >
           Docs
         </a>
@@ -133,47 +152,51 @@ export function AppShell({ children }: { children: ReactNode }) {
   const pathname = usePathname() ?? '/app';
 
   return (
-    <div className="flex min-h-screen flex-col">
-      {/* First focusable element in the shell, visible only once focused. */}
+    <div className="bg-canvas min-h-screen">
       <a
         href="#app-content"
-        className="sr-only focus:not-sr-only focus:absolute focus:left-4 focus:top-4 focus:z-50 focus:rounded-[var(--radius-pill)] focus:bg-[var(--color-ink)] focus:px-4 focus:py-2 focus:text-sm focus:text-white"
+        className="bg-ink sr-only focus:not-sr-only focus:fixed focus:left-4 focus:top-4 focus:z-50 focus:rounded-[var(--radius-pill)] focus:px-4 focus:py-2 focus:text-sm focus:text-white"
       >
         Skip to content
       </a>
 
-      {/* The header spans the viewport while the CONTENT stays a column. Keeping the two
-          widths independent is what stops a laptop reading as a phone screenshot: the
-          chrome breathes to the edges, the reading measure does not. */}
-      <header className="mx-auto flex w-full max-w-[76rem] items-center gap-4 px-5 pb-2 pt-5 md:px-8 md:pt-7">
-        {/* The two outer cells carry equal flex basis so the nav sits on the VIEWPORT's
-            centre line rather than on whatever is left between a short wordmark and a
-            wide button — which is what made it read as slightly adrift. */}
-        <div className="flex flex-1 justify-start">
-          <Wordmark />
+      {/* Desktop rail */}
+      <aside className="fixed inset-y-0 left-0 z-30 hidden w-[248px] flex-col border-r border-[var(--border-hairline)] px-5 pb-6 pt-6 lg:flex">
+        <HomeLink />
+        <SideNav pathname={pathname} />
+        <div className="mt-auto">
+          <Disclosure />
         </div>
-        <AppNav pathname={pathname} />
-        <div className="flex flex-1 justify-end">
-          <ConnectButton />
-        </div>
-      </header>
+      </aside>
 
-      {/* The content column. A phone frame below md, a reading column above it — still far
-          short of full width, because a ledger read edge-to-edge on a 1440px display is
-          harder to scan, not easier. */}
-      <div className="mx-auto flex w-full max-w-[30rem] flex-1 flex-col px-5 md:max-w-[40rem]">
-        <main id="app-content" className="flex-1 pb-28 pt-3 md:pb-16">
-          <div className="flex flex-col gap-4">
+      <div className="flex min-h-screen flex-col lg:pl-[248px]">
+        {/* Top bar: wordmark on mobile, connect control everywhere */}
+        <header className="bg-canvas/85 sticky top-0 z-20 backdrop-blur-xl">
+          <div className="mx-auto flex h-16 w-full max-w-[1120px] items-center justify-between gap-4 px-5 md:px-8">
+            <HomeLink className="lg:hidden" />
+            <span className="hidden lg:block" />
+            <ConnectButton />
+          </div>
+        </header>
+
+        <main
+          id="app-content"
+          tabIndex={-1}
+          className="mx-auto w-full max-w-[1120px] flex-1 px-5 pb-32 pt-2 outline-none md:px-8 lg:pb-16"
+        >
+          <div className="flex flex-col gap-4 empty:hidden">
             <NetworkGuard />
             <ChainStatus />
           </div>
-          <div className="mt-5">{children}</div>
+          <div className="mt-2">{children}</div>
 
-          <div className="hairline-t mt-12 pt-8">
+          <div className="hairline-t mt-14 pt-8 lg:hidden">
             <Disclosure />
           </div>
         </main>
       </div>
+
+      <TabBar pathname={pathname} />
     </div>
   );
 }

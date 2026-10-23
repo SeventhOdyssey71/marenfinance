@@ -3,73 +3,69 @@ import type { ReactNode } from 'react';
 import { ArrowUpRight } from './icons';
 
 type Size = 'sm' | 'md' | 'lg';
-type Variant = 'primary' | 'secondary' | 'ghost';
+type Variant = 'primary' | 'secondary' | 'ghost' | 'dark';
 /**
  * How the trailing icon is drawn.
- *   filled  a solid violet disc, for the one primary action on a view
- *   ring    a violet outline disc, for the nav CTA
- *   bare    the glyph alone, no disc, for secondary actions
+ *   filled  a soft disc behind the glyph, for the one primary action on a view
+ *   ring    an outlined disc
+ *   bare    the glyph alone, for secondary actions
  */
 type Badge = 'filled' | 'ring' | 'bare';
 
-// 44px min height everywhere (BRAND.md section 4), but tighter horizontally than
-// the first pass. The reference pills are compact; ours were chunky enough that two
-// side by side read as a toolbar rather than a choice.
+// 44px is the default target (md). sm is for dense toolbars on desktop, lg for heroes.
 const sizing: Record<Size, string> = {
-  sm: 'h-11 pl-5 pr-2 text-sm gap-2.5',
-  md: 'h-11 pl-6 pr-2 text-sm gap-3',
-  lg: 'h-12 pl-7 pr-2 text-[0.9375rem] gap-4',
+  sm: 'h-9 pl-4 pr-1.5 text-[0.8125rem] gap-2',
+  md: 'h-11 pl-5 pr-1.5 text-[0.9375rem] gap-3',
+  lg: 'h-[52px] pl-6 pr-2 text-[0.9375rem] gap-3.5',
 };
 
-// Bare-arrow variants carry no circle, so they need real padding on the right
-// instead of room for a badge.
 const bareSizing: Record<Size, string> = {
-  sm: 'h-11 px-5 text-sm gap-2.5',
-  md: 'h-11 px-6 text-sm gap-3',
-  lg: 'h-12 px-7 text-[0.9375rem] gap-3.5',
+  sm: 'h-9 px-4 text-[0.8125rem] gap-1.5',
+  md: 'h-11 px-5 text-[0.9375rem] gap-2',
+  lg: 'h-[52px] px-6 text-[0.9375rem] gap-2.5',
 };
 
 const badgeSizing: Record<Size, string> = {
-  sm: 'size-7',
+  sm: 'size-6',
   md: 'size-8',
   lg: 'size-9',
 };
 
-// Soft-UGLYCASH pills: primary is a clean surface pill wrapped in a pink glow
-// (`app-pill-glow`, defined in globals under the light app); secondary is a
-// borderless soft-grey pill; ghost is quiet. No pill carries a visible outline —
-// separation is the glow, the fill or the text weight.
+/**
+ * Primary is the logo violet, solid, white type. Secondary is a quiet grey well.
+ * Dark is ink, for a call to action that sits on a light marketing band. Ghost is
+ * text. No pill carries an outline or a glow: the fill is the hierarchy.
+ */
 const variants: Record<Variant, string> = {
-  primary: 'bg-surface text-text app-pill-glow font-medium',
-  secondary: 'bg-surface-inset text-text hover:bg-text/[0.08] font-medium',
+  primary: 'bg-violet-500 text-white hover:bg-violet-600 font-medium',
+  secondary: 'bg-surface-inset text-text hover:bg-[#e8e8ec] font-medium',
   ghost: 'bg-transparent text-text-muted hover:text-text font-medium',
+  dark: 'bg-ink text-white hover:bg-[#25252b] font-medium',
 };
 
 /**
- * Disabled paint, per variant.
- *
- * Held here rather than at the call site because a disabled control is now load-bearing in
- * this product: `lib/chain/preflight.ts` disables anything that cannot succeed, so the
- * disabled state is a state users will genuinely see, beside a sentence explaining it. It
- * has to read as "not available", not as "broken", and it has to stay legible — white at
- * 25% on `surface` is below AA, which is why primary keeps a 40% fill.
+ * Disabled paint, per variant. `lib/chain/preflight.ts` disables anything that cannot
+ * succeed, so this is a state people genuinely see beside a sentence explaining it.
+ * It has to read as "not available", not "broken", and stay legible.
  */
 const disabledVariants: Record<Variant, string> = {
-  // The glow drops on a disabled primary (globals: `.app-pill-glow:disabled`), so
-  // the pill falls back to a quiet grey well that reads as "not available".
   primary: 'disabled:bg-surface-inset disabled:text-text-subtle',
-  secondary: 'disabled:text-text-subtle',
+  secondary: 'disabled:text-text-subtle disabled:hover:bg-surface-inset',
   ghost: 'disabled:text-text-subtle',
+  dark: 'disabled:bg-surface-inset disabled:text-text-subtle',
 };
 
 const badgeVariants: Record<Variant, string> = {
-  primary: 'bg-violet-500 text-white',
-  secondary: 'bg-text/[0.06] text-text-muted',
+  primary: 'bg-white/20 text-white',
+  secondary: 'bg-text/[0.07] text-text',
   ghost: 'bg-text/[0.06] text-text-muted',
+  dark: 'bg-white/15 text-white',
 };
 
-/** A violet outline disc rather than a solid one. */
-const RING_BADGE = 'border border-violet-500/70 text-violet-500';
+const RING_BADGE = 'border border-current/35';
+
+const PRESS =
+  'transition-[color,background-color,transform] duration-150 ease-[var(--ease-standard)] active:scale-[0.97]';
 
 export type PillButtonProps = {
   href: string;
@@ -84,10 +80,7 @@ export type PillButtonProps = {
   'aria-label'?: string;
 };
 
-/**
- * The Maren pill. Primary is a white fill with a circular violet icon badge on
- * the right; secondary is a raised surface with a hairline border.
- */
+/** The Maren pill, as a link. Navigating links earn a trailing arrow by default. */
 export function PillButton({
   href,
   children,
@@ -108,14 +101,14 @@ export function PillButton({
       {shape === 'bare' ? (
         <span
           aria-hidden
-          className="shrink-0 transition-transform duration-[120ms] ease-out group-hover:translate-x-0.5"
+          className="shrink-0 transition-transform duration-150 ease-out group-hover:translate-x-0.5"
         >
           {glyph}
         </span>
       ) : (
         <span
           aria-hidden
-          className={`grid shrink-0 place-items-center rounded-[var(--radius-pill)] transition-transform duration-[120ms] ease-out group-hover:translate-x-0.5 ${badgeSizing[size]} ${shape === 'ring' ? RING_BADGE : badgeVariants[variant]}`}
+          className={`grid shrink-0 place-items-center rounded-[var(--radius-pill)] transition-transform duration-150 ease-out group-hover:translate-x-0.5 ${badgeSizing[size]} ${shape === 'ring' ? RING_BADGE : badgeVariants[variant]}`}
         >
           {glyph}
         </span>
@@ -125,7 +118,7 @@ export function PillButton({
 
   const box = shape === 'bare' ? bareSizing[size] : sizing[size];
   // Press-scale, matching PillAction: a link should feel as physical as a button.
-  const classes = `group inline-flex items-center justify-between rounded-[var(--radius-pill)] transition-[color,background-color,border-color,transform] duration-[120ms] ease-out active:scale-[0.97] ${box} ${variants[variant]} ${className}`;
+  const classes = `group inline-flex items-center justify-between rounded-[var(--radius-pill)] ${PRESS} ${box} ${variants[variant]} ${className}`;
 
   if (external) {
     return (
@@ -183,7 +176,7 @@ export function PillAction({
       type={type}
       onClick={onClick}
       disabled={disabled}
-      className={`group inline-flex items-center justify-between rounded-[var(--radius-pill)] transition-[color,background-color,border-color,transform] duration-[120ms] ease-out active:scale-[0.97] disabled:cursor-not-allowed ${sizing[size]} ${variants[variant]} ${disabledVariants[variant]} ${className}`}
+      className={`group inline-flex items-center justify-center rounded-[var(--radius-pill)] ${PRESS} disabled:cursor-not-allowed disabled:active:scale-100 ${icon ? `${sizing[size]} justify-between` : bareSizing[size]} ${variants[variant]} ${disabledVariants[variant]} ${className}`}
       {...rest}
     >
       <span className="whitespace-nowrap">{children}</span>
@@ -193,7 +186,7 @@ export function PillAction({
       {icon ? (
         <span
           aria-hidden
-          className={`group-disabled:text-text-subtle grid shrink-0 place-items-center rounded-[var(--radius-pill)] transition-transform duration-[120ms] ease-out group-enabled:group-hover:translate-x-0.5 group-disabled:bg-white/[0.06] ${badgeSizing[size]} ${badgeVariants[variant]}`}
+          className={`group-disabled:text-text-subtle grid shrink-0 place-items-center rounded-[var(--radius-pill)] transition-transform duration-150 ease-out group-enabled:group-hover:translate-x-0.5 group-disabled:bg-text/[0.05] ${badgeSizing[size]} ${badgeVariants[variant]}`}
         >
           {icon}
         </span>
@@ -215,7 +208,7 @@ export function TextPill({
   return (
     <Link
       href={href}
-      className={`bg-surface-inset text-text hover:bg-text/[0.08] inline-flex h-11 items-center rounded-[var(--radius-pill)] px-5 text-sm font-medium transition-[color,background-color,transform] duration-[120ms] ease-out active:scale-[0.97] ${className}`}
+      className={`bg-surface-inset text-text inline-flex h-11 items-center rounded-[var(--radius-pill)] px-5 text-[0.9375rem] font-medium hover:bg-[#e8e8ec] ${PRESS} ${className}`}
     >
       {children}
     </Link>

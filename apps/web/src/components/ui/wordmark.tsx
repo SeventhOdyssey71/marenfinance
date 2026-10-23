@@ -19,8 +19,8 @@ export function Wordmark({ className = '' }: { className?: string }) {
       <img src="/brand/maren-mark.png" alt="" aria-hidden className="h-full w-auto" />
       <span
         aria-hidden
-        className="font-bold tracking-[-0.03em]"
-        style={{ fontSize: '1.05em', lineHeight: 1 }}
+        className="font-medium tracking-[-0.035em]"
+        style={{ fontSize: '1.1em', lineHeight: 1 }}
       >
         Maren
       </span>

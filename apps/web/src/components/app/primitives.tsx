@@ -21,6 +21,64 @@ export function AppCard({
   return <Tag className={`card p-6 ${className}`}>{children}</Tag>;
 }
 
+/**
+ * The top of every app screen: one title, one optional line of context, actions on the
+ * right at desktop widths and below the copy on a phone. `eyebrow` is a quiet sentence-case
+ * label above the title, for screens that live inside a section (Finance > Vault).
+ */
+export function PageHeader({
+  eyebrow,
+  title,
+  description,
+  actions,
+  className = '',
+}: {
+  eyebrow?: ReactNode;
+  title: ReactNode;
+  description?: ReactNode;
+  actions?: ReactNode;
+  className?: string;
+}) {
+  return (
+    <header
+      className={`flex flex-col gap-4 pb-6 pt-4 md:flex-row md:items-end md:justify-between md:pt-6 ${className}`}
+    >
+      <div className="min-w-0">
+        {eyebrow ? <p className="t-label mb-2">{eyebrow}</p> : null}
+        <h1 className="t-h1">{title}</h1>
+        {description ? (
+          <p className="text-text-muted mt-2 max-w-[60ch] text-[0.9375rem] leading-relaxed text-pretty">
+            {description}
+          </p>
+        ) : null}
+      </div>
+      {actions ? <div className="flex shrink-0 flex-wrap items-center gap-2">{actions}</div> : null}
+    </header>
+  );
+}
+
+/** A heading for a group of cards inside a screen, with an optional trailing action. */
+export function SectionHeader({
+  title,
+  action,
+  id,
+  className = '',
+}: {
+  title: ReactNode;
+  action?: ReactNode;
+  id?: string;
+  className?: string;
+}) {
+  return (
+    <div className={`mb-3 flex items-center justify-between gap-4 ${className}`}>
+      <h2 id={id} className="text-text text-[0.9375rem] font-medium tracking-[-0.012em]">
+        {title}
+      </h2>
+      {action ? <div className="text-text-muted text-sm">{action}</div> : null}
+    </div>
+  );
+}
+
 export function CardTitle({
   children,
   id,
@@ -38,7 +96,7 @@ export function CardTitle({
 }
 
 export function Label({ children, className = '' }: { children: ReactNode; className?: string }) {
-  return <span className={`t-label text-text-subtle ${className}`}>{children}</span>;
+  return <span className={`t-label ${className}`}>{children}</span>;
 }
 
 /**
@@ -77,7 +135,7 @@ export function Panel({
         // shell went from one header landmark to four the moment panels shipped.
         <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2 border-b border-[var(--border-hairline)] px-5 py-3">
           {title ? (
-            <h2 id={labelledBy} className="t-label text-text-subtle">
+            <h2 id={labelledBy} className="text-text text-sm font-medium tracking-[-0.01em]">
               {title}
             </h2>
           ) : (
@@ -220,7 +278,7 @@ export function Info({
 }) {
   return (
     <details id={id} className="group mt-4">
-      <summary className="text-text-muted hover:text-text inline-flex cursor-pointer list-none items-center gap-1.5 rounded-[var(--radius-pill)] text-xs transition-colors duration-[120ms] ease-out marker:content-none">
+      <summary className="text-text-muted hover:text-text inline-flex cursor-pointer list-none items-center gap-1.5 rounded-[var(--radius-pill)] text-xs transition-colors duration-150 ease-out marker:content-none">
         <InfoIcon className="size-3.5 shrink-0" />
         {summary}
       </summary>
@@ -282,24 +340,24 @@ export function ActionLink({
   variant?: 'primary' | 'secondary';
 }) {
   const variants = {
-    primary: 'bg-surface text-text app-pill-glow',
-    secondary: 'bg-surface-inset text-text hover:bg-text/[0.08]',
+    primary: 'bg-violet-500 text-white hover:bg-violet-600',
+    secondary: 'bg-surface-inset text-text hover:bg-[#e8e8ec]',
   } as const;
   const badges = {
-    primary: 'bg-violet-500 text-white',
-    secondary: 'bg-text/[0.06] text-text-muted',
+    primary: 'bg-white/20 text-white',
+    secondary: 'bg-text/[0.07] text-text',
   } as const;
 
   return (
     <a
       href={href}
-      className={`group inline-flex h-12 items-center justify-between gap-4 rounded-[var(--radius-pill)] pl-6 pr-2 text-[0.9375rem] font-medium transition-[color,background-color,transform] duration-[120ms] ease-out active:scale-[0.97] ${variants[variant]}`}
+      className={`group inline-flex h-11 items-center justify-between gap-3 rounded-[var(--radius-pill)] pl-5 pr-1.5 text-[0.9375rem] font-medium transition-[color,background-color,transform] duration-150 ease-out active:scale-[0.97] ${variants[variant]}`}
     >
       <span className="whitespace-nowrap">{children}</span>
       {icon ? (
         <span
           aria-hidden
-          className={`grid size-9 shrink-0 place-items-center rounded-[var(--radius-pill)] transition-transform duration-[120ms] ease-out group-hover:translate-x-0.5 ${badges[variant]}`}
+          className={`grid size-8 shrink-0 place-items-center rounded-[var(--radius-pill)] transition-transform duration-150 ease-out group-hover:translate-x-0.5 ${badges[variant]}`}
         >
           {icon}
         </span>
@@ -320,11 +378,11 @@ export function Note({
 }) {
   // Neutral notes are a soft grey well — tone, not an outline. A warning keeps its
   // amber hairline because there the border carries meaning.
-  const border = tone === 'warning' ? 'border border-warning/30' : '';
+  const border = tone === 'warning' ? 'border border-warning/25 bg-[#fff8eb]' : 'bg-surface-inset';
   return (
     <div
       {...(role ? { role } : {})}
-      className={`rounded-[14px] ${border} bg-surface-inset text-text-muted p-4 text-sm leading-relaxed`}
+      className={`rounded-[var(--radius-input)] ${border} text-text-muted p-4 text-sm leading-relaxed`}
     >
       {children}
     </div>

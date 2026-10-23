@@ -1,11 +1,11 @@
 import type { Metadata, Viewport } from 'next';
 import type { ReactNode } from 'react';
-import { satoshi, geistMono, neueMontreal, sfProRounded } from './fonts';
+import { geistMono, neueMontreal } from './fonts';
 import './globals.css';
 
 const title = 'Maren Finance: Spend Bitcoin. Never sell it.';
 const description =
-  'Join the Maren iOS beta on Mezo testnet. Borrow MUSD against testnet Bitcoin and pay by handle. Pre-audit; testnet funds only.';
+  'Borrow MUSD against your Bitcoin and pay anyone by handle, on Mezo testnet. Pre-audit; testnet funds only.';
 
 /**
  * The origin every relative metadata URL is resolved against — including the social card.
@@ -69,8 +69,8 @@ export const metadata: Metadata = {
 };
 
 export const viewport: Viewport = {
-  themeColor: '#08080A',
-  colorScheme: 'dark',
+  themeColor: '#ffffff',
+  colorScheme: 'light',
   width: 'device-width',
   initialScale: 1,
 };
@@ -79,7 +79,7 @@ export default function RootLayout({ children }: Readonly<{ children: ReactNode 
   return (
     <html
       lang="en"
-      className={`${satoshi.variable} ${geistMono.variable} ${neueMontreal.variable} ${sfProRounded.variable}`}
+      className={`${neueMontreal.variable} ${geistMono.variable}`}
     >
       <body className="bg-bg text-text antialiased">{children}</body>
     </html>
