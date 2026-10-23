@@ -53,8 +53,20 @@ function useDismiss(open: boolean, close: () => void) {
  * badge — a green dot and the short address — so the header does not change shape depending
  * on how a user got in.
  */
-export function ConnectButton() {
-  return privyConfigured ? <PrivyConnectButton /> : <WagmiConnectButton />;
+/**
+ * `quiet` draws the disconnected button as a secondary (white, outlined) block. The
+ * shell's top bar uses it: every disconnected screen already carries its own violet
+ * Connect, and two violet buttons on one view is one too many.
+ */
+const LOUD = 'bg-violet-500 text-white hover:bg-violet-600';
+const QUIET = 'bg-surface text-text border border-[var(--border-strong)] hover:bg-surface-inset';
+
+export function ConnectButton({ quiet = false }: { quiet?: boolean } = {}) {
+  return privyConfigured ? (
+    <PrivyConnectButton quiet={quiet} />
+  ) : (
+    <WagmiConnectButton quiet={quiet} />
+  );
 }
 
 /** The signed-in badge and its menu. `signOut` differs between the two flows. */
@@ -111,7 +123,7 @@ function AccountMenu({
 }
 
 /** The wallet-only flow: pick a wagmi connector from a menu. Unchanged behaviour. */
-function WagmiConnectButton() {
+function WagmiConnectButton({ quiet }: { quiet: boolean }) {
   const { address, isConnected } = useAccount();
   const { connectors, connect, isPending, error } = useConnect();
   const { disconnect } = useDisconnect();
@@ -129,12 +141,12 @@ function WagmiConnectButton() {
         onClick={() => setOpen((v) => !v)}
         aria-expanded={open}
         aria-haspopup="menu"
-        className="group inline-flex h-10 items-center gap-2.5 bg-violet-500 px-4 text-sm text-white transition-[background-color] duration-150 ease-out hover:bg-violet-600 active:brightness-95"
+        className={`group inline-flex h-10 items-center gap-2.5 px-4 text-sm transition-[background-color] duration-150 ease-out active:brightness-95 ${quiet ? QUIET : LOUD}`}
       >
         {isPending ? 'Connecting…' : 'Connect wallet'}
         <span
           aria-hidden
-          className="grid shrink-0 place-items-center text-white transition-transform duration-150 ease-out group-hover:translate-x-0.5"
+          className="grid shrink-0 place-items-center transition-transform duration-150 ease-out group-hover:translate-x-0.5"
         >
           <svg
             viewBox="0 0 16 16"
@@ -191,7 +203,7 @@ function WagmiConnectButton() {
  * shows the address like any other connection. Signing out clears the Privy session and the
  * wagmi connector together, so a returning visitor lands back on the sign-in surface.
  */
-function PrivyConnectButton() {
+function PrivyConnectButton({ quiet }: { quiet: boolean }) {
   const { ready, authenticated, user, login, logout } = usePrivy();
   const { address, isConnected } = useAccount();
   const { disconnect } = useDisconnect();
@@ -221,12 +233,12 @@ function PrivyConnectButton() {
       type="button"
       disabled={!ready}
       onClick={() => login()}
-      className="group inline-flex h-10 items-center gap-2.5 bg-violet-500 px-4 text-sm text-white transition-[background-color] duration-150 ease-out hover:bg-violet-600 active:brightness-95 disabled:cursor-not-allowed disabled:opacity-60"
+      className={`group inline-flex h-10 items-center gap-2.5 px-4 text-sm transition-[background-color] duration-150 ease-out active:brightness-95 disabled:cursor-not-allowed disabled:opacity-60 ${quiet ? QUIET : LOUD}`}
     >
       {ready ? 'Sign in' : 'Loading…'}
       <span
         aria-hidden
-        className="grid shrink-0 place-items-center text-white transition-transform duration-150 ease-out group-hover:translate-x-0.5"
+        className="grid shrink-0 place-items-center transition-transform duration-150 ease-out group-hover:translate-x-0.5"
       >
         <svg
           viewBox="0 0 16 16"

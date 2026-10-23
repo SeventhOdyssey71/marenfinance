@@ -64,7 +64,8 @@ const ROW = {
 };
 
 const CELL = {
-  wrap: '@xl:grid-cols-1 @xl:py-4',
+  // content-start: a figure with no caption must not drop below its neighbours.
+  wrap: '@xl:grid-cols-1 @xl:content-start @xl:py-4',
   label: '@xl:text-[0.8125rem]',
   // In a cell the figure leads its own column, so it steps up a size.
   value:

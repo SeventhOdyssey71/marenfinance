@@ -44,9 +44,7 @@ export function PageHeader({
 }) {
   if (align === 'center') {
     return (
-      <header
-        className={`flex flex-col items-center pb-10 pt-10 text-center md:pt-16 ${className}`}
-      >
+      <div className={`flex flex-col items-center pb-10 pt-10 text-center md:pt-16 ${className}`}>
         {eyebrow ? <p className="t-bracket mb-4">{eyebrow}</p> : null}
         <h1 className="t-h1">{title}</h1>
         {description ? (
@@ -57,11 +55,11 @@ export function PageHeader({
         {actions ? (
           <div className="mt-6 flex flex-wrap items-center justify-center gap-2">{actions}</div>
         ) : null}
-      </header>
+      </div>
     );
   }
   return (
-    <header
+    <div
       className={`flex flex-col gap-4 pb-8 pt-6 md:flex-row md:items-end md:justify-between md:pt-10 ${className}`}
     >
       <div className="min-w-0">
@@ -74,7 +72,7 @@ export function PageHeader({
         ) : null}
       </div>
       {actions ? <div className="flex shrink-0 flex-wrap items-center gap-2">{actions}</div> : null}
-    </header>
+    </div>
   );
 }
 

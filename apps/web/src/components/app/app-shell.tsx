@@ -232,7 +232,7 @@ export function AppShell({ children }: { children: ReactNode }) {
             <p className="text-text hidden text-[0.9375rem] lg:block">{crumbFor(pathname)}</p>
             <div className="flex items-center gap-5">
               <NetworkPill />
-              <ConnectButton />
+              <ConnectButton quiet />
             </div>
           </div>
         </header>
