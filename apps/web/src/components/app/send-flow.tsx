@@ -1,11 +1,11 @@
 'use client';
 
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { formatMusd, shortAddress } from '@maren/sdk';
 import type { Address } from 'viem';
 
 import { BlockedNote } from '@/components/app/blocked';
-import { Musd } from '@/components/app/money';
+import { Dash, Musd } from '@/components/app/money';
 import { Note } from '@/components/app/primitives';
 import { PillAction } from '@/components/ui/pill-button';
 import { ArrowRight, ArrowUpRight, Check } from '@/components/ui/icons';
@@ -56,6 +56,59 @@ const STEPS: { key: Step; label: string }[] = [
   { key: 'recipient', label: 'Recipient' },
   { key: 'review', label: 'Review' },
 ];
+
+/**
+ * The text field the Pay surfaces share, drawn exactly like `AmountField`'s box: white,
+ * square, a strong hairline that turns violet on focus (the focus indicator, replacing the
+ * outline). Exported so the other Pay panels type into the same control rather than a
+ * near copy of it.
+ */
+export const TEXT_FIELD =
+  'bg-surface text-text placeholder:text-text-subtle h-12 w-full min-w-0 border border-[var(--border-strong)] px-4 text-[0.9375rem] outline-none transition-[border-color] duration-150 ease-out focus:border-violet-500';
+
+/** The same box for a field with a unit beside the input ("days", "MUSD"). */
+export const SUFFIX_FIELD =
+  'bg-surface flex h-12 items-center gap-2 border border-[var(--border-strong)] px-4 transition-[border-color] duration-150 ease-out focus-within:border-violet-500';
+
+/** The quiet sentence-case label above a field. */
+export const FIELD_LABEL = 't-label block';
+
+/**
+ * The bottom band of a composer card: one line of context on the left (the gas payer,
+ * the balance), the square submit on the right. On a phone the note sits above a
+ * full-width button. `stack` keeps that column layout at every width, for two buttons.
+ */
+export function ComposerFooter({
+  note,
+  stack = false,
+  children,
+}: {
+  note?: ReactNode;
+  stack?: boolean;
+  children: ReactNode;
+}) {
+  return (
+    <div
+      className={`flex flex-col gap-3 border-t border-[var(--border-hairline)] px-5 py-4 ${
+        stack ? '' : 'sm:flex-row sm:items-center sm:justify-between sm:gap-6'
+      }`}
+    >
+      {note ? (
+        <div className="text-text-muted min-w-0 text-pretty text-[0.8125rem] leading-relaxed">
+          {note}
+        </div>
+      ) : (
+        <span aria-hidden className="hidden sm:block" />
+      )}
+      <div className={`flex shrink-0 flex-col gap-2 sm:flex-row ${stack ? 'sm:justify-end' : ''}`}>
+        {children}
+      </div>
+    </div>
+  );
+}
+
+/** Full width on a phone, sized to its label from `sm`. */
+export const FOOTER_BUTTON = 'w-full justify-between sm:w-auto sm:min-w-[10rem]';
 
 export function SendFlow({ runner }: { runner: TxRunner }) {
   const { data: balances } = useBalances();
@@ -132,7 +185,7 @@ export function SendFlow({ runner }: { runner: TxRunner }) {
       { label: 'Amount', value: <Musd wei={amountWei} /> },
       {
         label: 'Spender',
-        value: <span className="num text-text-subtle break-all text-xs">{SPENDERS.pay}</span>,
+        value: <span className="mono text-text-muted break-all text-xs">{SPENDERS.pay}</span>,
       },
     ],
     gas: {
@@ -167,10 +220,12 @@ export function SendFlow({ runner }: { runner: TxRunner }) {
           isHandle && resolved ? (
             <span>
               <span className="text-text block">{resolved.handle}</span>
-              <span className="num text-text-subtle block text-xs">{resolved.address}</span>
+              <span className="mono text-text-muted mt-0.5 block break-all text-xs">
+                {resolved.address}
+              </span>
             </span>
           ) : (
-            <span className="num text-text-subtle break-all text-xs">{recipient}</span>
+            <span className="mono text-text-muted break-all text-xs">{recipient}</span>
           ),
       },
       ...(memo ? [{ label: 'Memo', value: <span className="text-text-muted">{memo}</span> }] : []),
@@ -191,8 +246,13 @@ export function SendFlow({ runner }: { runner: TxRunner }) {
       : undefined,
   });
 
+  // Who pays the gas for THIS send, from the same derivation the sheet's intent uses, so
+  // the review row and the confirmation sheet cannot disagree.
+  const payAction = isHandle ? 'payHandle' : 'payAddress';
+  const gasSponsored = gasNote(actionIsRelayable(payAction), '', relayer).sponsored;
+
   return (
-    <div className="mx-auto w-full max-w-xl">
+    <section aria-labelledby="send-flow-title" className="card mx-auto w-full max-w-[520px]">
       <FlowHeader step={step} onBack={() => setStep(step === 'review' ? 'recipient' : 'amount')} />
 
       {step === 'amount' ? (
@@ -210,6 +270,7 @@ export function SendFlow({ runner }: { runner: TxRunner }) {
 
       {step === 'recipient' ? (
         <RecipientStep
+          amountWei={amountWei}
           to={to}
           onTo={setTo}
           isAddress={isAddress}
@@ -233,7 +294,8 @@ export function SendFlow({ runner }: { runner: TxRunner }) {
           toHandle={isHandle && resolved ? resolved.handle : null}
           toAddress={recipient as Address}
           memo={memo}
-          relayerLine={gasLine(actionIsRelayable(isHandle ? 'payHandle' : 'payAddress'), relayer)}
+          relayerLine={gasLine(actionIsRelayable(payAction), relayer)}
+          gasSponsored={gasSponsored}
           needsApproval={needsApproval && amountWei > 0n}
           allowanceWei={allowanceWei}
           ready={writes.ready}
@@ -241,7 +303,7 @@ export function SendFlow({ runner }: { runner: TxRunner }) {
           onSend={() => runner.request(sendIntent())}
         />
       ) : null}
-    </div>
+    </section>
   );
 }
 
@@ -249,57 +311,62 @@ export function SendFlow({ runner }: { runner: TxRunner }) {
 
 function FlowHeader({ step, onBack }: { step: Step; onBack: () => void }) {
   const activeIndex = STEPS.findIndex((s) => s.key === step);
-  const progress = (activeIndex / (STEPS.length - 1)) * 100;
 
   return (
-    <div className="mb-6">
-      <div className="mb-3 flex items-center gap-3">
+    <>
+      {/* The label holds still between steps; Back appears on the right once there is
+          somewhere to go back to, so nothing shifts under the reader's eye. */}
+      <div className="flex min-h-12 items-center justify-between gap-3 border-b border-[var(--border-hairline)] px-5">
+        <h2 id="send-flow-title" className="t-bracket">
+          [ Send MUSD ]
+        </h2>
         {step !== 'amount' ? (
           <button
             type="button"
             onClick={onBack}
             aria-label="Go back a step"
-            className="text-text-muted hover:text-text grid size-11 shrink-0 place-items-center rounded-[var(--radius-pill)] border border-[var(--border-hairline)] transition-[color,border-color,transform] duration-[120ms] ease-out hover:border-[var(--border-strong)] active:scale-[0.97]"
+            className="-mr-2 inline-flex h-11 items-center gap-1.5 px-2 text-sm text-violet-400 transition-colors duration-150 ease-out hover:text-violet-600"
           >
             <ArrowRight aria-hidden className="size-4 rotate-180" />
+            Back
           </button>
-        ) : (
-          <span className="size-11 shrink-0" />
-        )}
-        <span className="t-h3">Send MUSD</span>
+        ) : null}
       </div>
 
-      {/* A real, labelled progress bar rather than decoration. */}
+      {/* A real, labelled progress bar rather than decoration: three cells, one per step,
+          the current one underlined in ink and the finished ones ticked. */}
       <div
-        className="bg-surface-inset relative h-0.5 w-full overflow-hidden rounded-[var(--radius-pill)]"
+        className="grid grid-cols-3 divide-x divide-[var(--border-hairline)] border-b border-[var(--border-hairline)]"
         role="progressbar"
         aria-valuemin={1}
         aria-valuemax={STEPS.length}
         aria-valuenow={activeIndex + 1}
         aria-label={`Step ${activeIndex + 1} of ${STEPS.length}: ${STEPS[activeIndex]!.label}`}
       >
-        <div
-          className="absolute inset-y-0 left-0 rounded-[var(--radius-pill)] bg-violet-500 transition-[width] duration-300 ease-out motion-reduce:transition-none"
-          style={{ width: `${progress}%` }}
-        />
+        {STEPS.map((s, i) => {
+          const state = i < activeIndex ? 'done' : i === activeIndex ? 'current' : 'todo';
+          return (
+            <span
+              key={s.key}
+              aria-hidden
+              className={`relative flex h-10 min-w-0 items-center gap-2 px-3 text-xs sm:px-5 ${
+                state === 'current' ? 'text-text font-medium' : 'text-text-muted'
+              }`}
+            >
+              {state === 'done' ? (
+                <Check className="text-success size-3.5 shrink-0" />
+              ) : (
+                <span className="mono shrink-0 text-[0.6875rem] font-normal">0{i + 1}</span>
+              )}
+              <span className="truncate">{s.label}</span>
+              {state === 'current' ? (
+                <span className="bg-text absolute inset-x-0 -bottom-px h-0.5" />
+              ) : null}
+            </span>
+          );
+        })}
       </div>
-      <div className="mt-2 flex items-center justify-between">
-        {STEPS.map((s, i) => (
-          <span
-            key={s.key}
-            className={`t-label ${
-              i === activeIndex
-                ? 'text-text'
-                : i < activeIndex
-                  ? 'text-violet-400'
-                  : 'text-text-subtle'
-            }`}
-          >
-            {s.label}
-          </span>
-        ))}
-      </div>
-    </div>
+    </>
   );
 }
 
@@ -310,7 +377,8 @@ function groupInt(intPart: string): string {
   return /^\d+$/.test(intPart) ? intPart.replace(/\B(?=(\d{3})+(?!\d))/g, ',') : intPart;
 }
 
-const BIG_NUMBER = 'num text-center text-[2.75rem] sm:text-[3.25rem] leading-none tracking-tight';
+const BIG_NUMBER =
+  'num text-center text-[3rem] sm:text-[3.5rem] font-medium leading-none tracking-[-0.045em]';
 
 function AmountStep({
   amount,
@@ -352,106 +420,120 @@ function AmountStep({
   };
 
   return (
-    <div>
-      {/* Clicking the number area focuses the real input; the input itself stays the
-          accessible, keyboard-reachable control (never hidden behind aria-hidden). The
-          display span is a decorative duplicate that carries the greyed-decimal treatment. */}
-      <div
-        /* The real input is text-transparent — a decorative span draws the styled digits —
-           and it used to suppress its own outline, so tabbing into the first field on the
-           Pay tab showed nothing at all. Letting the global :focus-visible ring through is
-           the whole fix; it lands on the input, which sits inset-0 over the digits. A
-           second ring on this wrapper would draw a different rect at a different radius. */
-        className="flex w-full cursor-text flex-col items-center py-6"
-        onMouseDown={(e) => {
-          if (e.target !== inputRef.current) {
-            e.preventDefault();
-            inputRef.current?.focus();
-          }
-        }}
-      >
-        <div className="flex items-baseline justify-center gap-3">
-          <div className="relative">
-            <span
-              aria-hidden
-              className={`${BIG_NUMBER} block ${over ? 'text-danger' : 'text-text'}`}
-            >
-              {whole}
-              {frac ? (
-                <span className={over ? 'text-danger/60' : 'text-text-subtle'}>{frac}</span>
-              ) : null}
-            </span>
-            <input
-              ref={inputRef}
-              value={amount}
-              onChange={(e) => sanitize(e.target.value)}
-              onKeyDown={(e) => {
-                if (e.key === 'Enter' && canContinue) onContinue();
-              }}
-              inputMode="decimal"
-              autoComplete="off"
-              spellCheck={false}
-              aria-label="Amount to send, in MUSD"
-              aria-invalid={over ? true : undefined}
-              className={`${BIG_NUMBER} absolute inset-0 w-full bg-transparent text-transparent caret-violet-500`}
-            />
-          </div>
-          <span className="t-h3 text-text-muted shrink-0">MUSD</span>
-        </div>
-      </div>
-
-      {/* Wallet pill + Max, honest available balance. */}
-      <div className="mb-2 flex items-center justify-center gap-2">
-        <span className="bg-surface-inset inline-flex h-11 items-center gap-2 rounded-[var(--radius-pill)] border border-[var(--border-hairline)] px-3.5">
-          <span aria-hidden className="bg-success size-1.5 rounded-[var(--radius-pill)]" />
-          <span className="t-label text-text-muted">Your wallet</span>
-          <span className="text-text-subtle text-xs">·</span>
-          {balanceKnown ? (
-            <Musd wei={balance} size="sm" tone="muted" />
-          ) : (
-            <span className="text-text-subtle text-xs">—</span>
-          )}
-        </span>
-        <button
-          type="button"
-          onClick={() => onAmount(formatMusd(balance, { unit: false }).replace(/,/g, ''))}
-          disabled={balance <= 0n}
-          className="bg-surface-inset text-text-muted hover:text-text inline-flex h-11 items-center rounded-[var(--radius-pill)] border border-[var(--border-hairline)] px-4 text-xs font-medium transition-[color,border-color,transform] duration-[120ms] ease-out hover:border-[var(--border-strong)] active:scale-[0.97] disabled:opacity-40"
+    <>
+      <div className="px-5 pb-8 pt-12 sm:pt-14">
+        {/* Clicking the number area focuses the real input; the input itself stays the
+            accessible, keyboard-reachable control (never hidden behind aria-hidden). The
+            display span is a decorative duplicate that carries the greyed-decimal treatment. */}
+        <div
+          /* The real input is text-transparent — a decorative span draws the styled digits —
+             and it used to suppress its outline with nothing in its place, so tabbing into
+             the first field on the Pay tab showed nothing at all. The input, which sits
+             inset-0 over the digits, now draws its own focus rule (see its className); a
+             second indicator on this wrapper would draw a different rect. */
+          className="flex w-full cursor-text flex-col items-center"
+          onMouseDown={(e) => {
+            if (e.target !== inputRef.current) {
+              e.preventDefault();
+              inputRef.current?.focus();
+            }
+          }}
         >
-          Max
-        </button>
+          <div className="flex max-w-full items-baseline justify-center gap-2.5">
+            <div className="relative min-w-0">
+              <span
+                aria-hidden
+                className={`${BIG_NUMBER} block ${over ? 'text-danger' : 'text-text'}`}
+              >
+                {whole}
+                {frac ? (
+                  <span className={over ? 'text-danger/60' : 'text-text-subtle'}>{frac}</span>
+                ) : null}
+              </span>
+              <input
+                ref={inputRef}
+                value={amount}
+                onChange={(e) => sanitize(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' && canContinue) onContinue();
+                }}
+                inputMode="decimal"
+                autoComplete="off"
+                spellCheck={false}
+                aria-label="Amount to send, in MUSD"
+                aria-invalid={over ? true : undefined}
+                /* Focus is a 2px violet rule under the figure rather than the global ring:
+                   the ring drew a rounded box around three digits, the one round thing on a
+                   square screen. The rule is the replacement indicator, not its absence. */
+                className={`${BIG_NUMBER} absolute inset-0 w-full rounded-none bg-transparent text-transparent caret-violet-500 outline-none focus-visible:shadow-[inset_0_-2px_0_var(--color-violet-500)]`}
+              />
+            </div>
+            <span className="text-text-muted shrink-0 text-xl font-medium tracking-[-0.02em]">
+              MUSD
+            </span>
+          </div>
+          <p className="text-text-muted mt-4 hidden text-xs sm:block">Press Enter to continue</p>
+        </div>
+
+        {funds.rangeDead && funds.blocker ? (
+          <div className="mt-8">
+            <BlockedNote blocker={funds.blocker} id="send-amount-blocked" />
+          </div>
+        ) : over ? (
+          <p role="alert" className="text-danger mt-6 text-center text-sm">
+            {funds.blocker?.title}
+          </p>
+        ) : null}
       </div>
 
-      <p className="text-text-subtle mb-6 text-center text-xs">
-        Type an amount, then continue. On desktop, press Enter.
-      </p>
-
-      {funds.rangeDead && funds.blocker ? (
-        <div className="mb-6">
-          <BlockedNote blocker={funds.blocker} id="send-amount-blocked" />
-        </div>
-      ) : over ? (
-        <p role="alert" className="text-danger mb-6 text-center text-sm">
-          {funds.blocker?.title}
-        </p>
-      ) : null}
-
-      <PillAction
-        onClick={onContinue}
-        disabled={!canContinue}
-        icon={<ArrowRight className="size-4" />}
-        className="w-full justify-between"
-        aria-describedby="send-amount-blocked"
+      <ComposerFooter
+        note={
+          // The honest available balance, and Max beside it as an inline action.
+          <span className="flex flex-wrap items-center gap-x-2">
+            <span>Available</span>
+            {balanceKnown ? <Musd wei={balance} size="sm" /> : <Dash size="sm" />}
+            <button
+              type="button"
+              onClick={() => onAmount(formatMusd(balance, { unit: false }).replace(/,/g, ''))}
+              disabled={balance <= 0n}
+              className="disabled:text-text-subtle -my-3 inline-flex min-h-11 items-center px-1.5 text-[0.8125rem] text-violet-400 transition-colors duration-150 ease-out hover:text-violet-600 disabled:cursor-not-allowed"
+            >
+              Max
+            </button>
+          </span>
+        }
       >
-        Continue
-      </PillAction>
-    </div>
+        <PillAction
+          onClick={onContinue}
+          disabled={!canContinue}
+          icon={<ArrowRight className="size-4" />}
+          className={FOOTER_BUTTON}
+          aria-describedby="send-amount-blocked"
+        >
+          Continue
+        </PillAction>
+      </ComposerFooter>
+    </>
   );
 }
 
 // ── step 2: recipient ────────────────────────────────────────────────────────
 
+/** A status line under a field: a dot that carries the tone, and words that carry the meaning. */
+export function FieldStatus({ tone, children }: { tone: 'ok' | 'error'; children: ReactNode }) {
+  return (
+    <span className="flex flex-wrap items-center gap-x-2 gap-y-1">
+      <span
+        aria-hidden
+        className={`size-1.5 shrink-0 rounded-full ${tone === 'ok' ? 'bg-success' : 'bg-danger'}`}
+      />
+      {children}
+    </span>
+  );
+}
+
 function RecipientStep({
+  amountWei,
   to,
   onTo,
   isAddress,
@@ -464,6 +546,7 @@ function RecipientStep({
   canContinue,
   onContinue,
 }: {
+  amountWei: bigint;
   to: string;
   onTo: (v: string) => void;
   isAddress: boolean;
@@ -483,81 +566,92 @@ function RecipientStep({
   const trimmed = to.trim();
 
   return (
-    <div>
-      <label htmlFor="send-to" className="t-label text-text-subtle block">
-        To
-      </label>
-      <input
-        id="send-to"
-        ref={inputRef}
-        value={to}
-        onChange={(e) => onTo(e.target.value)}
-        onKeyDown={(e) => {
-          if (e.key === 'Enter' && canContinue) onContinue();
-        }}
-        placeholder="@handle or 0x address"
-        autoComplete="off"
-        spellCheck={false}
-        aria-describedby="send-to-status"
-        className="num text-text placeholder:text-text-subtle/60 mt-3 w-full border-b border-[var(--border-hairline)] bg-transparent pb-3 text-lg focus:border-[var(--border-strong)]"
-      />
-
-      {/* The resolved address, always, before anything is signed. */}
-      <div id="send-to-status" className="mt-3 min-h-[1.25rem] text-sm" role="status">
-        {isHandle && isFetching ? (
-          <span className="text-text-subtle">Resolving handle…</span>
-        ) : isHandle && resolved ? (
-          <span className="flex flex-wrap items-center gap-2">
-            <span aria-hidden className="bg-success size-1.5 rounded-[var(--radius-pill)]" />
-            <span className="text-text-muted">{resolved.handle} resolves to</span>
-            <span className="num text-text text-[0.8125rem]">{resolved.address}</span>
-          </span>
-        ) : isHandle ? (
-          <span className="text-danger">No such handle on this network.</span>
-        ) : isAddress ? (
-          <span className="flex flex-wrap items-center gap-2">
-            <span aria-hidden className="bg-success size-1.5 rounded-[var(--radius-pill)]" />
-            <span className="text-text-muted">Valid address.</span>
-          </span>
-        ) : trimmed.length > 0 ? (
-          <span className="text-text-subtle">Enter a full @handle or a 0x address.</span>
-        ) : (
-          <span className="text-text-subtle">Enter an @handle or a 0x address.</span>
-        )}
-      </div>
-
-      <RecentRecipients
-        onPick={onTo}
-        activeAddress={isAddress ? (trimmed as Address) : resolved?.address}
-      />
-
-      <div className="mt-8">
-        <label htmlFor="send-memo" className="t-label text-text-subtle block">
-          Memo (optional)
+    <>
+      <div className="px-5 pb-7 pt-6">
+        <label htmlFor="send-to" className={FIELD_LABEL}>
+          To
         </label>
         <input
-          id="send-memo"
-          value={memo}
-          onChange={(e) => onMemo(e.target.value)}
-          placeholder="What is this for?"
-          aria-describedby="send-memo-count"
-          className="text-text placeholder:text-text-subtle/60 mt-3 w-full border-b border-[var(--border-hairline)] bg-transparent pb-3 text-[0.9375rem] focus:border-[var(--border-strong)]"
+          id="send-to"
+          ref={inputRef}
+          value={to}
+          onChange={(e) => onTo(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter' && canContinue) onContinue();
+          }}
+          placeholder="@handle or 0x address"
+          autoComplete="off"
+          spellCheck={false}
+          aria-describedby="send-to-status"
+          className={`${TEXT_FIELD} mt-2`}
         />
-        <p id="send-memo-count" className="text-text-subtle mt-2 text-xs">
-          <span className="num">{memoBytes}</span>/80 bytes · public on-chain
-          {memoBytes > 80 ? <span className="text-danger"> · too long</span> : null}
-        </p>
+
+        {/* The resolved address, always, before anything is signed. */}
+        <div id="send-to-status" className="mt-2.5 min-h-[1.25rem] text-[0.8125rem]" role="status">
+          {isHandle && isFetching ? (
+            <span className="text-text-muted">Resolving handle…</span>
+          ) : isHandle && resolved ? (
+            <FieldStatus tone="ok">
+              <span className="text-text-muted">{resolved.handle} resolves to</span>
+              <span className="mono text-text break-all text-xs">{resolved.address}</span>
+            </FieldStatus>
+          ) : isHandle ? (
+            <FieldStatus tone="error">
+              <span className="text-danger">No such handle on this network.</span>
+            </FieldStatus>
+          ) : isAddress ? (
+            <FieldStatus tone="ok">
+              <span className="text-text-muted">Valid address.</span>
+            </FieldStatus>
+          ) : trimmed.length > 0 ? (
+            <span className="text-text-muted">Enter a full @handle or a 0x address.</span>
+          ) : (
+            <span className="text-text-muted">Enter an @handle or a 0x address.</span>
+          )}
+        </div>
+
+        <RecentRecipients
+          onPick={onTo}
+          activeAddress={isAddress ? (trimmed as Address) : resolved?.address}
+        />
+
+        <div className="mt-6">
+          <label htmlFor="send-memo" className={FIELD_LABEL}>
+            Memo (optional)
+          </label>
+          <input
+            id="send-memo"
+            value={memo}
+            onChange={(e) => onMemo(e.target.value)}
+            placeholder="What is this for?"
+            aria-describedby="send-memo-count"
+            aria-invalid={memoBytes > 80 ? true : undefined}
+            className={`${TEXT_FIELD} mt-2`}
+          />
+          <p id="send-memo-count" className="text-text-muted mt-2.5 text-xs">
+            <span className="num">{memoBytes}</span>/80 bytes · public on-chain
+            {memoBytes > 80 ? <span className="text-danger"> · too long</span> : null}
+          </p>
+        </div>
       </div>
 
-      <PillAction
-        onClick={onContinue}
-        disabled={!canContinue}
-        icon={<ArrowRight className="size-4" />}
-        className="mt-8 w-full justify-between"
+      <ComposerFooter
+        note={
+          <span className="flex flex-wrap items-center gap-x-1.5">
+            Sending <Musd wei={amountWei} size="sm" />
+          </span>
+        }
       >
-        Continue
-      </PillAction>
-    </div>
+        <PillAction
+          onClick={onContinue}
+          disabled={!canContinue}
+          icon={<ArrowRight className="size-4" />}
+          className={FOOTER_BUTTON}
+        >
+          Continue
+        </PillAction>
+      </ComposerFooter>
+    </>
   );
 }
 
@@ -596,23 +690,28 @@ function RecentRecipients({
   if (isPending || recents.length === 0) return null;
 
   return (
-    <div className="mt-6">
-      <span className="t-label text-text-subtle block">Recent</span>
-      <div className="mt-3 flex flex-wrap gap-2">
+    <div className="mt-5">
+      <span className={FIELD_LABEL}>Recent</span>
+      <div className="mt-2 flex flex-wrap gap-2">
         {recents.map((r) => {
           const active = activeAddress && r.address.toLowerCase() === activeAddress.toLowerCase();
+          const isName = r.label.startsWith('@');
           return (
             <button
               key={r.address}
               type="button"
-              onClick={() => onPick(r.label.startsWith('@') ? r.label : r.address)}
-              className={`inline-flex h-11 items-center gap-2 rounded-[var(--radius-pill)] border px-4 text-sm transition-[color,border-color,transform] duration-[120ms] ease-out active:scale-[0.97] ${
+              aria-pressed={active ? true : false}
+              onClick={() => onPick(isName ? r.label : r.address)}
+              title={r.address}
+              className={`inline-flex h-11 items-center border px-4 text-sm transition-[color,background-color,border-color] duration-150 ease-out ${
                 active
-                  ? 'text-text border-violet-500'
-                  : 'bg-surface-inset text-text-muted hover:text-text border-[var(--border-hairline)] hover:border-[var(--border-strong)]'
+                  ? 'bg-surface-inset text-text border-text'
+                  : 'bg-surface text-text-muted hover:text-text border-[var(--border-hairline)] hover:border-[var(--border-strong)]'
               }`}
             >
-              <span className="num max-w-[16ch] truncate">{r.label}</span>
+              <span className={`max-w-[16ch] truncate ${isName ? '' : 'mono text-[0.8125rem]'}`}>
+                {r.label}
+              </span>
             </button>
           );
         })}
@@ -632,6 +731,7 @@ function ReviewStep({
   toAddress,
   memo,
   relayerLine,
+  gasSponsored,
   needsApproval,
   allowanceWei,
   ready,
@@ -646,6 +746,7 @@ function ReviewStep({
   toAddress: Address;
   memo: string;
   relayerLine: string;
+  gasSponsored: boolean;
   needsApproval: boolean;
   allowanceWei: bigint | null;
   ready: boolean;
@@ -657,53 +758,61 @@ function ReviewStep({
   const [whole, frac] = formatted.split('.');
 
   return (
-    <div>
-      <div className="py-4 text-center">
-        <span className="num inline-flex items-baseline justify-center gap-2 text-[2.5rem] leading-none tracking-tight">
-          <span className="text-text">{whole}</span>
-          {frac ? <span className="text-text-subtle">.{frac}</span> : null}
-          <span className="t-h3 text-text-muted">MUSD</span>
-        </span>
+    <>
+      <div className="px-5 pb-7 pt-12 sm:pt-14">
+        <div className="text-center">
+          <span className="num inline-flex items-baseline justify-center gap-2.5 text-[3rem] font-medium leading-none tracking-[-0.045em] sm:text-[3.5rem]">
+            <span>
+              <span className="text-text">{whole}</span>
+              {frac ? <span className="text-text-subtle">.{frac}</span> : null}
+            </span>
+            <span className="text-text-muted text-xl tracking-[-0.02em]">MUSD</span>
+          </span>
+        </div>
+
+        <dl className="mt-10 divide-y divide-[var(--border-hairline)] border border-[var(--border-hairline)]">
+          <ReviewRow
+            label="From"
+            value={fromHandle ?? 'Your wallet'}
+            sub={fromAddress ?? 'Signed by your connected wallet'}
+            subMono={fromAddress !== null}
+          />
+          <ReviewRow
+            label="To"
+            value={toHandle ?? shortAddress(toAddress)}
+            sub={toAddress}
+            subMono
+          />
+          {memo ? (
+            <ReviewRow label="Memo" value={memo} sub="Written on-chain, public forever" />
+          ) : null}
+          <ReviewRow label="Network fee" value={gasSponsored ? 'Maren pays' : 'You pay, in BTC'} />
+        </dl>
+
+        {needsApproval ? (
+          <div className="mt-5">
+            <Note>
+              MarenPay needs an allowance for {formatMusd(amountWei)} first; currently{' '}
+              {formatMusd(allowanceWei ?? 0n)}. That is a separate transaction, shown here rather
+              than slipped in behind the payment.
+            </Note>
+          </div>
+        ) : null}
+
+        {balance < amountWei ? (
+          <p role="alert" className="text-danger mt-4 text-sm">
+            This is more than your wallet holds now. Go back and lower the amount.
+          </p>
+        ) : null}
       </div>
 
-      <dl className="card overflow-hidden">
-        <ReviewRow
-          label="From"
-          value={fromHandle ?? 'Your wallet'}
-          sub={fromAddress ?? 'Signed by your connected wallet'}
-          subMono={fromAddress !== null}
-        />
-        <ReviewRow label="To" value={toHandle ?? shortAddress(toAddress)} sub={toAddress} subMono />
-        {memo ? (
-          <ReviewRow label="Memo" value={memo} sub="Written on-chain, public forever" />
-        ) : null}
-        <ReviewRow label="Network fee" value="You pay gas" sub={relayerLine} last />
-      </dl>
-
-      {needsApproval ? (
-        <div className="mt-6">
-          <Note>
-            MarenPay needs an allowance for {formatMusd(amountWei)} first; currently{' '}
-            {formatMusd(allowanceWei ?? 0n)}. That is a separate transaction, shown here rather than
-            slipped in behind the payment.
-          </Note>
-        </div>
-      ) : null}
-
-      <p className="text-text-subtle mt-6 text-xs leading-relaxed">{relayerLine}</p>
-
-      {balance < amountWei ? (
-        <p role="alert" className="text-danger mt-3 text-sm">
-          This is more than your wallet holds now. Go back and lower the amount.
-        </p>
-      ) : null}
-
-      <div className="mt-4 flex flex-wrap gap-3">
+      <ComposerFooter note={relayerLine} stack={needsApproval}>
         {needsApproval ? (
           <PillAction
             onClick={onApprove}
             disabled={!ready}
             icon={<ArrowUpRight className="size-4" />}
+            className={FOOTER_BUTTON}
           >
             Approve {formatMusd(amountWei)}
           </PillAction>
@@ -712,12 +821,13 @@ function ReviewStep({
           variant={needsApproval ? 'secondary' : 'primary'}
           onClick={onSend}
           disabled={!ready || needsApproval || balance < amountWei}
-          icon={<Check className="size-4" />}
+          icon={<ArrowUpRight className="size-4" />}
+          className={FOOTER_BUTTON}
         >
           Send {formatMusd(amountWei)}
         </PillAction>
-      </div>
-    </div>
+      </ComposerFooter>
+    </>
   );
 }
 
@@ -726,26 +836,20 @@ function ReviewRow({
   value,
   sub,
   subMono = false,
-  last = false,
 }: {
   label: string;
   value: string;
   sub?: string;
   subMono?: boolean;
-  last?: boolean;
 }) {
   return (
-    <div
-      className={`flex items-start justify-between gap-6 px-5 py-3.5 ${
-        last ? '' : 'border-b border-[var(--border-hairline)]'
-      }`}
-    >
-      <dt className="t-label text-text-subtle pt-0.5">{label}</dt>
+    <div className="flex items-start justify-between gap-6 px-4 py-3.5">
+      <dt className="text-text-muted shrink-0 text-sm">{label}</dt>
       <dd className="min-w-0 text-right">
         <span className="text-text block break-words text-sm">{value}</span>
         {sub ? (
           <span
-            className={`text-text-subtle mt-0.5 block break-all text-xs ${subMono ? 'num' : ''}`}
+            className={`text-text-muted mt-1 block break-all ${subMono ? 'mono text-[0.75rem]' : 'text-xs'}`}
           >
             {sub}
           </span>

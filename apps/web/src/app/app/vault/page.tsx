@@ -1,6 +1,7 @@
 'use client';
 
-import { useMemo, useState } from 'react';
+import { useMemo, useState, type ReactNode } from 'react';
+import { usePathname } from 'next/navigation';
 import {
   LIQUIDATION_RESERVE,
   MAREN_POLICY,
@@ -18,6 +19,7 @@ import {
 
 import { BlockedNote } from '@/components/app/blocked';
 import { AmountField, AmountSlider, Segmented } from '@/components/app/controls';
+import { Fact, FactGroup } from '@/components/app/facts';
 import { HealthChip } from '@/components/app/health';
 import {
   Btc,
@@ -31,17 +33,12 @@ import {
 import { PriceBanner } from '@/components/app/price-banner';
 import {
   ActionButton,
-  AppCard,
   AppLoading,
   EmptyState,
-  Label,
-  Metric,
-  MetricStrip,
   Note,
+  PageHeader,
   Panel,
-  PanelBody,
   Refreshing,
-  StatRow,
 } from '@/components/app/primitives';
 import { TxSheet, useTxRunner, type TxIntent, type TxRunner } from '@/components/app/tx';
 import { ArrowRight, VaultIcon } from '@/components/ui/icons';
@@ -96,10 +93,15 @@ const MODES = [
  * to whoever had already been routed into it, below the controls. A reviewer could use the
  * whole product without learning that the pooled position was the point.
  *
- * It is now `SocialVaultPanel`, above the tab strip, with the vault's own health on the
- * same scale a user's position is judged on, its collateral and debt, and how full it is
+ * It is now `SocialVaultPanel`, a full panel with the vault's own health on the same
+ * scale a user's position is judged on, its collateral and debt, and how full it is
  * against `depositCap()`. The pooling risk is in the panel body rather than behind the
  * info affordance. `RouteCard` is gone: it said the same thing to a smaller audience.
+ *
+ * LAYOUT. One column, three groups: your position, the controls (tabs over the panel they
+ * switch), then the shared vault. The vault panel used to sit above the tabs; it now
+ * follows them, so someone checking their own money meets their own figures first, and
+ * every vault figure is visible in it rather than one toggle down.
  *
  * And the routing is now a decision the user watches being made. `RouteChoice` sits above
  * the deposit amount with both routes, the live threshold that separates them, and the
@@ -112,7 +114,7 @@ const MODES = [
  * what the panel was for: "Adds collateral and raises your ratio immediately", "Reduces
  * your principal and raises your ratio", "The amount available is already capped at
  * Maren's 180% floor". A user who has pressed the Deposit tab knows they are depositing.
- * The panels now carry a `t-label` header bar, and the space those sentences occupied is
+ * The panels now carry a bracketed header bar, and the space those sentences occupied is
  * occupied by the numbers the action changes, immediately next to the control that changes
  * them.
  *
@@ -165,6 +167,15 @@ export default function VaultPage() {
   const chain: VaultState = { price, position, balances, stats };
 
   /**
+   * Rendered at `/app/vault` this is a screen, with its own title. Inside Finance's tab
+   * panel, Finance's header and the tab already name it, and a second `h1` would give the
+   * page two titles. A page module cannot take props or export a variant, so the route is
+   * what says which of the two this is.
+   */
+  const standalone = usePathname() === '/app/vault';
+  const header = standalone ? <PageHeader eyebrow="[ Vault ]" title="Bitcoin credit" /> : null;
+
+  /**
    * No wallet, no vault screen.
    *
    * Everything below — the position strip, the borrow slider, the withdrawal ceiling — is
@@ -174,9 +185,7 @@ export default function VaultPage() {
    */
   if (!source.connected) {
     return (
-      <div className="flex flex-col gap-4">
-        <Header />
-
+      <Screen header={header}>
         <ConnectPrompt icon={<VaultIcon className="size-6" />} title="Connect to open a position">
           {/* `data-contrast` is verify-contrast's hook for muted body copy on a card
               surface, which is this token's worst case. It lives on whichever copy is
@@ -191,7 +200,7 @@ export default function VaultPage() {
         {/* The vault itself is public, so a visitor with no wallet still gets the thing
             the product is built around rather than a locked door. */}
         <SocialVaultPanel />
-      </div>
+      </Screen>
     );
   }
 
@@ -207,24 +216,24 @@ export default function VaultPage() {
 
   if (firstLoad) {
     return (
-      <div className="flex flex-col gap-4">
-        <Header />
-        <AppLoading panels={[3, 3]} />
-      </div>
+      <Screen header={header}>
+        <AppLoading panels={[3, 4, 4]} />
+      </Screen>
     );
   }
 
   if (position?.route === 'direct') {
     return (
-      <div className="flex flex-col gap-4">
-        <Header refreshing={refreshing} />
-        <PositionStrip livePrice={livePrice} />
-        <Note>
-          This wallet has a direct Mezo trove. Manage it through Mezo’s direct-trove interface.
-          Maren’s deposit, borrow, repay and withdrawal controls act on its shared vault and cannot
-          change this separate position.
-        </Note>
-      </div>
+      <Screen header={header}>
+        <Group>
+          <PositionStrip livePrice={livePrice} refreshing={refreshing} />
+          <Note>
+            This wallet has a direct Mezo trove. Manage it through Mezo’s direct-trove interface.
+            Maren’s deposit, borrow, repay and withdrawal controls act on its shared vault and
+            cannot change this separate position.
+          </Note>
+        </Group>
+      </Screen>
     );
   }
 
@@ -237,100 +246,166 @@ export default function VaultPage() {
    */
   const mode: Mode = chosen ?? (empty ? 'deposit' : 'borrow');
 
+  /**
+   * One refreshing mark, on the panel whose figures are being re-read: the position, or,
+   * for an account with no position panel yet, the action panel below the tabs.
+   */
+  const actionRefreshing = empty && refreshing;
+
   return (
-    <div className="flex flex-col gap-4">
-      <Header refreshing={refreshing} />
+    <Screen header={header}>
+      {/* Your own money first. No position panel when there is no position: an empty
+          account lands on the Deposit tab, and the deposit form IS this screen's empty
+          state. */}
+      {price.state !== 'live' || !empty ? (
+        <Group>
+          {price.state !== 'live' ? <PriceBanner feed={price} /> : null}
+          {empty ? null : <PositionStrip livePrice={livePrice} refreshing={refreshing} />}
+        </Group>
+      ) : null}
 
-      {price.state !== 'live' ? <PriceBanner feed={price} /> : null}
+      {/* The controls, as tabs over the panel they switch. */}
+      <div>
+        <Segmented options={MODES} value={mode} onChange={setChosen} label="Vault action" />
+        <div className="mt-3">
+          {mode === 'borrow' ? (
+            <BorrowPanel
+              runner={runner}
+              chain={chain}
+              onDeposit={() => setChosen('deposit')}
+              refreshing={actionRefreshing}
+            />
+          ) : null}
+          {mode === 'deposit' ? (
+            <DepositPanel runner={runner} chain={chain} refreshing={actionRefreshing} />
+          ) : null}
+          {mode === 'repay' ? (
+            <RepayPanel runner={runner} chain={chain} refreshing={actionRefreshing} />
+          ) : null}
+          {mode === 'withdraw' ? (
+            <WithdrawPanel runner={runner} chain={chain} refreshing={actionRefreshing} />
+          ) : null}
+        </div>
+      </div>
 
-      {/* No position strip when there is no position. An empty account lands on the
-          Deposit tab, and the deposit form IS this screen's empty state. */}
-      {empty ? null : <PositionStrip livePrice={livePrice} />}
-
-      {/* The vault is the product, so it sits above the controls that act on it rather
-          than below them as a footnote for whoever was routed into it. */}
+      {/* The shared trove every position here sits in. It is the product, so it is on the
+          screen in full, and it comes after the user's own money and the controls that act
+          on it rather than in front of them. */}
       <SocialVaultPanel />
 
-      <Segmented options={MODES} value={mode} onChange={setChosen} label="Vault action" />
-
-      {mode === 'borrow' ? (
-        <BorrowPanel runner={runner} chain={chain} onDeposit={() => setChosen('deposit')} />
-      ) : null}
-      {mode === 'deposit' ? <DepositPanel runner={runner} chain={chain} /> : null}
-      {mode === 'repay' ? <RepayPanel runner={runner} chain={chain} /> : null}
-      {mode === 'withdraw' ? <WithdrawPanel runner={runner} chain={chain} /> : null}
-
       <TxSheet runner={runner} />
+    </Screen>
+  );
+}
+
+/**
+ * The screen's single column. Groups (your position, the controls, the shared vault) sit
+ * 40px apart; anything inside a group sits 16px apart, so the eye reads three things, not
+ * nine.
+ */
+function Screen({ header, children }: { header: ReactNode; children: ReactNode }) {
+  return (
+    <div>
+      {header}
+      <div className="flex flex-col gap-10">{children}</div>
     </div>
   );
 }
 
-function Header({ refreshing = false }: { refreshing?: boolean }) {
-  return (
-    <div className="flex items-start justify-between gap-4">
-      <div>
-        <Label>Vault</Label>
-        <h1 className="t-h3 mt-1.5">Bitcoin credit</h1>
-      </div>
-      {refreshing ? <Refreshing /> : null}
-    </div>
-  );
+/** Cards that belong together inside one group. */
+function Group({ children }: { children: ReactNode }) {
+  return <div className="flex flex-col gap-4">{children}</div>;
 }
 
 /** The position, as three readings on a rule rather than three stacked rows. */
-function PositionStrip({ livePrice }: { livePrice: bigint | null }) {
+function PositionStrip({
+  livePrice,
+  refreshing = false,
+}: {
+  livePrice: bigint | null;
+  refreshing?: boolean;
+}) {
   const { data: position } = usePosition();
+
+  /**
+   * The position's own health, classified by the SDK the same way Home classifies it: a
+   * zero-amount preview of the position as read. Only when there is debt to be healthy
+   * against and a live price to judge it by; otherwise there is no chip rather than a
+   * guess.
+   */
+  const health =
+    position && livePrice && position.debtWei > 0n
+      ? previewBorrow(position, livePrice, 0n).health
+      : null;
 
   return (
     <Panel
       title="Your position"
       meta={
-        // Only when the vault panel below is not already carrying it. A pooled user saw
-        // the same route named twice in two stacked panels.
-        position && position.route !== 'pooled' ? (
-          <span className="t-label text-text-subtle">Your own trove</span>
-        ) : (
-          <span className="t-label text-text-subtle">In the social vault</span>
-        )
+        <>
+          {refreshing ? <Refreshing /> : null}
+          <span className="text-text-muted text-[0.8125rem]">
+            {position && position.route !== 'pooled' ? 'Your own trove' : 'In the social vault'}
+          </span>
+          {health ? <HealthChip status={health.status} /> : null}
+        </>
       }
     >
-      <MetricStrip>
-        <Metric
-          className="px-5 py-4"
+      <FactGroup>
+        <Fact
           label="Collateral"
-          value={position ? <Btc wei={position.collateralWei} size="lg" /> : <Dash size="lg" />}
+          value={position ? <Btc wei={position.collateralWei} /> : <Dash />}
           caption={
             position && livePrice
               ? formatUsd((position.collateralWei * livePrice) / 10n ** 18n)
               : 'needs a live price'
           }
         />
-        <Metric
-          className="px-5 py-4"
+        <Fact
           label="Total debt"
-          value={position ? <Musd wei={position.debtWei} size="lg" /> : <Dash size="lg" />}
+          value={position ? <Musd wei={position.debtWei} /> : <Dash />}
           caption={
             position?.route === 'direct'
               ? 'includes the 200 MUSD reserve'
               : 'no reserve, social vault'
           }
         />
-        <Metric
-          className="px-5 py-4"
+        <Fact
           label="Borrow limit"
-          value={
-            position ? (
-              <Musd wei={position.maxBorrowingCapacityWei} size="lg" />
-            ) : (
-              <Dash size="lg" />
-            )
-          }
+          value={position ? <Musd wei={position.maxBorrowingCapacityWei} /> : <Dash />}
           caption="fixed when this trove opened"
         />
-      </MetricStrip>
+      </FactGroup>
     </Panel>
   );
 }
+
+/**
+ * The foot of every action panel: the reason a control is disabled, then the control,
+ * then the one sentence about what it costs. In that order because that is the order
+ * someone reads them in before pressing.
+ */
+function ActionFooter({ notes, children }: { notes?: ReactNode; children: ReactNode }) {
+  return (
+    <div className="flex flex-col gap-4 border-t border-[var(--border-hairline)] px-5 py-5">
+      {notes}
+      <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center sm:gap-x-5">
+        {children}
+      </div>
+    </div>
+  );
+}
+
+/** The cost line beside an action button. A sentence people read, so it is not subtle. */
+function CostLine({ children }: { children: ReactNode }) {
+  return <span className="text-text-muted max-w-[52ch] text-xs leading-relaxed">{children}</span>;
+}
+
+/** Full width on a phone, where the thumb is; its own size beside the cost line above. */
+const BUTTON = 'w-full sm:w-auto';
+
+/** An amount is a short number. The field stops at a flow's width, not the column's. */
+const FIELD = 'max-w-[520px]';
 
 /**
  * Whether a blocker is worth putting on screen.
@@ -355,10 +430,12 @@ function BorrowPanel({
   runner,
   chain,
   onDeposit,
+  refreshing,
 }: {
   runner: TxRunner;
   chain: VaultState;
   onDeposit: () => void;
+  refreshing: boolean;
 }) {
   const { position: accountPosition, price, stats } = chain;
   const position = useMemo(
@@ -514,24 +591,30 @@ function BorrowPanel({
    */
   if (position && position.collateralWei === 0n) {
     return (
-      <AppCard className="p-5">
-        <EmptyState
-          icon={<VaultIcon className="size-6" />}
-          title="Deposit first"
-          action={
-            <ActionButton onClick={onDeposit} icon={<ArrowRight className="size-4" />}>
-              Deposit Bitcoin
-            </ActionButton>
-          }
-        >
-          Borrowing needs collateral. {formatApr(INTEREST_RATE_BPS)}, fixed.
-        </EmptyState>
-        {range.blocker && range.blocker.scope === 'pool' ? (
-          <div className="mt-2">
-            <BlockedNote blocker={range.blocker} />
-          </div>
-        ) : null}
-      </AppCard>
+      <Panel title="Borrow MUSD" meta={refreshing ? <Refreshing /> : null}>
+        <div className="px-5 py-6">
+          <EmptyState
+            icon={<VaultIcon className="size-6" />}
+            title="Deposit first"
+            action={
+              <ActionButton
+                onClick={onDeposit}
+                icon={<ArrowRight className="size-4" />}
+                className={BUTTON}
+              >
+                Deposit Bitcoin
+              </ActionButton>
+            }
+          >
+            Borrowing needs collateral. {formatApr(INTEREST_RATE_BPS)}, fixed.
+          </EmptyState>
+          {range.blocker && range.blocker.scope === 'pool' ? (
+            <div className="mt-5">
+              <BlockedNote blocker={range.blocker} />
+            </div>
+          ) : null}
+        </div>
+      </Panel>
     );
   }
 
@@ -539,9 +622,12 @@ function BorrowPanel({
     <Panel
       title="Borrow MUSD"
       meta={
-        <span data-contrast="route-body" className="text-text-muted text-xs">
-          {formatApr(INTEREST_RATE_BPS)}, fixed for the life of this loan
-        </span>
+        <>
+          {refreshing ? <Refreshing /> : null}
+          <span data-contrast="route-body" className="text-text-muted text-[0.8125rem]">
+            {formatApr(INTEREST_RATE_BPS)}, fixed for the life of this loan
+          </span>
+        </>
       }
     >
       {/*
@@ -555,19 +641,19 @@ function BorrowPanel({
         instant a screen reader lands on the Vault is an interruption, not information.
       */}
       {range.blocker && range.rangeDead ? (
-        <div className="border-b border-[var(--border-hairline)] px-5 py-4">
+        <div className="px-5 pt-5">
           <BlockedNote blocker={range.blocker} id="borrow-blocked" />
         </div>
       ) : null}
 
       {/* The control, and the amount it sets, adjacent. */}
-      <div className="px-5 py-5">
-        <div className="flex flex-wrap items-baseline justify-between gap-x-6 gap-y-2">
-          <div className="flex items-baseline gap-3">
+      <div className="px-5 pb-5 pt-6">
+        <div className="flex flex-wrap items-center justify-between gap-x-6 gap-y-2">
+          <div className="flex items-baseline gap-2.5">
             <Num size="xl" tone={range.rangeDead ? 'subtle' : 'default'}>
               {formatMusd(value, { unit: false })}
             </Num>
-            <span className="t-h3 text-text-muted">MUSD</span>
+            <span className="text-text-muted text-lg">MUSD</span>
           </div>
           {preview ? <HealthChip status={preview.health.status} /> : null}
         </div>
@@ -607,7 +693,7 @@ function BorrowPanel({
         </div>
 
         {ceiling && ceiling.amountWei > 0n && !range.rangeDead ? (
-          <p className="text-text-subtle mt-3 text-xs leading-relaxed">
+          <p className="text-text-muted mt-4 max-w-[68ch] text-xs leading-relaxed">
             {ceiling.binding === 'pool'
               ? 'Capped by the shared trove’s collateral buffer, including the fee on any new debt.'
               : ceiling.binding === 'ceiling'
@@ -621,30 +707,27 @@ function BorrowPanel({
           the explanation above is an assertion; with it, anyone can check it. */}
       {range.rangeDead && stats ? (
         <div className="border-t border-[var(--border-hairline)]">
-          <MetricStrip>
-            <Metric
-              className="px-5 py-4"
+          <FactGroup>
+            <Fact
               label="Vault health"
               value={
-                <Num size="lg" className="text-warning" tone="inherit">
+                <Num className="text-warning" tone="inherit">
                   {formatCollateralRatio(stats.troveIcrWei)}
                 </Num>
               }
               caption={`must be at or above ${policyRatio(MAREN_VAULT.minTroveCr)} for anyone to borrow`}
             />
-            <Metric
-              className="px-5 py-4"
+            <Fact
               label="Your collateral"
-              value={position ? <Btc wei={position.collateralWei} size="lg" /> : <Dash size="lg" />}
+              value={position ? <Btc wei={position.collateralWei} /> : <Dash />}
               caption="untouched, and withdrawable"
             />
-            <Metric
-              className="px-5 py-4"
+            <Fact
               label="Your debt"
-              value={position ? <Musd wei={position.debtWei} size="lg" /> : <Dash size="lg" />}
+              value={position ? <Musd wei={position.debtWei} /> : <Dash />}
               caption="unaffected by the pool’s ratio"
             />
-          </MetricStrip>
+          </FactGroup>
         </div>
       ) : null}
 
@@ -654,110 +737,110 @@ function BorrowPanel({
       {preview ? (
         <>
           <div className="border-t border-[var(--border-hairline)]">
-            <MetricStrip>
-              <Metric
-                className="px-5 py-4"
+            <FactGroup>
+              <Fact
                 label="Resulting ratio"
                 value={
                   <RatioOrDash
                     cr={preview.collateralRatio}
                     debtWei={preview.debtWei}
-                    size="lg"
                     tone={ratioTone ? 'inherit' : 'default'}
                     className={ratioTone?.text ?? ''}
                   />
                 }
                 caption={healthLabel[preview.health.status]}
               />
-              <Metric
-                className="px-5 py-4"
+              <Fact
                 label="Liquidation price"
                 value={
-                  <LiquidationPrice
-                    wei={preview.liquidationPriceWei}
-                    debtWei={preview.debtWei}
-                    size="lg"
-                  />
+                  <LiquidationPrice wei={preview.liquidationPriceWei} debtWei={preview.debtWei} />
                 }
                 caption="pooled positions liquidate at 140%"
               />
-              <Metric
-                className="px-5 py-4"
+              <Fact
                 label="Bitcoin can fall"
                 value={
                   <DropToLiquidation
                     bps={preview.health.priceDropToLiquidationBps}
                     debtWei={preview.debtWei}
-                    size="lg"
                   />
                 }
                 caption="from today’s price"
               />
-            </MetricStrip>
+            </FactGroup>
           </div>
 
           <div className="border-t border-[var(--border-hairline)]">
-            <PanelBody>
-              <StatRow
+            <FactGroup layout="rows">
+              <Fact
                 label="Origination fee"
-                hint="applies only above the pool’s existing MUSD reserve"
+                caption="applies only above the pool’s existing MUSD reserve"
                 value={<Musd wei={preview.originationFeeWei} />}
               />
-              <StatRow
+              <Fact
                 label="Liquidation reserve"
-                hint="refunded when the trove closes"
+                caption="refunded when the trove closes"
                 value={
                   position?.route === 'direct' ? (
                     <Musd wei={LIQUIDATION_RESERVE} />
                   ) : (
-                    <span className="text-text-subtle text-sm">none on this route</span>
+                    <span className="text-text-muted text-sm">none on this route</span>
                   )
                 }
               />
-              <StatRow label="Total debt after" value={<Musd wei={preview.debtWei} />} last />
-            </PanelBody>
+              <Fact label="Total debt after" value={<Musd wei={preview.debtWei} />} />
+            </FactGroup>
           </div>
         </>
       ) : null}
 
-      <div className="border-t border-[var(--border-hairline)] px-5 py-4">
-        {belowRecommendation ? (
-          <p className="text-warning max-w-[68ch] text-sm leading-relaxed" role="status">
-            Bitcoin would only need to fall {dropPercent}% to liquidate this, below the{' '}
-            {policyRatio(MAREN_POLICY.targetCr)} we recommend.
-          </p>
-        ) : null}
+      <ActionFooter
+        notes={
+          <>
+            {belowRecommendation ? (
+              <p className="text-warning max-w-[68ch] text-sm leading-relaxed" role="status">
+                Bitcoin would only need to fall {dropPercent}% to liquidate this, below the{' '}
+                {policyRatio(MAREN_POLICY.targetCr)} we recommend.
+              </p>
+            ) : null}
 
-        {/* A blocker that is about THIS amount rather than the whole range sits by the
-            button, which is where the user is looking when they find out. */}
-        {!range.rangeDead && worthStating(pre, value) && pre.blocker ? (
-          <div className={belowRecommendation ? 'mt-3' : ''}>
-            <BlockedNote blocker={pre.blocker} id="borrow-amount-blocked" role="alert" />
-          </div>
-        ) : null}
-
-        <div className="mt-3 flex flex-wrap items-center gap-x-5 gap-y-3">
-          <ActionButton
-            onClick={() => runner.request(intent())}
-            disabled={!pre.ok || !writes.ready}
-            aria-describedby={range.rangeDead ? 'borrow-blocked' : 'borrow-amount-blocked'}
-            icon={<ArrowRight className="size-4" />}
-          >
-            {value > 0n ? `Borrow ${formatMusd(value)}` : 'Borrow'}
-          </ActionButton>
-          {/* The gas claim, kept true and kept beside the button that incurs it. Same
-              expression the intent uses, so the line under the button and the line in
-              the sheet it opens cannot disagree. */}
-          <span className="text-text-subtle text-xs">
-            {gasLine(position?.route === 'pooled' && actionIsRelayable('borrowMusd'), relayer)}
-          </span>
-        </div>
-      </div>
+            {/* A blocker that is about THIS amount rather than the whole range sits by the
+                button, which is where the user is looking when they find out. */}
+            {!range.rangeDead && worthStating(pre, value) && pre.blocker ? (
+              <BlockedNote blocker={pre.blocker} id="borrow-amount-blocked" role="alert" />
+            ) : null}
+          </>
+        }
+      >
+        <ActionButton
+          onClick={() => runner.request(intent())}
+          disabled={!pre.ok || !writes.ready}
+          aria-describedby={range.rangeDead ? 'borrow-blocked' : 'borrow-amount-blocked'}
+          icon={<ArrowRight className="size-4" />}
+          className={BUTTON}
+        >
+          {value > 0n ? `Borrow ${formatMusd(value)}` : 'Borrow'}
+        </ActionButton>
+        {/* The gas claim, kept true and kept beside the button that incurs it. Same
+            expression the intent uses, so the line under the button and the line in
+            the sheet it opens cannot disagree. */}
+        <CostLine>
+          {gasLine(position?.route === 'pooled' && actionIsRelayable('borrowMusd'), relayer)}
+        </CostLine>
+      </ActionFooter>
     </Panel>
   );
 }
 
-function DepositPanel({ runner, chain }: { runner: TxRunner; chain: VaultState }) {
+function DepositPanel({
+  runner,
+  chain,
+  refreshing,
+}: {
+  runner: TxRunner;
+  chain: VaultState;
+  refreshing: boolean;
+}) {
   const { position, price } = chain;
   const writes = useMarenWrites({ onSimulated: runner.onSimulated });
   const [input, setInput] = useState('0.05');
@@ -823,17 +906,22 @@ function DepositPanel({ runner, chain }: { runner: TxRunner; chain: VaultState }
     <Panel
       title="Deposit Bitcoin"
       meta={
-        <span className="text-text-muted text-xs">Raises your ratio the moment it confirms</span>
+        <>
+          {refreshing ? <Refreshing /> : null}
+          <span className="text-text-muted text-[0.8125rem]">
+            Raises your ratio the moment it confirms
+          </span>
+        </>
       }
     >
       {/* THE DECISION, BEFORE THE AMOUNT FIELD. It is a function of the amount, so it sits
           next to the control that sets it and moves as that control moves. */}
-      <div className="border-b border-[var(--border-hairline)] px-5 py-5">
+      <div className="px-5 py-5">
         <RouteChoice collateralWei={collateralAfter} priceWei={livePrice} />
       </div>
 
-      <div className="px-5 py-5">
-        <div className="max-w-md">
+      <div className="border-t border-[var(--border-hairline)] px-5 py-5">
+        <div className={FIELD}>
           <AmountField
             value={input}
             onChange={setInput}
@@ -851,50 +939,56 @@ function DepositPanel({ runner, chain }: { runner: TxRunner; chain: VaultState }
             error={fieldError(pre, wei)}
           />
         </div>
+      </div>
 
-        {position ? (
-          <div className="mt-6 max-w-md">
-            <StatRow label="Collateral after" value={<Btc wei={collateralAfter} />} />
-            <StatRow
+      {position ? (
+        <div className="border-t border-[var(--border-hairline)]">
+          <FactGroup layout="rows">
+            <Fact label="Collateral after" value={<Btc wei={collateralAfter} />} />
+            <Fact
               label="Where it goes"
-              value={<span className="text-text text-sm">The social vault</span>}
-              last
+              value={<span className="text-text text-[0.9375rem]">The social vault</span>}
             />
-          </div>
-        ) : null}
+          </FactGroup>
+        </div>
+      ) : null}
 
-        {worthStating(pre, wei) && pre.blocker ? (
-          <div className="mt-5 max-w-md">
+      <ActionFooter
+        notes={
+          worthStating(pre, wei) && pre.blocker ? (
             <BlockedNote
               blocker={pre.blocker}
               id="deposit-blocked"
               role={pre.rangeDead ? 'status' : 'alert'}
             />
-          </div>
-        ) : null}
-      </div>
-
-      <div className="border-t border-[var(--border-hairline)] px-5 py-4">
-        <div className="flex flex-wrap items-center gap-x-5 gap-y-3">
-          <ActionButton
-            onClick={() => runner.request(intent())}
-            disabled={!pre.ok || !writes.ready}
-            aria-describedby="deposit-blocked"
-            icon={<ArrowRight className="size-4" />}
-          >
-            Deposit {wei > 0n ? formatBtc(wei) : ''}
-          </ActionButton>
-          {/* The one action Maren can never sponsor, said before the user signs it. */}
-          <span className="text-text-subtle max-w-[46ch] text-xs leading-relaxed">
-            A deposit costs Bitcoin gas and always will, because it carries value.
-          </span>
-        </div>
-      </div>
+          ) : null
+        }
+      >
+        <ActionButton
+          onClick={() => runner.request(intent())}
+          disabled={!pre.ok || !writes.ready}
+          aria-describedby="deposit-blocked"
+          icon={<ArrowRight className="size-4" />}
+          className={BUTTON}
+        >
+          Deposit {wei > 0n ? formatBtc(wei) : ''}
+        </ActionButton>
+        {/* The one action Maren can never sponsor, said before the user signs it. */}
+        <CostLine>A deposit costs Bitcoin gas and always will, because it carries value.</CostLine>
+      </ActionFooter>
     </Panel>
   );
 }
 
-function RepayPanel({ runner, chain }: { runner: TxRunner; chain: VaultState }) {
+function RepayPanel({
+  runner,
+  chain,
+  refreshing,
+}: {
+  runner: TxRunner;
+  chain: VaultState;
+  refreshing: boolean;
+}) {
   const { position, balances } = chain;
   const writes = useMarenWrites({ onSimulated: runner.onSimulated });
   const relayer = useRelayerStatus();
@@ -925,7 +1019,7 @@ function RepayPanel({ runner, chain }: { runner: TxRunner; chain: VaultState }) 
       { label: 'Amount', value: <Musd wei={wei} /> },
       {
         label: 'Spender',
-        value: <span className="num text-text-subtle break-all text-xs">{SPENDERS.vault}</span>,
+        value: <span className="mono text-text-muted break-all text-xs">{SPENDERS.vault}</span>,
       },
     ],
     changes: [
@@ -987,10 +1081,17 @@ function RepayPanel({ runner, chain }: { runner: TxRunner; chain: VaultState }) 
   return (
     <Panel
       title="Repay debt"
-      meta={<span className="text-text-muted text-xs">Interest is simple, never compounding</span>}
+      meta={
+        <>
+          {refreshing ? <Refreshing /> : null}
+          <span className="text-text-muted text-[0.8125rem]">
+            Interest is simple, never compounding
+          </span>
+        </>
+      }
     >
       <div className="px-5 py-5">
-        <div className="max-w-md">
+        <div className={FIELD}>
           <AmountField
             value={input}
             onChange={setInput}
@@ -1006,64 +1107,72 @@ function RepayPanel({ runner, chain }: { runner: TxRunner; chain: VaultState }) 
             error={fieldError(pre, wei)}
           />
         </div>
-
-        {position ? (
-          <div className="mt-6 max-w-md">
-            <StatRow label="Debt after" value={<Musd wei={debtAfter} />} last />
-          </div>
-        ) : null}
-
-        {worthStating(pre, wei) && pre.blocker ? (
-          <div className="mt-5 max-w-md">
-            <BlockedNote
-              blocker={pre.blocker}
-              id="repay-blocked"
-              role={pre.rangeDead ? 'status' : 'alert'}
-            />
-          </div>
-        ) : null}
-
-        {pre.ok && needsApproval ? (
-          <div className="mt-5 max-w-md">
-            <Note>
-              The vault needs an allowance for {formatMusd(wei)} first. That is a separate
-              transaction, shown here rather than slipped in behind the repay.
-            </Note>
-          </div>
-        ) : null}
       </div>
 
-      <div className="border-t border-[var(--border-hairline)] px-5 py-4">
-        <div className="flex flex-wrap items-center gap-x-5 gap-y-3">
-          {needsApproval ? (
-            <ActionButton
-              onClick={() => runner.request(approvalIntent())}
-              disabled={!pre.ok || !writes.ready}
-              aria-describedby="repay-blocked"
-              icon={<ArrowRight className="size-4" />}
-            >
-              Approve {formatMusd(wei)}
-            </ActionButton>
-          ) : null}
+      {position ? (
+        <div className="border-t border-[var(--border-hairline)]">
+          <FactGroup layout="rows">
+            <Fact label="Debt after" value={<Musd wei={debtAfter} />} />
+          </FactGroup>
+        </div>
+      ) : null}
+
+      <ActionFooter
+        notes={
+          <>
+            {worthStating(pre, wei) && pre.blocker ? (
+              <BlockedNote
+                blocker={pre.blocker}
+                id="repay-blocked"
+                role={pre.rangeDead ? 'status' : 'alert'}
+              />
+            ) : null}
+
+            {pre.ok && needsApproval ? (
+              <Note>
+                The vault needs an allowance for {formatMusd(wei)} first. That is a separate
+                transaction, shown here rather than slipped in behind the repay.
+              </Note>
+            ) : null}
+          </>
+        }
+      >
+        {needsApproval ? (
           <ActionButton
-            variant={needsApproval ? 'secondary' : 'primary'}
-            onClick={() => runner.request(intent())}
-            disabled={!pre.ok || needsApproval || !writes.ready}
+            onClick={() => runner.request(approvalIntent())}
+            disabled={!pre.ok || !writes.ready}
             aria-describedby="repay-blocked"
             icon={<ArrowRight className="size-4" />}
+            className={BUTTON}
           >
-            Repay {wei > 0n ? formatMusd(wei) : ''}
+            Approve {formatMusd(wei)}
           </ActionButton>
-          <span className="text-text-subtle text-xs">
-            Repay stays open when the oracle is stale.
-          </span>
-        </div>
-      </div>
+        ) : null}
+        <ActionButton
+          variant={needsApproval ? 'secondary' : 'primary'}
+          onClick={() => runner.request(intent())}
+          disabled={!pre.ok || needsApproval || !writes.ready}
+          aria-describedby="repay-blocked"
+          icon={<ArrowRight className="size-4" />}
+          className={BUTTON}
+        >
+          Repay {wei > 0n ? formatMusd(wei) : ''}
+        </ActionButton>
+        <CostLine>Repay stays open when the oracle is stale.</CostLine>
+      </ActionFooter>
     </Panel>
   );
 }
 
-function WithdrawPanel({ runner, chain }: { runner: TxRunner; chain: VaultState }) {
+function WithdrawPanel({
+  runner,
+  chain,
+  refreshing,
+}: {
+  runner: TxRunner;
+  chain: VaultState;
+  refreshing: boolean;
+}) {
   const { position } = chain;
   const writes = useMarenWrites({ onSimulated: runner.onSimulated });
   const relayer = useRelayerStatus();
@@ -1119,13 +1228,16 @@ function WithdrawPanel({ runner, chain }: { runner: TxRunner; chain: VaultState 
     <Panel
       title="Withdraw Bitcoin"
       meta={
-        <span className="text-text-muted text-xs">
-          Already capped at Maren’s {policyRatio(MAREN_POLICY.minHealthyCr)} floor
-        </span>
+        <>
+          {refreshing ? <Refreshing /> : null}
+          <span className="text-text-muted text-[0.8125rem]">
+            Already capped at Maren’s {policyRatio(MAREN_POLICY.minHealthyCr)} floor
+          </span>
+        </>
       }
     >
       <div className="px-5 py-5">
-        <div className="max-w-md">
+        <div className={FIELD}>
           <AmountField
             value={input}
             onChange={setInput}
@@ -1137,39 +1249,38 @@ function WithdrawPanel({ runner, chain }: { runner: TxRunner; chain: VaultState 
             error={fieldError(pre, wei)}
           />
         </div>
+      </div>
 
-        {position ? (
-          <div className="mt-6 max-w-md">
-            <StatRow label="Collateral after" value={<Btc wei={collateralAfter} />} last />
-          </div>
-        ) : null}
+      {position ? (
+        <div className="border-t border-[var(--border-hairline)]">
+          <FactGroup layout="rows">
+            <Fact label="Collateral after" value={<Btc wei={collateralAfter} />} />
+          </FactGroup>
+        </div>
+      ) : null}
 
-        {worthStating(pre, wei) && pre.blocker ? (
-          <div className="mt-5 max-w-md">
+      <ActionFooter
+        notes={
+          worthStating(pre, wei) && pre.blocker ? (
             <BlockedNote
               blocker={pre.blocker}
               id="withdraw-blocked"
               role={pre.rangeDead ? 'status' : 'alert'}
             />
-          </div>
-        ) : null}
-      </div>
-
-      <div className="border-t border-[var(--border-hairline)] px-5 py-4">
-        <div className="flex flex-wrap items-center gap-x-5 gap-y-3">
-          <ActionButton
-            onClick={() => runner.request(intent())}
-            disabled={!pre.ok || !writes.ready}
-            aria-describedby="withdraw-blocked"
-            icon={<ArrowRight className="size-4" />}
-          >
-            Withdraw {wei > 0n ? formatBtc(wei) : ''}
-          </ActionButton>
-          <span className="text-text-subtle text-xs">
-            Withdrawal is never paused. If Maren halts the vault, exits stay open.
-          </span>
-        </div>
-      </div>
+          ) : null
+        }
+      >
+        <ActionButton
+          onClick={() => runner.request(intent())}
+          disabled={!pre.ok || !writes.ready}
+          aria-describedby="withdraw-blocked"
+          icon={<ArrowRight className="size-4" />}
+          className={BUTTON}
+        >
+          Withdraw {wei > 0n ? formatBtc(wei) : ''}
+        </ActionButton>
+        <CostLine>Withdrawal is never paused. If Maren halts the vault, exits stay open.</CostLine>
+      </ActionFooter>
     </Panel>
   );
 }

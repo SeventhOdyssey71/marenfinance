@@ -28,19 +28,21 @@ export function Tabs({ children }: { children?: ReactNode }) {
 
   return (
     <div className="doc-tabs">
-      <div className="doc-tabstrip" role="tablist">
-        {tabs.map((tab, i) => (
-          <button
-            key={i}
-            type="button"
-            role="tab"
-            aria-selected={i === active}
-            className={`doc-tabbtn${i === active ? 'is-active' : ''}`}
-            onClick={() => setActive(i)}
-          >
-            {tab.props.title ?? `Tab ${i + 1}`}
-          </button>
-        ))}
+      <div className="doc-tabbar">
+        <div className="doc-tabstrip" role="tablist">
+          {tabs.map((tab, i) => (
+            <button
+              key={i}
+              type="button"
+              role="tab"
+              aria-selected={i === active}
+              className={i === active ? 'doc-tabbtn is-active' : 'doc-tabbtn'}
+              onClick={() => setActive(i)}
+            >
+              {tab.props.title ?? `Tab ${i + 1}`}
+            </button>
+          ))}
+        </div>
       </div>
       <div className="doc-tabpanel" role="tabpanel">
         {tabs[active]?.props.children}
@@ -70,22 +72,30 @@ function codeText(node: ReactNode): string {
 function CopyButton({ text }: { text: string }) {
   const [copied, setCopied] = useState(false);
   return (
-    <button
-      type="button"
-      className="doc-copy"
-      aria-label={copied ? 'Copied' : 'Copy code'}
-      onClick={() => {
-        navigator.clipboard?.writeText(text).then(
-          () => {
-            setCopied(true);
-            window.setTimeout(() => setCopied(false), 1400);
-          },
-          () => undefined,
-        );
-      }}
-    >
-      {copied ? <IconCheck /> : <IconCopy />}
-    </button>
+    <>
+      <button
+        type="button"
+        className="doc-copy"
+        data-copied={copied ? '' : undefined}
+        aria-label="Copy code"
+        title="Copy code"
+        onClick={() => {
+          navigator.clipboard?.writeText(text).then(
+            () => {
+              setCopied(true);
+              window.setTimeout(() => setCopied(false), 1400);
+            },
+            () => undefined,
+          );
+        }}
+      >
+        <IconCopy className="doc-copy-icon doc-copy-idle" />
+        <IconCheck className="doc-copy-icon doc-copy-done" />
+      </button>
+      <span className="sr-only" role="status">
+        {copied ? 'Copied' : ''}
+      </span>
+    </>
   );
 }
 
@@ -98,10 +108,25 @@ export function Pre({ children, inGroup }: { children?: ReactNode; inGroup?: boo
   const codeEl = isValidElement(children) ? (children as ReactElement<CodeElementProps>) : null;
   const lang = codeEl?.props['data-lang'] ?? '';
   const text = codeText(children);
+  if (inGroup) {
+    return (
+      <div className="doc-code">
+        <pre className="doc-pre">{children}</pre>
+      </div>
+    );
+  }
   return (
     <div className="doc-code">
-      {!inGroup && lang ? <span className="doc-code-lang">{lang}</span> : null}
-      <CopyButton text={text} />
+      {lang ? (
+        <div className="doc-code-head">
+          <span className="doc-code-lang">{lang}</span>
+          <CopyButton text={text} />
+        </div>
+      ) : (
+        <div className="doc-code-float">
+          <CopyButton text={text} />
+        </div>
+      )}
       <pre className="doc-pre">{children}</pre>
     </div>
   );
@@ -120,26 +145,27 @@ export function CodeGroup({ children }: { children?: ReactNode }) {
   const blocks = Children.toArray(children).filter(isValidElement) as PreElement[];
   const [active, setActive] = useState(0);
   if (blocks.length === 0) return null;
-
+  const current = blocks[active];
   return (
     <div className="doc-codegroup">
-      <div className="doc-tabstrip" role="tablist">
-        {blocks.map((block, i) => (
-          <button
-            key={i}
-            type="button"
-            role="tab"
-            aria-selected={i === active}
-            className={`doc-tabbtn${i === active ? 'is-active' : ''}`}
-            onClick={() => setActive(i)}
-          >
-            {tabLabel(block, i)}
-          </button>
-        ))}
+      <div className="doc-tabbar">
+        <div className="doc-tabstrip" role="tablist">
+          {blocks.map((block, i) => (
+            <button
+              key={i}
+              type="button"
+              role="tab"
+              aria-selected={i === active}
+              className={i === active ? 'doc-tabbtn is-active' : 'doc-tabbtn'}
+              onClick={() => setActive(i)}
+            >
+              {tabLabel(block, i)}
+            </button>
+          ))}
+        </div>
+        {current ? <CopyButton text={codeText(current.props.children)} /> : null}
       </div>
-      {blocks[active]
-        ? cloneElement(blocks[active], { inGroup: true } as Partial<PreElement['props']>)
-        : null}
+      {current ? cloneElement(current, { inGroup: true } as Partial<PreElement['props']>) : null}
     </div>
   );
 }

@@ -61,7 +61,7 @@ export function BlockedNote({
           — BRAND.md keeps contract internals off the primary surface — but kept, because
           deleting it makes the sentence above unfalsifiable. */}
       {blocker.name ? (
-        <p className="num text-text-subtle mt-2.5 text-xs">Contract check: {blocker.name}</p>
+        <p className="mono text-text-muted mt-2.5 text-xs">Contract check: {blocker.name}</p>
       ) : null}
     </div>
   );

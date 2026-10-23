@@ -244,13 +244,8 @@ const check = (name, pass, detail = '') => {
   const canvases = await page.evaluate(() => document.querySelectorAll('canvas').length);
   check('reduced-motion: zero shader canvases mounted', canvases === 0, `canvases=${canvases}`);
 
-  const fallback = await page.evaluate(() => {
-    const el = document.querySelector('.mesh-fallback');
-    if (!el) return null;
-    const bg = getComputedStyle(el).backgroundImage;
-    return bg && bg !== 'none' ? bg.slice(0, 40) : null;
-  });
-  check('reduced-motion: static gradient fallback present', Boolean(fallback));
+  // The landing no longer mounts a shader at all (the square redesign, 2026-10-23), so
+  // there is no gradient fallback to look for; "zero canvases" above is the whole check.
 
   const revealed = await page.evaluate(() =>
     [...document.querySelectorAll('.reveal')].every(
@@ -273,7 +268,8 @@ const check = (name, pass, detail = '') => {
 
   const triggers = page.locator('#faq button[aria-expanded]');
   const n = await triggers.count();
-  check('faq: 8 accordion triggers with aria-expanded', n === 8, `found=${n}`);
+  // Four questions, the same four as before the redesign; this said 8 and was stale.
+  check('faq: 4 accordion triggers with aria-expanded', n === 4, `found=${n}`);
 
   const first = triggers.first();
   const panelId = await first.getAttribute('aria-controls');
@@ -486,7 +482,8 @@ const check = (name, pass, detail = '') => {
   );
   check(
     'app (no wallet): a purposeful empty state, not a grid of dashes',
-    /No wallet connected/.test(appBody) && placeholderDashes === 0,
+    // The disconnected Home is a question now, not a "No wallet connected" card.
+    /What do you want to do with your Bitcoin\?/.test(appBody) && placeholderDashes === 0,
     `${placeholderDashes} placeholder dashes`,
   );
 

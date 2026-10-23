@@ -1,13 +1,13 @@
 'use client';
 
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { useAccount, usePublicClient } from 'wagmi';
 import type { Hex } from 'viem';
 import { getChain } from '@maren/sdk';
 
-import { ActionButton, Info, Note, Panel } from '@/components/app/primitives';
-import { ArrowRight } from '@/components/ui/icons';
+import { ActionButton, Info, Note } from '@/components/app/primitives';
+import { ArrowRight, Check } from '@/components/ui/icons';
 import { useTxRunner, type TxRunner } from '@/components/app/tx';
 import {
   clearCommitment,
@@ -139,7 +139,7 @@ export function HandleRegistration({ runner }: { runner: TxRunner }) {
         changes: [
           {
             label: 'Registration',
-            before: <span className="text-text-subtle">not started</span>,
+            before: <span className="text-text-muted">not started</span>,
             after: <span className="text-text">step 1 of 2 done</span>,
           },
         ],
@@ -147,11 +147,11 @@ export function HandleRegistration({ runner }: { runner: TxRunner }) {
           { label: 'Handle', value: <span className="text-text">@{handle}</span> },
           {
             label: 'Commitment',
-            value: <span className="num text-text-subtle break-all text-xs">{commitment}</span>,
+            value: <span className="mono text-text-muted break-all text-xs">{commitment}</span>,
           },
           {
             label: 'Owner',
-            value: <span className="num text-text-subtle break-all text-xs">{address}</span>,
+            value: <span className="mono text-text-muted break-all text-xs">{address}</span>,
           },
         ],
         gas: gasNote(
@@ -186,7 +186,7 @@ export function HandleRegistration({ runner }: { runner: TxRunner }) {
       changes: [
         {
           label: 'Your handle',
-          before: <span className="text-text-subtle">{primary ?? 'none'}</span>,
+          before: <span className="text-text-muted">{primary ?? 'none'}</span>,
           after: <span className="text-text">@{pending.handle}</span>,
         },
       ],
@@ -195,14 +195,14 @@ export function HandleRegistration({ runner }: { runner: TxRunner }) {
         {
           label: 'Committed at',
           value: (
-            <span className="num text-text-subtle text-xs">
+            <span className="mono text-text-muted text-xs">
               block timestamp {committedAt?.toString() ?? '—'}
             </span>
           ),
         },
         {
           label: 'Owner',
-          value: <span className="num text-text-subtle break-all text-xs">{pending.owner}</span>,
+          value: <span className="mono text-text-muted break-all text-xs">{pending.owner}</span>,
         },
       ],
       gas: gasNote(
@@ -238,157 +238,205 @@ export function HandleRegistration({ runner }: { runner: TxRunner }) {
   if (!source.connected) return null;
 
   const taken = available === false;
+  const step1Done = onChain;
 
   return (
-    <Panel
-      title="Your handle"
-      meta={primary ? <span className="t-label text-text-subtle">{primary}</span> : null}
-    >
-      <div className="px-5 py-5">
-        {/* The two-transaction, 60-second shape of this flow is stated whether or not the
-            account already holds a handle. An earlier version dropped it for returning
-            users, which meant the people most likely to be claiming a SECOND handle were
-            the only ones not told why the second step makes them wait. */}
-        <p className="text-text-muted max-w-[68ch] text-sm leading-relaxed">
-          {primary ? `You hold ${primary}. ` : ''}Claiming a handle takes two transactions, 60
-          seconds apart.
-        </p>
-
-        <div className="mt-6 max-w-md">
-          <label htmlFor="handle-input" className="t-label text-text-subtle block">
-            Handle
-          </label>
-          <div className="mt-3 flex items-baseline gap-2 border-b border-[var(--border-hairline)] pb-3 focus-within:border-[var(--border-strong)]">
-            <span className="t-h3 text-text-muted">@</span>
-            <input
-              id="handle-input"
-              value={input}
-              onChange={(event) => setInput(event.target.value)}
-              placeholder="yourname"
-              autoComplete="off"
-              spellCheck={false}
-              aria-describedby="handle-status"
-              className="num text-text placeholder:text-text-subtle/60 min-w-0 flex-1 bg-transparent text-lg"
-            />
-          </div>
-          <p id="handle-status" className="mt-3 min-h-[1.25rem] text-sm" role="status">
-            {validation ? (
-              <span className="text-danger">{validation}</span>
-            ) : handle.length < 3 ? (
-              <span className="text-text-subtle">
-                3 to 32 lowercase letters, digits, underscores.
-              </span>
-            ) : checkingAvailable ? (
-              <span className="text-text-subtle">Checking the registry…</span>
-            ) : taken ? (
-              <span className="text-danger">@{handle} is already registered.</span>
-            ) : available === true ? (
-              <span className="text-success">@{handle} is available.</span>
-            ) : (
-              <span className="text-text-subtle">Checking the registry…</span>
-            )}
-          </p>
-        </div>
-
-        {problem ? (
-          <div className="mt-6">
-            <Note tone="warning" role="alert">
-              {problem}
-            </Note>
-          </div>
-        ) : null}
-
-        {/* --- the two steps ---------------------------------------------------- */}
-        <ol className="mt-8 flex flex-col gap-6">
-          <li>
-            <p className="t-label text-text-subtle">Step 1: commit</p>
-            <p className="text-text-muted mt-2 max-w-[68ch] text-sm leading-relaxed">
-              Publishes a hash of the handle, your address and a random secret. The name itself
-              stays private until step two.
-            </p>
-            <div className="mt-4">
-              <ActionButton
-                onClick={() => void beginCommit()}
-                disabled={
-                  busy ||
-                  handle.length < 3 ||
-                  validation !== null ||
-                  taken ||
-                  onChain ||
-                  !writes.ready
-                }
-                icon={<ArrowRight className="size-4" />}
-              >
-                {onChain ? 'Committed' : busy ? 'Preparing…' : 'Commit'}
-              </ActionButton>
-            </div>
-          </li>
-
-          <li>
-            <p className="t-label text-text-subtle">Step 2: claim</p>
-            <p className="text-text-muted mt-2 max-w-[68ch] text-sm leading-relaxed">
-              {!pending ? (
-                'Available once a commitment for this handle exists in this browser.'
-              ) : !onChain ? (
-                'Waiting for the commit transaction to be mined.'
-              ) : secondsRemaining === null ? (
-                'Reading the commitment’s age from the contract…'
-              ) : secondsRemaining > 0 ? (
-                <>
-                  <span className="num text-text">{secondsRemaining}s</span> to go. MarenRegistry
-                  refuses a reveal younger than 60 seconds. That delay is what makes copying your
-                  commitment from the mempool useless.
-                </>
-              ) : (
-                'The commitment is old enough. Reveal the secret to claim the handle.'
-              )}
-            </p>
-            <div className="mt-4">
-              <ActionButton
-                variant={revealable ? 'primary' : 'secondary'}
-                onClick={beginRegister}
-                disabled={!revealable || !writes.ready}
-                icon={<ArrowRight className="size-4" />}
-              >
-                {pending ? `Claim @${pending.handle}` : 'Claim'}
-              </ActionButton>
-            </div>
-          </li>
-        </ol>
-
-        <Info summary="Why two transactions">
-          A single <span className="num">register(&quot;name&quot;)</span> sitting in a public
-          mempool is a free option for anyone watching it: copy the calldata, pay more gas, take the
-          name. The commitment binds the handle to <em className="not-italic">your</em> address, so
-          a copied commitment can only ever be revealed by you. The 60-second minimum age is what
-          stops the two transactions being sent in the same block, which would defeat it.
-        </Info>
-
-        {pending && onChain ? (
-          <div className="mt-6">
-            <Note>
-              <p className="text-text">A commitment for @{pending.handle} is live.</p>
-              <p className="mt-1">
-                Its secret is stored in this browser only. Clearing site data before step two loses
-                the handle until the commitment expires seven days after it was made.
-              </p>
-              <div className="mt-4">
-                <ActionButton
-                  variant="quiet"
-                  onClick={() => {
-                    clearCommitment(NETWORK, pending.handle);
-                    setPending(null);
-                    setCommittedAt(null);
-                  }}
-                >
-                  Discard this commitment
-                </ActionButton>
-              </div>
-            </Note>
-          </div>
-        ) : null}
+    <section aria-labelledby="handle-heading" className="card p-5 md:p-6">
+      <div className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
+        <h2 id="handle-heading" className="t-h3">
+          Your handle
+        </h2>
+        {primary ? <span className="text-text-muted text-sm">{primary}</span> : null}
       </div>
-    </Panel>
+      {/* The two-transaction, 60-second shape of this flow is stated whether or not the
+          account already holds a handle. An earlier version dropped it for returning
+          users, which meant the people most likely to be claiming a SECOND handle were
+          the only ones not told why the second step makes them wait. */}
+      <p className="text-text-muted mt-1.5 max-w-[52ch] text-pretty text-sm leading-relaxed">
+        {primary ? `You hold ${primary}. ` : ''}Claiming a handle takes two transactions, 60 seconds
+        apart.
+      </p>
+
+      <div className="mt-6 max-w-md">
+        <label htmlFor="handle-input" className="t-label block">
+          Handle
+        </label>
+        <div className="bg-surface mt-2.5 flex h-12 items-center gap-1 border border-[var(--border-strong)] px-4 transition-[border-color] duration-150 ease-out focus-within:border-violet-500">
+          <span aria-hidden className="text-text-muted text-lg">
+            @
+          </span>
+          <input
+            id="handle-input"
+            type="text"
+            value={input}
+            onChange={(event) => setInput(event.target.value)}
+            placeholder="yourname"
+            autoComplete="off"
+            autoCapitalize="none"
+            inputMode="text"
+            spellCheck={false}
+            aria-describedby="handle-status"
+            className="text-text placeholder:text-text-subtle min-w-0 flex-1 bg-transparent text-lg outline-none"
+          />
+        </div>
+        <p id="handle-status" className="mt-2.5 min-h-[1.25rem] text-sm" role="status">
+          {validation ? (
+            <span className="text-danger">{validation}</span>
+          ) : handle.length < 3 ? (
+            <span className="text-text-muted">3 to 32 lowercase letters, digits, underscores.</span>
+          ) : checkingAvailable ? (
+            <span className="text-text-muted">Checking the registry…</span>
+          ) : taken ? (
+            <span className="text-danger">@{handle} is already registered.</span>
+          ) : available === true ? (
+            <span className="text-success">@{handle} is available.</span>
+          ) : (
+            <span className="text-text-muted">Checking the registry…</span>
+          )}
+        </p>
+      </div>
+
+      {problem ? (
+        <div className="mt-6">
+          <Note tone="warning" role="alert">
+            {problem}
+          </Note>
+        </div>
+      ) : null}
+
+      {/* --- the two steps ---------------------------------------------------- */}
+      <ol className="mt-8 border-t border-[var(--border-hairline)]">
+        <Step
+          n={1}
+          title="Commit"
+          done={step1Done}
+          description="Publishes a hash of the handle, your address and a random secret. The name itself stays private until step two."
+          action={
+            <ActionButton
+              variant={step1Done ? 'secondary' : 'primary'}
+              onClick={() => void beginCommit()}
+              disabled={
+                busy ||
+                handle.length < 3 ||
+                validation !== null ||
+                taken ||
+                onChain ||
+                !writes.ready
+              }
+              icon={<ArrowRight className="size-4" />}
+            >
+              {onChain ? 'Committed' : busy ? 'Preparing…' : 'Commit'}
+            </ActionButton>
+          }
+        />
+        <Step
+          n={2}
+          title="Claim"
+          done={false}
+          description={
+            !pending ? (
+              'Available once a commitment for this handle exists in this browser.'
+            ) : !onChain ? (
+              'Waiting for the commit transaction to be mined.'
+            ) : secondsRemaining === null ? (
+              'Reading the commitment’s age from the contract…'
+            ) : secondsRemaining > 0 ? (
+              <>
+                <span className="num text-text">{secondsRemaining}s</span> to go. MarenRegistry
+                refuses a reveal younger than 60 seconds. That delay is what makes copying your
+                commitment from the mempool useless.
+              </>
+            ) : (
+              'The commitment is old enough. Reveal the secret to claim the handle.'
+            )
+          }
+          action={
+            <ActionButton
+              variant={revealable ? 'primary' : 'secondary'}
+              onClick={beginRegister}
+              disabled={!revealable || !writes.ready}
+              icon={<ArrowRight className="size-4" />}
+            >
+              {pending ? `Claim @${pending.handle}` : 'Claim'}
+            </ActionButton>
+          }
+        />
+      </ol>
+
+      <Info summary="Why two transactions">
+        A single <span className="mono">register(&quot;name&quot;)</span> sitting in a public
+        mempool is a free option for anyone watching it: copy the calldata, pay more gas, take the
+        name. The commitment binds the handle to <em className="not-italic">your</em> address, so a
+        copied commitment can only ever be revealed by you. The 60-second minimum age is what stops
+        the two transactions being sent in the same block, which would defeat it.
+      </Info>
+
+      {pending && onChain ? (
+        <div className="mt-6">
+          <Note>
+            <p className="text-text">A commitment for @{pending.handle} is live.</p>
+            <p className="mt-1">
+              Its secret is stored in this browser only. Clearing site data before step two loses
+              the handle until the commitment expires seven days after it was made.
+            </p>
+            <div className="mt-4">
+              <ActionButton
+                variant="quiet"
+                onClick={() => {
+                  clearCommitment(NETWORK, pending.handle);
+                  setPending(null);
+                  setCommittedAt(null);
+                }}
+              >
+                Discard this commitment
+              </ActionButton>
+            </div>
+          </Note>
+        </div>
+      ) : null}
+    </section>
+  );
+}
+
+/**
+ * One step of the claim, as a numbered row on a hairline. The number sits in a small
+ * square cell; once the step is on chain the cell shows a check, and the button beside it
+ * says "Committed", so the state is never carried by the mark alone.
+ */
+function Step({
+  n,
+  title,
+  done,
+  description,
+  action,
+}: {
+  n: number;
+  title: string;
+  done: boolean;
+  description: ReactNode;
+  action: ReactNode;
+}) {
+  return (
+    <li className="flex gap-4 border-b border-[var(--border-hairline)] py-5">
+      <span
+        aria-hidden
+        className={`num grid size-7 shrink-0 place-items-center border text-[0.8125rem] ${
+          done ? 'border-success/40 text-success' : 'text-text-muted border-[var(--border-strong)]'
+        }`}
+      >
+        {done ? <Check className="size-3.5" /> : n}
+      </span>
+      <div className="min-w-0 flex-1">
+        <p className="text-text text-[0.9375rem]">
+          <span className="sr-only">Step {n}: </span>
+          {title}
+        </p>
+        <p className="text-text-muted mt-1 max-w-[60ch] text-pretty text-sm leading-relaxed">
+          {description}
+        </p>
+        <div className="mt-4">{action}</div>
+      </div>
+    </li>
   );
 }
 

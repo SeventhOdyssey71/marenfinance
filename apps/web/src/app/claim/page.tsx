@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState, type ReactNode } from 'react';
 import Link from 'next/link';
 import { useQuery } from '@tanstack/react-query';
 import { usePublicClient } from 'wagmi';
@@ -19,12 +19,12 @@ import { actionIsRelayable } from '@/lib/chain/relay';
 import { gasLine, gasNote, useMarenWrites, useRelayerStatus } from '@/lib/chain/write';
 import { NETWORK, contractsDeployed, useDataSource } from '@/lib/data/source';
 import { Musd } from '@/components/app/money';
-import { ActionButton, Loading, Note, Panel, Refreshing } from '@/components/app/primitives';
+import { ActionButton, Loading, Note, Refreshing } from '@/components/app/primitives';
 import { SignIn } from '@/components/app/sign-in';
 import { ConnectButton, NetworkGuard } from '@/components/app/wallet';
 import { TxSheet, useTxRunner, type TxIntent } from '@/components/app/tx';
-import { Check, LinkIcon } from '@/components/ui/icons';
-import { TESTFLIGHT_URL } from '@/lib/links';
+import { ArrowUpRight, Check } from '@/components/ui/icons';
+import { Wordmark } from '@/components/ui/wordmark';
 
 /**
  * /claim — the receiving half of a payment link.
@@ -162,57 +162,75 @@ export default function ClaimPage() {
     };
   }, []);
 
+  // One centred column: the wordmark and the connect control above a single card, the
+  // pre-audit line under it. The same arrival as an incomplete /pay link, on the canvas.
   return (
-    <div className="mx-auto flex min-h-screen w-full max-w-[30rem] flex-col px-5">
-      <header className="flex items-center justify-between pb-2 pt-5">
-        <Link
-          href="/"
-          aria-label="Maren Finance home"
-          className="-m-2 inline-flex w-fit rounded-[var(--radius-pill)] p-2"
-        >
-          <span
-            className="text-[22px] leading-none tracking-[-0.02em] text-[color:var(--color-text)]"
-            style={{
-              fontFamily: 'var(--font-sf-rounded), ui-rounded, system-ui, sans-serif',
-              fontWeight: 600,
-            }}
-          >
-            Maren
-          </span>
+    <div className="flex min-h-screen flex-col px-5">
+      <header className="mx-auto flex w-full max-w-[440px] items-center justify-between gap-4 pt-6">
+        <Link href="/" aria-label="Maren Finance home" className="-m-1.5 inline-flex w-fit p-1.5">
+          <Wordmark className="h-[20px] text-[19px]" />
         </Link>
         <ConnectButton />
       </header>
 
-      <main id="main" className="flex-1 pb-16 pt-6">
-        <div className="mb-6">
-          <span className="t-label text-text-subtle">Payment link</span>
-          <h1 className="t-h2 mt-1.5">Claim your MUSD</h1>
-          <p className="text-text-muted mt-2 text-sm">
-            Mezo {NETWORK} · Pre-audit · Testnet funds only
-          </p>
+      <main id="main" className="mx-auto w-full max-w-[440px] flex-1 pb-16 pt-10 sm:pt-[9vh]">
+        <div className="mb-4 empty:hidden">
+          <NetworkGuard />
         </div>
 
-        <NetworkGuard />
+        {parsed === null ? (
+          <ClaimCard>
+            <Body>
+              <Loading>Opening your link</Loading>
+            </Body>
+          </ClaimCard>
+        ) : parsed.kind === 'invalid' ? (
+          <InvalidLink />
+        ) : parsed.kind === 'missing' ? (
+          <NoLink />
+        ) : (
+          <ClaimFlow
+            key={`${parsed.linkKey}:${parsed.linkId}`}
+            secret={parsed.secret}
+            linkKey={parsed.linkKey}
+            hintedId={parsed.linkId}
+          />
+        )}
 
-        <div className="mt-4">
-          {parsed === null ? (
-            <Loading>Opening your link</Loading>
-          ) : parsed.kind === 'invalid' ? (
-            <InvalidLink />
-          ) : parsed.kind === 'missing' ? (
-            <NoLink />
-          ) : (
-            <ClaimFlow
-              key={`${parsed.linkKey}:${parsed.linkId}`}
-              secret={parsed.secret}
-              linkKey={parsed.linkKey}
-              hintedId={parsed.linkId}
-            />
-          )}
-        </div>
+        <p className="text-text-muted mt-5 text-center text-xs">
+          Mezo {NETWORK} · Pre-audit · Testnet funds only
+        </p>
       </main>
     </div>
   );
+}
+
+/**
+ * The one card every state renders into: the bracket label, the page's single h1, and the
+ * state's own body. `meta` is the right side of the label row (the link number, the
+ * refetch mark) and only exists once the link has been read.
+ */
+function ClaimCard({ meta, children }: { meta?: ReactNode; children: ReactNode }) {
+  return (
+    <section aria-labelledby="claim-title" className="card p-5 md:p-7">
+      <div className="flex min-h-5 items-center justify-between gap-4">
+        <span className="t-bracket">[ Payment link ]</span>
+        {meta ? <span className="flex items-center gap-3">{meta}</span> : null}
+      </div>
+      <h1
+        id="claim-title"
+        className="text-text mt-4 text-balance text-[1.5rem] font-medium leading-[1.15] tracking-[-0.026em]"
+      >
+        Claim your MUSD
+      </h1>
+      {children}
+    </section>
+  );
+}
+
+/** The state's content, under the title. */
+function Body({ children }: { children: ReactNode }) {
+  return <div className="mt-6">{children}</div>;
 }
 
 function ClaimFlow({
@@ -232,50 +250,54 @@ function ClaimFlow({
 
   if (!source.deployed) {
     return (
-      <Panel title="Claimable link">
-        <div className="px-5 py-6">
+      <ClaimCard>
+        <Body>
           <Note>Maren is not deployed on Mezo {source.network}, so there is no link to read.</Note>
-        </div>
-      </Panel>
+        </Body>
+      </ClaimCard>
     );
   }
 
   if (lookup.isPending) {
     return (
-      <Panel title="Claimable link">
-        <div className="px-5">
+      <ClaimCard>
+        <Body>
           <Loading>Reading this link from Mezo</Loading>
-        </div>
-      </Panel>
+        </Body>
+      </ClaimCard>
     );
   }
 
   if (lookup.isError) {
     return (
-      <Panel title="Claimable link">
-        <div className="px-5 py-6">
+      <ClaimCard>
+        <Body>
           <Note tone="warning" role="alert">
             Mezo did not answer when this link was read, so its state is unknown right now. Nothing
             has been claimed. Try reading the link again.
           </Note>
-          <div className="mt-4">
-            <ActionButton onClick={() => void lookup.refetch()} disabled={lookup.isFetching}>
+          <div className="mt-5">
+            <ActionButton
+              onClick={() => void lookup.refetch()}
+              disabled={lookup.isFetching}
+              className="w-full"
+            >
               {lookup.isFetching ? 'Reading link…' : 'Try again'}
             </ActionButton>
           </div>
-        </div>
-      </Panel>
+        </Body>
+      </ClaimCard>
     );
   }
 
   const result = lookup.data;
   if (result.kind === 'undeployed') {
     return (
-      <Panel title="Claimable link">
-        <div className="px-5 py-6">
+      <ClaimCard>
+        <Body>
           <Note>Maren is not deployed on Mezo {source.network}, so there is no link to read.</Note>
-        </div>
-      </Panel>
+        </Body>
+      </ClaimCard>
     );
   }
   if (result.kind === 'not-found') {
@@ -301,11 +323,11 @@ function ClaimFlow({
       { label: 'Amount', value: <Musd wei={link.amountWei} /> },
       {
         label: 'Link',
-        value: <span className="num text-text-muted">#{link.linkId.toString()}</span>,
+        value: <span className="mono text-text-muted text-xs">#{link.linkId.toString()}</span>,
       },
       {
         label: 'Claimed to',
-        value: <span className="num text-text-subtle break-all text-xs">{source.account}</span>,
+        value: <span className="mono text-text-muted break-all text-xs">{source.account}</span>,
       },
     ],
     gas: gasNote(
@@ -317,59 +339,57 @@ function ClaimFlow({
     submit: writes.ready ? () => writes.claimLink(link.linkId, secret) : undefined,
   });
 
+  const openInApp = link.linkId > 0n && link.linkId <= 18_446_744_073_709_551_615n;
+
   return (
     <>
-      <Panel
-        title="Claimable link"
+      <ClaimCard
         meta={
-          <span className="flex items-center gap-3">
+          <>
             {refreshing ? <Refreshing /> : null}
-            <span className="text-text-muted num text-xs">#{link.linkId.toString()}</span>
-          </span>
+            <span className="mono text-text-muted text-xs">#{link.linkId.toString()}</span>
+          </>
         }
       >
-        <div className="px-5 py-5">
-          <div className="flex items-baseline justify-between gap-4 border-b border-[var(--border-hairline)] pb-4">
-            <span className="t-label text-text-subtle">Amount</span>
-            <Musd wei={link.amountWei} size="lg" />
-          </div>
-
-          {link.state === 'claimable' ? (
-            <>
-              {link.linkId > 0n && link.linkId <= 18_446_744_073_709_551_615n ? (
-                <div className="mt-5 border-b border-[var(--border-hairline)] pb-5">
-                  <a
-                    href={`maren://claim?id=${link.linkId}#${secret}`}
-                    className="bg-text text-bg inline-flex min-h-11 items-center rounded-[var(--radius-pill)] px-5 text-sm font-medium"
-                  >
-                    Open in Maren on iPhone
-                  </a>
-                  <p className="text-text-muted mt-3 text-xs leading-relaxed">
-                    Requires the latest iOS beta. Opens a review before you sign.{' '}
-                    <a
-                      href={TESTFLIGHT_URL}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="underline"
-                    >
-                      Get the beta
-                    </a>{' '}
-                    or claim with a wallet below.
-                  </p>
-                </div>
-              ) : null}
-              <Claimable
-                account={source.account}
-                ready={writes.ready}
-                relayerLine={gasLine(actionIsRelayable('claimLink'), relayer)}
-                onClaim={() => runner.request(claimIntent())}
-              />
-            </>
-          ) : (
-            <SettledLink state={link.state} expiryUnix={link.expiryUnix} />
-          )}
+        {/* The amount is the record's own, read from `MarenPay.links(id)`. */}
+        <div className="mt-2">
+          <span className="sr-only">Amount: </span>
+          <Musd wei={link.amountWei} size="xl" />
         </div>
-      </Panel>
+
+        {link.state === 'claimable' ? (
+          <>
+            <Claimable
+              account={source.account}
+              ready={writes.ready}
+              relayerLine={gasLine(actionIsRelayable('claimLink'), relayer)}
+              onClaim={() => runner.request(claimIntent())}
+            />
+            {openInApp ? (
+              <div className="mt-6 border-t border-[var(--border-hairline)] pt-6">
+                <a
+                  href={`maren://claim?id=${link.linkId}#${secret}`}
+                  className="bg-surface text-text hover:bg-surface-inset group inline-flex h-11 w-full items-center justify-between border border-[var(--border-strong)] px-4 text-[0.9375rem] transition-[background-color] duration-150 ease-out active:brightness-95"
+                >
+                  Open in Maren on iPhone
+                  <ArrowUpRight
+                    aria-hidden
+                    className="size-4 transition-transform duration-150 ease-out group-hover:translate-x-0.5"
+                  />
+                </a>
+                {/* No beta sign-up link: the public TestFlight is closed to new testers, so
+                    this is only for people who already have the app. */}
+                <p className="text-text-muted mt-3 text-xs leading-relaxed">
+                  Requires the latest iOS beta. Opens a review before you sign. Without the app,
+                  claim with a wallet above.
+                </p>
+              </div>
+            ) : null}
+          </>
+        ) : (
+          <SettledLink state={link.state} expiryUnix={link.expiryUnix} />
+        )}
+      </ClaimCard>
 
       <TxSheet runner={runner} />
     </>
@@ -388,8 +408,8 @@ function Claimable({
   onClaim: () => void;
 }) {
   return (
-    <div className="mt-5">
-      <p className="text-text-muted text-sm leading-relaxed">
+    <div className="mt-6 border-t border-[var(--border-hairline)] pt-6">
+      <p className="text-text-muted text-pretty text-sm leading-relaxed">
         Whoever opens this link can claim it, so treat it like cash. The claim signs your own
         address, so observers of the submitted transaction cannot redirect that claim. Anyone with
         the original link can claim first; only share it with the intended recipient.
@@ -405,14 +425,17 @@ function Claimable({
           </div>
         </div>
       ) : (
-        <>
-          <p className="text-text-subtle mt-6 text-xs leading-relaxed">{relayerLine}</p>
-          <div className="mt-4">
-            <ActionButton onClick={onClaim} disabled={!ready} icon={<Check className="size-4" />}>
-              Claim into my wallet
-            </ActionButton>
-          </div>
-        </>
+        <div className="mt-6">
+          <p className="text-text-muted text-[0.8125rem] leading-relaxed">{relayerLine}</p>
+          <ActionButton
+            onClick={onClaim}
+            disabled={!ready}
+            icon={<Check className="size-4" />}
+            className="mt-4 w-full justify-between"
+          >
+            Claim into my wallet
+          </ActionButton>
+        </div>
       )}
     </div>
   );
@@ -423,65 +446,58 @@ function SettledLink({ state, expiryUnix }: { state: ClaimState; expiryUnix: big
 
   if (state === 'claimed') {
     return (
-      <div className="mt-5">
+      <Body>
         <Note>
           This link has already been claimed. Its MUSD has been paid out and it cannot be claimed
           again.
         </Note>
-      </div>
+      </Body>
     );
   }
   if (state === 'reclaimed') {
     return (
-      <div className="mt-5">
+      <Body>
         <Note>
           The creator has already reclaimed this link, so the escrow has been returned to them and
           there is nothing left to claim.
         </Note>
-      </div>
+      </Body>
     );
   }
   // expired
   return (
-    <div className="mt-5">
+    <Body>
       <Note tone="warning">
         This link expired on <span className="num">{expiryText}</span> before it was claimed. Only
         its creator can reclaim it now, back into their own wallet.
       </Note>
-    </div>
+    </Body>
   );
 }
 
 function NoLink() {
   return (
-    <Panel title="Claimable link">
-      <div className="px-5 py-6">
+    <ClaimCard>
+      <Body>
         <Note>
           Open the complete payment link sent to you to see its amount and claim it. This address
           has no claim key. Ask the sender to share the original link again.
         </Note>
-      </div>
-    </Panel>
+      </Body>
+    </ClaimCard>
   );
 }
 
 function InvalidLink() {
   return (
-    <Panel
-      title="Claimable link"
-      meta={
-        <span className="bg-surface-inset text-text-muted grid size-8 place-items-center rounded-[var(--radius-pill)]">
-          <LinkIcon className="size-4" />
-        </span>
-      }
-    >
-      <div className="px-5 py-6">
+    <ClaimCard>
+      <Body>
         <Note tone="warning" role="alert">
           This is not a link Maren can claim. Its claim key is missing, malformed, or names a link
           this deployment does not hold. Nothing has been submitted. Check you copied the whole
-          link, including everything after the <span className="num">#</span>.
+          link, including everything after the <span className="mono">#</span>.
         </Note>
-      </div>
-    </Panel>
+      </Body>
+    </ClaimCard>
   );
 }

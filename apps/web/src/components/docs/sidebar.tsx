@@ -14,7 +14,7 @@ export function Sidebar({ nav, onNavigate }: { nav: SidebarGroup[]; onNavigate?:
     <nav className="doc-nav" aria-label="Docs">
       {nav.map((group) => (
         <div className="doc-navgroup" key={group.group}>
-          <h4 className="doc-navgroup-title">{group.group}</h4>
+          <h2 className="doc-navgroup-title">{group.group}</h2>
           {group.pages.map((page) => {
             const active = pathname === page.href;
             return (
@@ -23,7 +23,7 @@ export function Sidebar({ nav, onNavigate }: { nav: SidebarGroup[]; onNavigate?:
                 href={page.href}
                 onClick={onNavigate}
                 aria-current={active ? 'page' : undefined}
-                className={`doc-navlink${active ? 'is-active' : ''}`}
+                className={active ? 'doc-navlink is-active' : 'doc-navlink'}
               >
                 {page.title}
               </Link>

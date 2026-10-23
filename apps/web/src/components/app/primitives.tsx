@@ -21,6 +21,91 @@ export function AppCard({
   return <Tag className={`card p-6 ${className}`}>{children}</Tag>;
 }
 
+/**
+ * The top of every app screen: one title, one optional line of context, actions on the
+ * right at desktop widths and below the copy on a phone. `eyebrow` is a quiet sentence-case
+ * label above the title, for screens that live inside a section (Finance > Vault).
+ */
+export function PageHeader({
+  eyebrow,
+  title,
+  description,
+  actions,
+  align = 'left',
+  className = '',
+}: {
+  eyebrow?: ReactNode;
+  title: ReactNode;
+  description?: ReactNode;
+  actions?: ReactNode;
+  /** `center` is the greeting form: a question or a hello over the whole column. */
+  align?: 'left' | 'center';
+  className?: string;
+}) {
+  if (align === 'center') {
+    return (
+      <div className={`flex flex-col items-center pb-10 pt-10 text-center md:pt-16 ${className}`}>
+        {eyebrow ? <p className="t-bracket mb-4">{eyebrow}</p> : null}
+        <h1 className="t-h1">{title}</h1>
+        {description ? (
+          <div className="text-text-muted mt-3 max-w-[62ch] text-pretty text-base leading-relaxed">
+            {description}
+          </div>
+        ) : null}
+        {actions ? (
+          <div className="mt-6 flex flex-wrap items-center justify-center gap-2">{actions}</div>
+        ) : null}
+      </div>
+    );
+  }
+  return (
+    <div
+      className={`flex flex-col gap-4 pb-8 pt-6 md:flex-row md:items-end md:justify-between md:pt-10 ${className}`}
+    >
+      <div className="min-w-0">
+        {eyebrow ? <p className="t-bracket mb-3">{eyebrow}</p> : null}
+        <h1 className="t-h1">{title}</h1>
+        {description ? (
+          <p className="text-text-muted mt-2 max-w-[60ch] text-pretty text-[0.9375rem] leading-relaxed">
+            {description}
+          </p>
+        ) : null}
+      </div>
+      {actions ? <div className="flex shrink-0 flex-wrap items-center gap-2">{actions}</div> : null}
+    </div>
+  );
+}
+
+/**
+ * The label above a group: bracketed mono capitals, "[ RECENT ]", with an optional
+ * trailing action (a violet text link such as "View all"). Pass the words; the brackets
+ * are added here.
+ */
+export function SectionHeader({
+  title,
+  action,
+  id,
+  className = '',
+}: {
+  title: ReactNode;
+  action?: ReactNode;
+  id?: string;
+  className?: string;
+}) {
+  return (
+    <div className={`mb-3 flex items-center justify-between gap-4 ${className}`}>
+      <h2 id={id} className="t-bracket">
+        [ {title} ]
+      </h2>
+      {action ? (
+        <div className="text-sm text-violet-400 [&_a:hover]:text-violet-600 [&_button:hover]:text-violet-600">
+          {action}
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
 export function CardTitle({
   children,
   id,
@@ -38,7 +123,7 @@ export function CardTitle({
 }
 
 export function Label({ children, className = '' }: { children: ReactNode; className?: string }) {
-  return <span className={`t-label text-text-subtle ${className}`}>{children}</span>;
+  return <span className={`t-label ${className}`}>{children}</span>;
 }
 
 /**
@@ -77,8 +162,8 @@ export function Panel({
         // shell went from one header landmark to four the moment panels shipped.
         <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2 border-b border-[var(--border-hairline)] px-5 py-3">
           {title ? (
-            <h2 id={labelledBy} className="t-label text-text-subtle">
-              {title}
+            <h2 id={labelledBy} className="t-bracket">
+              [ {title} ]
             </h2>
           ) : (
             <span />
@@ -220,7 +305,7 @@ export function Info({
 }) {
   return (
     <details id={id} className="group mt-4">
-      <summary className="text-text-muted hover:text-text inline-flex cursor-pointer list-none items-center gap-1.5 rounded-[var(--radius-pill)] text-xs transition-colors duration-[120ms] ease-out marker:content-none">
+      <summary className="text-text-muted hover:text-text inline-flex cursor-pointer list-none items-center gap-1.5 rounded-[var(--radius-pill)] text-xs transition-colors duration-150 ease-out marker:content-none">
         <InfoIcon className="size-3.5 shrink-0" />
         {summary}
       </summary>
@@ -254,7 +339,7 @@ export function EmptyState({
     // collapsed the title to one word per line.
     <div className="flex flex-col items-start gap-4">
       {icon ? (
-        <span className="bg-surface-inset grid size-11 shrink-0 place-items-center rounded-[var(--radius-pill)] text-violet-500">
+        <span className="grid size-10 shrink-0 place-items-center border border-[var(--border-hairline)] text-violet-500">
           {icon}
         </span>
       ) : null}
@@ -282,24 +367,20 @@ export function ActionLink({
   variant?: 'primary' | 'secondary';
 }) {
   const variants = {
-    primary: 'bg-surface text-text app-pill-glow',
-    secondary: 'bg-surface-inset text-text hover:bg-text/[0.08]',
-  } as const;
-  const badges = {
-    primary: 'bg-violet-500 text-white',
-    secondary: 'bg-text/[0.06] text-text-muted',
+    primary: 'bg-violet-500 text-white hover:bg-violet-600',
+    secondary: 'bg-surface text-text border border-[var(--border-strong)] hover:bg-surface-inset',
   } as const;
 
   return (
     <a
       href={href}
-      className={`group inline-flex h-12 items-center justify-between gap-4 rounded-[var(--radius-pill)] pl-6 pr-2 text-[0.9375rem] font-medium transition-[color,background-color,transform] duration-[120ms] ease-out active:scale-[0.97] ${variants[variant]}`}
+      className={`group inline-flex h-11 items-center justify-between gap-3 px-5 text-[0.9375rem] transition-[color,background-color,border-color] duration-150 ease-out active:brightness-95 ${variants[variant]}`}
     >
       <span className="whitespace-nowrap">{children}</span>
       {icon ? (
         <span
           aria-hidden
-          className={`grid size-9 shrink-0 place-items-center rounded-[var(--radius-pill)] transition-transform duration-[120ms] ease-out group-hover:translate-x-0.5 ${badges[variant]}`}
+          className="grid shrink-0 place-items-center transition-transform duration-150 ease-out group-hover:translate-x-0.5"
         >
           {icon}
         </span>
@@ -320,11 +401,11 @@ export function Note({
 }) {
   // Neutral notes are a soft grey well — tone, not an outline. A warning keeps its
   // amber hairline because there the border carries meaning.
-  const border = tone === 'warning' ? 'border border-warning/30' : '';
+  const border = tone === 'warning' ? 'border border-warning/25 bg-[#fff8eb]' : 'bg-surface-inset';
   return (
     <div
       {...(role ? { role } : {})}
-      className={`rounded-[14px] ${border} bg-surface-inset text-text-muted p-4 text-sm leading-relaxed`}
+      className={`rounded-[var(--radius-input)] ${border} text-text-muted p-4 text-sm leading-relaxed`}
     >
       {children}
     </div>

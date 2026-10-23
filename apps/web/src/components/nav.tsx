@@ -1,134 +1,48 @@
-'use client';
-
 import Link from 'next/link';
-import { useEffect, useRef, useState } from 'react';
+import { TextPill } from './ui/pill-button';
+import { Wordmark } from './ui/wordmark';
 
 /**
- * Nav — a clean, transparent bar: the Maren mark + wordmark on the left with the
- * section links beside it, a quiet "Sign in" and a dark pill CTA on the right. No
- * boxed pill, no sticker chrome. A subtle blur keeps it legible over content on
- * scroll. Collapses to a menu button + sheet under lg.
+ * The landing nav: wordmark, three links, one quiet "Open app" pill. The pill is grey
+ * on purpose: the hero's violet "Open app" is the one violet thing in the first view.
+ * Under md the links drop out rather than collapsing into a menu; the page is short,
+ * and the hero carries the same two destinations.
  */
 
-type NavLink = { href: string; label: string };
-
-const links: readonly NavLink[] = [
-  { href: '#product', label: 'Product' },
+const links: readonly { href: string; label: string }[] = [
+  { href: '#how', label: 'How it works' },
   { href: '#faq', label: 'FAQ' },
-  { href: '/app', label: 'Open web app' },
+  { href: '/docs', label: 'Docs' },
 ];
 
 export function Nav() {
-  const [open, setOpen] = useState(false);
-
-  const menuButton = useRef<HTMLButtonElement>(null);
-
-  useEffect(() => {
-    const desktop = window.matchMedia('(min-width: 1024px)');
-    const closeOnDesktop = () => {
-      if (desktop.matches) setOpen(false);
-    };
-    desktop.addEventListener('change', closeOnDesktop);
-    return () => desktop.removeEventListener('change', closeOnDesktop);
-  }, []);
-
-  useEffect(() => {
-    if (!open) return;
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') {
-        setOpen(false);
-        menuButton.current?.focus();
-      }
-    };
-    window.addEventListener('keydown', onKey);
-    return () => window.removeEventListener('keydown', onKey);
-  }, [open]);
-
   return (
-    <header className="nav-bar sticky top-0 z-50">
-      <div className="u-wrap">
-        <div className="flex h-[68px] items-center justify-between gap-4">
-          <div className="flex items-center gap-9">
-            <Link href="/" aria-label="Maren Finance, home" className="nav-logo">
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img src="/brand/maren-mark.png" alt="" className="nav-logo-mark" />
-              <span>Maren</span>
-            </Link>
+    <header className="bg-bg/85 sticky top-0 z-50 border-b border-[var(--border-hairline)] backdrop-blur-md">
+      <div className="container-maren flex h-16 items-center justify-between gap-6">
+        <Link
+          href="/"
+          aria-label="Maren Finance, home"
+          className="-ml-1 inline-flex h-11 items-center px-1"
+        >
+          <Wordmark className="h-[20px] text-[19px]" />
+        </Link>
 
-            <nav aria-label="Primary" className="nav-links hidden lg:flex">
+        <div className="flex items-center gap-6">
+          <nav aria-label="Primary" className="hidden md:block">
+            <ul className="flex items-center gap-1">
               {links.map((l) => (
-                <a key={l.href} href={l.href}>
-                  {l.label}
-                </a>
+                <li key={l.href}>
+                  <Link
+                    href={l.href}
+                    className="text-text-muted hover:text-text inline-flex h-11 items-center px-3 text-[0.9375rem] transition-[color] duration-150"
+                  >
+                    {l.label}
+                  </Link>
+                </li>
               ))}
-            </nav>
-          </div>
-
-          <div className="flex items-center gap-3">
-            <a href="/docs" className="hidden text-sm lg:inline-flex">
-              Docs
-            </a>
-            <a href="/app" className="nav-cta">
-              Open app
-            </a>
-
-            <button
-              ref={menuButton}
-              type="button"
-              onClick={() => setOpen((v) => !v)}
-              aria-expanded={open}
-              aria-controls="mobile-nav"
-              aria-label={open ? 'Close menu' : 'Open menu'}
-              className="nav-menu-btn u-chip size-11 shrink-0 lg:hidden"
-            >
-              <svg
-                viewBox="0 0 20 20"
-                className="size-4"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth={1.8}
-                strokeLinecap="round"
-                aria-hidden
-              >
-                {open ? (
-                  <>
-                    <path d="M5 5l10 10" />
-                    <path d="M15 5 5 15" />
-                  </>
-                ) : (
-                  <>
-                    <path d="M3 7h14" />
-                    <path d="M3 13h14" />
-                  </>
-                )}
-              </svg>
-            </button>
-          </div>
-        </div>
-
-        {/* Mobile sheet */}
-        <div id="mobile-nav" hidden={!open} className="u-card mx-auto mt-2 p-3 lg:hidden">
-          <ul className="flex flex-col">
-            {links.map((l) => (
-              <li
-                key={l.href}
-                className="border-b border-[color:var(--border-hairline)] last:border-b-0"
-              >
-                <a
-                  href={l.href}
-                  onClick={() => setOpen(false)}
-                  className="flex h-12 items-center px-2 text-[16px] font-medium text-[color:var(--ink)]"
-                >
-                  {l.label}
-                </a>
-              </li>
-            ))}
-            <li className="pt-3">
-              <a href="/docs" className="nav-cta flex w-full justify-center">
-                Read docs
-              </a>
-            </li>
-          </ul>
+            </ul>
+          </nav>
+          <TextPill href="/app">Open app</TextPill>
         </div>
       </div>
     </header>

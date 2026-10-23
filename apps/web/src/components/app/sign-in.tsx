@@ -5,7 +5,6 @@ import { usePrivy } from '@privy-io/react-auth';
 import { privyConfigured } from '@/lib/privy';
 import { ArrowUpRight } from '@/components/ui/icons';
 import { PillAction } from '@/components/ui/pill-button';
-import { Note } from './primitives';
 import { ConnectButton } from './wallet';
 
 /**
@@ -36,7 +35,7 @@ function PrivySignIn() {
         type="button"
         disabled={!ready}
         onClick={() => login({ loginMethods: ['google'] })}
-        className="bg-text text-bg hover:bg-text/90 active:bg-text/80 group inline-flex h-11 items-center justify-center gap-3 rounded-[var(--radius-pill)] px-5 text-sm font-medium transition-[color,background-color,transform] duration-[120ms] ease-out active:scale-[0.97] disabled:cursor-not-allowed disabled:opacity-60"
+        className="bg-ink group inline-flex h-11 items-center justify-center gap-3 px-5 text-[0.9375rem] text-white transition-[background-color] duration-150 ease-out hover:bg-[#25252b] active:brightness-95 disabled:cursor-not-allowed disabled:opacity-60"
       >
         <span
           aria-hidden
@@ -56,7 +55,7 @@ function PrivySignIn() {
         Connect a wallet
       </PillAction>
 
-      <p className="text-text-subtle max-w-[24rem] text-xs leading-relaxed">
+      <p className="text-text-muted max-w-[24rem] text-[0.8125rem] leading-relaxed">
         Google creates a Mezo wallet for you: no seed phrase, no extension. You can connect your own
         wallet instead.
       </p>
@@ -73,7 +72,9 @@ function WalletOnlySignIn() {
   return (
     <div className="flex flex-col items-start gap-3 sm:min-w-[15rem]">
       <ConnectButton />
-      <Note>Use a wallet that supports Mezo. Funds will arrive at the address you connect.</Note>
+      <p className="text-text-muted max-w-[30rem] text-[0.8125rem] leading-relaxed">
+        Use a wallet that supports Mezo. Funds will arrive at the address you connect.
+      </p>
     </div>
   );
 }

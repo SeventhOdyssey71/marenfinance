@@ -26,7 +26,7 @@ export function Segmented<T extends string>({
     <div
       role="tablist"
       aria-label={label}
-      className="bg-surface-inset inline-flex w-full max-w-xl gap-1 rounded-[var(--radius-pill)] p-1"
+      className="bg-surface inline-flex w-full max-w-xl border border-[var(--border-hairline)] p-1"
     >
       {options.map((option) => {
         const active = option.key === value;
@@ -37,10 +37,8 @@ export function Segmented<T extends string>({
             role="tab"
             aria-selected={active}
             onClick={() => onChange(option.key)}
-            className={`h-11 flex-1 rounded-[var(--radius-pill)] px-4 text-sm transition-colors duration-[120ms] ease-out ${
-              active
-                ? 'bg-surface-raised text-text font-medium shadow-[0_1px_2px_rgba(16,16,19,0.06),0_4px_10px_-6px_rgba(16,16,19,0.18)]'
-                : 'text-text-muted hover:text-text'
+            className={`h-10 flex-1 px-4 text-sm transition-colors duration-150 ease-out ${
+              active ? 'bg-surface-inset text-text font-medium' : 'text-text-muted hover:text-text'
             }`}
           >
             {option.label}
@@ -84,11 +82,11 @@ export function AmountField({
 
   return (
     <div>
-      <label htmlFor={id} className="t-label text-text-subtle block">
+      <label htmlFor={id} className="t-label block">
         {label}
       </label>
 
-      <div className="mt-3 flex items-baseline gap-3 border-b border-[var(--border-hairline)] pb-3 focus-within:border-[var(--border-strong)]">
+      <div className="bg-surface mt-2.5 flex items-baseline gap-3 border border-[var(--border-strong)] px-4 py-3.5 transition-[border-color] duration-150 focus-within:border-violet-500">
         <input
           id={id}
           value={value}
@@ -99,25 +97,26 @@ export function AmountField({
           placeholder="0.00"
           aria-describedby={error ? `${id}-error` : undefined}
           aria-invalid={error ? true : undefined}
-          className="num text-text placeholder:text-text-subtle/60 min-w-0 flex-1 bg-transparent text-3xl"
+          className="num text-text placeholder:text-text-subtle min-w-0 flex-1 bg-transparent text-[2rem] font-medium tracking-[-0.03em] outline-none"
         />
-        <span className="t-h3 text-text-muted shrink-0">{unit}</span>
+        <span className="text-text-muted shrink-0 text-lg">{unit}</span>
       </div>
 
       {max !== undefined ? (
         <div className="mt-3 flex items-center justify-between gap-4 text-sm">
-          <span className="text-text-subtle">{maxLabel ?? 'Available'}</span>
+          <span className="text-text-muted">{maxLabel ?? 'Available'}</span>
           {onMax ? (
             <button
               type="button"
               onClick={onMax}
-              /* The visible label is the balance itself, which on its own announces as
-                 "0.05 BTC" with no hint that pressing it fills the field. */
-              aria-label={`Use the full ${maxLabel ?? 'available'} balance, ${max}`}
               /* The glyph alone was about 18px of tap target. The negative margin keeps
                  the row looking identical while giving it a real one. */
-              className="text-text-muted hover:text-text -my-2 min-h-[44px] rounded-[var(--radius-pill)] px-1.5 py-2 transition-colors duration-[120ms] ease-out"
+              className="text-text-muted hover:text-text -my-2 min-h-[44px] px-1.5 py-2 transition-colors duration-150 ease-out"
             >
+              {/* The visible label is the balance itself, which alone announces as "0.05 BTC"
+                 with no hint that pressing it fills the field. `max` is a node, so the hint is
+                 hidden text rather than an aria-label template (which read "[object Object]"). */}
+              <span className="sr-only">Use the full {maxLabel ?? 'available'} balance, </span>
               {max}
             </button>
           ) : (
@@ -133,7 +132,7 @@ export function AmountField({
               key={preset.label}
               type="button"
               onClick={() => onChange(preset.value)}
-              className="bg-surface-inset text-text-muted hover:text-text hover:bg-text/[0.08] inline-flex h-11 items-center rounded-[var(--radius-pill)] px-4 text-sm transition-colors duration-[120ms] ease-out"
+              className="bg-surface text-text-muted hover:text-text inline-flex h-9 items-center border border-[var(--border-hairline)] px-3.5 text-[0.8125rem] transition-[color,border-color] duration-150 ease-out hover:border-[var(--border-strong)]"
             >
               {preset.label}
             </button>
@@ -141,7 +140,9 @@ export function AmountField({
         </div>
       ) : null}
 
-      {hint ? <div className="text-text-subtle mt-3 text-xs leading-relaxed">{hint}</div> : null}
+      {hint ? (
+        <div className="text-text-muted mt-3 text-[0.8125rem] leading-relaxed">{hint}</div>
+      ) : null}
       {error ? (
         <p id={`${id}-error`} role="alert" className="text-danger mt-3 text-sm">
           {error}
@@ -234,7 +235,7 @@ export function AmountSlider({
                 type="button"
                 onClick={marker.onSelect}
                 disabled={disabled}
-                className="disabled:text-text-subtle rounded-[var(--radius-pill)] text-violet-400 transition-colors duration-[120ms] ease-out hover:text-violet-400/80"
+                className="disabled:text-text-subtle rounded-[var(--radius-pill)] text-violet-400 transition-colors duration-150 ease-out hover:text-violet-400/80"
               >
                 {marker.label}
               </button>

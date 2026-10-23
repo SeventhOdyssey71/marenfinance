@@ -4,7 +4,7 @@ import { useState } from 'react';
 import { useSearchParams } from 'next/navigation';
 
 import { Segmented } from '@/components/app/controls';
-import { Label } from '@/components/app/primitives';
+import { PageHeader } from '@/components/app/primitives';
 import EarnPage from '../earn/page';
 import VaultPage from '../vault/page';
 
@@ -39,18 +39,18 @@ export default function FinancePage() {
   );
 
   return (
-    <div className="flex flex-col gap-6">
-      <div className="flex flex-col gap-3">
-        <Label>Finance</Label>
-        <Segmented
-          options={SECTIONS}
-          value={section}
-          onChange={setSection}
-          label="Finance section"
-        />
-      </div>
+    <div>
+      <PageHeader
+        title="Finance"
+        description="Borrow MUSD against your Bitcoin in the vault, or move idle MUSD into Earn."
+      />
 
-      {section === 'vault' ? <VaultPage /> : <EarnPage />}
+      <Segmented options={SECTIONS} value={section} onChange={setSection} label="Finance section" />
+
+      {/* The two sections are full screens in their own right (they are also routes), so
+          they get the whole column below the switch. Each one drops its own title here:
+          the header above and the selected tab already say where you are. */}
+      <div className="mt-8">{section === 'vault' ? <VaultPage /> : <EarnPage />}</div>
     </div>
   );
 }
