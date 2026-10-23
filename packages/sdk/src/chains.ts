@@ -124,8 +124,25 @@ export const mezoTestnet = defineChain({
     // per-transaction receipt failure and mark that ROW as awaiting a receipt, rather than
     // failing the whole scan. Failing the scan turned one inconsistent row into "we could
     // not read your history", which is the worst available answer and was also a false one.
-    default: { http: ['https://rpc.test.mezo.org', 'https://mezo-testnet.drpc.org'] },
-    public: { http: ['https://rpc.test.mezo.org', 'https://mezo-testnet.drpc.org'] },
+    //
+    // WEBSOCKET, MEASURED 2026-10-23. wss://rpc-ws.test.mezo.org is Mezo's own socket
+    // (mezod docs/testnet.md lists it beside the HTTP endpoint). Over one open socket an
+    // eth_call came back in ~240-270ms p50 against ~440-475ms for the same call over HTTP
+    // to rpc.test.mezo.org, eth_getLogs over 9,000 blocks in ~1.15s, twenty parallel calls
+    // with no failures, and eth_subscribe newHeads works (one block every ~3.5s). The
+    // only cost is the first connect, ~1s, paid once per tab. Clients put it in front of
+    // the HTTP list and fail over to HTTP whenever it is down.
+    //
+    // No other public endpoint serves matsnet: boar, Validation Cloud, Ankr, thirdweb and
+    // publicnode were all probed the same day and either do not resolve or refuse 31611.
+    default: {
+      http: ['https://rpc.test.mezo.org', 'https://mezo-testnet.drpc.org'],
+      webSocket: ['wss://rpc-ws.test.mezo.org'],
+    },
+    public: {
+      http: ['https://rpc.test.mezo.org', 'https://mezo-testnet.drpc.org'],
+      webSocket: ['wss://rpc-ws.test.mezo.org'],
+    },
   },
   blockExplorers: {
     default: {
