@@ -5,19 +5,24 @@ import { healthLabel, healthTone, toneClasses } from '@/lib/health';
 /**
  * The health chip and the health scale.
  *
- * These two are the ONLY coloured elements on the portfolio hero. Every figure around
- * them — ratio, liquidation price, drop tolerance — stays `text`. That is BRAND.md §2's
- * rule, written after an earlier card rendered four saturated colours in one small panel
- * and read as decoration rather than information.
+ * These two are the ONLY coloured elements on a position. Every figure around them
+ * (ratio, liquidation price, drop tolerance) stays `text`. That is BRAND.md §2's rule,
+ * written after an earlier card rendered four saturated colours in one small panel and
+ * read as decoration rather than information.
+ *
+ * Status is never carried by colour alone: the chip is a dot AND a word, and the scale
+ * states its thresholds in figures beside the marks.
  */
 
 export function HealthChip({ status }: { status: HealthStatus }) {
   const tone = toneClasses[healthTone[status]];
+  // A dot and a word, no outline. It sits in panel header bars and beside large figures,
+  // and a bordered pill there read as one more badge competing with the number.
   return (
     <span
-      className={`inline-flex items-center gap-2 rounded-[var(--radius-pill)] border px-3 py-1.5 text-[0.8125rem] ${tone.border} ${tone.text}`}
+      className={`inline-flex shrink-0 items-center gap-1.5 whitespace-nowrap text-[0.8125rem] font-medium ${tone.text}`}
     >
-      <span aria-hidden className={`size-1.5 rounded-[var(--radius-pill)] ${tone.dot}`} />
+      <span aria-hidden className={`size-2 shrink-0 rounded-[var(--radius-pill)] ${tone.dot}`} />
       {healthLabel[status]}
     </span>
   );
@@ -28,6 +33,11 @@ export function HealthChip({ status }: { status: HealthStatus }) {
  * implied by colour. The scale runs from the protocol's 110% cliff to 300%; anything
  * above that is clamped to the end, because the difference between 400% and 800% is not
  * information a user needs and rendering it would compress the part that matters.
+ *
+ * The scale is its own size container. It renders inside a phone-width card, inside a
+ * disclosure on Home, and across a full-width panel, and the two minor captions (140,
+ * 160) only fit when there is room for them, which is a question about the scale's width,
+ * not the viewport's.
  */
 export function HealthScale({
   collateralRatio,
@@ -47,7 +57,7 @@ export function HealthScale({
   /**
    * Ticks and their captions share one percentage each. An earlier version spaced the
    * captions with `justify-between`, which put "180% Maren floor" at the middle of the
-   * track while its tick sat at 37% — a scale whose labels disagree with its marks is
+   * track while its tick sat at 37%. A scale whose labels disagree with its marks is
    * worse than a scale with no labels at all.
    */
   const marks = [
@@ -60,9 +70,9 @@ export function HealthScale({
   const tone = toneClasses[healthTone[status]];
 
   return (
-    <div className="mt-6">
+    <div className="@container mt-6">
       <div
-        className="bg-surface-inset relative h-1.5 rounded-[var(--radius-pill)]"
+        className="bg-surface-inset relative h-1.5"
         role="img"
         aria-label={`Collateral ratio ${formatCollateralRatio(collateralRatio)} on a scale from 110% to 300%. Maren's borrowing floor is 180%; pooled positions can be liquidated below 140%, and direct troves below 110%.`}
       >
@@ -70,24 +80,26 @@ export function HealthScale({
           <span
             key={mark.label}
             aria-hidden
-            className="bg-text/25 absolute top-0 h-1.5 w-px"
+            className={`absolute top-1/2 w-px -translate-y-1/2 ${
+              mark.minor ? 'bg-text/20 h-1.5' : 'bg-text/45 h-3'
+            }`}
             style={{ left: `${percentOf(mark.at)}%` }}
           />
         ))}
         <span
           aria-hidden
-          className={`border-bg absolute -top-1 size-3.5 -translate-x-1/2 rounded-[var(--radius-pill)] border-2 ${tone.dot}`}
+          className={`absolute top-1/2 size-3.5 -translate-x-1/2 -translate-y-1/2 rounded-[var(--radius-pill)] border-2 border-surface ${tone.dot}`}
           style={{ left: `${position}%` }}
         />
       </div>
 
-      <div className="text-text-subtle relative mt-2.5 h-4 text-[0.6875rem]">
+      <div className="text-text-muted relative mt-3 h-4 text-xs">
         <span className="num absolute left-0">110</span>
         {marks.map((mark) => (
           <span
             key={mark.label}
             className={`num absolute -translate-x-1/2 whitespace-nowrap ${
-              mark.minor ? 'hidden sm:inline' : ''
+              mark.minor ? '@md:inline hidden' : ''
             }`}
             style={{ left: `${percentOf(mark.at)}%` }}
           >

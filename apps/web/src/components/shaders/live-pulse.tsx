@@ -1,47 +1,24 @@
-'use client';
-
-import dynamic from 'next/dynamic';
 import type { ReactNode } from 'react';
-import { useShaderGate } from '@/hooks/use-shader-gate';
-
-const PulseCanvas = dynamic(() => import('./canvases').then((m) => ({ default: m.PulseCanvas })), {
-  ssr: false,
-});
 
 /**
- * Shader usage 2 of 3 — PulsingBorder, on the single live element on the page:
- * the position-health card. It is a status indicator, so its colour tracks the
- * health state (BRAND.md §5.2). Here the example position is healthy, so it
- * pulses in `success`.
+ * The position-health card's frame, now static.
  *
- * Below the fold, so it is lazy-mounted on first intersection and paused the
- * moment it leaves the viewport.
+ * This used to mount a WebGL `PulsingBorder` shader around the card, tinted by the health
+ * state, plus a coloured hairline on top of the card's own. It was the one moving thing
+ * on the app's working surface, and it said the health state with colour and motion
+ * alone. The card already carries the state where it can be read: the `HealthChip` in its
+ * header is a dot AND a word. So the frame renders the card and nothing else, and the
+ * shader canvases it used are gone.
+ *
+ * The export and its props are kept so the screens that wrap a card in it keep compiling;
+ * `colors` is accepted and ignored.
  */
 export function LivePulseFrame({
   children,
-  colors = ['#34D399', '#3ECF8E'],
 }: {
   children: ReactNode;
+  /** Ignored. Kept so existing call sites compile unchanged. */
   colors?: readonly string[];
 }) {
-  const { ref, mounted, visible, reduced } = useShaderGate();
-
-  return (
-    <div ref={ref} className="relative">
-      {/* Static hairline is always present; the shader only adds the pulse. */}
-      <div
-        aria-hidden
-        className="border-success/20 pointer-events-none absolute -inset-px rounded-[var(--radius-card)] border"
-      />
-      {!reduced && mounted && (
-        <div
-          aria-hidden
-          className="pointer-events-none absolute -inset-4 overflow-hidden opacity-70"
-        >
-          <PulseCanvas running={visible} colors={colors} />
-        </div>
-      )}
-      <div className="relative">{children}</div>
-    </div>
-  );
+  return <>{children}</>;
 }

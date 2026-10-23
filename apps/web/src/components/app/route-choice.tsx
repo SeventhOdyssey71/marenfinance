@@ -10,7 +10,8 @@ import {
 } from '@maren/sdk';
 
 import { Num } from '@/components/app/money';
-import { Info, Label } from '@/components/app/primitives';
+import { Info } from '@/components/app/primitives';
+import { Check } from '@/components/ui/icons';
 
 /**
  * THE CHOICE, MADE EXPLICIT.
@@ -43,8 +44,8 @@ export function RouteChoice({
 
   if (!choice) {
     return (
-      <div className="bg-surface-inset rounded-[var(--radius-input)] p-4">
-        <p className="text-text-subtle text-sm leading-relaxed">
+      <div className="bg-surface-inset p-4">
+        <p className="text-text-muted text-sm leading-relaxed">
           Which route this deposit takes depends on the BTC price, and the oracle has not given a
           usable one. Depositing still works.
         </p>
@@ -73,7 +74,7 @@ export function RouteChoice({
         />
       </div>
 
-      <p className="text-text-muted mt-4 max-w-[68ch] text-sm leading-relaxed" role="status">
+      <p className="text-text mt-4 max-w-[68ch] text-pretty text-sm leading-relaxed" role="status">
         {recommendation(choice)}
       </p>
 
@@ -109,9 +110,10 @@ function recommendation(choice: Choice): string {
 /**
  * One route, as a card.
  *
- * The chosen one takes the violet ring. It is the only colour in the pair, which is
- * BRAND.md §2's rule doing what it is for: with two cards on screen the reader's question
- * is "which one am I on", and exactly one thing on screen answers it.
+ * Two square boxes. The recommended one is drawn in ink with a check and the word; the
+ * other in a hairline. The word carries the meaning and the line carries the emphasis,
+ * so it reads without relying on colour, and the violet stays on the one button that
+ * acts.
  */
 function RouteOption({
   name,
@@ -128,10 +130,8 @@ function RouteOption({
 }) {
   return (
     <div
-      className={`rounded-[var(--radius-input)] border p-4 ${
-        chosen
-          ? 'border-violet-400/45 bg-violet-900/70'
-          : 'bg-surface-inset border-[var(--border-hairline)]'
+      className={`bg-surface border p-4 ${
+        chosen ? 'border-text' : 'border-[var(--border-hairline)]'
       }`}
     >
       <div className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1">
@@ -140,13 +140,18 @@ function RouteOption({
             deposit", which is true of a route you cannot reach and false the moment you
             can: a user past the threshold is recommended a trove of their own AND is
             still depositing into the social vault. The sentence below carries that. */}
-        {chosen ? <Label className="text-violet-400">Recommended</Label> : null}
+        {chosen ? (
+          <span className="text-text inline-flex items-center gap-1 text-[0.8125rem]">
+            <Check className="size-3.5 shrink-0" />
+            Recommended
+          </span>
+        ) : null}
       </div>
-      <div className="mt-2.5 flex items-baseline gap-2">
-        <span className="text-text-subtle text-xs">{amountLabel}</span>
-        <Num size="lg">{amount}</Num>
+      <div className="mt-3 flex items-baseline gap-1.5 [&_.num]:text-lg">
+        <span className="text-text-muted text-xs">{amountLabel}</span>
+        <Num>{amount}</Num>
       </div>
-      <p className="text-text-muted mt-2 text-xs leading-relaxed">{sentence}</p>
+      <p className="text-text-muted mt-1.5 text-pretty text-xs leading-relaxed">{sentence}</p>
     </div>
   );
 }

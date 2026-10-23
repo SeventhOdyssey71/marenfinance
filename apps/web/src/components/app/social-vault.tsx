@@ -14,10 +14,10 @@ import {
   vaultShareTenths,
 } from '@maren/sdk';
 
-import { ArrowDown } from '@/components/ui/icons';
+import { Fact, FactGroup } from '@/components/app/facts';
 import { HealthChip, HealthScale } from '@/components/app/health';
 import { Btc, Dash, Musd, Num } from '@/components/app/money';
-import { Info, Metric, MetricStrip, Note, Panel } from '@/components/app/primitives';
+import { Info, Note, Panel } from '@/components/app/primitives';
 import { policyRatio } from '@/lib/health';
 import { usePosition, usePrice, useProtocolStats } from '@/lib/data/source';
 
@@ -59,7 +59,9 @@ export function SocialVaultPanel({
   if (!stats) {
     return (
       <Panel title="The social vault">
-        <p className="text-text-subtle px-5 py-4 text-sm">Reading the vault.</p>
+        <p className="text-text-muted px-5 py-4 text-sm" role="status">
+          Reading the vault.
+        </p>
       </Panel>
     );
   }
@@ -72,29 +74,6 @@ export function SocialVaultPanel({
     : 0;
   const collateralUsd = livePrice ? collateralValue(stats.troveCollateralWei, livePrice) : null;
 
-  /**
-   * Before the trove is seeded `troveStatus()` reports an ICR of `type(uint256).max`, and
-   * a health chip on a vault that does not exist yet would be the most confident lie on
-   * the screen. `troveOpen` is carried separately for exactly this reason.
-   */
-  const health = stats.troveOpen ? (
-    <>
-      <div className="flex flex-wrap items-baseline justify-between gap-x-6 gap-y-3">
-        <div className="flex flex-wrap items-baseline gap-3">
-          <Num size="xl">{formatCollateralRatio(stats.troveIcrWei)}</Num>
-          <span className="text-text-subtle text-sm">vault health</span>
-        </div>
-        <HealthChip status={status} />
-      </div>
-      <HealthScale collateralRatio={stats.troveIcrWei} status={status} />
-    </>
-  ) : (
-    <p className="text-text-muted max-w-[64ch] text-sm leading-relaxed">
-      The shared trove has not been opened yet, so there is no vault health to report and borrowing
-      is closed. Deposits are unaffected.
-    </p>
-  );
-
   if (variant === 'compact') {
     return (
       <Panel
@@ -102,44 +81,37 @@ export function SocialVaultPanel({
         meta={
           <Link
             href="/app/vault"
-            className="text-text-muted hover:text-text text-xs transition-colors duration-[120ms] ease-out"
+            className="-my-2 inline-flex min-h-[44px] items-center text-[0.8125rem] text-violet-400 transition-colors duration-150 ease-out hover:text-violet-600"
           >
             Open the vault
           </Link>
         }
       >
-        <MetricStrip>
-          <Metric
-            className="px-5 py-4"
+        <FactGroup>
+          <Fact
             label="Vault health"
             value={
-              stats.troveOpen ? (
-                <Num size="lg">{formatCollateralRatio(stats.troveIcrWei)}</Num>
-              ) : (
-                <Dash size="lg" />
-              )
+              stats.troveOpen ? <Num>{formatCollateralRatio(stats.troveIcrWei)}</Num> : <Dash />
             }
             caption={`floor ${policyRatio(MAREN_VAULT.minTroveCr)}, target ${policyRatio(
               MAREN_POLICY.targetCr,
             )}`}
           />
-          <Metric
-            className="px-5 py-4"
+          <Fact
             label="Your share"
-            value={position ? <Btc wei={position.collateralWei} size="lg" /> : <Dash size="lg" />}
+            value={position ? <Btc wei={position.collateralWei} /> : <Dash />}
             caption={
               inVault
                 ? `${formatPercentTenths(shareTenths)} of ${formatBtc(stats.totalCollateralWei)}`
                 : 'nothing of yours is pooled'
             }
           />
-          <Metric
-            className="px-5 py-4"
+          <Fact
             label="Capacity used"
-            value={<Num size="lg">{formatPercentTenths(capacity.filledTenths)}</Num>}
+            value={<Num>{formatPercentTenths(capacity.filledTenths)}</Num>}
             caption={`${formatBtc(capacity.usedWei)} of ${formatBtc(capacity.capWei)}`}
           />
-        </MetricStrip>
+        </FactGroup>
 
         <div className="border-t border-[var(--border-hairline)] px-5 py-4">
           <SharedMeaning />
@@ -151,98 +123,100 @@ export function SocialVaultPanel({
   return (
     <Panel
       title="The social vault"
-      meta={<span className="t-label text-text-subtle">One trove, shared</span>}
+      meta={<span className="text-text-muted text-[0.8125rem]">One trove, shared</span>}
     >
-      <div className="px-5 py-5">{health}</div>
-
-      {/* EVERYTHING BELOW IS ABOUT THE PROTOCOL, NOT ABOUT YOU.
-          It used to be the screen's subject — vault collateral, vault debt, capacity used,
-          a fill bar, your share of the pool, then two paragraphs — so someone opening
-          Finance to check their own money met twelve figures about a shared trove first.
-          It is all still here and still one click away, because the pooling is the part
-          that can cost someone money and hiding it would be worse. It is just no longer
-          what the screen opens with. The health figure above stays visible: that one is
-          worth interrupting for. */}
-      <details className="group border-t border-[var(--border-hairline)]">
-        <summary className="text-text-muted hover:text-text flex min-h-[44px] cursor-pointer list-none items-center justify-between px-5 py-3 text-sm transition-colors duration-[120ms] ease-out [&::-webkit-details-marker]:hidden">
-          <span>How the shared vault works</span>
-          <ArrowDown
-            className="size-4 transition-transform duration-200 ease-out group-open:rotate-180 motion-reduce:transition-none"
-            aria-hidden
-          />
-        </summary>
-
-        <div className="border-t border-[var(--border-hairline)]">
-          <MetricStrip>
-            <Metric
-              className="px-5 py-4"
-              label="Vault collateral"
-              value={<Btc wei={stats.troveCollateralWei} size="lg" />}
-              caption={collateralUsd !== null ? formatUsd(collateralUsd) : 'needs a live price'}
-            />
-            <Metric
-              className="px-5 py-4"
-              label="Vault debt"
-              value={<Musd wei={stats.troveNetDebtWei} size="lg" />}
-              caption="drawn by everyone in it"
-            />
-            <Metric
-              className="px-5 py-4"
-              label="Capacity used"
-              value={<Num size="lg">{formatPercentTenths(capacity.filledTenths)}</Num>}
-              caption={`of a ${formatBtc(capacity.capWei)} cap`}
-            />
-          </MetricStrip>
-        </div>
-
-        <div className="border-t border-[var(--border-hairline)] px-5 py-4">
-          <CapacityBar
-            filledTenths={capacity.filledTenths}
-            usedWei={capacity.usedWei}
-            capWei={capacity.capWei}
-            headroomWei={capacity.headroomWei}
-          />
-          {capacity.full ? (
-            <div className="mt-4">
-              <Note tone="warning" role="status">
-                The vault is at its cap. Deposits reopen when the cap is raised or someone
-                withdraws. Repaying and withdrawing are unaffected.
-              </Note>
+      {/* The vault's health leads. Before the trove is seeded `troveStatus()` reports an
+          ICR of `type(uint256).max`, and a health chip on a vault that does not exist yet
+          would be the most confident lie on the screen, so `troveOpen` gates it. */}
+      <div className="px-5 pb-5 pt-5">
+        {stats.troveOpen ? (
+          <>
+            <p className="text-text-muted text-[0.8125rem]">Vault health</p>
+            <div className="mt-1.5 flex flex-wrap items-center gap-x-5 gap-y-2">
+              <Num size="xl">{formatCollateralRatio(stats.troveIcrWei)}</Num>
+              <HealthChip status={status} />
             </div>
-          ) : null}
-        </div>
+            <HealthScale collateralRatio={stats.troveIcrWei} status={status} />
+          </>
+        ) : (
+          <p className="text-text-muted max-w-[64ch] text-sm leading-relaxed">
+            The shared trove has not been opened yet, so there is no vault health to report and
+            borrowing is closed. Deposits are unaffected.
+          </p>
+        )}
+      </div>
 
-        {inVault && position ? (
-          <div className="border-t border-[var(--border-hairline)]">
-            <MetricStrip>
-              <Metric
-                className="px-5 py-4"
-                label="Your collateral in it"
-                value={<Btc wei={position.collateralWei} size="lg" />}
-                caption={`${formatPercentTenths(shareTenths)} of the vault`}
-              />
-              <Metric
-                className="px-5 py-4"
-                label="Your debt in it"
-                value={<Musd wei={position.debtWei} size="lg" />}
-                caption="yours alone, not the vault's"
-              />
-            </MetricStrip>
+      {/* EVERYTHING BELOW IS ABOUT THE PROTOCOL, NOT ABOUT YOU, and it is visible rather
+          than one click down. It used to sit behind a "How the shared vault works" toggle
+          because this panel led the Vault screen and twelve figures about a shared trove
+          met someone checking their own money first. The panel now follows the user's own
+          position and the controls, so it no longer leads, and the figures and the pooling
+          risk can be read without opening anything. */}
+      <div className="border-t border-[var(--border-hairline)]">
+        <FactGroup>
+          <Fact
+            label="Vault collateral"
+            value={<Btc wei={stats.troveCollateralWei} />}
+            caption={collateralUsd !== null ? formatUsd(collateralUsd) : 'needs a live price'}
+          />
+          <Fact
+            label="Vault debt"
+            value={<Musd wei={stats.troveNetDebtWei} />}
+            caption="drawn by everyone in it"
+          />
+          <Fact
+            label="Capacity used"
+            value={<Num>{formatPercentTenths(capacity.filledTenths)}</Num>}
+            caption={`of a ${formatBtc(capacity.capWei)} cap`}
+          />
+        </FactGroup>
+      </div>
+
+      <div className="border-t border-[var(--border-hairline)] px-5 py-4">
+        <CapacityBar
+          filledTenths={capacity.filledTenths}
+          usedWei={capacity.usedWei}
+          capWei={capacity.capWei}
+          headroomWei={capacity.headroomWei}
+        />
+        {capacity.full ? (
+          <div className="mt-4">
+            <Note tone="warning" role="status">
+              The vault is at its cap. Deposits reopen when the cap is raised or someone withdraws.
+              Repaying and withdrawing are unaffected.
+            </Note>
           </div>
         ) : null}
+      </div>
 
-        <div className="border-t border-[var(--border-hairline)] px-5 py-4">
-          <SharedMeaning />
-          <Info summary="How Maren limits that risk">
-            Maren liquidates a pooled position internally at{' '}
-            {policyRatio(MAREN_POLICY.vaultLiquidationCr)}, far above the protocol’s 110%, and backs
-            that with a {formatBtc(MAREN_VAULT.minDeposit)} floor, per-block keeper checks and an
-            insurance buffer funded from vault fees. These are mitigations, not a guarantee. Nobody
-            can borrow at all while the vault sits under {policyRatio(MAREN_VAULT.minTroveCr)},
-            which is checked on every borrow whether or not it adds any trove debt.
-          </Info>
+      {inVault && position ? (
+        <div className="border-t border-[var(--border-hairline)]">
+          <FactGroup>
+            <Fact
+              label="Your collateral in it"
+              value={<Btc wei={position.collateralWei} />}
+              caption={`${formatPercentTenths(shareTenths)} of the vault`}
+            />
+            <Fact
+              label="Your debt in it"
+              value={<Musd wei={position.debtWei} />}
+              caption="yours alone, not the vault's"
+            />
+          </FactGroup>
         </div>
-      </details>
+      ) : null}
+
+      <div className="border-t border-[var(--border-hairline)] px-5 py-4">
+        <SharedMeaning />
+        <Info summary="How Maren limits that risk">
+          Maren liquidates a pooled position internally at{' '}
+          {policyRatio(MAREN_POLICY.vaultLiquidationCr)}, far above the protocol’s 110%, and backs
+          that with a {formatBtc(MAREN_VAULT.minDeposit)} floor, per-block keeper checks and an
+          insurance buffer funded from vault fees. These are mitigations, not a guarantee. Nobody
+          can borrow at all while the vault sits under {policyRatio(MAREN_VAULT.minTroveCr)}, which
+          is checked on every borrow whether or not it adds any trove debt.
+        </Info>
+      </div>
     </Panel>
   );
 }
@@ -255,7 +229,10 @@ export function SocialVaultPanel({
  */
 function SharedMeaning() {
   return (
-    <p data-contrast="route-body" className="text-text-muted max-w-[68ch] text-sm leading-relaxed">
+    <p
+      data-contrast="route-body"
+      className="text-text-muted max-w-[68ch] text-pretty text-sm leading-relaxed"
+    >
       Everyone here shares one trove on MUSD: your Bitcoin is segregated in{' '}
       <em className="text-text not-italic">accounting, not custody</em>, so a fall faster than the
       keeper can act could socialise losses.
@@ -285,7 +262,7 @@ function CapacityBar({
   return (
     <div>
       <div
-        className="bg-surface-inset relative h-2 overflow-hidden rounded-[var(--radius-pill)]"
+        className="bg-surface-inset relative h-1.5 overflow-hidden"
         role="img"
         aria-label={`${formatPercentTenths(filledTenths)} of the vault's ${formatBtc(
           capWei,
@@ -293,11 +270,11 @@ function CapacityBar({
       >
         <div
           aria-hidden
-          className="h-2 rounded-[var(--radius-pill)] bg-violet-400"
+          className="bg-text/70 h-1.5"
           style={{ width: `${filledTenths / 10}%`, minWidth: usedWei > 0n ? '2px' : '0' }}
         />
       </div>
-      <div className="text-text-subtle mt-2 flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1 text-xs">
+      <div className="text-text-muted mt-2 flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1 text-xs">
         <span>
           <Btc wei={usedWei} size="sm" tone="muted" /> deposited
         </span>
