@@ -1,72 +1,48 @@
-import { GASLESS_CAVEAT } from '@/lib/copy/value-props';
+import { LandingSection, SectionHead } from './landing/section-head';
 import { Reveal } from './ui/reveal';
-import { Tag } from './ugly-ui';
 
 /**
- * How it works — three big numbered sticker cards: deposit, draw, spend. Honest
- * throughout: the first-deposit-costs-gas caveat is stated on step 01 and the
- * 140/110 buffer on step 02. (The full "why" of the gasless caveat lives in the FAQ.)
- *
- * The gasless caveat sentence itself is single-sourced from `value-props.ts`, so the
- * intro, this page and the value props cannot phrase it differently.
+ * How it works: three steps as one divided strip, read left to right. One object with
+ * hairline divisions rather than three cards, because the steps are a sequence, not a
+ * set of equals. The deposit's gas cost is stated where it applies (step 1); the full
+ * gas story is in the FAQ.
  */
 
-const STEPS: readonly { n: string; title: string; body: string; fill: string }[] = [
+const STEPS: readonly { title: string; body: string }[] = [
   {
-    n: '01',
-    title: 'Deposit BTC',
-    body: `Get the iOS beta, fund it with testnet BTC, and deposit from 0.001 BTC. ${GASLESS_CAVEAT}`,
-    fill: 'var(--lime)',
+    title: 'Deposit Bitcoin',
+    body: 'Start from 0.001 BTC. The deposit itself needs a little BTC for gas.',
   },
   {
-    n: '02',
-    title: 'Draw MUSD',
-    body: 'Borrow MUSD against it. You see your ratio, capacity and distance to liquidation before you sign. Maren liquidates at 140%, thirty points above Mezo’s 110%.',
-    fill: 'var(--cyan)',
+    title: 'Borrow MUSD',
+    body: 'Draw dollars against your Bitcoin instead of selling it. The app shows how far Bitcoin can fall before your position could be liquidated.',
   },
   {
-    n: '03',
-    title: 'Spend it',
-    body: 'Pay a handle, send a link, request or split. Idle MUSD can sit in Earn instead of sitting still.',
-    fill: 'var(--pink)',
+    title: 'Pay anyone',
+    body: 'Send MUSD to an @handle or to any address. Payments move wallet to wallet.',
   },
 ];
 
 export function HowItWorks() {
   return (
-    <section id="how" className="u-wrap scroll-mt-28 pt-32 sm:pt-48">
-      <Reveal className="flex flex-col items-center text-center">
-        <Tag>How it works</Tag>
-        <h2 className="u-display mt-5 max-w-[16ch] text-[clamp(30px,4.6vw,54px)]">
-          Deposit. Draw. Spend.
-        </h2>
-        <p className="mt-4 max-w-[52ch] text-[15px] font-normal leading-[1.5] text-[color:var(--muted)] sm:text-[17px]">
-          Three steps on Mezo testnet. Borrow against Bitcoin without selling it, then move the
-          dollars you draw the way you already move money.
-        </p>
-      </Reveal>
-
-      <Reveal className="mt-12 grid grid-cols-1 gap-5 md:grid-cols-3">
-        {STEPS.map((s) => (
-          <article key={s.n} className="u-card flex flex-col p-6">
-            <span
-              className="u-display grid size-14 place-items-center rounded-[14px] text-[26px] leading-none"
-              style={{ background: 'var(--accent-wash)', color: 'var(--accent-text)' }}
+    <LandingSection id="how" labelledBy="how-title">
+      <Reveal>
+        <SectionHead id="how-title" label="How it works" title="Three steps from Bitcoin to a payment." />
+        <ol role="list" className="card mx-auto mt-14 grid max-w-[880px] md:grid-cols-3">
+          {STEPS.map((s, i) => (
+            <li
+              key={s.title}
+              className="border-[var(--border-hairline)] p-6 md:p-8 [&:not(:first-child)]:border-t md:[&:not(:first-child)]:border-l md:[&:not(:first-child)]:border-t-0"
             >
-              {s.n}
-            </span>
-            <h3
-              className="mt-5 text-[21px] font-semibold tracking-[-0.02em] text-[color:var(--ink)]"
-              style={{ fontFamily: 'var(--display)' }}
-            >
-              {s.title}
-            </h3>
-            <p className="mt-3 text-[15px] font-medium leading-[1.5] text-[color:var(--muted)]">
-              {s.body}
-            </p>
-          </article>
-        ))}
+              <span aria-hidden className="t-bracket">
+                {String(i + 1).padStart(2, '0')}
+              </span>
+              <h3 className="t-h3 mt-5 md:mt-8">{s.title}</h3>
+              <p className="text-text-muted mt-2 text-pretty text-base leading-[1.55]">{s.body}</p>
+            </li>
+          ))}
+        </ol>
       </Reveal>
-    </section>
+    </LandingSection>
   );
 }

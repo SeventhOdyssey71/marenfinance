@@ -1,10 +1,10 @@
 import Link from 'next/link';
-import { TESTFLIGHT_URL } from '@/lib/links';
-import { Reveal } from './ui/reveal';
+import { ArrowUpRight } from './ui/icons';
+import { Wordmark } from './ui/wordmark';
 
 /**
- * Footer — a loud closing CTA on a lime sticker panel, then the link table.
- * The closing copy repeats the honest position: pre-audit, start small.
+ * Footer: the wordmark and one line about Maren, three short link columns, and the
+ * standing disclosure. Links are 44px tall on touch and tighten to a list on desktop.
  */
 
 type FooterLink = { label: string; href: string; external?: boolean };
@@ -14,114 +14,74 @@ const columns: readonly FooterColumn[] = [
   {
     heading: 'Product',
     links: [
-      { label: 'What you can do', href: '#product' },
-      { label: 'How it works', href: '#how' },
-      { label: 'Open web app', href: '/app' },
-      { label: 'Join the iOS beta', href: TESTFLIGHT_URL, external: true },
+      { label: 'How it works', href: '/#how' },
+      { label: 'FAQ', href: '/#faq' },
+      { label: 'Open app', href: '/app' },
     ],
   },
   {
     heading: 'Learn',
     links: [
-      { label: 'FAQ', href: '#faq' },
       { label: 'Docs', href: '/docs' },
+      { label: 'Mezo docs', href: 'https://info.mezo.org', external: true },
     ],
   },
   {
     heading: 'Network',
     links: [
-      { label: 'Testnet Explorer', href: 'https://explorer.test.mezo.org', external: true },
+      { label: 'Testnet explorer', href: 'https://explorer.test.mezo.org', external: true },
       { label: 'mezo.org', href: 'https://mezo.org', external: true },
-      { label: 'Mezo docs', href: 'https://info.mezo.org', external: true },
     ],
   },
 ];
 
+const LINK =
+  'text-text hover:text-text-muted inline-flex h-11 items-center gap-1 text-[0.9375rem] transition-[color] duration-150 md:h-8';
+
 export function Footer() {
   return (
-    <footer className="u-wrap pb-12 pt-32 sm:pt-48">
-      {/* Closing CTA — clean dark panel */}
-      <Reveal>
-        <div className="rounded-[36px] bg-[color:var(--ink)] p-10 text-center sm:p-16">
-          <h2 className="u-display mx-auto max-w-[16ch] text-[clamp(30px,5vw,58px)] text-white">
-            Spend Bitcoin. Never sell it.
-          </h2>
-          <p className="mx-auto mt-4 max-w-[46ch] text-[15px] font-normal leading-[1.5] text-white/65 sm:text-[17px]">
-            Try deposits, borrowing and payments with testnet funds. Eligible transactions are
-            sponsored while the relayer is available.
-          </p>
-          <div className="mt-8 flex justify-center">
-            <a
-              href={TESTFLIGHT_URL}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="footer-cta"
-            >
-              Join the iOS beta
-            </a>
-          </div>
-        </div>
-      </Reveal>
-
-      {/* Link table */}
-      <div className="mt-14 grid grid-cols-1 gap-6 border-t border-[color:var(--border-hairline)] pt-10 md:grid-cols-[1.6fr_1fr_1fr_1fr]">
+    <footer className="container-maren">
+      <div className="grid gap-10 border-t border-[var(--border-hairline)] pt-12 md:grid-cols-[minmax(0,2fr)_repeat(3,minmax(0,1fr))] md:gap-8">
         <div>
-          <span
-            className="text-[22px] font-semibold tracking-[-0.02em] text-[color:var(--ink)]"
-            style={{ fontFamily: 'var(--display)' }}
-          >
-            Maren
-          </span>
-          <p className="mt-3 max-w-[34ch] text-[14px] font-medium leading-[1.55] text-[color:var(--muted)]">
-            Bitcoin-backed borrowing and payments. Available on the web and iPhone, on Mezo testnet.
+          <Link href="/" aria-label="Maren Finance, home" className="inline-flex h-11 items-center">
+            <Wordmark className="h-[20px] text-[19px]" />
+          </Link>
+          <p className="text-text-muted mt-3 max-w-[32ch] text-pretty text-[0.9375rem] leading-[1.55]">
+            Bitcoin-backed borrowing and payments on Mezo testnet, on the web and iPhone.
           </p>
         </div>
 
-        {columns.map((col) => (
-          <nav key={col.heading} aria-label={col.heading}>
-            <div className="text-[11px] font-bold uppercase tracking-[0.08em] text-[color:var(--placeholder)]">
-              {col.heading}
-            </div>
-            <ul className="mt-3 flex flex-col gap-2.5">
-              {col.links.map((l) => (
-                <li key={l.label}>
-                  {l.external ? (
-                    <a
-                      href={l.href}
-                      target="_blank"
-                      rel="noreferrer noopener"
-                      className="text-[14px] font-medium text-[color:var(--muted)] transition-colors duration-[120ms] ease-out hover:text-[color:var(--ink)]"
-                    >
-                      {l.label}
-                    </a>
-                  ) : (
-                    <Link
-                      href={l.href}
-                      className="text-[14px] font-medium text-[color:var(--muted)] transition-colors duration-[120ms] ease-out hover:text-[color:var(--ink)]"
-                    >
-                      {l.label}
-                    </Link>
-                  )}
-                </li>
-              ))}
-            </ul>
-          </nav>
-        ))}
+        <div className="grid grid-cols-2 gap-x-8 gap-y-6 sm:grid-cols-3 md:contents">
+          {columns.map((col) => (
+            <nav key={col.heading} aria-label={col.heading}>
+              <h2 className="t-label">{col.heading}</h2>
+              <ul className="mt-2 flex flex-col md:mt-3">
+                {col.links.map((l) => (
+                  <li key={l.label}>
+                    {l.external ? (
+                      <a href={l.href} target="_blank" rel="noreferrer noopener" className={LINK}>
+                        {l.label}
+                        <ArrowUpRight className="size-3.5 opacity-60" />
+                        <span className="sr-only"> (opens in a new tab)</span>
+                      </a>
+                    ) : (
+                      <Link href={l.href} className={LINK}>
+                        {l.label}
+                      </Link>
+                    )}
+                  </li>
+                ))}
+              </ul>
+            </nav>
+          ))}
+        </div>
       </div>
 
-      {/* Copyright */}
-      <div className="mt-10 flex flex-col items-start justify-between gap-2 border-t border-[color:var(--border-hairline)] pt-6 sm:flex-row sm:items-center">
-        <span className="text-[12.5px] font-medium leading-[1.5] text-[color:var(--muted)]">
-          © {new Date().getFullYear()} Maren Finance. Pre-audit software. Testnet funds only.
-        </span>
-        <span
-          className="inline-flex items-center gap-2.5 text-[12.5px] font-semibold uppercase tracking-[0.06em] text-[color:var(--ink)]"
-          style={{ fontFamily: 'var(--display)' }}
-        >
-          <span aria-hidden className="size-2 rounded-[3px] bg-[color:var(--lime)]" />
-          Built on Mezo
-          <span className="num font-medium text-[color:var(--muted)]">Testnet · 31611</span>
-        </span>
+      <div className="text-text-muted mt-12 flex flex-col gap-2 border-t border-[var(--border-hairline)] py-6 text-[0.8125rem] sm:flex-row sm:items-center sm:justify-between">
+        <p>© {new Date().getFullYear()} Maren Finance. Pre-audit software. Testnet funds only.</p>
+        <p>
+          Built on Mezo testnet, chain <span className="mono">31611</span>
+        </p>
       </div>
     </footer>
   );
