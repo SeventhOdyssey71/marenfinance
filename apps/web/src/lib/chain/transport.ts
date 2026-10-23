@@ -1,5 +1,13 @@
 import { getChain, type MezoNetwork } from '@maren/sdk';
-import { createPublicClient, fallback, http, webSocket, type Chain, type PublicClient } from 'viem';
+import {
+  createPublicClient,
+  fallback,
+  http,
+  webSocket,
+  type Chain,
+  type PublicClient,
+  type Transport,
+} from 'viem';
 
 /**
  * How this app talks to Mezo.
@@ -68,6 +76,68 @@ export const LOG_TIMEOUT_MS = 8_000;
 const BATCHES = new Set(['https://rpc.test.mezo.org']);
 
 /**
+ * A socket with a deadline, because viem's has none for connecting.
+ *
+ * viem resolves the socket on `open` and rejects on `error`, and only starts a request's
+ * timeout once the socket is open. A connection that STALLS (a proxy that takes the TCP
+ * connection and never finishes the upgrade, a captive portal, a socket that closes
+ * before opening without raising an error) therefore holds every request forever, and
+ * `fallback()` never gets the failure it needs to move on. Measured on this app with the
+ * socket blocked: /app sat sixty seconds with no data and made no HTTP request at all.
+ *
+ * So each request races the transport's own timeout, and a socket that misses it is
+ * skipped outright for a cooling-off period that doubles each time (30s up to 5min).
+ * Skipping is an instant rejection, so the fallback goes straight to HTTP instead of
+ * paying the deadline again on every read. viem keeps connecting in the background; if
+ * the socket opens later, the next attempt after the cool-off finds it ready.
+ */
+class SocketDeadlineError extends Error {
+  constructor(url: string, reason: string) {
+    super(`${url}: ${reason}`);
+    this.name = 'SocketDeadlineError';
+  }
+}
+
+function deadlineSocket(url: string, timeout: number): Transport {
+  const inner = webSocket(url, {
+    timeout,
+    retryCount: 0,
+    // A ping every 30s keeps idle proxies from dropping the socket between refetches.
+    keepAlive: { interval: 30_000 },
+    reconnect: { attempts: 5, delay: 2_000 },
+  });
+  let skipUntil = 0;
+  let coolOff = 30_000;
+
+  return (config) => {
+    const transport = inner(config);
+    return {
+      ...transport,
+      async request(args) {
+        if (Date.now() < skipUntil) throw new SocketDeadlineError(url, 'cooling off');
+        let timer: ReturnType<typeof setTimeout> | undefined;
+        const deadline = new Promise<never>((_, reject) => {
+          timer = setTimeout(() => reject(new SocketDeadlineError(url, 'deadline')), timeout);
+        });
+        try {
+          const result = await Promise.race([transport.request(args), deadline]);
+          coolOff = 30_000;
+          return result;
+        } catch (error) {
+          if (error instanceof SocketDeadlineError || /socket/i.test(String(error))) {
+            skipUntil = Date.now() + coolOff;
+            coolOff = Math.min(coolOff * 2, 300_000);
+          }
+          throw error;
+        } finally {
+          clearTimeout(timer);
+        }
+      },
+    } as ReturnType<Transport>;
+  };
+}
+
+/**
  * Retries are the FALLBACK's job, not the individual transport's.
  *
  * viem's `http()` retries a failed request against the same URL. Layering that under
@@ -79,13 +149,7 @@ const BATCHES = new Set(['https://rpc.test.mezo.org']);
  */
 function endpoints(chain: Chain, timeout: number) {
   const sockets = (chain.rpcUrls.default.webSocket ?? []).map((url) =>
-    webSocket(url, {
-      timeout,
-      retryCount: 0,
-      // A ping every 30s keeps idle proxies from dropping the socket between refetches.
-      keepAlive: { interval: 30_000 },
-      reconnect: { attempts: 5, delay: 2_000 },
-    }),
+    deadlineSocket(url, timeout),
   );
   const https = chain.rpcUrls.default.http.map((url) =>
     http(url, {
