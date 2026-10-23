@@ -9,6 +9,7 @@ import type { Hash } from 'viem';
 import { explainError, type RevertReason } from '@/lib/chain/errors';
 import { confirmTransaction, describeOutcome, type TxOutcome } from '@/lib/chain/receipt';
 import { NETWORK } from '@/lib/data/source';
+import { Note } from '@/components/app/primitives';
 import { PillAction } from '@/components/ui/pill-button';
 import { ArrowRight, ArrowUpRight, Check, CopyIcon } from '@/components/ui/icons';
 
@@ -288,6 +289,19 @@ export function TxSheet({ runner }: { runner: TxRunner }) {
   const open = phase.name !== 'idle';
   const busy = phase.name === 'checking' || phase.name === 'signing' || phase.name === 'pending';
 
+  // The entrance: the scrim fades and the sheet rises a few pixels, once, on open. A CSS
+  // transition rather than a keyframe so it is interruptible, and the global
+  // reduced-motion rule collapses it to an instant change.
+  const [entered, setEntered] = useState(false);
+  useEffect(() => {
+    if (!open) {
+      setEntered(false);
+      return;
+    }
+    const frame = requestAnimationFrame(() => setEntered(true));
+    return () => cancelAnimationFrame(frame);
+  }, [open]);
+
   useEffect(() => {
     if (!open) return;
     restoreRef.current = document.activeElement as HTMLElement | null;
@@ -329,20 +343,22 @@ export function TxSheet({ runner }: { runner: TxRunner }) {
   const intent = phase.intent;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-end justify-center sm:items-center">
-      {/* A proper scrim: the app's own background at 78% with a real blur behind it, so
-          the surface underneath reads as depth rather than as a hole cut in the page.
-          The old backdrop was near-black at 80% with a 4px blur, which on a dark app is
-          indistinguishable from switching the lights off. */}
+    <div className="fixed inset-0 z-50 flex items-end justify-center sm:items-center sm:p-6">
+      {/* One flat scrim: ink at a third, barely blurred. The screen behind stays legible
+          as the place the user came from, rather than going dark like a hole in the page. */}
       <button
         type="button"
         aria-label="Close"
         tabIndex={-1}
         onClick={() => !busy && runner.close()}
-        className="absolute inset-0 cursor-default bg-black/45 backdrop-blur-md"
+        className={`bg-ink/30 absolute inset-0 cursor-default backdrop-blur-[2px] transition-opacity duration-200 ease-out ${
+          entered ? 'opacity-100' : 'opacity-0'
+        }`}
       />
-      {/* `card-modal`, not `card`: cards are border-only now, and a transparent dialog
-          would show the screen it is interrupting straight through itself. */}
+      {/* `card-modal` plus `ticks`: the raised square with registration marks at its
+          corners. Header, body and footer are three bands split by hairlines; only the
+          body scrolls, so a 64-leg split never pushes the buttons off screen. A bottom
+          sheet on a phone (safe-area padding in the footer), a centred dialog from `sm`. */}
       <div
         ref={dialogRef}
         role="dialog"
@@ -350,7 +366,9 @@ export function TxSheet({ runner }: { runner: TxRunner }) {
         aria-labelledby="tx-sheet-title"
         tabIndex={-1}
         data-tx-phase={phase.name}
-        className="card-modal relative m-0 w-full max-w-[30rem] rounded-b-none p-6 sm:m-4 sm:rounded-[var(--radius-card)] sm:p-7"
+        className={`card-modal ticks flex max-h-[calc(100dvh-1rem)] w-full max-w-[30rem] flex-col outline-none transition-[opacity,transform] duration-300 ease-[var(--ease-entrance)] sm:max-h-[calc(100dvh-3rem)] ${
+          entered ? 'translate-y-0 opacity-100' : 'translate-y-3 opacity-0'
+        }`}
       >
         {phase.name === 'confirm' || phase.name === 'checking' || phase.name === 'signing' ? (
           <Confirming
@@ -385,25 +403,48 @@ export function TxSheet({ runner }: { runner: TxRunner }) {
   );
 }
 
-/** The eyebrow: one word for where this is, with a dot carrying the tone. */
-function StatusLine({
+// The three bands of the sheet. Each phase renders all three, so the frame never changes
+// shape between phases; only what is inside it does.
+
+/** The top band: where this transaction is, in a bracket label with a dot or a spinner. */
+function SheetHeader({
   tone,
-  children,
   spinning = false,
+  children,
 }: {
   tone: Tone;
-  children: ReactNode;
   spinning?: boolean;
+  children: string;
 }) {
   return (
-    <p className={`t-label flex items-center gap-2 ${toneText[tone]}`}>
-      {spinning ? (
-        <Spinner />
-      ) : (
-        <span aria-hidden className={`size-1.5 rounded-[var(--radius-pill)] ${toneDot[tone]}`} />
-      )}
+    <div className="flex min-h-12 shrink-0 items-center border-b border-[var(--border-hairline)] px-5 sm:px-6">
+      <p className={`t-bracket flex items-center gap-2.5 ${toneText[tone]}`}>
+        {spinning ? (
+          <Spinner />
+        ) : (
+          <span aria-hidden className={`size-1.5 shrink-0 rounded-full ${toneDot[tone]}`} />
+        )}
+        [ {children} ]
+      </p>
+    </div>
+  );
+}
+
+/** The middle band: the only part that scrolls. */
+function SheetBody({ children }: { children: ReactNode }) {
+  return (
+    <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-5 py-6 sm:px-6">
       {children}
-    </p>
+    </div>
+  );
+}
+
+/** The bottom band: the actions, full width on a phone, right-aligned from `sm`. */
+function SheetFooter({ children }: { children: ReactNode }) {
+  return (
+    <div className="flex shrink-0 flex-col-reverse gap-2 border-t border-[var(--border-hairline)] px-5 pb-[max(1rem,env(safe-area-inset-bottom))] pt-4 sm:flex-row sm:items-center sm:justify-end sm:px-6 sm:pb-4">
+      {children}
+    </div>
   );
 }
 
@@ -415,18 +456,120 @@ function StatusLine({
  * happened to reach — a broken-looking artefact rather than an absence of motion. So the
  * ring is hidden outright under reduce and a static dot takes its place.
  */
-function Spinner() {
+function Spinner({ className = 'size-3' }: { className?: string }) {
   return (
     <>
       <span
         aria-hidden
-        className="size-3 shrink-0 animate-spin rounded-[var(--radius-pill)] border-2 border-current border-t-transparent motion-reduce:hidden"
+        className={`${className} shrink-0 animate-spin rounded-full border-[1.5px] border-current border-t-transparent motion-reduce:hidden`}
       />
       <span
         aria-hidden
-        className="hidden size-1.5 shrink-0 rounded-[var(--radius-pill)] bg-current motion-reduce:block"
+        className="hidden size-1.5 shrink-0 rounded-full bg-current motion-reduce:block"
       />
     </>
+  );
+}
+
+/** The headline every phase leads with. One id, so the dialog is always labelled. */
+function Title({ children }: { children: ReactNode }) {
+  return (
+    <h2
+      id="tx-sheet-title"
+      className="text-text text-balance text-[1.5rem] font-medium leading-[1.15] tracking-[-0.026em]"
+    >
+      {children}
+    </h2>
+  );
+}
+
+/** Body copy under a headline. Muted, readable, capped at a comfortable measure. */
+function Lead({ children }: { children: ReactNode }) {
+  return (
+    <p className="text-text-muted mt-3 max-w-[52ch] text-pretty text-[0.9375rem] leading-relaxed">
+      {children}
+    </p>
+  );
+}
+
+/**
+ * Who pays the gas, as a fact in the itemised list rather than a footnote under it.
+ * Derived from the same `gas.sponsored` the runner hands to `confirmTransaction`, so the
+ * row and the receipt can never disagree.
+ */
+function gasPayer(gas: TxIntent['gas']): string {
+  return gas.sponsored ? 'Maren pays' : 'You pay, in BTC';
+}
+
+/**
+ * The three things that happen after Confirm, in order, with where this transaction is.
+ *
+ * `checking` is a read-only `eth_call`: nothing has been asked of the user. `signing` is
+ * the wallet being open. `pending` is a hash with no receipt yet. The last step is never
+ * drawn as done here: done is the Settled view, and it only exists once the chain says so.
+ */
+const STEP_ORDER = ['checking', 'signing', 'pending'] as const;
+
+function Steps({ phase, sponsored }: { phase: Phase['name']; sponsored: boolean }) {
+  const current = STEP_ORDER.indexOf(phase as (typeof STEP_ORDER)[number]);
+  const steps = [
+    'Check against Mezo',
+    sponsored ? 'Sign in your wallet' : 'Approve in your wallet',
+    'Wait for the receipt',
+  ];
+
+  return (
+    <ol className="mt-6 divide-y divide-[var(--border-hairline)] border border-[var(--border-hairline)]">
+      {steps.map((label, i) => {
+        const state = i < current ? 'done' : i === current ? 'current' : 'todo';
+        return (
+          <li key={label} className="flex h-12 items-center gap-3 px-4 text-[0.9375rem]">
+            <span aria-hidden className="mono text-text-muted w-5 shrink-0 text-xs">
+              {String(i + 1).padStart(2, '0')}
+            </span>
+            <span
+              className={`min-w-0 flex-1 ${state === 'current' ? 'text-text font-medium' : 'text-text-muted'}`}
+            >
+              {label}
+            </span>
+            {/* The state, in a word and a mark; never colour alone. */}
+            <span
+              className={`flex shrink-0 items-center gap-2 text-xs ${
+                state === 'done'
+                  ? 'text-success'
+                  : state === 'current'
+                    ? 'text-violet-400'
+                    : 'text-text-muted'
+              }`}
+            >
+              {state === 'done' ? (
+                <>
+                  <Check aria-hidden className="size-3.5" />
+                  Done
+                </>
+              ) : state === 'current' ? (
+                <>
+                  <Spinner />
+                  Now
+                </>
+              ) : (
+                'Next'
+              )}
+            </span>
+          </li>
+        );
+      })}
+    </ol>
+  );
+}
+
+/** Label and value on a hairline. The shared row of every list on the sheet. */
+function Row({ label, children }: { label: ReactNode; children: ReactNode }) {
+  return (
+    <div className="flex items-start justify-between gap-6 px-4 py-3">
+      <dt className="text-text-muted shrink-0 text-sm">{label}</dt>
+      <dd className="text-text min-w-0 text-right text-sm [overflow-wrap:anywhere]">{children}</dd>
+    </div>
   );
 }
 
@@ -446,96 +589,109 @@ function Confirming({
 
   return (
     <>
-      <StatusLine tone="neutral" spinning={checking || signing}>
-        {checking ? 'Checking' : signing ? 'Waiting for your wallet' : 'Confirm'}
-      </StatusLine>
-      <h2 id="tx-sheet-title" className="t-h3 mt-3 pr-6">
-        {intent.title}
-      </h2>
+      <SheetHeader tone="neutral" spinning={checking || signing}>
+        {checking ? 'Checking' : signing ? 'Waiting for your wallet' : 'Review'}
+      </SheetHeader>
 
-      {checking ? (
-        <p className="text-text-muted mt-3 max-w-[52ch] text-sm leading-relaxed">
-          Running this against Mezo as a read-only call first. If it would revert, you will see why
-          here and your wallet will never open.
-        </p>
-      ) : null}
-      {signing ? (
-        <p className="text-text-muted mt-3 max-w-[52ch] text-sm leading-relaxed">
-          It would succeed against the chain as it is right now.{' '}
-          {intent.gas.sponsored
-            ? // A relayed action asks for a signature over a message, not a transaction.
-              // The wallet says so in its own words and the two should agree: what is
-              // being approved costs the signer nothing and sends nothing by itself.
-              'Sign it in your wallet. You are signing an instruction, not sending a transaction, ' +
-              'and Maren submits it and pays the Bitcoin gas.'
-            : 'Approve it in your wallet. This is the only signature this action needs.'}
-        </p>
-      ) : null}
+      <SheetBody>
+        <Title>{intent.title}</Title>
 
-      {phase.name === 'confirm' ? (
-        <>
-          <dl className="mt-5">
-            {intent.details.map((detail) => (
-              <div
-                key={detail.label}
-                className="flex items-start justify-between gap-6 border-b border-[var(--border-hairline)] py-3 last:border-b-0"
-              >
-                <dt className="text-text-muted text-sm">{detail.label}</dt>
-                <dd className="text-right text-sm">{detail.value}</dd>
-              </div>
-            ))}
-          </dl>
+        {phase.name === 'confirm' ? (
+          <>
+            <dl className="mt-6 divide-y divide-[var(--border-hairline)] border border-[var(--border-hairline)]">
+              {intent.details.map((detail) => (
+                <Row key={detail.label} label={detail.label}>
+                  {detail.value}
+                </Row>
+              ))}
+              <Row label="Network fee">{gasPayer(intent.gas)}</Row>
+            </dl>
 
-          <p className="text-text-subtle mt-4 text-xs leading-relaxed">{intent.gas.note}</p>
-
-          {intent.caution ? (
-            <p className="text-warning mt-4 text-sm leading-relaxed" role="alert">
-              {intent.caution}
+            <p className="text-text-muted mt-3 text-pretty text-[0.8125rem] leading-relaxed">
+              {intent.gas.note}
             </p>
-          ) : null}
-        </>
-      ) : null}
 
-      <div className="mt-6 flex flex-wrap items-center gap-3">
+            {intent.caution ? (
+              <div className="mt-4">
+                <Note tone="warning" role="alert">
+                  {intent.caution}
+                </Note>
+              </div>
+            ) : null}
+          </>
+        ) : (
+          <>
+            <Steps phase={phase.name} sponsored={intent.gas.sponsored} />
+            {checking ? (
+              <Lead>
+                Running this against Mezo as a read-only call first. If it would revert, you will
+                see why here and your wallet will never open.
+              </Lead>
+            ) : null}
+            {signing ? (
+              <Lead>
+                It would succeed against the chain as it is right now.{' '}
+                {intent.gas.sponsored
+                  ? // A relayed action asks for a signature over a message, not a transaction.
+                    // The wallet says so in its own words and the two should agree: what is
+                    // being approved costs the signer nothing and sends nothing by itself.
+                    'Sign it in your wallet. You are signing an instruction, not sending a transaction, ' +
+                    'and Maren submits it and pays the Bitcoin gas.'
+                  : 'Approve it in your wallet. This is the only signature this action needs.'}
+              </Lead>
+            ) : null}
+          </>
+        )}
+      </SheetBody>
+
+      <SheetFooter>
+        <PillAction
+          variant="secondary"
+          onClick={runner.close}
+          disabled={checking || signing}
+          className="w-full sm:w-auto"
+        >
+          Cancel
+        </PillAction>
         <PillAction
           onClick={onConfirm}
           disabled={checking || signing}
-          icon={<ArrowRight className="size-4" />}
+          icon={<ArrowUpRight className="size-4" />}
+          className="w-full sm:w-auto sm:min-w-[11rem]"
         >
           {checking ? 'Checking…' : signing ? 'In your wallet…' : intent.confirmLabel}
         </PillAction>
-        <PillAction variant="ghost" onClick={runner.close} disabled={checking || signing}>
-          Cancel
-        </PillAction>
-      </div>
+      </SheetFooter>
     </>
   );
 }
 
 function Pending({ intent, hash }: { intent: TxIntent; hash: Hash }) {
   return (
-    <div role="status">
-      <StatusLine tone="neutral" spinning>
+    <div role="status" className="flex min-h-0 flex-1 flex-col">
+      <SheetHeader tone="neutral" spinning>
         Submitted
-      </StatusLine>
-      <h2 id="tx-sheet-title" className="t-h3 mt-3 pr-6">
-        {intent.title}
-      </h2>
-      <p className="text-text-muted mt-3 max-w-[52ch] text-sm leading-relaxed">
-        {intent.gas.sponsored
-          ? // Which path submitted this, stated where the difference is visible: the
-            // transaction on the explorer will be sent by Maren's relayer, not by the
-            // account that signed it, and a user who does not expect that would read
-            // their own absence from the sender field as something having gone wrong.
-            'Maren’s relayer broadcast this and is paying the Bitcoin gas, so the sender on the ' +
-            'explorer is Maren rather than your account. '
-          : ''}
-        Waiting for a receipt. A transaction hash is not a result, so nothing is marked delivered
-        until the chain returns one with <span className="num">status success</span>.
-      </p>
-      {/* The explorer link appears WITH THE HASH, not with the receipt. A user watching a
-          pending transaction should be able to go and look at it. */}
-      <HashLine hash={hash} />
+      </SheetHeader>
+      <SheetBody>
+        <Title>{intent.title}</Title>
+        <Steps phase="pending" sponsored={intent.gas.sponsored} />
+        <Lead>
+          {intent.gas.sponsored
+            ? // Which path submitted this, stated where the difference is visible: the
+              // transaction on the explorer will be sent by Maren's relayer, not by the
+              // account that signed it, and a user who does not expect that would read
+              // their own absence from the sender field as something having gone wrong.
+              'Maren’s relayer broadcast this and is paying the Bitcoin gas, so the sender on the ' +
+              'explorer is Maren rather than your account. '
+            : ''}
+          Waiting for a receipt. A transaction hash is not a result, so nothing is marked delivered
+          until the chain returns one with{' '}
+          <span className="mono text-text text-[0.875em]">status success</span>.
+        </Lead>
+        {/* The explorer link appears WITH THE HASH, not with the receipt. A user watching a
+            pending transaction should be able to go and look at it. */}
+        <HashLine hash={hash} />
+      </SheetBody>
     </div>
   );
 }
@@ -570,50 +726,85 @@ function Settled({
     : (reason?.title ?? described.title);
 
   return (
-    <div role="status">
-      <StatusLine tone={tone}>{delivered ? 'Confirmed on Mezo' : described.title}</StatusLine>
+    <div role="status" className="flex min-h-0 flex-1 flex-col">
+      <SheetHeader tone={tone}>
+        {delivered ? 'Confirmed on Mezo' : SETTLED_EYEBROW[outcome.kind]}
+      </SheetHeader>
 
-      {/* THE OUTCOME LEADS. Not the hash, not the word "Delivered" — what happened, in
-          past tense, at headline size. */}
-      <h2 id="tx-sheet-title" className="t-h2 mt-3 pr-6">
-        {headline}
-      </h2>
+      <SheetBody>
+        {/* The tick is drawn only here, on a receipt with status success. */}
+        {delivered ? (
+          <span
+            aria-hidden
+            className="text-success mb-5 grid size-10 place-items-center border border-current"
+          >
+            <Check className="size-5" />
+          </span>
+        ) : null}
 
-      {delivered ? null : (
-        <p className="text-text-muted mt-3 max-w-[52ch] text-sm leading-relaxed">
-          {reason?.detail ?? described.detail}
-        </p>
-      )}
+        {/* THE OUTCOME LEADS. Not the hash, not the word "Delivered" — what happened, in
+            past tense, at headline size. */}
+        <Title>{headline}</Title>
 
-      {/* The mechanical facts, secondary: what the receipt said, and the Solidity name for
-          anyone who wants to grep the source. */}
-      {delivered ? null : (
-        <div className="bg-surface-inset mt-5 rounded-[var(--radius-input)] border border-[var(--border-hairline)] p-4">
-          <p className="text-text-muted text-sm leading-relaxed">{described.detail}</p>
-          {reason?.name ? (
-            <p className="num text-text-subtle mt-2.5 text-xs">Contract error: {reason.name}</p>
-          ) : null}
-          <p className="text-text-subtle mt-2.5 text-xs">
-            Attempted: <span className="text-text-muted">{intent.title}</span>
-          </p>
-        </div>
-      )}
+        {delivered ? null : <Lead>{reason?.detail ?? described.detail}</Lead>}
 
-      {delivered && intent.changes && intent.changes.length > 0 ? (
-        <Changes changes={intent.changes} />
-      ) : null}
+        {/* The mechanical facts, secondary: what the receipt said (when a decoded reason
+            already took the lead line), and the Solidity name for anyone who wants to grep
+            the source. */}
+        {delivered ? null : (
+          <div className="bg-surface-inset mt-5 p-4 text-sm leading-relaxed">
+            {reason ? <p className="text-text-muted mb-2.5">{described.detail}</p> : null}
+            <Facts name={reason?.name ?? null} attempted={intent.title} />
+          </div>
+        )}
 
-      <HashLine hash={hash} />
+        {delivered && intent.changes && intent.changes.length > 0 ? (
+          <Changes changes={intent.changes} />
+        ) : null}
 
-      <div className="mt-6">
+        <HashLine hash={hash} />
+      </SheetBody>
+
+      <SheetFooter>
         <PillAction
+          variant={delivered ? 'primary' : 'secondary'}
           onClick={onClose}
-          icon={delivered ? <Check className="size-4" /> : <ArrowRight className="size-4" />}
+          icon={delivered ? <Check className="size-4" /> : undefined}
+          className="w-full sm:w-auto sm:min-w-[8rem]"
         >
           {delivered ? 'Done' : 'Close'}
         </PillAction>
-      </div>
+      </SheetFooter>
     </div>
+  );
+}
+
+/**
+ * The eyebrow for a receipt that is not a success. Short, and different from
+ * `describeOutcome`'s title, which takes the headline when no revert reason was recovered.
+ */
+const SETTLED_EYEBROW: Record<TxOutcome['kind'], string> = {
+  delivered: 'Confirmed on Mezo',
+  reverted: 'Reverted',
+  timeout: 'No receipt yet',
+  unreachable: 'Mezo unreachable',
+};
+
+/** The contract's own error name and the attempted action, small, under the explanation. */
+function Facts({ name, attempted }: { name: string | null; attempted: string }) {
+  return (
+    <dl className="flex flex-col gap-1.5 text-xs">
+      {name ? (
+        <div className="flex flex-wrap gap-x-1.5">
+          <dt className="text-text-muted">Contract error:</dt>
+          <dd className="mono text-text [overflow-wrap:anywhere]">{name}</dd>
+        </div>
+      ) : null}
+      <div className="flex flex-wrap gap-x-1.5">
+        <dt className="text-text-muted">Attempted:</dt>
+        <dd className="text-text">{attempted}</dd>
+      </div>
+    </dl>
   );
 }
 
@@ -629,42 +820,43 @@ function Failed({
   onClose: () => void;
 }) {
   return (
-    <div role="alert">
-      <StatusLine tone={reason.submissionUnknown ? 'warning' : 'danger'}>
-        {reason.submissionUnknown ? 'Submission outcome unknown' : 'Not submitted'}
-      </StatusLine>
+    <div role="alert" className="flex min-h-0 flex-1 flex-col">
+      <SheetHeader tone={reason.submissionUnknown ? 'warning' : 'danger'}>
+        {/* The eyebrow is the consequence, so it never repeats the headline (the fallback
+            reason titles are "Not submitted" and "Submission outcome unknown"). */}
+        {reason.submissionUnknown ? 'Do not retry yet' : signed ? 'Nothing sent' : 'Nothing signed'}
+      </SheetHeader>
 
-      {/* The decoded human reason IS the headline. The raw contract error is secondary and
-          sits at the bottom in mono, for anyone who wants to grep the Solidity. */}
-      <h2 id="tx-sheet-title" className="t-h2 mt-3 pr-6">
-        {reason.title}
-      </h2>
-      <p className="text-text-muted mt-3 max-w-[52ch] text-sm leading-relaxed">{reason.detail}</p>
+      <SheetBody>
+        {/* The decoded human reason IS the headline. The raw contract error is secondary
+            and sits at the bottom in mono, for anyone who wants to grep the Solidity. */}
+        <Title>{reason.title}</Title>
+        <Lead>{reason.detail}</Lead>
 
-      <div className="bg-surface-inset mt-5 rounded-[var(--radius-input)] border border-[var(--border-hairline)] p-4">
-        <p className="text-text-muted text-sm leading-relaxed">
-          {reason.submissionUnknown
-            ? 'Do not repeat this action until its outcome is known. A missing receipt does not prove it was refused.'
-            : signed
-              ? 'Your wallet was asked to sign this and it did not go through. Nothing reached the chain.'
-              : 'Maren checked this against Mezo before opening your wallet, so no signature was ' +
-                'requested and no gas was spent.'}
-        </p>
-        {reason.name ? (
-          <p className="num text-text-subtle mt-2.5 text-xs">Contract error: {reason.name}</p>
-        ) : null}
-        <p className="text-text-subtle mt-2.5 text-xs">
-          Attempted: <span className="text-text-muted">{intent.title}</span>
-        </p>
-      </div>
+        <div className="bg-surface-inset mt-5 p-4 text-sm leading-relaxed">
+          <p className="text-text mb-2.5">
+            {reason.submissionUnknown
+              ? 'Do not repeat this action until its outcome is known. A missing receipt does not prove it was refused.'
+              : signed
+                ? 'Your wallet was asked to sign this and it did not go through. Nothing reached the chain.'
+                : 'Maren checked this against Mezo before opening your wallet, so no signature was ' +
+                  'requested and no gas was spent.'}
+          </p>
+          <Facts name={reason.name} attempted={intent.title} />
+        </div>
 
-      {reason.hash ? <HashLine hash={reason.hash} /> : null}
+        {reason.hash ? <HashLine hash={reason.hash} /> : null}
+      </SheetBody>
 
-      <div className="mt-6">
-        <PillAction onClick={onClose} icon={<ArrowRight className="size-4" />}>
+      <SheetFooter>
+        <PillAction
+          variant="secondary"
+          onClick={onClose}
+          className="w-full sm:w-auto sm:min-w-[8rem]"
+        >
           Close
         </PillAction>
-      </div>
+      </SheetFooter>
     </div>
   );
 }
@@ -672,23 +864,23 @@ function Failed({
 /** What moved: each figure before, and after. */
 function Changes({ changes }: { changes: TxChange[] }) {
   return (
-    <dl className="bg-surface-inset mt-5 rounded-[var(--radius-input)] border border-[var(--border-hairline)] px-4">
+    <dl className="mt-6 divide-y divide-[var(--border-hairline)] border border-[var(--border-hairline)]">
       {changes.map((change) => (
         <div
           key={change.label}
-          className="flex flex-wrap items-center justify-between gap-x-4 gap-y-1 border-b border-[var(--border-hairline)] py-3.5 last:border-b-0"
+          className="flex flex-wrap items-center justify-between gap-x-4 gap-y-1 px-4 py-3.5"
         >
           <dt className="text-text-muted text-sm">{change.label}</dt>
           <dd className="flex items-center gap-2.5 text-sm">
-            {/* Subtle, not struck through. A strike-through across tabular numerals is
-                hard to read and says "cancelled" rather than "was". The arrow already
-                carries the direction. */}
-            <span className="text-text-subtle">{change.before}</span>
+            {/* Muted, not struck through. A strike-through across numerals is hard to read
+                and says "cancelled" rather than "was". The arrow already carries the
+                direction. */}
+            <span className="text-text-muted">{change.before}</span>
             {/* Spoken, not just drawn: a screen reader reading "0.001 BTC 0.002 BTC" with
                 a decorative arrow between them has been told two numbers and no relation. */}
             <span className="sr-only">changed to</span>
-            <ArrowRight aria-hidden className="text-text-subtle size-3.5 shrink-0" />
-            <span className="text-text">{change.after}</span>
+            <ArrowRight aria-hidden className="text-text-muted size-3.5 shrink-0" />
+            <span className="text-text font-medium">{change.after}</span>
           </dd>
         </div>
       ))}
@@ -715,47 +907,51 @@ function HashLine({ hash }: { hash: Hash }) {
   }, [copied]);
 
   return (
-    <div className="mt-5 flex flex-wrap items-center gap-x-4 gap-y-2 border-t border-[var(--border-hairline)] pt-4">
-      <span className="t-label text-text-subtle">Transaction</span>
-      <button
-        type="button"
-        title={hash}
-        onClick={() => {
-          void navigator.clipboard?.writeText(hash);
-          setCopied(true);
-        }}
-        className="num text-text-muted hover:text-text inline-flex items-center gap-2 rounded-[var(--radius-pill)] text-xs transition-colors duration-[120ms] ease-out"
-      >
-        <span data-tx-hash>{shortHash(hash)}</span>
-        {/* Cross-fade on swap, not a snap: the copy glyph fades, shrinks and blurs
-            out while the check enters the same way, so the state change reads as
-            motion rather than a replacement. Both glyphs stay mounted and stacked;
-            the transition names opacity, transform and filter — nothing else. */}
-        <span className="relative grid size-3.5 place-items-center">
-          <CopyIcon
-            aria-hidden
-            className={`absolute transition-[opacity,transform,filter] duration-150 ease-out ${
-              copied ? 'scale-50 opacity-0 blur-[2px]' : 'scale-100 opacity-100 blur-0'
-            }`}
-          />
-          <Check
-            aria-hidden
-            className={`text-success absolute transition-[opacity,transform,filter] duration-150 ease-out ${
-              copied ? 'scale-100 opacity-100 blur-0' : 'scale-50 opacity-0 blur-[2px]'
-            }`}
-          />
-        </span>
-        <span className="sr-only">{copied ? 'Copied' : 'Copy the full transaction hash'}</span>
-      </button>
-      <a
-        href={explorerTxUrl(hash)}
-        target="_blank"
-        rel="noreferrer noopener"
-        className="text-text-muted hover:text-text ml-auto inline-flex items-center gap-1.5 text-xs transition-colors duration-[120ms] ease-out"
-      >
-        Explorer
-        <ArrowUpRight aria-hidden className="size-3.5" />
-      </a>
+    <div className="mt-5 flex flex-wrap items-center justify-between gap-x-3 border border-[var(--border-hairline)] pl-4">
+      <span className="text-text-muted text-sm">Transaction</span>
+      <div className="flex items-center">
+        <button
+          type="button"
+          title={hash}
+          onClick={() => {
+            void navigator.clipboard?.writeText(hash);
+            setCopied(true);
+          }}
+          className="text-text hover:bg-surface-inset inline-flex h-11 items-center gap-2 px-3 transition-colors duration-150 ease-out"
+        >
+          <span data-tx-hash className="mono text-[0.8125rem]">
+            {shortHash(hash)}
+          </span>
+          {/* Cross-fade on swap, not a snap: the copy glyph fades, shrinks and blurs
+              out while the check enters the same way, so the state change reads as
+              motion rather than a replacement. Both glyphs stay mounted and stacked;
+              the transition names opacity, transform and filter — nothing else. */}
+          <span className="text-text-muted relative grid size-3.5 place-items-center">
+            <CopyIcon
+              aria-hidden
+              className={`absolute transition-[opacity,transform,filter] duration-150 ease-out ${
+                copied ? 'scale-50 opacity-0 blur-[2px]' : 'scale-100 opacity-100 blur-0'
+              }`}
+            />
+            <Check
+              aria-hidden
+              className={`text-success absolute transition-[opacity,transform,filter] duration-150 ease-out ${
+                copied ? 'scale-100 opacity-100 blur-0' : 'scale-50 opacity-0 blur-[2px]'
+              }`}
+            />
+          </span>
+          <span className="sr-only">{copied ? 'Copied' : 'Copy the full transaction hash'}</span>
+        </button>
+        <a
+          href={explorerTxUrl(hash)}
+          target="_blank"
+          rel="noreferrer noopener"
+          className="inline-flex h-11 items-center gap-1 border-l border-[var(--border-hairline)] px-3 text-[0.8125rem] text-violet-400 transition-colors duration-150 ease-out hover:text-violet-600"
+        >
+          Explorer
+          <ArrowUpRight aria-hidden className="size-3.5" />
+        </a>
+      </div>
     </div>
   );
 }

@@ -14,17 +14,33 @@ import { Musd } from '@/components/app/money';
 import {
   ActionButton,
   Info,
-  Label,
   Loading,
   Note,
+  PageHeader,
   Panel,
   Refreshing,
 } from '@/components/app/primitives';
 import { ReceivePanel } from '@/components/app/receive-panel';
-import { SendFlow } from '@/components/app/send-flow';
+import {
+  ComposerFooter,
+  FIELD_LABEL,
+  FieldStatus,
+  FOOTER_BUTTON,
+  SendFlow,
+  SUFFIX_FIELD,
+  TEXT_FIELD,
+} from '@/components/app/send-flow';
 import { TxSheet, useTxRunner, type TxIntent, type TxRunner } from '@/components/app/tx';
 import { X402Teaser } from '@/components/app/x402-teaser';
-import { ArrowUpRight, LinkIcon, Minus, PayIcon, Plus } from '@/components/ui/icons';
+import {
+  ArrowUpRight,
+  Check,
+  CopyIcon,
+  LinkIcon,
+  Minus,
+  PayIcon,
+  Plus,
+} from '@/components/ui/icons';
 import { parseUnitsSafe, utf8Length } from '@/lib/copy';
 import { marenPayAbi } from '@/lib/chain/abis';
 import { preflightMusdSpend } from '@/lib/chain/preflight';
@@ -100,55 +116,123 @@ export default function PayPage() {
     if (TABS.some((t) => t.key === fromHash)) setTab(fromHash as Tab);
   }, []);
 
+  // Pay is the payment composer (the rail's "New payment" lands here), so the whole of it
+  // is one narrow centred column (DESIGN.md: flows are ~520px on purpose). The header sits
+  // in the same column as the form it titles.
   if (!source.connected) {
     return (
-      <div className="flex flex-col gap-4">
+      <div className="mx-auto w-full max-w-[520px]">
         <Header />
-        <ConnectPrompt icon={<PayIcon className="size-6" />} title="Connect to send MUSD">
-          Send MUSD to an @handle or a plain address, with an optional memo written on-chain.
-        </ConnectPrompt>
-        <GasLine />
+        <div className="flex flex-col gap-4">
+          <ConnectPrompt icon={<PayIcon className="size-6" />} title="Connect to send MUSD">
+            Send MUSD to an @handle or a plain address, with an optional memo written on-chain.
+          </ConnectPrompt>
+          <p className="text-text-muted text-[0.8125rem] leading-relaxed">
+            <GasLine />
+          </p>
+        </div>
         {/* The demo's offer is readable without a wallet, so the door stays open here. */}
-        <X402Teaser />
+        <div className="mt-10">
+          <X402Teaser />
+        </div>
       </div>
     );
   }
 
+  const current = TABS.find((t) => t.key === tab) ?? TABS[0]!;
+
   return (
-    <div className="flex flex-col gap-4">
-      <Header refreshing={refreshing} />
+    <div className="mx-auto w-full max-w-[520px]">
+      <Header
+        refreshing={refreshing}
+        description="Send MUSD to a handle or an address, split a bill, ask for a payment or share a claimable link."
+      />
 
-      <Segmented options={TABS} value={tab} onChange={setTab} label="Payment type" />
+      {/* Six tabs do not fit a 390px phone at a readable size, so below `sm` the row
+          scrolls sideways (bleeding to the screen edge, the half-visible tab saying there
+          is more) instead of crushing its labels. From `sm` it is the full control. */}
+      <div className="-mx-5 -my-1 overflow-x-auto px-5 py-1 [scrollbar-width:none] sm:mx-0 sm:overflow-visible sm:px-0 [&::-webkit-scrollbar]:hidden">
+        <div className="min-w-[29rem] sm:min-w-0">
+          <Segmented options={TABS} value={tab} onChange={setTab} label="Payment type" />
+        </div>
+      </div>
 
-      {tab === 'send' ? <SendFlow runner={runner} /> : null}
-      {tab === 'split' ? <SplitPanel runner={runner} /> : null}
-      {tab === 'request' ? (
-        <>
-          <RequestPanel runner={runner} />
-          <FulfilPanel runner={runner} />
-        </>
-      ) : null}
-      {tab === 'link' ? <LinkPanel runner={runner} /> : null}
-      {tab === 'receive' ? <ReceivePanel /> : null}
-      {tab === 'handle' ? <HandleRegistration runner={runner} /> : null}
+      <div role="tabpanel" aria-label={current.label} className="mt-5 flex flex-col gap-4">
+        {tab === 'send' ? <SendFlow runner={runner} /> : null}
+        {tab === 'split' ? <SplitPanel runner={runner} /> : null}
+        {tab === 'request' ? (
+          <>
+            <RequestPanel runner={runner} />
+            <FulfilPanel runner={runner} />
+          </>
+        ) : null}
+        {tab === 'link' ? <LinkPanel runner={runner} /> : null}
+        {tab === 'receive' ? <ReceivePanel /> : null}
+        {tab === 'handle' ? <HandleRegistration runner={runner} /> : null}
+      </div>
 
       {/* Below every flow, quiet on purpose: a protocol demo, not a money surface. */}
-      <X402Teaser />
+      <div className="mt-10">
+        <X402Teaser />
+      </div>
 
       <TxSheet runner={runner} />
     </div>
   );
 }
 
-function Header({ refreshing = false }: { refreshing?: boolean }) {
+function Header({
+  refreshing = false,
+  description,
+}: {
+  refreshing?: boolean;
+  description?: string;
+}) {
+  // The refetch mark is pinned to the title line rather than passed as a header action:
+  // on a phone, actions stack under the copy, and a mark that comes and goes there would
+  // push the whole form down and back up on every background read.
   return (
-    <div className="flex items-start justify-between gap-4">
-      <div>
-        <Label>Pay</Label>
-        <h1 className="t-h3 mt-1.5">Move dollars</h1>
-      </div>
-      {refreshing ? <Refreshing /> : null}
+    <div className="relative">
+      <PageHeader title="Pay" description={description} />
+      {refreshing ? (
+        <div className="absolute right-0 top-6 md:top-9">
+          <Refreshing />
+        </div>
+      ) : null}
     </div>
+  );
+}
+
+/**
+ * The composer card every Pay form sits in, the same shape as Send: a bracket label over
+ * a hairline, the form, and a footer band with the gas payer on the left and the submit
+ * on the right. `description` is the one line of what this form does.
+ */
+function FlowCard({
+  id,
+  title,
+  description,
+  footer,
+  children,
+}: {
+  id: string;
+  title: string;
+  description?: ReactNode;
+  footer?: ReactNode;
+  children: ReactNode;
+}) {
+  return (
+    <Panel title={title} labelledBy={id}>
+      <div className="px-5 pb-7 pt-5">
+        {description ? (
+          <p className="text-text-muted mb-6 max-w-[52ch] text-pretty text-sm leading-relaxed">
+            {description}
+          </p>
+        ) : null}
+        {children}
+      </div>
+      {footer}
+    </Panel>
   );
 }
 
@@ -165,11 +249,7 @@ function GasLine() {
   // Conditional, not deleted. With no relayer configured this is the same sentence it has
   // always been; with one accepting work it says Maren pays, which is by then true.
   const relayer = useRelayerStatus();
-  return (
-    <p className="text-text-subtle text-xs leading-relaxed">
-      {gasLine(actionIsRelayable('payAddress'), relayer)}
-    </p>
-  );
+  return <>{gasLine(actionIsRelayable('payAddress'), relayer)}</>;
 }
 
 /**
@@ -203,7 +283,9 @@ function RequestPanel({ runner }: { runner: TxRunner }) {
         value: resolved ? (
           <span>
             <span className="text-text block">{resolved.handle}</span>
-            <span className="num text-text-subtle block text-xs">{resolved.address}</span>
+            <span className="mono text-text-muted mt-0.5 block break-all text-xs">
+              {resolved.address}
+            </span>
           </span>
         ) : (
           <span className="text-text-muted">anyone with the request</span>
@@ -221,81 +303,79 @@ function RequestPanel({ runner }: { runner: TxRunner }) {
   });
 
   return (
-    <Panel
+    <FlowCard
+      id="request-title"
       title="Request payment"
-      meta={
-        <span className="text-text-muted text-xs">
-          An ask, not an obligation. Nothing moves until the other side pays it.
-        </span>
-      }
-    >
-      <div className="px-5 py-5">
-        <div className="mt-8 max-w-xl">
-          <AmountField value={amount} onChange={setAmount} unit="MUSD" label="Amount" />
-        </div>
-
-        <div className="mt-8 max-w-xl">
-          <label htmlFor="request-from" className="t-label text-text-subtle block">
-            From (optional)
-          </label>
-          <input
-            id="request-from"
-            value={from}
-            onChange={(event) => setFrom(event.target.value)}
-            placeholder="@handle"
-            autoComplete="off"
-            spellCheck={false}
-            className="num text-text placeholder:text-text-subtle/60 mt-3 w-full border-b border-[var(--border-hairline)] bg-transparent pb-3 text-lg focus:border-[var(--border-strong)]"
-          />
-          <p className="mt-3 min-h-[1.25rem] text-sm" role="status">
-            {isHandle && resolved ? (
-              <span className="flex flex-wrap items-center gap-2">
-                <span className="text-text-muted">{resolved.handle} resolves to</span>
-                <span className="num text-text text-[0.8125rem]">{resolved.address}</span>
-              </span>
-            ) : isHandle ? (
-              <span className="text-danger">No such handle on this network.</span>
-            ) : (
-              <span className="text-text-subtle">Anyone may fulfil an unaddressed request.</span>
-            )}
-          </p>
-        </div>
-
-        <div className="mt-8 max-w-xl">
-          <label htmlFor="request-memo" className="t-label text-text-subtle block">
-            Memo (optional)
-          </label>
-          <input
-            id="request-memo"
-            value={memo}
-            onChange={(event) => setMemo(event.target.value)}
-            placeholder="Invoice 0044"
-            className="text-text placeholder:text-text-subtle/60 mt-3 w-full border-b border-[var(--border-hairline)] bg-transparent pb-3 text-[0.9375rem] focus:border-[var(--border-strong)]"
-          />
-        </div>
-
-        <div className="mt-8">
-          <GasLine />
-        </div>
-
-        <div className="mt-4">
+      description="An ask, not an obligation. Nothing moves until the other side pays it."
+      footer={
+        <ComposerFooter note={<GasLine />}>
           <ActionButton
             onClick={() => runner.request(intent())}
             disabled={amountWei === 0n || !writes.ready || (isHandle && !resolved)}
             icon={<ArrowUpRight className="size-4" />}
+            className={FOOTER_BUTTON}
           >
             Request {amountWei > 0n ? formatMusd(amountWei) : ''}
           </ActionButton>
-        </div>
+        </ComposerFooter>
+      }
+    >
+      <AmountField value={amount} onChange={setAmount} unit="MUSD" label="Amount" />
 
-        {/* No "open requests" list. There was one, and it was seeded. Requests this account
-          creates appear in Activity, decoded from the contract's own RequestCreated
-          events — a real list is better than a plausible one. */}
-        <p className="text-text-subtle mt-8 text-xs leading-relaxed">
-          Requests you create appear in Activity.
+      <div className="mt-6">
+        <label htmlFor="request-from" className={FIELD_LABEL}>
+          From (optional)
+        </label>
+        <input
+          id="request-from"
+          value={from}
+          onChange={(event) => setFrom(event.target.value)}
+          placeholder="@handle"
+          autoComplete="off"
+          spellCheck={false}
+          aria-describedby="request-from-status"
+          className={`${TEXT_FIELD} mt-2`}
+        />
+        <p
+          id="request-from-status"
+          className="mt-2.5 min-h-[1.25rem] text-[0.8125rem]"
+          role="status"
+        >
+          {isHandle && resolved ? (
+            <FieldStatus tone="ok">
+              <span className="text-text-muted">{resolved.handle} resolves to</span>
+              <span className="mono text-text break-all text-xs">{resolved.address}</span>
+            </FieldStatus>
+          ) : isHandle ? (
+            <FieldStatus tone="error">
+              <span className="text-danger">No such handle on this network.</span>
+            </FieldStatus>
+          ) : (
+            <span className="text-text-muted">Anyone may fulfil an unaddressed request.</span>
+          )}
         </p>
       </div>
-    </Panel>
+
+      <div className="mt-4">
+        <label htmlFor="request-memo" className={FIELD_LABEL}>
+          Memo (optional)
+        </label>
+        <input
+          id="request-memo"
+          value={memo}
+          onChange={(event) => setMemo(event.target.value)}
+          placeholder="Invoice 0044"
+          className={`${TEXT_FIELD} mt-2`}
+        />
+      </div>
+
+      {/* No "open requests" list. There was one, and it was seeded. Requests this account
+        creates appear in Activity, decoded from the contract's own RequestCreated
+        events — a real list is better than a plausible one. */}
+      <p className="text-text-muted mt-5 text-xs leading-relaxed">
+        Requests you create appear in Activity.
+      </p>
+    </FlowCard>
   );
 }
 
@@ -392,7 +472,7 @@ function FulfilPanel({ runner }: { runner: TxRunner }) {
       { label: 'Amount', value: <Musd wei={amountWei} /> },
       {
         label: 'Spender',
-        value: <span className="num text-text-subtle break-all text-xs">{SPENDERS.pay}</span>,
+        value: <span className="mono text-text-muted break-all text-xs">{SPENDERS.pay}</span>,
       },
     ],
     gas: {
@@ -428,7 +508,7 @@ function FulfilPanel({ runner }: { runner: TxRunner }) {
       { label: 'Request', value: <span className="num text-text-muted">#{trimmed}</span> },
       {
         label: 'To',
-        value: <span className="num text-text-subtle break-all text-xs">{requester}</span>,
+        value: <span className="mono text-text-muted break-all text-xs">{requester}</span>,
       },
     ],
     gas: gasNote(
@@ -440,174 +520,172 @@ function FulfilPanel({ runner }: { runner: TxRunner }) {
     submit: writes.ready && requestId !== null ? () => writes.fulfillRequest(requestId) : undefined,
   });
 
+  // Which body this panel shows, named once so the footer can follow the same decision.
+  const view = !writes.ready
+    ? 'disconnected'
+    : requestId === null
+      ? 'empty'
+      : isFetching && record === undefined
+        ? 'loading'
+        : status === 0
+          ? 'missing'
+          : 'found';
+  // The record is readable and nothing on it stops this wallet paying: the gas line and
+  // the actions show. Every refusal is a Note in the body instead.
+  const offerPay =
+    view === 'found' && status !== 2 && status !== 3 && !isMine && !addressedElsewhere;
+  const twoSteps = needsApproval && amountWei > 0n;
+
   return (
-    <Panel
+    <FlowCard
+      id="fulfil-title"
       title="Pay a request"
-      meta={<span className="text-text-muted text-xs">Settle a request someone sent you.</span>}
+      description="Settle a request someone sent you."
+      footer={
+        offerPay ? (
+          <ComposerFooter
+            note={gasLine(actionIsRelayable('fulfillRequest'), relayer)}
+            stack={twoSteps}
+          >
+            {twoSteps ? (
+              <ActionButton
+                onClick={() => runner.request(approvalIntent())}
+                disabled={!writes.ready || !funds.ok}
+                aria-describedby="fulfil-blocked"
+                icon={<ArrowUpRight className="size-4" />}
+                className={FOOTER_BUTTON}
+              >
+                Approve {formatMusd(amountWei)}
+              </ActionButton>
+            ) : null}
+            <ActionButton
+              variant={twoSteps ? 'secondary' : 'primary'}
+              onClick={() => runner.request(fulfilIntent())}
+              disabled={!payable || !funds.ok || !writes.ready || twoSteps}
+              aria-describedby="fulfil-blocked"
+              icon={<PayIcon className="size-4" />}
+              className={FOOTER_BUTTON}
+            >
+              Pay {formatMusd(amountWei)}
+            </ActionButton>
+          </ComposerFooter>
+        ) : null
+      }
     >
-      <div className="px-5 py-5">
-        <div className="max-w-xl">
-          <label htmlFor="fulfil-id" className="t-label text-text-subtle block">
-            Request number
-          </label>
-          <input
-            id="fulfil-id"
-            value={idText}
-            onChange={(event) => setIdText(event.target.value.replace(/[^\d]/g, ''))}
-            inputMode="numeric"
-            placeholder="e.g. 42"
-            autoComplete="off"
-            spellCheck={false}
-            className="num text-text placeholder:text-text-subtle/60 mt-3 w-full border-b border-[var(--border-hairline)] bg-transparent pb-3 text-lg focus:border-[var(--border-strong)]"
-          />
-          <p className="text-text-subtle mt-3 text-xs">
-            The number the requester shared, or the id shown on their request in Activity.
-          </p>
+      <label htmlFor="fulfil-id" className={FIELD_LABEL}>
+        Request number
+      </label>
+      <input
+        id="fulfil-id"
+        value={idText}
+        onChange={(event) => setIdText(event.target.value.replace(/[^\d]/g, ''))}
+        inputMode="numeric"
+        placeholder="e.g. 42"
+        autoComplete="off"
+        spellCheck={false}
+        aria-describedby="fulfil-id-hint"
+        className={`${TEXT_FIELD} num mt-2`}
+      />
+      <p id="fulfil-id-hint" className="text-text-muted mt-2.5 text-xs leading-relaxed">
+        The number the requester shared, or the id shown on their request in Activity.
+      </p>
+
+      {view === 'disconnected' ? (
+        <div className="mt-5">
+          <Note>Connect a wallet on {getChain(NETWORK).name} to read and pay a request.</Note>
         </div>
+      ) : view === 'empty' ? null : view === 'loading' ? (
+        <div className="mt-1">
+          <Loading>Reading request #{trimmed} from Mezo</Loading>
+        </div>
+      ) : view === 'missing' ? (
+        <div className="mt-5">
+          <Note tone="warning" role="alert">
+            There is no request #{trimmed} on {getChain(NETWORK).name}. Check the number and try
+            again.
+          </Note>
+        </div>
+      ) : (
+        <>
+          <dl className="mt-5 divide-y divide-[var(--border-hairline)] border border-[var(--border-hairline)]">
+            <FulfilRow label="Amount" value={<Musd wei={amountWei} />} />
+            <FulfilRow
+              label="Requester"
+              value={<span className="text-text text-sm">{shortAddress(requester ?? zero)}</span>}
+              sub={requester}
+            />
+            <FulfilRow
+              label="Status"
+              value={
+                <span className={`text-sm ${isOpen ? 'text-text' : 'text-text-muted'}`}>
+                  {REQUEST_STATUS[status] ?? 'Unknown'}
+                </span>
+              }
+            />
+            {designatedPayer && designatedPayer !== zero ? (
+              <FulfilRow
+                label="Payer"
+                value={<span className="text-text text-sm">{shortAddress(designatedPayer)}</span>}
+                sub={designatedPayer}
+              />
+            ) : null}
+          </dl>
 
-        {!writes.ready ? (
-          <div className="mt-6">
-            <Note>Connect a wallet on {getChain(NETWORK).name} to read and pay a request.</Note>
-          </div>
-        ) : requestId === null ? null : isFetching && record === undefined ? (
-          <div className="mt-2">
-            <Loading>Reading request #{trimmed} from Mezo</Loading>
-          </div>
-        ) : status === 0 ? (
-          <div className="mt-6">
-            <Note tone="warning" role="alert">
-              There is no request #{trimmed} on {getChain(NETWORK).name}. Check the number and try
-              again.
-            </Note>
-          </div>
-        ) : (
-          <>
-            <dl className="card mt-6 overflow-hidden">
-              <FulfilRow label="Amount" value={<Musd wei={amountWei} />} />
-              <FulfilRow
-                label="Requester"
-                value={<span className="text-text text-sm">{shortAddress(requester ?? zero)}</span>}
-                sub={requester}
-              />
-              <FulfilRow
-                label="Status"
-                value={
-                  <span className={`text-sm ${isOpen ? 'text-text' : 'text-text-muted'}`}>
-                    {REQUEST_STATUS[status] ?? 'Unknown'}
-                  </span>
-                }
-                last={!(designatedPayer && designatedPayer !== zero)}
-              />
-              {designatedPayer && designatedPayer !== zero ? (
-                <FulfilRow
-                  label="Payer"
-                  value={<span className="text-text text-sm">{shortAddress(designatedPayer)}</span>}
-                  sub={designatedPayer}
-                  last
-                />
+          {status === 2 ? (
+            <div className="mt-5">
+              <Note>This request has already been fulfilled. Nothing is owed on it.</Note>
+            </div>
+          ) : status === 3 ? (
+            <div className="mt-5">
+              <Note>The requester cancelled this request, so it can no longer be paid.</Note>
+            </div>
+          ) : isMine ? (
+            <div className="mt-5">
+              <Note>
+                You created this request, so you cannot pay it yourself. Share the number with
+                whoever owes you.
+              </Note>
+            </div>
+          ) : addressedElsewhere ? (
+            <div className="mt-5">
+              <Note tone="warning" role="alert">
+                This request names a specific payer, and it is not the connected wallet. Only that
+                address can pay it.
+              </Note>
+            </div>
+          ) : (
+            <>
+              {funds.rangeDead && funds.blocker ? (
+                <div className="mt-5">
+                  <BlockedNote blocker={funds.blocker} id="fulfil-blocked" />
+                </div>
               ) : null}
-            </dl>
 
-            {status === 2 ? (
-              <div className="mt-6">
-                <Note>This request has already been fulfilled. Nothing is owed on it.</Note>
-              </div>
-            ) : status === 3 ? (
-              <div className="mt-6">
-                <Note>The requester cancelled this request, so it can no longer be paid.</Note>
-              </div>
-            ) : isMine ? (
-              <div className="mt-6">
-                <Note>
-                  You created this request, so you cannot pay it yourself. Share the number with
-                  whoever owes you.
-                </Note>
-              </div>
-            ) : addressedElsewhere ? (
-              <div className="mt-6">
-                <Note tone="warning" role="alert">
-                  This request names a specific payer, and it is not the connected wallet. Only that
-                  address can pay it.
-                </Note>
-              </div>
-            ) : (
-              <>
-                {funds.rangeDead && funds.blocker ? (
-                  <div className="mt-6">
-                    <BlockedNote blocker={funds.blocker} id="fulfil-blocked" />
-                  </div>
-                ) : null}
-
-                {funds.ok && needsApproval && amountWei > 0n ? (
-                  <div className="mt-6">
-                    <Note>
-                      MarenPay needs an allowance for {formatMusd(amountWei)} before it can pull the
-                      payment. That is a separate transaction, shown here rather than slipped in
-                      behind it.
-                    </Note>
-                  </div>
-                ) : null}
-
-                <div className="mt-6">
-                  <p className="text-text-subtle text-xs leading-relaxed">
-                    {gasLine(actionIsRelayable('fulfillRequest'), relayer)}
-                  </p>
+              {funds.ok && needsApproval && amountWei > 0n ? (
+                <div className="mt-5">
+                  <Note>
+                    MarenPay needs an allowance for {formatMusd(amountWei)} before it can pull the
+                    payment. That is a separate transaction, shown here rather than slipped in
+                    behind it.
+                  </Note>
                 </div>
-
-                <div className="mt-4 flex flex-wrap gap-3">
-                  {needsApproval && amountWei > 0n ? (
-                    <ActionButton
-                      onClick={() => runner.request(approvalIntent())}
-                      disabled={!writes.ready || !funds.ok}
-                      aria-describedby="fulfil-blocked"
-                      icon={<ArrowUpRight className="size-4" />}
-                    >
-                      Approve {formatMusd(amountWei)}
-                    </ActionButton>
-                  ) : null}
-                  <ActionButton
-                    variant={needsApproval && amountWei > 0n ? 'secondary' : 'primary'}
-                    onClick={() => runner.request(fulfilIntent())}
-                    disabled={
-                      !payable || !funds.ok || !writes.ready || (needsApproval && amountWei > 0n)
-                    }
-                    aria-describedby="fulfil-blocked"
-                    icon={<PayIcon className="size-4" />}
-                  >
-                    Pay {formatMusd(amountWei)}
-                  </ActionButton>
-                </div>
-              </>
-            )}
-          </>
-        )}
-      </div>
-    </Panel>
+              ) : null}
+            </>
+          )}
+        </>
+      )}
+    </FlowCard>
   );
 }
 
-function FulfilRow({
-  label,
-  value,
-  sub,
-  last = false,
-}: {
-  label: string;
-  value: ReactNode;
-  sub?: string;
-  last?: boolean;
-}) {
+function FulfilRow({ label, value, sub }: { label: string; value: ReactNode; sub?: string }) {
   return (
-    <div
-      className={`flex items-start justify-between gap-6 px-5 py-3.5 ${
-        last ? '' : 'border-b border-[var(--border-hairline)]'
-      }`}
-    >
-      <dt className="t-label text-text-subtle pt-0.5">{label}</dt>
+    <div className="flex items-start justify-between gap-6 px-4 py-3">
+      <dt className="text-text-muted shrink-0 pt-px text-sm">{label}</dt>
       <dd className="min-w-0 text-right">
         <span className="block">{value}</span>
         {sub ? (
-          <span className="num text-text-subtle mt-0.5 block break-all text-xs">{sub}</span>
+          <span className="mono text-text-muted mt-1 block break-all text-[0.75rem]">{sub}</span>
         ) : null}
       </dd>
     </div>
@@ -660,7 +738,7 @@ function LinkPanel({ runner }: { runner: TxRunner }) {
       { label: 'Amount', value: <Musd wei={amountWei} /> },
       {
         label: 'Spender',
-        value: <span className="num text-text-subtle break-all text-xs">{SPENDERS.pay}</span>,
+        value: <span className="mono text-text-muted break-all text-xs">{SPENDERS.pay}</span>,
       },
     ],
     gas: {
@@ -700,7 +778,7 @@ function LinkPanel({ runner }: { runner: TxRunner }) {
         { label: 'Expires', value: <span className="text-text-muted">in {expiryDays} days</span> },
         {
           label: 'Locked to key',
-          value: <span className="num text-text-subtle break-all text-xs">{linkKey}</span>,
+          value: <span className="mono text-text-muted break-all text-xs">{linkKey}</span>,
         },
       ],
       gas: gasNote(
@@ -724,85 +802,19 @@ function LinkPanel({ runner }: { runner: TxRunner }) {
   };
 
   return (
-    <Panel
+    <FlowCard
+      id="link-title"
       title="Payment link"
-      meta={
-        <span className="text-text-muted text-xs">
-          Escrows MUSD against a one-time key. Anyone with the link can claim it.
-        </span>
-      }
-    >
-      <div className="px-5 py-5">
-        <div className="mt-8 grid max-w-2xl grid-cols-1 gap-8 sm:grid-cols-2">
-          <AmountField
-            value={amount}
-            onChange={setAmount}
-            unit="MUSD"
-            label="Amount"
-            max={<Musd wei={balance} size="sm" />}
-            maxLabel="Available"
-            error={
-              funds.blocker && funds.blocker.scope === 'wallet' && amountWei > 0n
-                ? funds.blocker.title
-                : null
-            }
-          />
-          <div>
-            <label htmlFor="link-expiry" className="t-label text-text-subtle block">
-              Expires in
-            </label>
-            <div className="mt-3 flex items-baseline gap-3 border-b border-[var(--border-hairline)] pb-3 focus-within:border-[var(--border-strong)]">
-              <input
-                id="link-expiry"
-                value={days}
-                onChange={(event) => setDays(event.target.value)}
-                inputMode="numeric"
-                className="num text-text min-w-0 flex-1 bg-transparent text-3xl"
-              />
-              <span className="t-h3 text-text-muted shrink-0">days</span>
-            </div>
-            <p className="text-text-subtle mt-3 text-xs">Only you can reclaim it after that.</p>
-          </div>
-        </div>
-
-        <div className="mt-8 max-w-xl">
-          <label htmlFor="link-memo" className="t-label text-text-subtle block">
-            Memo (optional)
-          </label>
-          <input
-            id="link-memo"
-            value={memo}
-            onChange={(event) => setMemo(event.target.value)}
-            placeholder="Coffee fund"
-            className="text-text placeholder:text-text-subtle/60 mt-3 w-full border-b border-[var(--border-hairline)] bg-transparent pb-3 text-[0.9375rem] focus:border-[var(--border-strong)]"
-          />
-        </div>
-
-        {funds.rangeDead && funds.blocker ? (
-          <div className="mt-6">
-            <BlockedNote blocker={funds.blocker} id="link-blocked" />
-          </div>
-        ) : null}
-
-        {funds.ok && needsApproval && amountWei > 0n ? (
-          <div className="mt-6">
-            <Note>
-              MarenPay needs an allowance for {formatMusd(amountWei)} before it can escrow it.
-            </Note>
-          </div>
-        ) : null}
-
-        <div className="mt-8">
-          <GasLine />
-        </div>
-
-        <div className="mt-4 flex flex-wrap gap-3">
+      description="Escrows MUSD against a one-time key. Anyone with the link can claim it."
+      footer={
+        <ComposerFooter note={<GasLine />} stack={needsApproval && amountWei > 0n}>
           {needsApproval && amountWei > 0n ? (
             <ActionButton
               onClick={() => runner.request(approvalIntent())}
               disabled={!writes.ready || !funds.ok}
               aria-describedby="link-blocked"
               icon={<LinkIcon className="size-4" />}
+              className={FOOTER_BUTTON}
             >
               Approve {formatMusd(amountWei)}
             </ActionButton>
@@ -815,51 +827,122 @@ function LinkPanel({ runner }: { runner: TxRunner }) {
             }
             aria-describedby="link-blocked"
             icon={<LinkIcon className="size-4" />}
+            className={FOOTER_BUTTON}
           >
             Create link
           </ActionButton>
+        </ComposerFooter>
+      }
+    >
+      {/* The new link leads the card the moment the chain has accepted the escrow: it is
+          the one thing on this screen that cannot be recovered later. */}
+      {created ? (
+        <div className="mb-7">
+          <Note tone="warning" role="status">
+            <p className="text-text font-medium">Copy this now. It is shown once.</p>
+            <p className="mono text-text bg-surface mt-3 break-all border border-[var(--border-hairline)] px-3 py-2.5 text-xs leading-relaxed">
+              {typeof window !== 'undefined' ? window.location.origin : ''}/claim#{created.secret}
+            </p>
+            <p className="mt-3 text-xs leading-relaxed">
+              The claim key after the <span className="mono">#</span> never leaves your browser and
+              is not stored anywhere. Once you navigate away it is gone.
+            </p>
+            <div className="mt-4">
+              <ActionButton
+                variant="secondary"
+                onClick={() => {
+                  void navigator.clipboard?.writeText(
+                    `${window.location.origin}/claim#${created.secret}`,
+                  );
+                  setCopied(true);
+                }}
+                icon={
+                  copied ? (
+                    <Check className="text-success size-4" />
+                  ) : (
+                    <CopyIcon className="size-4" />
+                  )
+                }
+              >
+                {copied ? 'Copied' : 'Copy link'}
+              </ActionButton>
+            </div>
+          </Note>
         </div>
+      ) : null}
 
-        {created ? (
-          <div className="mt-6">
-            <Note tone="warning">
-              <p className="text-text">Copy this now. It is shown once.</p>
-              <p className="num text-text-muted mt-2 break-all text-xs">
-                {typeof window !== 'undefined' ? window.location.origin : ''}/claim#{created.secret}
-              </p>
-              <p className="mt-2 text-xs">
-                The claim key after the <span className="num">#</span> never leaves your browser and
-                is not stored anywhere. Once you navigate away it is gone.
-              </p>
-              <div className="mt-4">
-                <ActionButton
-                  variant="secondary"
-                  onClick={() => {
-                    void navigator.clipboard?.writeText(
-                      `${window.location.origin}/claim#${created.secret}`,
-                    );
-                    setCopied(true);
-                  }}
-                >
-                  {copied ? 'Copied' : 'Copy link'}
-                </ActionButton>
-              </div>
-            </Note>
-          </div>
-        ) : null}
+      <AmountField
+        value={amount}
+        onChange={setAmount}
+        unit="MUSD"
+        label="Amount"
+        max={<Musd wei={balance} size="sm" />}
+        maxLabel="Available"
+        error={
+          funds.blocker && funds.blocker.scope === 'wallet' && amountWei > 0n
+            ? funds.blocker.title
+            : null
+        }
+      />
 
-        {/* There is no "your links" list, and there cannot honestly be one that shows the
-          secrets: a bearer key that could be re-displayed later is a bearer key that was
-          stored, which is the opposite of what the design promises. The escrows themselves
-          are visible in Activity, from MarenPay's LinkCreated events. */}
-        <Info summary="Why past links cannot be shown again">
-          The claim key exists only in the URL fragment you copy. Maren never receives it and never
-          writes it down, so a list of your old links could show that they exist and their amounts
-          (which Activity does, from the contract’s events), but never the keys needed to claim
-          them. That is the cost of the secret being genuinely secret.
-        </Info>
+      <div className="mt-6">
+        <label htmlFor="link-expiry" className={FIELD_LABEL}>
+          Expires in
+        </label>
+        <div className={`${SUFFIX_FIELD} mt-2`}>
+          <input
+            id="link-expiry"
+            value={days}
+            onChange={(event) => setDays(event.target.value)}
+            inputMode="numeric"
+            aria-describedby="link-expiry-hint"
+            className="num text-text min-w-0 flex-1 bg-transparent text-[0.9375rem] outline-none"
+          />
+          <span className="text-text-muted shrink-0 text-sm">days</span>
+        </div>
+        <p id="link-expiry-hint" className="text-text-muted mt-2.5 text-xs">
+          Only you can reclaim it after that.
+        </p>
       </div>
-    </Panel>
+
+      <div className="mt-5">
+        <label htmlFor="link-memo" className={FIELD_LABEL}>
+          Memo (optional)
+        </label>
+        <input
+          id="link-memo"
+          value={memo}
+          onChange={(event) => setMemo(event.target.value)}
+          placeholder="Coffee fund"
+          className={`${TEXT_FIELD} mt-2`}
+        />
+      </div>
+
+      {funds.rangeDead && funds.blocker ? (
+        <div className="mt-5">
+          <BlockedNote blocker={funds.blocker} id="link-blocked" />
+        </div>
+      ) : null}
+
+      {funds.ok && needsApproval && amountWei > 0n ? (
+        <div className="mt-5">
+          <Note>
+            MarenPay needs an allowance for {formatMusd(amountWei)} before it can escrow it.
+          </Note>
+        </div>
+      ) : null}
+
+      {/* There is no "your links" list, and there cannot honestly be one that shows the
+        secrets: a bearer key that could be re-displayed later is a bearer key that was
+        stored, which is the opposite of what the design promises. The escrows themselves
+        are visible in Activity, from MarenPay's LinkCreated events. */}
+      <Info summary="Why past links cannot be shown again">
+        The claim key exists only in the URL fragment you copy. Maren never receives it and never
+        writes it down, so a list of your old links could show that they exist and their amounts
+        (which Activity does, from the contract’s events), but never the keys needed to claim them.
+        That is the cost of the secret being genuinely secret.
+      </Info>
+    </FlowCard>
   );
 }
 
@@ -1011,7 +1094,7 @@ function SplitPanel({ runner }: { runner: TxRunner }) {
       { label: 'Amount', value: <Musd wei={total} /> },
       {
         label: 'Spender',
-        value: <span className="num text-text-subtle break-all text-xs">{SPENDERS.pay}</span>,
+        value: <span className="mono text-text-muted break-all text-xs">{SPENDERS.pay}</span>,
       },
     ],
     gas: {
@@ -1048,7 +1131,7 @@ function SplitPanel({ runner }: { runner: TxRunner }) {
             value: (
               <span className="block text-right">
                 <Musd wei={amounts[i] ?? 0n} />
-                <span className="num text-text-subtle mt-0.5 block break-all text-xs">
+                <span className="mono text-text-muted mt-0.5 block break-all text-xs">
                   {info?.address}
                 </span>
               </span>
@@ -1073,136 +1156,22 @@ function SplitPanel({ runner }: { runner: TxRunner }) {
   };
 
   return (
-    <Panel
+    <FlowCard
+      id="split-title"
       title="Split a payment"
-      meta={
-        <span className="text-text-muted text-xs">
-          Pay up to {MAX_SPLIT_RECIPIENTS} people in one transaction. Each leg is a direct payment.
-        </span>
-      }
-    >
-      <div className="px-5 py-5">
-        <div className="mt-4 max-w-xl">
-          <Segmented options={SPLIT_MODES} value={mode} onChange={setMode} label="How to divide" />
-        </div>
-
-        {mode === 'even' ? (
-          <div className="mt-8 max-w-xl">
-            <AmountField
-              value={evenTotal}
-              onChange={setEvenTotal}
-              unit="MUSD"
-              label="Total to split evenly"
-              max={<Musd wei={balance} size="sm" />}
-              maxLabel="Available"
-              error={
-                funds.blocker && funds.blocker.scope === 'wallet' && total > 0n
-                  ? funds.blocker.title
-                  : null
-              }
-              hint={
-                rows.length > 0 && parseUnitsSafe(evenTotal) > 0n ? (
-                  <span>
-                    Each of {rows.length} gets{' '}
-                    <Musd wei={amounts[0] ?? 0n} size="sm" tone="muted" />
-                    {(amounts[0] ?? 0n) !== (amounts[amounts.length - 1] ?? 0n)
-                      ? ' (the odd wei goes to the first few)'
-                      : ''}
-                    .
-                  </span>
-                ) : null
-              }
-            />
-          </div>
-        ) : null}
-
-        <div className="mt-8">
-          <span className="t-label text-text-subtle block">Recipients</span>
-          <ul className="mt-3 flex flex-col gap-6">
-            {rows.map((row, index) => (
-              <li key={row.id}>
-                <SplitRecipientRow
-                  id={row.id}
-                  index={index}
-                  value={row.value}
-                  amount={row.amount}
-                  mode={mode}
-                  computedShare={amounts[index] ?? 0n}
-                  canRemove={rows.length > 2}
-                  onValue={setRowValue}
-                  onAmount={setRowAmount}
-                  onRemove={removeRow}
-                  onResolved={onResolved}
-                />
-              </li>
-            ))}
-          </ul>
-
-          <button
-            type="button"
-            onClick={addRow}
-            disabled={rows.length >= MAX_SPLIT_RECIPIENTS}
-            className="text-text-muted hover:text-text mt-6 inline-flex h-11 items-center gap-2 rounded-[var(--radius-pill)] border border-[var(--border-hairline)] px-4 text-sm transition-[color,border-color,transform] duration-[120ms] ease-out hover:border-[var(--border-strong)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-violet-500 active:scale-[0.97] disabled:opacity-40 disabled:hover:border-[var(--border-hairline)]"
-          >
-            <Plus aria-hidden className="size-4" />
-            Add recipient
-          </button>
-        </div>
-
-        <div className="mt-8 max-w-xl">
-          <label htmlFor="split-memo" className="t-label text-text-subtle block">
-            Memo (optional)
-          </label>
-          <input
-            id="split-memo"
-            value={memo}
-            onChange={(event) => setMemo(event.target.value)}
-            placeholder="Dinner, three ways"
-            autoComplete="off"
-            aria-describedby="split-memo-count"
-            className="text-text placeholder:text-text-subtle/60 mt-3 w-full border-b border-[var(--border-hairline)] bg-transparent pb-3 text-[0.9375rem] focus:border-[var(--border-strong)]"
-          />
-          <p id="split-memo-count" className="text-text-subtle mt-2 text-xs">
-            <span className="num">{memoBytes}</span>/80 bytes · one memo, written on-chain for every
-            leg
-            {memoBytes > 80 ? <span className="text-danger"> · too long</span> : null}
-          </p>
-        </div>
-
-        <div className="mt-8 flex items-baseline justify-between border-t border-[var(--border-hairline)] pt-5">
-          <span className="t-label text-text-subtle">Total</span>
-          <Musd wei={total} size="lg" />
-        </div>
-
-        {funds.rangeDead && funds.blocker ? (
-          <div className="mt-6">
-            <BlockedNote blocker={funds.blocker} id="split-blocked" />
-          </div>
-        ) : null}
-
-        {funds.ok && needsApproval && total > 0n ? (
-          <div className="mt-6">
-            <Note>
-              MarenPay needs an allowance for {formatMusd(total)} before it can pull the split;
-              currently {formatMusd(allowanceWei ?? 0n)}. That is a separate transaction, shown here
-              rather than slipped in behind the payment.
-            </Note>
-          </div>
-        ) : null}
-
-        <div className="mt-8">
-          <p className="text-text-subtle text-xs leading-relaxed">
-            {gasLine(actionIsRelayable('splitPayment'), relayer)}
-          </p>
-        </div>
-
-        <div className="mt-4 flex flex-wrap gap-3">
+      description={`Pay up to ${MAX_SPLIT_RECIPIENTS} people in one transaction. Each leg is a direct payment.`}
+      footer={
+        <ComposerFooter
+          note={gasLine(actionIsRelayable('splitPayment'), relayer)}
+          stack={needsApproval && total > 0n}
+        >
           {needsApproval && total > 0n ? (
             <ActionButton
               onClick={() => runner.request(approvalIntent())}
               disabled={!writes.ready || !funds.ok}
               aria-describedby="split-blocked"
               icon={<ArrowUpRight className="size-4" />}
+              className={FOOTER_BUTTON}
             >
               Approve {formatMusd(total)}
             </ActionButton>
@@ -1213,17 +1182,124 @@ function SplitPanel({ runner }: { runner: TxRunner }) {
             disabled={!reviewReady || (needsApproval && total > 0n)}
             aria-describedby="split-blocked"
             icon={<PayIcon className="size-4" />}
+            className={FOOTER_BUTTON}
           >
             Review split
           </ActionButton>
-        </div>
+        </ComposerFooter>
+      }
+    >
+      <Segmented options={SPLIT_MODES} value={mode} onChange={setMode} label="How to divide" />
 
-        <p className="text-text-subtle mt-8 text-xs leading-relaxed">
-          Splits you send appear in Activity as one payment per recipient, decoded from MarenPay’s
-          own Paid events.
+      {mode === 'even' ? (
+        <div className="mt-6">
+          <AmountField
+            value={evenTotal}
+            onChange={setEvenTotal}
+            unit="MUSD"
+            label="Total to split evenly"
+            max={<Musd wei={balance} size="sm" />}
+            maxLabel="Available"
+            error={
+              funds.blocker && funds.blocker.scope === 'wallet' && total > 0n
+                ? funds.blocker.title
+                : null
+            }
+            hint={
+              rows.length > 0 && parseUnitsSafe(evenTotal) > 0n ? (
+                <span>
+                  Each of {rows.length} gets <Musd wei={amounts[0] ?? 0n} size="sm" tone="muted" />
+                  {(amounts[0] ?? 0n) !== (amounts[amounts.length - 1] ?? 0n)
+                    ? ' (the odd wei goes to the first few)'
+                    : ''}
+                  .
+                </span>
+              ) : null
+            }
+          />
+        </div>
+      ) : null}
+
+      <div className="mt-6">
+        <span className={FIELD_LABEL}>Recipients</span>
+        <ul className="mt-2 flex flex-col gap-1">
+          {rows.map((row, index) => (
+            <li key={row.id}>
+              <SplitRecipientRow
+                id={row.id}
+                index={index}
+                value={row.value}
+                amount={row.amount}
+                mode={mode}
+                computedShare={amounts[index] ?? 0n}
+                canRemove={rows.length > 2}
+                onValue={setRowValue}
+                onAmount={setRowAmount}
+                onRemove={removeRow}
+                onResolved={onResolved}
+              />
+            </li>
+          ))}
+        </ul>
+
+        <ActionButton
+          variant="secondary"
+          onClick={addRow}
+          disabled={rows.length >= MAX_SPLIT_RECIPIENTS}
+          icon={<Plus aria-hidden className="size-4" />}
+          className="mt-2"
+        >
+          Add recipient
+        </ActionButton>
+      </div>
+
+      <div className="mt-6">
+        <label htmlFor="split-memo" className={FIELD_LABEL}>
+          Memo (optional)
+        </label>
+        <input
+          id="split-memo"
+          value={memo}
+          onChange={(event) => setMemo(event.target.value)}
+          placeholder="Dinner, three ways"
+          autoComplete="off"
+          aria-describedby="split-memo-count"
+          aria-invalid={memoBytes > 80 ? true : undefined}
+          className={`${TEXT_FIELD} mt-2`}
+        />
+        <p id="split-memo-count" className="text-text-muted mt-2.5 text-xs">
+          <span className="num">{memoBytes}</span>/80 bytes · one memo, written on-chain for every
+          leg
+          {memoBytes > 80 ? <span className="text-danger"> · too long</span> : null}
         </p>
       </div>
-    </Panel>
+
+      <div className="mt-6 flex items-baseline justify-between gap-4 border-t border-[var(--border-hairline)] pt-4">
+        <span className="text-text-muted text-sm">Total</span>
+        <Musd wei={total} size="lg" />
+      </div>
+
+      {funds.rangeDead && funds.blocker ? (
+        <div className="mt-5">
+          <BlockedNote blocker={funds.blocker} id="split-blocked" />
+        </div>
+      ) : null}
+
+      {funds.ok && needsApproval && total > 0n ? (
+        <div className="mt-5">
+          <Note>
+            MarenPay needs an allowance for {formatMusd(total)} before it can pull the split;
+            currently {formatMusd(allowanceWei ?? 0n)}. That is a separate transaction, shown here
+            rather than slipped in behind the payment.
+          </Note>
+        </div>
+      ) : null}
+
+      <p className="text-text-muted mt-5 text-xs leading-relaxed">
+        Splits you send appear in Activity as one payment per recipient, decoded from MarenPay’s own
+        Paid events.
+      </p>
+    </FlowCard>
   );
 }
 
@@ -1293,7 +1369,10 @@ function SplitRecipientRow({
 
   return (
     <div>
-      <div className="flex items-end gap-3">
+      {/* One line from `sm`: recipient, amount, remove. On a phone the amount drops to its
+          own line under the recipient (CSS order only; the tab order stays recipient,
+          amount, remove), so a 42-character address is not squeezed into 150px. */}
+      <div className="flex flex-wrap items-center gap-2 sm:flex-nowrap">
         <div className="min-w-0 flex-1">
           <label htmlFor={inputId} className="sr-only">
             Recipient {index + 1}
@@ -1307,12 +1386,12 @@ function SplitRecipientRow({
             spellCheck={false}
             inputMode="text"
             aria-describedby={statusId}
-            className="num text-text placeholder:text-text-subtle/60 w-full border-b border-[var(--border-hairline)] bg-transparent pb-3 text-lg focus:border-[var(--border-strong)]"
+            className={TEXT_FIELD}
           />
         </div>
 
         {mode === 'custom' ? (
-          <div className="flex shrink-0 items-baseline gap-2 border-b border-[var(--border-hairline)] pb-3 focus-within:border-[var(--border-strong)]">
+          <div className="bg-surface order-3 flex h-12 w-full shrink-0 items-center gap-1.5 border border-[var(--border-strong)] px-3 transition-[border-color] duration-150 ease-out focus-within:border-violet-500 sm:order-none sm:w-[8.5rem]">
             <label htmlFor={amountId} className="sr-only">
               Amount for recipient {index + 1}
             </label>
@@ -1324,13 +1403,15 @@ function SplitRecipientRow({
               autoComplete="off"
               spellCheck={false}
               placeholder="0.00"
-              className="num text-text placeholder:text-text-subtle/60 w-28 bg-transparent text-right text-lg"
+              className="num text-text placeholder:text-text-subtle w-full min-w-0 bg-transparent text-right text-[0.9375rem] outline-none"
             />
-            <span className="t-label text-text-muted shrink-0">MUSD</span>
+            <span className="text-text-muted shrink-0 text-xs">MUSD</span>
           </div>
         ) : (
-          <div className="shrink-0 pb-3 text-right">
-            <Musd wei={computedShare} tone="muted" />
+          // The even share is already stated once under the total ("Each of N gets"), so
+          // on a phone the row gives that width back to the address.
+          <div className="hidden min-w-[5.5rem] shrink-0 text-right sm:block">
+            <Musd wei={computedShare} size="sm" tone="muted" />
           </div>
         )}
 
@@ -1339,32 +1420,32 @@ function SplitRecipientRow({
           onClick={() => onRemove(id)}
           disabled={!canRemove}
           aria-label={`Remove recipient ${index + 1}`}
-          className="text-text-muted hover:text-text grid size-11 shrink-0 place-items-center rounded-[var(--radius-pill)] border border-[var(--border-hairline)] transition-[color,border-color,transform] duration-[120ms] ease-out hover:border-[var(--border-strong)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-violet-500 active:scale-[0.97] disabled:opacity-30 disabled:hover:border-[var(--border-hairline)]"
+          className="text-text-muted hover:text-text hover:bg-text/[0.05] disabled:text-text-subtle grid size-11 shrink-0 place-items-center transition-[color,background-color] duration-150 ease-out disabled:cursor-not-allowed disabled:hover:bg-transparent"
         >
           <Minus aria-hidden className="size-4" />
         </button>
       </div>
 
-      <p id={statusId} className="mt-2 min-h-[1.25rem] text-sm" role="status">
+      <p id={statusId} className="mt-2 min-h-[1.25rem] text-[0.8125rem]" role="status">
         {status === 'resolving' ? (
-          <span className="text-text-subtle">Resolving handle…</span>
+          <span className="text-text-muted">Resolving handle…</span>
         ) : status === 'handle' && handleResult ? (
-          <span className="flex flex-wrap items-center gap-2">
-            <span aria-hidden className="bg-success size-1.5 rounded-[var(--radius-pill)]" />
+          <FieldStatus tone="ok">
             <span className="text-text-muted">{handleResult.handle} resolves to</span>
-            <span className="num text-text text-[0.8125rem]">{handleResult.address}</span>
-          </span>
+            <span className="mono text-text break-all text-xs">{handleResult.address}</span>
+          </FieldStatus>
         ) : status === 'unknown' ? (
-          <span className="text-danger">No such handle on this network.</span>
+          <FieldStatus tone="error">
+            <span className="text-danger">No such handle on this network.</span>
+          </FieldStatus>
         ) : status === 'address' ? (
-          <span className="flex flex-wrap items-center gap-2">
-            <span aria-hidden className="bg-success size-1.5 rounded-[var(--radius-pill)]" />
+          <FieldStatus tone="ok">
             <span className="text-text-muted">Valid address.</span>
-          </span>
+          </FieldStatus>
         ) : status === 'invalid' ? (
-          <span className="text-text-subtle">Enter a full @handle or a 0x address.</span>
+          <span className="text-text-muted">Enter a full @handle or a 0x address.</span>
         ) : (
-          <span className="text-text-subtle">Enter an @handle or a 0x address.</span>
+          <span className="text-text-muted">Enter an @handle or a 0x address.</span>
         )}
       </p>
     </div>

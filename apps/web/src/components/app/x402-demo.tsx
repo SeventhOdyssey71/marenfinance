@@ -17,6 +17,7 @@ import {
   PanelBody,
   StatRow,
 } from '@/components/app/primitives';
+import { ComposerFooter } from '@/components/app/send-flow';
 import { explorerTxUrl } from '@/components/app/tx';
 import { ArrowUpRight, BoltIcon } from '@/components/ui/icons';
 import {
@@ -109,7 +110,7 @@ export function X402Demo() {
     return (
       <Note tone="warning" role="alert">
         The merchant route did not answer with an x402 offer.{' '}
-        <span className="num text-xs">{(offerQ.error as Error).message}</span>
+        <span className="mono text-xs">{(offerQ.error as Error).message}</span>
       </Note>
     );
   }
@@ -122,9 +123,9 @@ export function X402Demo() {
     return (
       <Note role="status">
         The demo merchant is not configured. Set{' '}
-        <span className="num text-xs">NEXT_PUBLIC_X402_MERCHANT</span> to the testnet address that
-        should receive demo payments, then reload. Nothing is served until a real receiving address
-        exists.
+        <span className="mono text-text text-xs">NEXT_PUBLIC_X402_MERCHANT</span> to the testnet
+        address that should receive demo payments, then reload. Nothing is served until a real
+        receiving address exists.
       </Note>
     );
   }
@@ -342,25 +343,28 @@ function X402Purchase({
     <div className="flex flex-col gap-4">
       <Panel title="The offer" labelledBy="x402-offer">
         <PanelBody>
-          <StatRow label="Resource" value={<span className="text-sm">Settlement note</span>} />
+          <StatRow
+            label="Resource"
+            value={<span className="text-text text-sm">Settlement note</span>}
+          />
           <StatRow label="Price" value={<Musd wei={price} size="sm" />} />
           <StatRow
             label="Merchant"
             value={
-              <span className="num text-text-muted text-xs" title={requirements.payTo}>
+              <span className="mono text-text-muted text-xs" title={requirements.payTo}>
                 {shortAddress(requirements.payTo)}
               </span>
             }
           />
           <StatRow
             label="Network"
-            value={<span className="num text-text-muted text-xs">{requirements.network}</span>}
+            value={<span className="mono text-text-muted text-xs">{requirements.network}</span>}
           />
           <StatRow
             label="Facilitator"
             hint="verifies and settles, pays the gas"
             value={
-              <span className="num text-text-muted text-xs">
+              <span className="mono text-text-muted text-xs">
                 {FACILITATOR_URL.replace('https://', '')}
               </span>
             }
@@ -370,8 +374,8 @@ function X402Purchase({
         <div className="px-5 pb-4">
           <Info summary="Where these figures come from">
             Everything above is read from the merchant route&rsquo;s live 402 answer, the same
-            answer any x402 client would get. The price is {formatMusd(price)} MUSD because MUSD has
-            18 decimals, so a one-cent HTTP price is exact rather than rounded.
+            answer any x402 client would get. The price is {formatMusd(price)} because MUSD has 18
+            decimals, so a one-cent HTTP price is exact rather than rounded.
           </Info>
         </div>
       </Panel>
@@ -390,7 +394,7 @@ function X402Purchase({
               label="Your MUSD"
               value={
                 balance === null ? (
-                  <span className="text-text-subtle text-xs">reading&hellip;</span>
+                  <span className="text-text-muted text-xs">reading&hellip;</span>
                 ) : (
                   <Musd wei={balance} size="sm" tone={insufficient ? 'muted' : 'default'} />
                 )
@@ -407,8 +411,8 @@ function X402Purchase({
               last
             />
           </PanelBody>
-          <div className="flex flex-col gap-3 px-5 pb-5 pt-2">
-            {insufficient ? (
+          {insufficient ? (
+            <div className="px-5 pb-5 pt-2">
               <Note tone="warning" role="status">
                 You need testnet MUSD to pay. It is minted, not dripped: get testnet BTC from the
                 Mezo faucet, then borrow MUSD at{' '}
@@ -416,28 +420,37 @@ function X402Purchase({
                   href="https://mezo.org/feature/borrow"
                   target="_blank"
                   rel="noreferrer noopener"
-                  className="text-text underline decoration-[var(--border-strong)] underline-offset-2"
+                  className="text-violet-400 underline decoration-violet-400/40 underline-offset-2 transition-[text-decoration-color] duration-150 hover:decoration-violet-400"
                 >
                   mezo.org/feature/borrow
                 </a>
                 .
               </Note>
-            ) : null}
+            </div>
+          ) : null}
+          {/* Who pays the gas, stated beside the button that commits to it. */}
+          <ComposerFooter
+            stack
+            note={
+              <>
+                Signing authorizes exactly {formatMusd(price)} to the merchant, expiring in ten
+                minutes. You pay no gas; the facilitator submits the transaction.
+              </>
+            }
+          >
             <ActionButton
               onClick={() => void buy()}
               disabled={busy || settled || insufficient || balance === null}
+              icon={<ArrowUpRight className="size-4" />}
+              className="w-full justify-between sm:w-auto sm:min-w-[16rem]"
             >
               {purchase.step === 'signing'
                 ? 'Waiting for your signature…'
                 : purchase.step === 'paying'
                   ? 'Settling through the facilitator…'
-                  : `Buy the note for ${formatMusd(price)} MUSD`}
+                  : `Buy the note for ${formatMusd(price)}`}
             </ActionButton>
-            <p className="text-text-subtle text-xs leading-relaxed">
-              Signing authorizes exactly {formatMusd(price)} MUSD to the merchant, expiring in ten
-              minutes. You pay no gas; the facilitator submits the transaction.
-            </p>
-          </div>
+          </ComposerFooter>
         </Panel>
       )}
 
@@ -473,7 +486,10 @@ function SettlementCard({
                 Settled per facilitator, reading receipt&hellip;
               </span>
             ) : purchase.receipt === 'confirmed' ? (
-              <span className="text-sm">Confirmed on chain</span>
+              <span className="text-success flex items-center gap-2 text-sm">
+                <span aria-hidden className="bg-success size-1.5 rounded-full" />
+                Confirmed on chain
+              </span>
             ) : (
               <span className="text-text-muted text-sm">Reported by facilitator</span>
             )
@@ -483,7 +499,7 @@ function SettlementCard({
           <StatRow
             label="Payer"
             value={
-              <span className="num text-text-muted text-xs" title={settlement.payer}>
+              <span className="mono text-text-muted text-xs" title={settlement.payer}>
                 {shortAddress(settlement.payer as Address)}
               </span>
             }
@@ -497,7 +513,7 @@ function SettlementCard({
               target="_blank"
               rel="noreferrer noopener"
               title={hash}
-              className="num text-text-muted hover:text-text inline-flex items-center gap-1.5 text-xs transition-colors duration-[120ms] ease-out"
+              className="mono -my-2 inline-flex min-h-11 items-center gap-1.5 text-xs text-violet-400 transition-colors duration-150 ease-out hover:text-violet-600"
             >
               {hash.slice(0, 10)}&hellip;{hash.slice(-6)}
               <ArrowUpRight aria-hidden className="size-3.5" />
@@ -509,7 +525,7 @@ function SettlementCard({
       <div className="px-5 pb-4">
         <Note role="status">{note}</Note>
         {purchase.step === 'done' && purchase.receipt === 'unobserved' ? (
-          <p className="text-text-subtle mt-3 text-xs leading-relaxed">
+          <p className="text-text-muted mt-3 text-xs leading-relaxed">
             Our own RPC has not returned a successful receipt for this hash yet, so this screen does
             not claim on-chain confirmation. The explorer link is the check.
           </p>

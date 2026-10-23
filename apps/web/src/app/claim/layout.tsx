@@ -18,17 +18,18 @@ export const metadata: Metadata = {
 export const dynamic = 'force-dynamic';
 
 /**
- * Wallet + query context for the claim page, and the app's light world.
+ * Wallet + query context for the claim page, on the app's canvas.
  *
  * It reuses the same `AppProviders` the /app subtree mounts, so a claimer connects with the
- * exact wallet stack they would inside the app. The light theme attribute re-derives the
- * colour tokens for this subtree the same way the app layout does.
+ * exact wallet stack they would inside the app. There is one light system now, so there is
+ * no theme attribute to set; the canvas is the only thing this layout paints, and the body
+ * matches it so overscroll never shows a white page behind it.
  */
 export default function ClaimLayout({ children }: { children: ReactNode }) {
   return (
     <AppProviders>
-      <style>{`body:has([data-app-theme='light']){background-color:#f2f2f2}`}</style>
-      <div data-app-theme="light" className="bg-bg text-text min-h-screen">
+      <style>{`body:has(#claim-root){background-color:var(--color-canvas)}`}</style>
+      <div id="claim-root" className="bg-canvas text-text min-h-screen">
         {children}
       </div>
     </AppProviders>
