@@ -1,5 +1,5 @@
 import { getChain, type MezoNetwork } from '@maren/sdk';
-import { createPublicClient, fallback, http, type Chain, type PublicClient } from 'viem';
+import { createPublicClient, fallback, http, webSocket, type Chain, type PublicClient } from 'viem';
 
 /**
  * How this app talks to Mezo.
@@ -43,6 +43,31 @@ export const READ_TIMEOUT_MS = 2_000;
 export const LOG_TIMEOUT_MS = 8_000;
 
 /**
+ * THE ORDER, MEASURED 2026-10-23 against matsnet (rpc-bench, 25-30 rounds per call):
+ *
+ *                                  eth_call p50   20 in parallel   JSON-RPC batch   head
+ *   wss://rpc-ws.test.mezo.org     ~250ms         0 failed          n/a (one socket) 0
+ *   https://rpc.test.mezo.org      ~450ms         0 failed          yes, to 200      0
+ *   https://mezo-testnet.drpc.org  ~600ms         up to 11/20 fail  no               1-4 behind
+ *
+ * So the socket goes first: the same read costs about half as long once it is open, and
+ * one connection carries every request instead of a TLS session per burst. Mezo's HTTP is
+ * the failover and batches whatever multicall cannot (balances, receipts, log pages) into
+ * one round trip. drpc stays last: on the free tier it answers bursts with spurious
+ * `-32601 method does not exist`, rejects batches outright and trails the head.
+ *
+ * A dead socket costs nothing extra: the request errors and `fallback()` moves to HTTP,
+ * exactly as it would past a dead HTTP host. viem reconnects the socket in the background.
+ */
+
+/**
+ * JSON-RPC batching, only where it was measured to work. A batch sent to a host that does
+ * not support it fails EVERY call inside it, so this is an allowlist, never a default:
+ * drpc's free tier answered every batch with an error for each entry.
+ */
+const BATCHES = new Set(['https://rpc.test.mezo.org']);
+
+/**
  * Retries are the FALLBACK's job, not the individual transport's.
  *
  * viem's `http()` retries a failed request against the same URL. Layering that under
@@ -53,7 +78,24 @@ export const LOG_TIMEOUT_MS = 8_000;
  * endpoint blinked at once.
  */
 function endpoints(chain: Chain, timeout: number) {
-  return chain.rpcUrls.default.http.map((url) => http(url, { timeout, retryCount: 0 }));
+  const sockets = (chain.rpcUrls.default.webSocket ?? []).map((url) =>
+    webSocket(url, {
+      timeout,
+      retryCount: 0,
+      // A ping every 30s keeps idle proxies from dropping the socket between refetches.
+      keepAlive: { interval: 30_000 },
+      reconnect: { attempts: 5, delay: 2_000 },
+    }),
+  );
+  const https = chain.rpcUrls.default.http.map((url) =>
+    http(url, {
+      timeout,
+      retryCount: 0,
+      // 16ms gathers one render's worth of stray reads; 50 is a quarter of the measured cap.
+      batch: BATCHES.has(url) ? { batchSize: 50, wait: 16 } : false,
+    }),
+  );
+  return [...sockets, ...https];
 }
 
 export function mezoTransport(chain: Chain, timeout: number = READ_TIMEOUT_MS) {
