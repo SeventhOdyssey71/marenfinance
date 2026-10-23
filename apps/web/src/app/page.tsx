@@ -16,12 +16,6 @@ import { Footer } from '@/components/footer';
 export default function HomePage() {
   return (
     <>
-      <a
-        href="#main"
-        className="bg-ink fixed left-4 top-2 z-[100] -translate-y-[160%] px-5 py-3 text-[0.9375rem] font-medium text-white focus:translate-y-0"
-      >
-        Skip to content
-      </a>
       <Nav />
 
       <main id="main" tabIndex={-1} className="focus:outline-none">

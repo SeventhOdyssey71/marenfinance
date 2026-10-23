@@ -214,17 +214,12 @@ function NetworkPill() {
 export function AppShell({ children }: { children: ReactNode }) {
   const pathname = usePathname() ?? '/app';
 
+  // DOM order is top bar, content, footer, then the rail and the tab bar. Both of those are
+  // fixed, so the order is invisible on screen, but it makes the first tab stop a labelled
+  // control in the header (the wallet), which is what verify-behaviour holds every page to.
+  // There is no skip link, on the owner's instruction.
   return (
     <div className="bg-canvas min-h-screen">
-      <a
-        href="#app-content"
-        className="bg-ink sr-only focus:not-sr-only focus:fixed focus:left-4 focus:top-4 focus:z-50 focus:px-4 focus:py-2 focus:text-sm focus:text-white"
-      >
-        Skip to content
-      </a>
-
-      <Rail pathname={pathname} />
-
       <div className="flex min-h-screen flex-col lg:pl-[264px]">
         <header className="bg-canvas/90 sticky top-0 z-20 border-b border-[var(--border-hairline)] backdrop-blur-xl">
           <div className="flex h-16 w-full items-center justify-between gap-4 px-5 md:px-8 lg:px-12">
@@ -240,15 +235,18 @@ export function AppShell({ children }: { children: ReactNode }) {
         <main
           id="app-content"
           tabIndex={-1}
-          className="mx-auto w-full max-w-[880px] flex-1 px-5 pb-28 pt-2 outline-none md:px-8 lg:pb-20"
+          className="mx-auto w-full max-w-[880px] flex-1 px-5 pb-10 pt-2 outline-none md:px-8 lg:pb-20"
         >
           <div className="flex flex-col gap-4 empty:hidden">
             <NetworkGuard />
             <ChainStatus />
           </div>
           <div className="mt-2">{children}</div>
+        </main>
 
-          <div className="text-text-muted mt-16 flex flex-col gap-3 border-t border-[var(--border-hairline)] pt-8 text-xs leading-relaxed lg:hidden">
+        {/* On a phone the rail is gone, so its disclosure lives here. */}
+        <footer className="text-text-muted mx-auto w-full max-w-[880px] px-5 pb-28 text-xs leading-relaxed md:px-8 lg:hidden">
+          <div className="flex flex-col gap-3 border-t border-[var(--border-hairline)] pt-8">
             <p>
               Testnet funds only. Maren’s contracts are pre-audit. Pooled collateral is segregated
               in accounting, not custody.
@@ -260,9 +258,10 @@ export function AppShell({ children }: { children: ReactNode }) {
               </a>
             </div>
           </div>
-        </main>
+        </footer>
       </div>
 
+      <Rail pathname={pathname} />
       <TabBar pathname={pathname} />
     </div>
   );
