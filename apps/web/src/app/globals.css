@@ -363,29 +363,6 @@
   .range-maren:active::-webkit-slider-thumb {
     transform: scale(1.08);
   }
-
-  /* Static gradient fallbacks used when shaders are unavailable or
-     prefers-reduced-motion is set. Same violet -> violet-900 -> bg falloff. */
-  .mesh-fallback {
-    background:
-      radial-gradient(
-        62% 78% at 22% 8%,
-        color-mix(in srgb, var(--color-violet-500) 62%, transparent) 0%,
-        transparent 62%
-      ),
-      radial-gradient(
-        58% 62% at 82% 26%,
-        color-mix(in srgb, var(--color-violet-900) 92%, transparent) 0%,
-        transparent 68%
-      ),
-      radial-gradient(90% 90% at 50% 100%, var(--color-bg) 38%, transparent 100%),
-      linear-gradient(180deg, var(--color-violet-900) 0%, var(--color-bg) 72%);
-  }
-
-  .grain-fallback {
-    background-image: radial-gradient(rgba(255, 255, 255, 0.055) 0.5px, transparent 0.6px);
-    background-size: 3px 3px;
-  }
 }
 
 @layer utilities {
@@ -411,36 +388,6 @@
     .reveal-ready {
       opacity: 1;
       transform: none;
-    }
-  }
-
-  /* Trace outline: a dashed rounded-rect that floats just inside a card edge,
-     marking one element as the differentiator. A CSS border follows the radius
-     cleanly (an SVG rect distorts its corners under non-uniform scale), and
-     breathes slowly in opacity. Used sparingly. */
-  .trace {
-    position: absolute;
-    inset: 7px;
-    border: 1.25px dashed var(--color-violet-500);
-    border-radius: 8px;
-    opacity: 0.42;
-    pointer-events: none;
-    animation: trace-breathe 4.5s ease-in-out infinite;
-  }
-
-  @keyframes trace-breathe {
-    0%,
-    100% {
-      opacity: 0.32;
-    }
-    50% {
-      opacity: 0.55;
-    }
-  }
-
-  @media (prefers-reduced-motion: reduce) {
-    .trace {
-      animation: none;
     }
   }
 }
