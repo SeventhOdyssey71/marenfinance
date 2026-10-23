@@ -129,7 +129,7 @@ function WagmiConnectButton() {
         onClick={() => setOpen((v) => !v)}
         aria-expanded={open}
         aria-haspopup="menu"
-        className="bg-violet-500 text-white hover:bg-violet-600 group inline-flex h-10 items-center gap-2.5 px-4 text-sm transition-[background-color] duration-150 ease-out active:brightness-95"
+        className="group inline-flex h-10 items-center gap-2.5 bg-violet-500 px-4 text-sm text-white transition-[background-color] duration-150 ease-out hover:bg-violet-600 active:brightness-95"
       >
         {isPending ? 'Connecting…' : 'Connect wallet'}
         <span
@@ -221,7 +221,7 @@ function PrivyConnectButton() {
       type="button"
       disabled={!ready}
       onClick={() => login()}
-      className="bg-violet-500 text-white hover:bg-violet-600 group inline-flex h-10 items-center gap-2.5 px-4 text-sm transition-[background-color] duration-150 ease-out active:brightness-95 disabled:cursor-not-allowed disabled:opacity-60"
+      className="group inline-flex h-10 items-center gap-2.5 bg-violet-500 px-4 text-sm text-white transition-[background-color] duration-150 ease-out hover:bg-violet-600 active:brightness-95 disabled:cursor-not-allowed disabled:opacity-60"
     >
       {ready ? 'Sign in' : 'Loading…'}
       <span

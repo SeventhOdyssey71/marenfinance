@@ -26,7 +26,7 @@ export function Segmented<T extends string>({
     <div
       role="tablist"
       aria-label={label}
-      className="inline-flex w-full max-w-xl border border-[var(--border-hairline)] bg-surface p-1"
+      className="bg-surface inline-flex w-full max-w-xl border border-[var(--border-hairline)] p-1"
     >
       {options.map((option) => {
         const active = option.key === value;
@@ -38,9 +38,7 @@ export function Segmented<T extends string>({
             aria-selected={active}
             onClick={() => onChange(option.key)}
             className={`h-10 flex-1 px-4 text-sm transition-colors duration-150 ease-out ${
-              active
-                ? 'bg-surface-inset text-text font-medium'
-                : 'text-text-muted hover:text-text'
+              active ? 'bg-surface-inset text-text font-medium' : 'text-text-muted hover:text-text'
             }`}
           >
             {option.label}
@@ -111,13 +109,14 @@ export function AmountField({
             <button
               type="button"
               onClick={onMax}
-              /* The visible label is the balance itself, which on its own announces as
-                 "0.05 BTC" with no hint that pressing it fills the field. */
-              aria-label={`Use the full ${maxLabel ?? 'available'} balance, ${max}`}
               /* The glyph alone was about 18px of tap target. The negative margin keeps
                  the row looking identical while giving it a real one. */
-              className="text-text-muted hover:text-text -my-2 min-h-[44px] rounded-[var(--radius-pill)] px-1.5 py-2 transition-colors duration-150 ease-out"
+              className="text-text-muted hover:text-text -my-2 min-h-[44px] px-1.5 py-2 transition-colors duration-150 ease-out"
             >
+              {/* The visible label is the balance itself, which alone announces as "0.05 BTC"
+                 with no hint that pressing it fills the field. `max` is a node, so the hint is
+                 hidden text rather than an aria-label template (which read "[object Object]"). */}
+              <span className="sr-only">Use the full {maxLabel ?? 'available'} balance, </span>
               {max}
             </button>
           ) : (
@@ -141,7 +140,9 @@ export function AmountField({
         </div>
       ) : null}
 
-      {hint ? <div className="text-text-muted mt-3 text-[0.8125rem] leading-relaxed">{hint}</div> : null}
+      {hint ? (
+        <div className="text-text-muted mt-3 text-[0.8125rem] leading-relaxed">{hint}</div>
+      ) : null}
       {error ? (
         <p id={`${id}-error`} role="alert" className="text-danger mt-3 text-sm">
           {error}

@@ -123,7 +123,7 @@ function Rail({ pathname }: { pathname: string }) {
       <div className="px-3">
         <Link
           href="/app/pay"
-          className="bg-surface hover:border-[var(--border-strong)] flex h-12 items-center gap-3 border border-[var(--border-hairline)] px-3.5 text-[0.9375rem] transition-[border-color] duration-150 ease-out"
+          className="bg-surface flex h-12 items-center gap-3 border border-[var(--border-hairline)] px-3.5 text-[0.9375rem] transition-[border-color] duration-150 ease-out hover:border-[var(--border-strong)]"
         >
           <Plus className="size-[18px] text-violet-500" aria-hidden />
           New payment

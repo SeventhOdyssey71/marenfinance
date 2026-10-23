@@ -44,11 +44,13 @@ export function PageHeader({
 }) {
   if (align === 'center') {
     return (
-      <header className={`flex flex-col items-center pb-10 pt-10 text-center md:pt-16 ${className}`}>
+      <header
+        className={`flex flex-col items-center pb-10 pt-10 text-center md:pt-16 ${className}`}
+      >
         {eyebrow ? <p className="t-bracket mb-4">{eyebrow}</p> : null}
         <h1 className="t-h1">{title}</h1>
         {description ? (
-          <div className="text-text-muted mt-3 max-w-[62ch] text-base leading-relaxed text-pretty">
+          <div className="text-text-muted mt-3 max-w-[62ch] text-pretty text-base leading-relaxed">
             {description}
           </div>
         ) : null}
@@ -66,7 +68,7 @@ export function PageHeader({
         {eyebrow ? <p className="t-bracket mb-3">{eyebrow}</p> : null}
         <h1 className="t-h1">{title}</h1>
         {description ? (
-          <p className="text-text-muted mt-2 max-w-[60ch] text-[0.9375rem] leading-relaxed text-pretty">
+          <p className="text-text-muted mt-2 max-w-[60ch] text-pretty text-[0.9375rem] leading-relaxed">
             {description}
           </p>
         ) : null}
