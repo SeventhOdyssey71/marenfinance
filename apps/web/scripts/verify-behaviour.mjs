@@ -146,6 +146,7 @@ const MUSD_ADDRESS = process.env.MAREN_MUSD_ADDRESS ?? '0x118917a40FAF1CD7a13dB0
 const vaultAbi = parseAbi([
   'function totalCollateral() view returns (uint256)',
   'function depositCap() view returns (uint256)',
+  'function MIN_TROVE_CR() view returns (uint256)',
   'function troveStatus() view returns (uint256,uint256,uint256)',
   'function balanceOf(address) view returns (uint256)',
 ]);
@@ -164,12 +165,13 @@ async function readVault() {
   const read = (functionName, args) =>
     rpc.readContract({ address: VAULT_ADDRESS, abi: vaultAbi, functionName, args });
   try {
-    const [totalCollateral, depositCap, status] = await Promise.all([
+    const [totalCollateral, depositCap, minTroveCr, status] = await Promise.all([
       read('totalCollateral'),
       read('depositCap'),
+      read('MIN_TROVE_CR'),
       read('troveStatus'),
     ]);
-    return { totalCollateral, depositCap, icr: status[2] };
+    return { totalCollateral, depositCap, minTroveCr, icr: status[2] };
   } catch (error) {
     console.log(`Could not read MarenVault directly: ${error.shortMessage ?? error.message}`);
     return null;
@@ -352,6 +354,26 @@ const check = (name, pass, detail = '') => {
     'landmarks present (header/main/footer/labelled navs)',
     landmarks.header === 1 && landmarks.main === 1 && landmarks.footer === 1 && landmarks.navs >= 2,
     JSON.stringify(landmarks),
+  );
+  const iosCtas = await page
+    .locator('a', { hasText: 'Get iOS app' })
+    .evaluateAll((links) =>
+      links.map((link) => ({ href: link.href, target: link.target, rel: link.rel })),
+    );
+  check(
+    'public iOS calls to action are pinned to TestFlight',
+    iosCtas.length === 4 &&
+      iosCtas.every(
+        (link) =>
+          link.href === 'https://testflight.apple.com/join/uhmv9YPE' &&
+          link.target === '_blank' &&
+          link.rel.includes('noopener'),
+      ),
+    JSON.stringify(iosCtas),
+  );
+  check(
+    'landing page no longer advertises the browser app',
+    (await page.locator('a[href="/app"]').count()) === 0,
   );
   const imgAlt = await page.evaluate(() =>
     [...document.querySelectorAll('svg[role=img]')].every((s) => s.hasAttribute('aria-label')),
@@ -697,6 +719,8 @@ const check = (name, pass, detail = '') => {
 
   // --- Vault, connected --------------------------------------------------
   await page.goto(BASE + '/app/vault', { waitUntil: 'networkidle' });
+  await connectWallet(page);
+  await domReady(page, () => document.querySelector('header button[aria-haspopup="menu"] .mono'));
   // The default tab is chosen from the position read, so wait for a tab to be selected.
   await domReady(page, () =>
     [...document.querySelectorAll('[role=tab]')].some(
@@ -736,6 +760,8 @@ const check = (name, pass, detail = '') => {
 
   // --- Activity, connected ------------------------------------------------
   await page.goto(BASE + '/app/activity', { waitUntil: 'networkidle' });
+  await connectWallet(page);
+  await domReady(page, () => document.querySelector('header button[aria-haspopup="menu"] .mono'));
   // A log scan over the whole deployed range; the block-range line is what it produces.
   const activityLive = await textReady(page, /Read (every block from|blocks)\s/, {
     timeout: 60_000,
@@ -785,12 +811,22 @@ const check = (name, pass, detail = '') => {
 
   // --- Pay, connected -----------------------------------------------------
   await page.goto(BASE + '/app/pay', { waitUntil: 'networkidle' });
-  await domReady(page, () => document.querySelector('#pay-to') !== null);
+  await connectWallet(page);
+  await domReady(page, () => document.querySelector('header button[aria-haspopup="menu"] .mono'));
+
+  // Send is deliberately paced Amount → Recipient. This throwaway account owns no MUSD,
+  // so it cannot (and should not) advance past Amount merely to expose the resolver. Split
+  // renders the same live handle resolver immediately and lets us test that contract read
+  // without weakening the empty-wallet precondition in the product.
+  await page.getByRole('tab', { name: 'Split' }).click();
+  const splitRecipient = page.locator('input[id^="split-recipient-"]').first();
+  await splitRecipient.waitFor({ state: 'visible' });
 
   // `@sele` is registered on matsnet to the deploying account. This resolves it through
   // MarenRegistry.tryResolve — a real read against a real registration.
-  await page.locator('#pay-to').fill('@sele');
-  const resolvedInline = await settled(page, '#pay-to-status');
+  await splitRecipient.fill('@sele');
+  const splitStatus = `#${await splitRecipient.getAttribute('id')}-status`;
+  const resolvedInline = await settled(page, splitStatus);
   check(
     'pay: a real handle resolves and its address is shown beside it',
     /0x[0-9a-fA-F]{40}/.test(resolvedInline),
@@ -798,8 +834,8 @@ const check = (name, pass, detail = '') => {
   );
 
   // An unregistered handle must fail loudly rather than falling back to anything.
-  await page.locator('#pay-to').fill('@nosuchhandle_zzz');
-  const unresolved = await settled(page, '#pay-to-status');
+  await splitRecipient.fill('@nosuchhandle_zzz');
+  const unresolved = await settled(page, splitStatus);
   check(
     'pay: an unregistered handle fails loudly rather than resolving to something',
     /No such handle/.test(unresolved),
@@ -837,12 +873,13 @@ const check = (name, pass, detail = '') => {
 
   // --- The handle registration flow --------------------------------------
   await page.getByRole('tab', { name: 'Handle' }).click();
-  const handlePanel = await textReady(page, /step 1: commit/i);
+  const handlePanel = await textReady(page, /two transactions, 60 seconds apart/i);
   check(
     'handle: registration is presented as two steps with the 60s wait explained',
-    /step 1: commit/i.test(handlePanel) &&
-      /step 2: claim/i.test(handlePanel) &&
-      /60 seconds/i.test(handlePanel),
+    (await page.locator('ol > li').count()) === 2 &&
+      /\bCommit\b/.test(handlePanel) &&
+      /\bClaim\b/.test(handlePanel) &&
+      /two transactions, 60 seconds apart/i.test(handlePanel),
   );
   check(
     'handle: the claim step is disabled until a commitment exists',
@@ -914,27 +951,27 @@ const check = (name, pass, detail = '') => {
 
   const borrowPanel = await page.locator('main').innerText();
   const slider = page.locator('input[type=range]');
+  const vaultAtBorrow = await readVault();
+  const poolBelowFloor = vaultAtBorrow !== null && vaultAtBorrow.icr < vaultAtBorrow.minTroveCr;
 
   /**
-   * THE POOLED TROVE IS ABOVE ITS FLOOR AGAIN, SO THIS SECTION ASSERTS THE OPEN STATE.
+   * LIVE ECONOMIC STATE CHANGES WITHOUT A DEPLOYMENT.
    *
-   * It used to assert the refusal: the trove sat at 152.9% against the vault's 180%
-   * `MIN_TROVE_CR`, no borrow could succeed at any amount, and the whole panel was one
-   * explanation of that. On 17 August the trove was topped up to ~220% with
-   * protocol-owned collateral, and a 30 MUSD borrow from this account now simulates
-   * clean while 40 MUSD is refused at the user's own floor.
-   *
-   * An assertion that still demanded the refusal would now be asserting a lie about the
-   * chain, and would have gone green for exactly the wrong reason. The guarantee being
-   * tested is unchanged and is the one that matters: THE PANEL AGREES WITH THE CONTRACT.
-   * When the contract refuses, the panel refuses first and for free; when the contract
-   * accepts, the panel offers a control whose whole range the contract accepts.
+   * The pooled trove has crossed its 180% floor in both directions as BTC moves and the
+   * keeper operates it. A permanent assertion for either the open or closed state would
+   * eventually demand a lie. The invariant is the useful one: THE PANEL AGREES WITH THE
+   * CONTRACT. When the contract refuses, the panel refuses first and for free; when the
+   * contract accepts, the panel offers a control whose whole range the contract accepts.
    */
   check(
-    'preflight: with the pooled trove above its floor, borrowing is OFFERED, not refused',
-    !/the pool itself is fully drawn right now/.test(borrowPanel) &&
-      !/TroveCollateralRatioTooLow/.test(borrowPanel),
-    'MarenVault.troveStatus().icr is back above MIN_TROVE_CR',
+    `preflight: borrowing ${poolBelowFloor ? 'is refused' : 'is offered'} exactly as the pooled trove requires`,
+    poolBelowFloor
+      ? /shared trove is too thin to lend against/i.test(borrowPanel) && (await slider.isDisabled())
+      : !/shared trove is too thin to lend against/i.test(borrowPanel) &&
+          !(await slider.isDisabled()),
+    vaultAtBorrow
+      ? `ICR=${vaultAtBorrow.icr}; floor=${vaultAtBorrow.minTroveCr}`
+      : 'direct MarenVault read unavailable',
   );
 
   /**
@@ -955,14 +992,16 @@ const check = (name, pass, detail = '') => {
 
   const sliderMax = Number((await slider.getAttribute('max')) ?? '0');
   check(
-    'preflight: the slider has a real range rather than a track bounded by zero',
-    sliderMax > 0 && !(await slider.isDisabled()),
+    `preflight: the slider ${poolBelowFloor ? 'cannot submit while the pool is closed' : 'has a usable live range'}`,
+    sliderMax > 0 && (poolBelowFloor ? await slider.isDisabled() : !(await slider.isDisabled())),
     `max=${sliderMax}`,
   );
   check(
-    'preflight: the slider describes the maximum it will actually travel to',
-    /of a maximum/.test((await slider.getAttribute('aria-valuetext')) ?? '') &&
-      !/Borrowing is unavailable/.test((await slider.getAttribute('aria-valuetext')) ?? ''),
+    `preflight: the slider describes ${poolBelowFloor ? 'why borrowing is unavailable' : 'the maximum it can reach'}`,
+    poolBelowFloor
+      ? /Borrowing is unavailable/.test((await slider.getAttribute('aria-valuetext')) ?? '')
+      : /of a maximum/.test((await slider.getAttribute('aria-valuetext')) ?? '') &&
+          !/Borrowing is unavailable/.test((await slider.getAttribute('aria-valuetext')) ?? ''),
     (await slider.getAttribute('aria-valuetext')) ?? '',
   );
 
@@ -976,39 +1015,49 @@ const check = (name, pass, detail = '') => {
    * have room for. The guarantee under test is the one that survives either state: a value
    * inside the range the panel advertises is a value the panel will submit.
    */
-  await slider.fill('500');
-  await domReady(page, () =>
-    [...document.querySelectorAll('button')].some(
-      (b) => /^Borrow [\d,]/.test(b.textContent ?? '') && !b.disabled,
-    ),
-  );
   const borrowButton = page.getByRole('button', { name: /^Borrow/ }).last();
-  check(
-    'preflight: the Borrow button is enabled at a valid amount inside the slider’s range',
-    !(await borrowButton.isDisabled()),
-    (await slider.getAttribute('aria-valuetext')) ?? '',
-  );
-  check(
-    'preflight: the panel names which ceiling is binding, so the number is falsifiable',
-    /Capped by (Mezo’s per-trove ceiling|Maren’s)/.test(borrowPanel),
-    'borrowCeiling() reports the binding constraint, and the panel states it',
-  );
+  if (poolBelowFloor) {
+    check(
+      'preflight: the Borrow button stays disabled while the pooled trove is below its floor',
+      await borrowButton.isDisabled(),
+      'no wallet prompt can be opened from a transaction that would revert',
+    );
+  } else {
+    await slider.fill('500');
+    await domReady(page, () =>
+      [...document.querySelectorAll('button')].some(
+        (b) => /^Borrow [\d,]/.test(b.textContent ?? '') && !b.disabled,
+      ),
+    );
+    check(
+      'preflight: the Borrow button is enabled at a valid amount inside the slider’s range',
+      !(await borrowButton.isDisabled()),
+      (await slider.getAttribute('aria-valuetext')) ?? '',
+    );
+    check(
+      'preflight: the panel names which ceiling is binding, so the number is falsifiable',
+      /Capped by (Mezo’s per-trove ceiling|Maren’s)/.test(borrowPanel),
+      'borrowCeiling() reports the binding constraint, and the panel states it',
+    );
+  }
 
   /**
    * The open state has to keep the promise the closed state kept: reaching a confirmation
    * is not the same as signing. The signer here CANNOT sign, and the measurement is that
    * nothing ever asked it to. Nothing below is broadcast — the sheet is opened and closed.
    */
-  await borrowButton.click();
-  const borrowSheet = page.locator('[role=dialog]');
-  await borrowSheet.waitFor({ state: 'visible', timeout: 20_000 });
-  check(
-    'preflight: an offered borrow opens a confirmation, and it is a labelled modal dialog',
-    (await borrowSheet.getAttribute('aria-modal')) === 'true' &&
-      (await borrowSheet.getAttribute('data-tx-phase')) === 'confirm',
-  );
-  await page.keyboard.press('Escape');
-  await borrowSheet.waitFor({ state: 'detached', timeout: 10_000 }).catch(() => {});
+  if (!poolBelowFloor) {
+    await borrowButton.click();
+    const borrowSheet = page.locator('[role=dialog]');
+    await borrowSheet.waitFor({ state: 'visible', timeout: 20_000 });
+    check(
+      'preflight: an offered borrow opens a confirmation, and it is a labelled modal dialog',
+      (await borrowSheet.getAttribute('aria-modal')) === 'true' &&
+        (await borrowSheet.getAttribute('data-tx-phase')) === 'confirm',
+    );
+    await page.keyboard.press('Escape');
+    await borrowSheet.waitFor({ state: 'detached', timeout: 10_000 }).catch(() => {});
+  }
   check(
     'preflight: NO SIGNATURE WAS REQUESTED, at any point',
     wallet.signatureRequests.length === 0,
@@ -1181,6 +1230,13 @@ const check = (name, pass, detail = '') => {
    * which are two pieces of internal vocabulary for the thing the product is built around.
    */
   await page.goto(BASE + '/app', { waitUntil: 'networkidle' });
+  await connectWallet(page);
+  await domReady(page, () => document.querySelector('header button[aria-haspopup="menu"] .mono'));
+  await textReady(page, /vault health/i);
+  // Route and shared-custody risk are expert detail by design, one deliberate tap down.
+  // Open that disclosure before asserting its contents instead of treating collapsed
+  // details as absent from the product.
+  await page.getByText('Position details', { exact: true }).click();
   const portfolioLive = await textReady(page, /the social vault/i);
   const vaultOnHome = await readVault();
   check(
@@ -1216,6 +1272,8 @@ const check = (name, pass, detail = '') => {
   const holdsMusd = musdHeld !== null && musdHeld > 0n;
 
   await page.goto(BASE + '/app/pay', { waitUntil: 'networkidle' });
+  await connectWallet(page);
+  await domReady(page, () => document.querySelector('header button[aria-haspopup="menu"] .mono'));
   const payLive = await textReady(page, holdsMusd ? /you pay the bitcoin gas/i : /No MUSD to send/);
   if (holdsMusd) {
     check(
@@ -1236,6 +1294,8 @@ const check = (name, pass, detail = '') => {
   }
 
   await page.goto(BASE + '/app/earn', { waitUntil: 'networkidle' });
+  await connectWallet(page);
+  await domReady(page, () => document.querySelector('header button[aria-haspopup="menu"] .mono'));
   const earnLive = await textReady(
     page,
     holdsMusd ? /does not display an APY/i : /No MUSD to deposit/,

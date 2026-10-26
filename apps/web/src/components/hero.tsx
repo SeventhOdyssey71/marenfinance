@@ -1,5 +1,6 @@
 import { Screen } from './landing/screen';
 import { PillButton } from './ui/pill-button';
+import { IOS_APP_CTA, TESTFLIGHT_URL } from '@/lib/links';
 
 /**
  * The hero: a bracketed testnet note, the brand line, one sentence, two destinations,
@@ -41,8 +42,8 @@ export function Hero() {
           Borrow MUSD, Mezo’s Bitcoin-backed dollar, against your BTC and pay anyone by @handle.
         </p>
         <div className="mt-9 flex flex-wrap justify-center gap-3">
-          <PillButton href="/app" size="lg">
-            Open app
+          <PillButton href={TESTFLIGHT_URL} size="lg" external>
+            {IOS_APP_CTA}
           </PillButton>
           <PillButton href="/docs" size="lg" variant="secondary">
             Read the docs

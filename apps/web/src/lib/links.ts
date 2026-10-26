@@ -9,3 +9,6 @@
 
 /** Public TestFlight invite for the iOS beta. */
 export const TESTFLIGHT_URL = 'https://testflight.apple.com/join/uhmv9YPE';
+
+/** Canonical copy for every public route into the iOS beta. */
+export const IOS_APP_CTA = 'Get iOS app';

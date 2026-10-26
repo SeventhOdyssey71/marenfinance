@@ -302,10 +302,11 @@ export async function installReadOnlyWallet(
  * @param {import('playwright-core').Page} page
  */
 export async function connectWallet(page) {
-  // wagmi's injected connector reconnects on its own when the provider is already
-  // present and `shimDisconnect` remembers the session, so by the time this runs the
-  // connect button is often gone. That is a connected wallet, not a failure.
-  const alreadyOn = await page.locator('header .num').count();
+  // A client-side route transition keeps the provider connected. A full reload does not:
+  // AppProviders deliberately sets reconnectOnMount=false so an installed wallet cannot
+  // open a popup before the user asks. Browser checks use page.goto between routes, so
+  // they call this after each reload and reproduce that explicit click.
+  const alreadyOn = await page.locator('header button[aria-haspopup="menu"] .mono').count();
   if (alreadyOn > 0) return true;
 
   const connect = page.getByRole('button', { name: /Connect wallet/ }).first();

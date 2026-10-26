@@ -5,6 +5,7 @@ import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { Sidebar, type SidebarGroup } from './sidebar';
 import { ThemeToggle } from './theme-toggle';
 import { IconMenu, IconClose } from './icons';
+import { IOS_APP_CTA, TESTFLIGHT_URL } from '@/lib/links';
 
 function Brand({ onNavigate }: { onNavigate?: () => void }) {
   return (
@@ -24,9 +25,15 @@ function TopLinks({ onNavigate }: { onNavigate?: () => void }) {
       <Link className="doc-toplink" href="/docs/get-started/quickstart" onClick={onNavigate}>
         Start testing
       </Link>
-      <Link className="doc-toplink" href="/app" onClick={onNavigate}>
-        Open app
-      </Link>
+      <a
+        className="doc-toplink"
+        href={TESTFLIGHT_URL}
+        target="_blank"
+        rel="noreferrer noopener"
+        onClick={onNavigate}
+      >
+        {IOS_APP_CTA}
+      </a>
     </>
   );
 }
