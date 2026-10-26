@@ -355,25 +355,20 @@ const check = (name, pass, detail = '') => {
     landmarks.header === 1 && landmarks.main === 1 && landmarks.footer === 1 && landmarks.navs >= 2,
     JSON.stringify(landmarks),
   );
-  const iosCtas = await page
-    .locator('a', { hasText: 'Get iOS app' })
+  const webCtas = await page
+    .locator('a', { hasText: 'Open web app' })
     .evaluateAll((links) =>
-      links.map((link) => ({ href: link.href, target: link.target, rel: link.rel })),
+      links.map((link) => ({ href: link.getAttribute('href'), target: link.target })),
     );
   check(
-    'public iOS calls to action are pinned to TestFlight',
-    iosCtas.length === 4 &&
-      iosCtas.every(
-        (link) =>
-          link.href === 'https://testflight.apple.com/join/uhmv9YPE' &&
-          link.target === '_blank' &&
-          link.rel.includes('noopener'),
-      ),
-    JSON.stringify(iosCtas),
+    'public product calls to action are pinned to the web app',
+    webCtas.length === 4 &&
+      webCtas.every((link) => link.href === '/app' && link.target !== '_blank'),
+    JSON.stringify(webCtas),
   );
   check(
-    'landing page no longer advertises the browser app',
-    (await page.locator('a[href="/app"]').count()) === 0,
+    'landing page no longer advertises TestFlight',
+    (await page.locator('a[href*="testflight.apple.com"]').count()) === 0,
   );
   const imgAlt = await page.evaluate(() =>
     [...document.querySelectorAll('svg[role=img]')].every((s) => s.hasAttribute('aria-label')),

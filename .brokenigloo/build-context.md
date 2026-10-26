@@ -14,7 +14,7 @@
 
 ### Key Improvements
 
-- All public marketing CTAs now use one canonical TestFlight URL and the label “Get iOS app.”
+- All public marketing CTAs now use one canonical `/app` destination and the label “Open web app”; no TestFlight CTA remains.
 - Browser coverage now follows the current Pay stepper and reconnects explicitly after full reloads.
 - Borrowing browser checks now derive open/closed expectations from live `MarenVault` state and prove a blocked borrow never requests a signature.
 

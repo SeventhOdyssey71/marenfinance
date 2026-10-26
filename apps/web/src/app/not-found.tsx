@@ -1,7 +1,7 @@
 import Link from 'next/link';
 import { PillButton } from '@/components/ui/pill-button';
 import { Wordmark } from '@/components/ui/wordmark';
-import { IOS_APP_CTA, TESTFLIGHT_URL } from '@/lib/links';
+import { WEB_APP_CTA, WEB_APP_URL } from '@/lib/links';
 
 export default function NotFound() {
   return (
@@ -28,8 +28,8 @@ export default function NotFound() {
           <PillButton href="/" size="lg">
             Go home
           </PillButton>
-          <PillButton href={TESTFLIGHT_URL} size="lg" variant="secondary" external>
-            {IOS_APP_CTA}
+          <PillButton href={WEB_APP_URL} size="lg" variant="secondary">
+            {WEB_APP_CTA}
           </PillButton>
         </div>
       </main>

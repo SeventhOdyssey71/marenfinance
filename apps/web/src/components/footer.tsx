@@ -1,5 +1,5 @@
 import Link from 'next/link';
-import { IOS_APP_CTA, TESTFLIGHT_URL } from '@/lib/links';
+import { WEB_APP_CTA, WEB_APP_URL } from '@/lib/links';
 import { ArrowUpRight } from './ui/icons';
 import { Wordmark } from './ui/wordmark';
 
@@ -17,7 +17,7 @@ const columns: readonly FooterColumn[] = [
     links: [
       { label: 'How it works', href: '/#how' },
       { label: 'FAQ', href: '/#faq' },
-      { label: IOS_APP_CTA, href: TESTFLIGHT_URL, external: true },
+      { label: WEB_APP_CTA, href: WEB_APP_URL },
     ],
   },
   {

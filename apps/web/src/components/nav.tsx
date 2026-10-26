@@ -1,11 +1,11 @@
 import Link from 'next/link';
-import { IOS_APP_CTA, TESTFLIGHT_URL } from '@/lib/links';
+import { WEB_APP_CTA, WEB_APP_URL } from '@/lib/links';
 import { TextPill } from './ui/pill-button';
 import { Wordmark } from './ui/wordmark';
 
 /**
- * The landing nav: wordmark, three links, one quiet iOS pill. The pill is grey
- * on purpose: the hero's violet iOS action is the one violet thing in the first view.
+ * The landing nav: wordmark, three links, one quiet web-app pill. The pill is grey
+ * on purpose: the hero's violet web-app action is the one violet thing in the first view.
  * Under md the links drop out rather than collapsing into a menu; the page is short,
  * and the hero carries the same two destinations.
  */
@@ -43,9 +43,7 @@ export function Nav() {
               ))}
             </ul>
           </nav>
-          <TextPill href={TESTFLIGHT_URL} external>
-            {IOS_APP_CTA}
-          </TextPill>
+          <TextPill href={WEB_APP_URL}>{WEB_APP_CTA}</TextPill>
         </div>
       </div>
     </header>

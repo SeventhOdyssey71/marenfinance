@@ -202,21 +202,13 @@ export function PillAction({
 export function TextPill({
   href,
   children,
-  external = false,
   className = '',
 }: {
   href: string;
   children: ReactNode;
-  external?: boolean;
   className?: string;
 }) {
   const classes = `bg-surface text-text hover:bg-surface-inset inline-flex h-11 items-center rounded-[var(--radius-control)] border border-[var(--border-strong)] px-5 text-[0.9375rem] ${PRESS} ${className}`;
-  if (external)
-    return (
-      <a href={href} className={classes} target="_blank" rel="noreferrer noopener">
-        {children}
-      </a>
-    );
   return (
     <Link href={href} className={classes}>
       {children}
