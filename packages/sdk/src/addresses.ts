@@ -177,6 +177,13 @@ export interface MarenAddresses {
   marenForwarder: Address;
   marenRegistry: Address;
   marenEarn: Address;
+  /**
+   * MarenAutoKeeper: holds the vault's KEEPER_ROLE and lets ANYONE run the two repairs that
+   * stop borrowing (push idle collateral into the trove, refinance a full ceiling), each
+   * sized and gated on-chain. Deployed by tools/ops/enable-auto-keeper.mjs. Zero until then,
+   * and every client hides the action while it is zero.
+   */
+  marenAutoKeeper: Address;
 }
 
 const ZERO = '0x0000000000000000000000000000000000000000' as const;
@@ -188,6 +195,7 @@ export const MAREN_ADDRESSES: Record<MezoNetwork, MarenAddresses> = {
     marenForwarder: ZERO,
     marenRegistry: ZERO,
     marenEarn: ZERO,
+    marenAutoKeeper: ZERO,
   },
   // Deployed to Mezo matsnet on 2026-08-15 from
   // 0x54196397D6f01b48739dB3957257cB33cD341885, and source-verified on Blockscout.
@@ -203,6 +211,7 @@ export const MAREN_ADDRESSES: Record<MezoNetwork, MarenAddresses> = {
     marenForwarder: '0x22cC1Adfb0C91D9359746dE3F7E8cB7F2B8eA98C',
     marenRegistry: '0x9e123Cdd0CD524812CF9F552d3FAB13d8143b77E',
     marenEarn: '0xE3B02b215085B99Ce61E0F5ea9763Ac637aa7826',
+    marenAutoKeeper: ZERO,
   },
 };
 

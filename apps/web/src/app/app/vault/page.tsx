@@ -12,10 +12,15 @@ import {
   formatCollateralRatio,
   formatMusd,
   formatUsd,
+  getChain,
+  getMarenAddresses,
   INTEREST_RATE_BPS,
+  isDeployed,
+  marenAutoKeeperAbi,
   previewBorrow,
   recommendedBorrow,
 } from '@maren/sdk';
+import { useReadContract } from 'wagmi';
 
 import { BlockedNote } from '@/components/app/blocked';
 import { AmountField, AmountSlider, Segmented } from '@/components/app/controls';
@@ -64,6 +69,7 @@ import {
   useRelayerStatus,
 } from '@/lib/chain/write';
 import {
+  NETWORK,
   useBalances,
   useDataSource,
   usePosition,
@@ -426,6 +432,64 @@ function fieldError(pre: Preflight, amountWei: bigint): string | null {
   return pre.blocker.scope === 'input' || pre.blocker.scope === 'wallet' ? pre.blocker.title : null;
 }
 
+/**
+ * The repair anyone can run, offered exactly where borrowing is refused.
+ *
+ * When the shared trove is under its floor because collateral sits idle in the vault, the
+ * fix used to wait for a person with the keeper key. MarenAutoKeeper made it public: the
+ * contract decides how much idle BTC to push and refuses when nothing is needed, so this
+ * renders only when the contract itself says a push would help, and says what it moves.
+ * Self-paid and never relayed, so it works with the relayer down.
+ */
+function RestoreBorrowing({ runner }: { runner: TxRunner }) {
+  const keeper = getMarenAddresses(NETWORK).marenAutoKeeper;
+  const deployed = isDeployed(keeper);
+  const writes = useMarenWrites({ onSimulated: runner.onSimulated });
+  const amount = useReadContract({
+    address: keeper,
+    abi: marenAutoKeeperAbi,
+    functionName: 'rebalanceAmount',
+    chainId: getChain(NETWORK).id,
+    query: { enabled: deployed, refetchInterval: 30_000 },
+  });
+  const wei = typeof amount.data === 'bigint' ? amount.data : 0n;
+  if (!deployed || wei === 0n) return null;
+
+  const intent = (): TxIntent => ({
+    title: 'Move idle collateral into the shared trove',
+    successTitle: 'Moved idle collateral into the trove',
+    details: [
+      { label: 'Amount', value: <Btc wei={wei} /> },
+      { label: 'From', value: <span>The vault’s idle collateral</span> },
+      { label: 'To', value: <span>The shared Mezo trove</span> },
+      {
+        label: 'Your position',
+        value: <span className="text-text-muted">unchanged</span>,
+      },
+    ],
+    gas: { sponsored: false, note: 'You pay the BTC gas, a fraction of a cent. Not relayed.' },
+    submit: () => writes.rebalanceVault(),
+    confirmLabel: 'Move collateral',
+  });
+
+  return (
+    <div className="mt-3 flex flex-col gap-3 border border-[var(--border-hairline)] p-4 sm:flex-row sm:items-center sm:justify-between">
+      <p className="text-text-muted max-w-[52ch] text-sm leading-relaxed">
+        <span className="text-text">Anyone can fix this.</span> <Btc wei={wei} /> of the vault’s own
+        collateral is sitting idle beside the trove. Moving it in brings borrowing back for
+        everyone. The contract decides the amount and cannot touch any position.
+      </p>
+      <ActionButton
+        variant="secondary"
+        onClick={() => runner.request(intent())}
+        disabled={!writes.ready}
+      >
+        Restore borrowing
+      </ActionButton>
+    </div>
+  );
+}
+
 function BorrowPanel({
   runner,
   chain,
@@ -643,6 +707,9 @@ function BorrowPanel({
       {range.blocker && range.rangeDead ? (
         <div className="px-5 pt-5">
           <BlockedNote blocker={range.blocker} id="borrow-blocked" />
+          {range.blocker.name === 'TroveCollateralRatioTooLow' ? (
+            <RestoreBorrowing runner={runner} />
+          ) : null}
         </div>
       ) : null}
 
