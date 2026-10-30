@@ -13,7 +13,7 @@
 #   forge fmt --check
 #   forge build --sizes
 #   FOUNDRY_PROFILE=ci forge test
-#   forge snapshot --check --tolerance 5 --no-match-contract "MarenVaultInvariantTest|MarenVaultForkTest|DeployedBorrowRepairForkTest|NativeBorrowHintsForkTest"
+#   forge snapshot --check --tolerance 5 --no-match-contract "MarenVaultInvariantTest|MarenVaultForkTest|DeployedBorrowRepairForkTest|NativeBorrowHintsForkTest|MarenAutoKeeperForkTest"
 #   forge coverage --report summary --ir-minimum
 #   cd ../..
 #
@@ -205,12 +205,13 @@ jobs:
       # The fork suites are skipped without a matsnet RPC, and foundry reports an invariant
       # run descriptor rather than a gas figure, so `--check` calls both a drift on every
       # single run. Excluding them is what makes a reported drift mean something.
-      # NativeBorrowHintsForkTest joined the list when it was added: same category, same
-      # reason, and without it `--check` fails on a missing entry rather than on drift.
+      # NativeBorrowHintsForkTest and MarenAutoKeeperForkTest joined the list when they were
+      # added: same category, same reason, and without them `--check` fails on a missing
+      # entry rather than on drift.
       - name: Gas snapshot
         run: >-
           forge snapshot --check --tolerance 5
-          --no-match-contract "MarenVaultInvariantTest|MarenVaultForkTest|DeployedBorrowRepairForkTest|NativeBorrowHintsForkTest"
+          --no-match-contract "MarenVaultInvariantTest|MarenVaultForkTest|DeployedBorrowRepairForkTest|NativeBorrowHintsForkTest|MarenAutoKeeperForkTest"
 
       # Not `|| true`. Coverage compiles via-IR with the optimizer off, which is a
       # genuinely different pipeline from `forge test`, and it has already caught two
