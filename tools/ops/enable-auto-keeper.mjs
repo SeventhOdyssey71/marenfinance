@@ -24,7 +24,7 @@
  *     [--password-file <path>] [--rpc <url>] [--no-verify]
  */
 import { spawnSync } from 'node:child_process';
-import { existsSync, readFileSync, writeFileSync } from 'node:fs';
+import { existsSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { parseArgs } from 'node:util';
@@ -169,19 +169,38 @@ if (!keeper) {
           'https://api.explorer.test.mezo.org/api',
         ]),
   ];
+  // forge writes run-latest.json (and a timestamped copy) with the PLANNED transactions
+  // BEFORE it asks for the keystore password, so an unsigned attempt looks exactly like a
+  // deployment. Clear the latest record first, and below trust only receipts plus code
+  // actually on chain. A first run reported "Deployed 0x13C9..." this way after Foundry had
+  // rejected the password and sent nothing.
+  rmSync(BROADCAST, { force: true });
   const r = spawnSync('forge', args, { cwd: CONTRACTS, stdio: 'inherit' });
-  // A failed Blockscout verification exits non-zero AFTER the broadcast landed, so the
-  // receipts decide what happened, not the exit code.
-  if (!existsSync(BROADCAST)) {
-    console.error('\nNo broadcast record; nothing was deployed.');
-    process.exit(r.status ?? 1);
-  }
-  const run = JSON.parse(readFileSync(BROADCAST, 'utf8'));
-  const created = run.transactions.find(
+  const run = existsSync(BROADCAST) ? JSON.parse(readFileSync(BROADCAST, 'utf8')) : null;
+  const created = run?.transactions?.find(
     (t) => t.transactionType === 'CREATE' && t.contractName === 'MarenAutoKeeper',
   );
-  if (!created?.contractAddress)
-    throw new Error('Broadcast record has no MarenAutoKeeper creation.');
+  const landed =
+    (run?.receipts?.length ?? 0) > 0 &&
+    Boolean(created?.contractAddress) &&
+    cast(['code', created.contractAddress, '--rpc-url', RPC]).value !== '0x';
+  if (!landed) {
+    // Real broadcast records are committed (they carry tx hashes); an unsigned one would be
+    // a false record, so remove every record of this attempt that holds no receipts.
+    const dir = dirname(BROADCAST);
+    for (const f of existsSync(dir) ? readdirSync(dir) : []) {
+      if (!/^run-.*\.json$/.test(f)) continue;
+      const rec = JSON.parse(readFileSync(join(dir, f), 'utf8'));
+      if ((rec.receipts?.length ?? 0) === 0) rmSync(join(dir, f));
+    }
+    console.error(
+      `\nNothing was deployed (forge exited ${r.status}). If Foundry said "incorrect password",` +
+        '\nno transaction was signed or sent. Re-run and type the maren-deployer keystore password.\n',
+    );
+    process.exit(r.status || 1);
+  }
+  // A failed Blockscout verification exits non-zero AFTER the broadcast landed, so the
+  // receipts decide what happened, not the exit code.
   const address = cast(['to-check-sum-address', created.contractAddress]).value;
   if (read(VAULT, 'hasRole(bytes32,address)(bool)', keeperRole, address) !== 'true')
     throw new Error(`Deployed ${address}, but it does not hold KEEPER_ROLE. Check the grant tx.`);
