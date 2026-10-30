@@ -538,6 +538,58 @@ export const marenRegistryAbi = [
 ] as const;
 
 /** MarenEarn — ERC-4626 over the MUSD Stability Pool. `packages/contracts/src/MarenEarn.sol`. */
+/**
+ * MarenAutoKeeper (packages/contracts/src/MarenAutoKeeper.sol). Permissionless: anyone may
+ * call either repair; both are sized and gated on-chain and revert when there is nothing
+ * to do. Hints affect gas only; zero hints use the vault's current SortedTroves neighbours.
+ */
+export const marenAutoKeeperAbi = [
+  {
+    type: 'function',
+    name: 'rebalance',
+    stateMutability: 'nonpayable',
+    inputs: [
+      { name: 'upperHint', type: 'address' },
+      { name: 'lowerHint', type: 'address' },
+    ],
+    outputs: [{ name: 'amount', type: 'uint256' }],
+  },
+  {
+    type: 'function',
+    name: 'rebalanceAmount',
+    stateMutability: 'view',
+    inputs: [],
+    outputs: [{ name: '', type: 'uint256' }],
+  },
+  {
+    type: 'function',
+    name: 'refinance',
+    stateMutability: 'nonpayable',
+    inputs: [
+      { name: 'upperHint', type: 'address' },
+      { name: 'lowerHint', type: 'address' },
+    ],
+    outputs: [],
+  },
+  {
+    type: 'function',
+    name: 'refinanceAllowed',
+    stateMutability: 'view',
+    inputs: [],
+    outputs: [{ name: '', type: 'bool' }],
+  },
+  { type: 'error', name: 'NothingToRebalance', inputs: [] },
+  {
+    type: 'error',
+    name: 'CeilingHasHeadroom',
+    inputs: [
+      { name: 'debt', type: 'uint256' },
+      { name: 'ceiling', type: 'uint256' },
+    ],
+  },
+  { type: 'error', name: 'TroveNotOpen', inputs: [] },
+] as const;
+
 export const marenEarnAbi = [
   {
     type: 'function',

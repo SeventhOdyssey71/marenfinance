@@ -20,7 +20,13 @@ import {
   type Hex,
 } from 'viem';
 import { privateKeyToAccount } from 'viem/accounts';
-import { getChain, getMarenAddresses, getMusdAddresses } from '@maren/sdk';
+import {
+  getChain,
+  getMarenAddresses,
+  getMusdAddresses,
+  isDeployed,
+  marenAutoKeeperAbi,
+} from '@maren/sdk';
 
 import { marenEarnAbi, marenPayAbi, marenRegistryAbi, marenVaultAbi } from './abis';
 import { ExplainedError } from './errors';
@@ -313,6 +319,12 @@ export interface MarenWrites {
   ) => Promise<Hash>;
   earnDeposit: (assetsWei: bigint) => Promise<Hash>;
   earnWithdraw: (assetsWei: bigint) => Promise<Hash>;
+  /**
+   * MarenAutoKeeper.rebalance(): move the vault's idle BTC into the shared trove. Anyone may
+   * call it; the contract sizes the push and refuses when there is nothing to do. Always
+   * self-paid: it is not on the relay hub's allowlist, and costs a fraction of a cent.
+   */
+  rebalanceVault: () => Promise<Hash>;
   commitHandle: (commitment: Hex) => Promise<Hash>;
   registerHandle: (handle: string, secret: Hex) => Promise<Hash>;
 }
@@ -859,6 +871,30 @@ export function useMarenWrites(options: MarenWriteOptions = {}): MarenWrites {
           publicClient,
           params,
           'earnWithdraw',
+          () => publicClient.simulateContract({ ...params, account }),
+          () => writeContractAsync({ ...params, chainId: targetChain.id }),
+        );
+      },
+
+      // --- the permissionless keeper ---------------------------------------------
+      async rebalanceVault() {
+        const { account, publicClient } = requireSigner();
+        if (!isDeployed(maren.marenAutoKeeper))
+          throw new Error('The vault repair is not deployed on this network.');
+        const zero = '0x0000000000000000000000000000000000000000' as const;
+        const params = {
+          address: maren.marenAutoKeeper,
+          abi: marenAutoKeeperAbi,
+          functionName: 'rebalance',
+          args: [zero, zero],
+        } as const;
+        return submitCall(
+          account,
+          publicClient,
+          params,
+          // Null: never relayed. The hub's allowlist has no entry for it, and a repair that
+          // anyone can run should not depend on the relayer being up.
+          null,
           () => publicClient.simulateContract({ ...params, account }),
           () => writeContractAsync({ ...params, chainId: targetChain.id }),
         );
